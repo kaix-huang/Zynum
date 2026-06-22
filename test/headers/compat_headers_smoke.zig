@@ -10,16 +10,16 @@ const c = @cImport({
 
 test "compatibility headers import through Zig" {
     comptime {
-        _ = c.cblas_saxpy;
-        _ = c.cblas_dgemv;
-        _ = c.cblas_cgemm;
-        _ = c.cblas_dsyr2k;
-        _ = c.cblas_zher2k;
-        _ = c.saxpy_;
-        _ = c.dgemv_;
-        _ = c.cgemm_;
-        _ = c.dsyr2k_;
-        _ = c.zher2k_;
+        if (!@hasDecl(c, "cblas_saxpy")) @compileError("missing cblas_saxpy");
+        if (!@hasDecl(c, "cblas_dgemv")) @compileError("missing cblas_dgemv");
+        if (!@hasDecl(c, "cblas_cgemm")) @compileError("missing cblas_cgemm");
+        if (!@hasDecl(c, "cblas_dsyr2k")) @compileError("missing cblas_dsyr2k");
+        if (!@hasDecl(c, "cblas_zher2k")) @compileError("missing cblas_zher2k");
+        if (!@hasDecl(c, "saxpy_")) @compileError("missing saxpy_");
+        if (!@hasDecl(c, "dgemv_")) @compileError("missing dgemv_");
+        if (!@hasDecl(c, "cgemm_")) @compileError("missing cgemm_");
+        if (!@hasDecl(c, "dsyr2k_")) @compileError("missing dsyr2k_");
+        if (!@hasDecl(c, "zher2k_")) @compileError("missing zher2k_");
     }
 
     const length: c.zynum_blas_int = 1;

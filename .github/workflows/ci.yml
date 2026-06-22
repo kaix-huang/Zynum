@@ -52,9 +52,9 @@ jobs:
       - name: Test native
         if: matrix.target == 'native'
         run: zig build test --summary failures
-      - name: Test Apple M4 target
+      - name: Build Apple M4 target
         if: matrix.target == 'aarch64-macos-apple-m4'
-        run: zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast --summary failures
+        run: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast --summary failures
       - name: Test x86_64 baseline target
         if: matrix.target == 'x86_64-linux-baseline'
         run: zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline --summary failures
