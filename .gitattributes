@@ -1,0 +1,18 @@
+* text=auto eol=lf
+
+*.zig text eol=lf
+*.zon text eol=lf
+*.S text eol=lf
+*.h text eol=lf
+*.f90 text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary

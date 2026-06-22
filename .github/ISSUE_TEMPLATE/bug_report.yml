@@ -1,0 +1,60 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+name: Bug Report
+description: Report a correctness, build, or compatibility problem.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Zynum. If this report may involve a vulnerability, do not file a public issue; see `SECURITY.md` for private reporting options.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What failed, and what did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - zynum core API
+        - zynum-blas implementation
+        - BLAS compatibility headers or ABI
+        - Future LAPACK, FFT, sparse, CNN, or Transformer module
+        - ARM, x86, GPU, or NPU backend
+        - Build, packaging, or CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Commands, inputs, target, CPU, and relevant environment variables.
+      render: sh
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Zig version, OS, CPU, compiler target, and linked BLAS comparators.
+      value: |
+        - Zig:
+        - OS:
+        - CPU:
+        - Target:
+        - BLAS comparator(s):
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Paste compiler errors, test failures, diffs, or runtime output.
+      render: text

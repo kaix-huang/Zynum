@@ -1,0 +1,19 @@
+// Copyright (C) 2026 Zynum contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+.{
+    .name = .zynum_zig_example,
+    .version = "0.0.1-beta",
+    .fingerprint = 0x2d20ce985ac39b5a,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .zynum = .{
+            .path = "../..",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "matrix_multiply.zig",
+    },
+}

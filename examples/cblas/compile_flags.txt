@@ -1,0 +1,3 @@
+-I../../include
+-I../../zig-out/include
+-std=c11

@@ -1,0 +1,89 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+name: CI
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            target: native
+          - os: macos-15
+            target: aarch64-macos-apple-m4
+          - os: ubuntu-24.04
+            target: native
+          - os: ubuntu-24.04
+            target: x86_64-linux-baseline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+      - name: Check formatting
+        run: zig fmt --check build.zig build.zig.zon src test bench examples tools
+      - name: Regenerate compatibility headers
+        run: zig build generate-headers
+      - name: Check generated headers are up to date
+        run: |
+          if [ -n "$(git status --porcelain -- include/zynum/blas)" ]; then
+            echo "Generated compatibility headers are out of date. Run 'zig build generate-headers' and commit the result."
+            git --no-pager diff -- include/zynum/blas
+            git --no-pager status --short -- include/zynum/blas
+            exit 1
+          fi
+      - name: Test native
+        if: matrix.target == 'native'
+        run: zig build test --summary failures
+      - name: Test Apple M4 target
+        if: matrix.target == 'aarch64-macos-apple-m4'
+        run: zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast --summary failures
+      - name: Test x86_64 baseline target
+        if: matrix.target == 'x86_64-linux-baseline'
+        run: zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline --summary failures
+      - name: Build install artifacts
+        if: matrix.target == 'native'
+        run: zig build --summary failures
+      - name: Run Zig example
+        if: matrix.target == 'native'
+        run: zig build --build-file examples/zig/build.zig run
+      - name: Run CBLAS example
+        if: matrix.target == 'native'
+        run: |
+          mkdir -p zig-out/examples
+          cc -std=c11 examples/cblas/dgemm.c \
+            -I zig-out/include -L zig-out/lib -lzynum_blas \
+            -Wl,-rpath,zig-out/lib \
+            -o zig-out/examples/cblas-dgemm
+          zig-out/examples/cblas-dgemm
+      - name: Run Fortran example when gfortran is available
+        if: matrix.target == 'native'
+        run: |
+          if command -v gfortran >/dev/null 2>&1; then
+            mkdir -p zig-out/examples/fortran-mod
+            gfortran -std=f2008 -J zig-out/examples/fortran-mod \
+              -c zig-out/include/zynum/blas/blas.f90 \
+              -o zig-out/examples/zynum_blas_fortran.o
+            gfortran -std=f2008 -I zig-out/examples/fortran-mod \
+              examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
+              -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
+              -o zig-out/examples/fortran-dgemm
+            zig-out/examples/fortran-dgemm
+          fi

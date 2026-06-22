@@ -1,0 +1,39 @@
+// Copyright (C) 2026 Zynum contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+.{
+    .name = .zynum,
+    .version = "0.0.1-beta",
+    .fingerprint = 0x407596199b6c23c2, // Changing this has security and trust implications.
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "include",
+        "bench/bench.zig",
+        "bench/gemm_sweep.zig",
+        "bench/tools/plot_gemm_sweep.py",
+        "bench/tools/run_gemm_sweep_isolated.py",
+        "test",
+        "tools",
+        "docs",
+        "examples/README.md",
+        "examples/cblas/README.md",
+        "examples/cblas/compile_flags.txt",
+        "examples/cblas/dgemm.c",
+        "examples/fortran/README.md",
+        "examples/fortran/dgemm.f90",
+        "examples/zig/README.md",
+        "examples/zig/build.zig",
+        "examples/zig/build.zig.zon",
+        "examples/zig/matrix_multiply.zig",
+        "README.md",
+        "LICENSE",
+        "CONTRIBUTING.md",
+        "CODE_OF_CONDUCT.md",
+        "SECURITY.md",
+        "CHANGELOG.md",
+    },
+}

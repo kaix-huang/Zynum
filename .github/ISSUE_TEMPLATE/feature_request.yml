@@ -1,0 +1,58 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+name: Feature Request
+description: Propose an API, kernel, platform, or tooling improvement.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing an improvement. Concrete use cases, target platforms, and validation ideas help prioritize the work.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What use case should Zynum support?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - zynum core API
+        - zynum-blas kernels
+        - BLAS compatibility API or ABI
+        - LAPACK module
+        - FFT module
+        - Sparse module
+        - CNN or Transformer acceleration
+        - ARM, x86, GPU, or NPU backend
+        - Build, packaging, or CI
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the API, ABI, backend, or workflow change.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other APIs, libraries, kernels, or workflows you considered.
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: Correctness tests, benchmarks, platforms, or compatibility checks.
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility notes
+      description: Expected impact on existing APIs, ABI compatibility, generated headers, or package consumers.

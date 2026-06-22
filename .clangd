@@ -1,0 +1,12 @@
+# Project-local clangd hints for C examples and compatibility header smoke tests.
+CompileFlags:
+    Add:
+        - -Iinclude
+        - -Izig-out/include
+        - -std=c11
+---
+If:
+    PathMatch: .*\.h
+CompileFlags:
+    Add:
+        - -xc-header

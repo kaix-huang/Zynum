@@ -1,0 +1,25 @@
+.zig-cache/
+.zig-global-cache/
+zig-out/
+
+.DS_Store
+__pycache__/
+*.py[cod]
+
+*.o
+*.a
+*.dylib
+*.so
+*.dll
+*.exe
+*.mod
+*.smod
+
+*.log
+*.err
+*.stdout
+*.csv
+*.svg
+
+# Keep generated/local benchmark outputs ignored, but allow curated README/docs assets.
+!docs/assets/**/*.svg
