@@ -470,6 +470,14 @@ test "parallel sgemm and dgemm column split matches reference" {
     try expectGemmNoTransCase(f64, allocator, 96, 97, 96, 96, 96, 96, 0.75, -0.25);
 }
 
+test "parallel sgemm and dgemm row split matches reference" {
+    const allocator = std.testing.allocator;
+    fortran.setMaxThreads(10);
+    defer fortran.setMaxThreads(0);
+    try expectGemmNoTransCase(f32, allocator, 512, 16, 1024, 512, 1024, 512, 1, 0);
+    try expectGemmNoTransCase(f64, allocator, 512, 16, 1024, 512, 1024, 512, 1, 0);
+}
+
 test "dgemm invalid parameter leaves output unchanged" {
     var ta = [_]u8{'X'};
     var tb = [_]u8{'N'};

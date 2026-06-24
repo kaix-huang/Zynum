@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-const gemm_task = @import("../gemm_task.zig");
+const gemm_task = @import("../matrix_matrix/task.zig");
 const asimd = @import("asimd.zig");
 const features = @import("features.zig");
 

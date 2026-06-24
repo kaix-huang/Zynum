@@ -24,7 +24,7 @@ zig fmt --check build.zig build.zig.zon src test bench examples tools
 Useful target checks:
 
 ```sh
-zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast
+zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast
 zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline
 zig build test -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast
 ```
@@ -287,26 +287,41 @@ example. For ABI details, legacy Fortran notes, and complex value caveats, see
 
 ## Runtime Controls For Local Experiments
 
-Set module-scoped environment variables before the first BLAS call in a process.
-These switches are experimental and may change before 1.0.
+Set Zynum's project-specific environment variable before the first BLAS call in a
+process. This is the only supported Zynum environment variable.
+
+Development requirement: do not introduce any additional Zynum environment
+variables beyond `ZYNUM_MAXIMUM_THREADS`. New dispatch, backend,
+instruction-set, or worker-strategy controls must be internal policy or explicit
+APIs/build options, not process environment.
 
 | Variable | Purpose |
 | --- | --- |
-| `ZYNUM_BLAS_NUM_THREADS` | Positive integer thread limit override. |
-| `ZYNUM_BLAS_AMX` | Enables, disables, or leaves automatic experimental Apple AMX dispatch. |
-| `ZYNUM_BLAS_GEMM_POOL` | Controls the experimental persistent GEMM batch worker pool. |
-| `ZYNUM_BLAS_GEMM_IO` | Selects experimental `std.Io` worker strategies. |
+| `ZYNUM_MAXIMUM_THREADS` | Positive integer cap on the number of threads Zynum may use. When unset, the cap defaults to the runtime CPU count. |
 
 Benchmarking baseline:
 
 ```sh
-export ZYNUM_BLAS_NUM_THREADS=6
-export ZYNUM_BLAS_GEMM_POOL=0
-export ZYNUM_BLAS_GEMM_IO=0
+# Leave unset unless a test explicitly needs a thread cap.
+unset ZYNUM_MAXIMUM_THREADS
 ```
 
-See `common/benchmarking.md` for comparator-library thread variables and
+Instruction-set selection, Apple AMX/SME use, and `std.Io` worker strategy are
+internal dispatch decisions rather than environment-variable modes. See
+`common/benchmarking.md` for comparator-library thread variables and
 reproducibility rules.
+
+Representative BLAS Level 1/2 comparisons are available through:
+
+```sh
+zig build bench-level12-sweep --release=fast -- --size 1024 --reps 60
+```
+
+This sweep loads Zynum plus configured Accelerate/OpenBLAS comparator libraries
+and times common double-precision Level 1/2 kernels. Treat the mixed-library
+step as a local probe; use fresh-process isolation before making reportable
+claims because Zynum and comparator libraries may keep worker or dispatch state
+after their first call.
 
 ## Adding A Public Zig Operation
 
@@ -338,17 +353,30 @@ Do not rename standard BLAS ABI symbols. The shared library name is
 
 ## Adding A GEMM Kernel
 
-1. Put architecture-specific code under `src/blas/kernels/<arch>/`.
-2. Add capability detection or compile-time feature checks in the architecture
+1. Decide whether the kernel can be represented by an existing shared body:
+   fixed-width packed-B SIMD should prefer
+   `src/blas/kernels/matrix_matrix/packed_simd.zig`, and real-GEMM alpha/beta write-back
+   should use `src/blas/kernels/matrix_matrix/epilogue.zig`.
+2. Put architecture-specific feature gates, hard feasibility checks, and
+   hardware state code under `src/blas/kernels/<arch>/`.
+3. Add capability detection or compile-time feature checks in the architecture
    feature file.
-3. Register the backend in `src/blas/kernels/backend.zig`.
-4. Keep shared task fields in `src/blas/kernels/gemm_task.zig`.
-5. Keep shape gates and threading policy in `src/blas/gemm/dispatch.zig`.
-6. Add correctness tests that hit the path where practical.
-7. Add benchmark commands and result summaries to the relevant docs.
+4. Add or update the descriptor in `src/blas/kernels/matrix_matrix/catalog.zig`. Prefer
+   parameter changes there for tile, packing, unroll, and minimum-work tuning.
+5. Add the candidate to `src/blas/kernels/matrix_matrix.zig` for the relevant target
+   feature set.
+6. Update `src/blas/kernels/matrix_matrix/tuning.zig` when the shape/scalar matching rule
+   changes.
+7. Map the descriptor's `KernelId` in `src/blas/kernels/matrix_matrix/executor.zig`.
+8. Keep shared task fields in `src/blas/kernels/matrix_matrix/task.zig`.
+9. Keep task splitting and threading policy in `src/blas/gemm/dispatch.zig`.
+10. Add correctness tests that hit the path where practical.
+11. Add benchmark commands and result summaries to the relevant docs.
 
 Kernel changes should be capability-based, not CPU-name-based. CPU names are
-valid benchmark labels but weak dispatch boundaries.
+valid benchmark labels but weak dispatch boundaries. Prefer new comptime
+parameters, prologue/epilogue hooks, or `ExecutionPlan` fields over cloning an
+existing micro-kernel loop.
 
 ## Generated Files
 

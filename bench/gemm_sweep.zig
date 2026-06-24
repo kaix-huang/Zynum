@@ -44,10 +44,12 @@ const Shape = struct {
 };
 
 const max_custom_shapes = 64;
-const pool_env_name = "ZYNUM_BLAS_GEMM_POOL";
-const io_env_name = "ZYNUM_BLAS_GEMM_IO";
 
 const default_shapes = [_]Shape{
+    .{ .label = "m1_n1_k1", .m = 1, .n = 1, .k = 1 },
+    .{ .label = "m8_n8_k8", .m = 8, .n = 8, .k = 8 },
+    .{ .label = "m31_n31_k31", .m = 31, .n = 31, .k = 31 },
+    .{ .label = "m33_n33_k33", .m = 33, .n = 33, .k = 33 },
     .{ .label = "sq64", .m = 64, .n = 64, .k = 64 },
     .{ .label = "sq96", .m = 96, .n = 96, .k = 96 },
     .{ .label = "sq128", .m = 128, .n = 128, .k = 128 },
@@ -57,13 +59,21 @@ const default_shapes = [_]Shape{
     .{ .label = "sq512", .m = 512, .n = 512, .k = 512 },
     .{ .label = "sq768", .m = 768, .n = 768, .k = 768 },
     .{ .label = "sq1024", .m = 1024, .n = 1024, .k = 1024 },
+    .{ .label = "m63_n65_k17", .m = 63, .n = 65, .k = 17 },
+    .{ .label = "m65_n63_k33", .m = 65, .n = 63, .k = 33 },
+    .{ .label = "m127_n129_k31", .m = 127, .n = 129, .k = 31 },
+    .{ .label = "m129_n127_k33", .m = 129, .n = 127, .k = 33 },
+    .{ .label = "m1_n4096_k256", .m = 1, .n = 4096, .k = 256 },
+    .{ .label = "m4096_n1_k256", .m = 4096, .n = 1, .k = 256 },
     .{ .label = "m1024_n64_k1024", .m = 1024, .n = 64, .k = 1024 },
     .{ .label = "m2048_n64_k512", .m = 2048, .n = 64, .k = 512 },
     .{ .label = "m4096_n32_k256", .m = 4096, .n = 32, .k = 256 },
+    .{ .label = "m2048_n17_k257", .m = 2048, .n = 17, .k = 257 },
     .{ .label = "m512_n64_k2048", .m = 512, .n = 64, .k = 2048 },
     .{ .label = "m64_n1024_k1024", .m = 64, .n = 1024, .k = 1024 },
     .{ .label = "m64_n2048_k512", .m = 64, .n = 2048, .k = 512 },
     .{ .label = "m32_n4096_k256", .m = 32, .n = 4096, .k = 256 },
+    .{ .label = "m17_n2048_k257", .m = 17, .n = 2048, .k = 257 },
     .{ .label = "m64_n512_k2048", .m = 64, .n = 512, .k = 2048 },
     .{ .label = "m1024_n1024_k64", .m = 1024, .n = 1024, .k = 64 },
     .{ .label = "m1024_n1024_k128", .m = 1024, .n = 1024, .k = 128 },
@@ -76,50 +86,12 @@ const default_shapes = [_]Shape{
     .{ .label = "m256_n512_k768", .m = 256, .n = 512, .k = 768 },
     .{ .label = "m768_n512_k256", .m = 768, .n = 512, .k = 256 },
     .{ .label = "m512_n768_k256", .m = 512, .n = 768, .k = 256 },
+    .{ .label = "m384_n640_k96", .m = 384, .n = 640, .k = 96 },
+    .{ .label = "m640_n384_k96", .m = 640, .n = 384, .k = 96 },
 };
 
 fn usage() void {
     std.debug.print("usage: gemm-sweep --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--reps n] [--csv path] [--kind sgemm|dgemm|cgemm|zgemm] [--shape label:m:n:k]\n", .{});
-}
-
-fn zynumBlasPoolWorkersRequested() bool {
-    const raw = std.c.getenv(pool_env_name) orelse return false;
-    const value = std.mem.span(raw);
-    return std.mem.eql(u8, value, "1") or
-        std.ascii.eqlIgnoreCase(value, "true") or
-        std.ascii.eqlIgnoreCase(value, "on");
-}
-
-fn zynumBlasIoWorkersRequested() bool {
-    const raw = std.c.getenv(io_env_name) orelse return false;
-    const value = std.mem.span(raw);
-    return std.mem.eql(u8, value, "1") or
-        std.ascii.eqlIgnoreCase(value, "true") or
-        std.ascii.eqlIgnoreCase(value, "on") or
-        std.ascii.eqlIgnoreCase(value, "concurrent") or
-        std.ascii.eqlIgnoreCase(value, "group-concurrent") or
-        std.ascii.eqlIgnoreCase(value, "group_concurrent") or
-        std.ascii.eqlIgnoreCase(value, "async") or
-        std.ascii.eqlIgnoreCase(value, "group-async") or
-        std.ascii.eqlIgnoreCase(value, "group_async") or
-        std.ascii.eqlIgnoreCase(value, "future") or
-        std.ascii.eqlIgnoreCase(value, "future-concurrent") or
-        std.ascii.eqlIgnoreCase(value, "future_concurrent") or
-        std.ascii.eqlIgnoreCase(value, "await") or
-        std.ascii.eqlIgnoreCase(value, "future-async") or
-        std.ascii.eqlIgnoreCase(value, "future_async") or
-        std.ascii.eqlIgnoreCase(value, "async-await") or
-        std.ascii.eqlIgnoreCase(value, "async_await") or
-        std.ascii.eqlIgnoreCase(value, "pool") or
-        std.ascii.eqlIgnoreCase(value, "persistent") or
-        std.ascii.eqlIgnoreCase(value, "persistent-pool") or
-        std.ascii.eqlIgnoreCase(value, "persistent_pool") or
-        std.ascii.eqlIgnoreCase(value, "worker-pool") or
-        std.ascii.eqlIgnoreCase(value, "worker_pool");
-}
-
-fn zynumBlasStatefulWorkersRequested() bool {
-    return zynumBlasPoolWorkersRequested() or zynumBlasIoWorkersRequested();
 }
 
 fn parseShape(spec: []const u8) !Shape {
@@ -341,14 +313,6 @@ pub fn main(init: std.process.Init) !void {
         lib_count += 1;
     }
 
-    const zynum_blas_stateful_workers = zynumBlasStatefulWorkersRequested();
-    if (zynum_blas_stateful_workers and lib_count > 1) {
-        std.debug.print(
-            "warning: ZYNUM_BLAS_GEMM_POOL or ZYNUM_BLAS_GEMM_IO is enabled; mixed-library sweeps share one process and can let Zynum BLAS workers/std.Io state perturb later comparator libraries. Use fresh processes for reportable comparator numbers.\n",
-            .{},
-        );
-    }
-
     var csv_file = try std.Io.Dir.cwd().createFile(init.io, csv_path.?, .{ .truncate = true });
     defer csv_file.close(init.io);
     var buf: [8192]u8 = undefined;
@@ -356,8 +320,10 @@ pub fn main(init: std.process.Init) !void {
     try writer.interface.writeAll("kind,shape_index,label,m,n,k,library,gflops,best_ns,reps\n");
 
     const shapes: []const Shape = if (custom_shape_count == 0) default_shapes[0..] else custom_shapes[0..custom_shape_count];
+    // Keep benchmark libraries loaded until process exit. Zynum and comparator
+    // BLAS implementations may own process-lifetime worker threads after use.
     for (libs[0..lib_count]) |spec| {
-        var lib = try loadLib(spec.name, spec.path);
+        const lib = try loadLib(spec.name, spec.path);
         std.debug.print("[lib {s}] {d} shapes\n", .{ lib.name, shapes.len });
         for (shapes, 0..) |shape, shape_index| {
             std.debug.print("[{d}/{d}] {s} m={d} n={d} k={d}\n", .{ shape_index + 1, shapes.len, shape.label, shape.m, shape.n, shape.k });
@@ -380,11 +346,6 @@ pub fn main(init: std.process.Init) !void {
                 const zg = try benchGemm(ComplexF64, lib.zgemm, allocator, init.io, shape, reps);
                 try writeCsvRow(&writer.interface, "zgemm", shape_index, shape, lib.name, zg, reps);
             }
-        }
-        if (zynum_blas_stateful_workers and std.mem.eql(u8, lib.name, "zynum-blas")) {
-            std.debug.print("[lib Zynum BLAS] keeping dylib loaded because stateful GEMM workers may outlive the benchmark loop\n", .{});
-        } else {
-            lib.dyn.close();
         }
     }
     try writer.interface.flush();

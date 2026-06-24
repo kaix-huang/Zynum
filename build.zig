@@ -41,6 +41,7 @@ pub fn build(b: *std.Build) void {
         const sme_gemm_files = [_]std.Build.LazyPath{
             b.path("src/blas/kernels/aarch64/sme_f32_gemm.S"),
             b.path("src/blas/kernels/aarch64/sme_f64_gemm.S"),
+            b.path("src/blas/kernels/aarch64/vector_matrix_sve.S"),
         };
         const modules = [_]*std.Build.Module{
             zynum_mod,
@@ -234,4 +235,38 @@ pub fn build(b: *std.Build) void {
 
     const gemm_sweep_step = b.step("bench-gemm-sweep", "Sweep GEMM shapes and write CSV results");
     gemm_sweep_step.dependOn(&run_gemm_sweep.step);
+
+    const level12_sweep = b.addExecutable(.{
+        .name = "level12-sweep",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/level12_sweep.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    b.installArtifact(level12_sweep);
+
+    const run_level12_sweep = b.addRunArtifact(level12_sweep);
+    run_level12_sweep.addArg("--zynum-blas");
+    run_level12_sweep.addFileArg(lib.getEmittedBin());
+    if (bench_openblas) |path| {
+        run_level12_sweep.addArg("--openblas");
+        run_level12_sweep.addArg(path);
+    } else if (target.result.os.tag == .macos) {
+        run_level12_sweep.addArg("--openblas");
+        run_level12_sweep.addArg("/opt/homebrew/opt/openblas/lib/libopenblas.dylib");
+    }
+    if (bench_accelerate) |path| {
+        run_level12_sweep.addArg("--accelerate");
+        run_level12_sweep.addArg(path);
+    } else if (target.result.os.tag == .macos) {
+        run_level12_sweep.addArg("--accelerate");
+        run_level12_sweep.addArg("/System/Library/Frameworks/Accelerate.framework/Accelerate");
+    }
+    if (b.args) |args| run_level12_sweep.addArgs(args);
+    run_level12_sweep.step.dependOn(b.getInstallStep());
+
+    const level12_sweep_step = b.step("bench-level12-sweep", "Sweep representative BLAS Level 1/2 kernels");
+    level12_sweep_step.dependOn(&run_level12_sweep.step);
 }

@@ -7,8 +7,8 @@ selected architecture-aware GEMM optimization work.
 
 The long-term goal is a high-performance runtime that can directly replace BLAS,
 LAPACK, FFT, sparse linear algebra, CNN, and Transformer acceleration libraries
-across ARM, x86, GPU, and NPU backends while preserving Zig ergonomics and
-C/Fortran interoperability.
+across portable and architecture-specific CPU kernels while preserving Zig
+ergonomics and C/Fortran interoperability.
 
 ## Beta Line Priorities
 
@@ -20,6 +20,44 @@ C/Fortran interoperability.
 | GEMM | Continue architecture-specific SGEMM/DGEMM/CGEMM/ZGEMM optimization while keeping dispatch policy evidence-based. |
 | Tooling | Keep CI fast, reproducible, and strict about formatting and generated-header drift. |
 | Documentation | Keep usage docs rich, concrete, and conservative about performance claims. |
+
+## 0.1.x Release Line
+
+The `0.1.x` line is the BLAS-completion and performance line. It should remain
+focused on Zynum BLAS rather than expanding into future numerical modules.
+
+Release goals:
+
+- Complete practical support for the full BLAS surface: every Level 1, Level 2,
+  and Level 3 routine, all real and complex scalar types, packed/banded/triangular
+  and symmetric/Hermitian variants, CBLAS row-major wrappers, Fortran ABI entry
+  points, generated C headers, and generated Fortran module declarations.
+- Keep typed Zig APIs aligned with the BLAS surface while preserving checked
+  views, workspace APIs, and explicit aliasing rules.
+- Support ARM and x86 CPU families with portable fallbacks plus feature-aware
+  kernels for the important architecture tiers:
+  - AArch64 ASIMD, SVE/SVE2 where available, Apple AMX, and SME/SME2 paths on
+    Apple Silicon and other capable ARM systems.
+  - x86_64 baseline/SSE-family, AVX, AVX2/FMA, AVX512/FMA, and current Intel and
+    AMD desktop/server CPUs.
+- Make Apple's latest production silicon the primary native performance gate.
+  The target for 0.1 is that Zynum beats Accelerate across the documented BLAS
+  benchmark suite on the latest Apple chips, with `ZYNUM_MAXIMUM_THREADS` unset
+  unless a single-thread gate is being measured.
+- Treat any performance claim against Accelerate, OpenBLAS, MKL, or another
+  comparator as invalid unless it has fresh-process isolation, exact commands,
+  CSV artifacts, runtime thread counts, target features, and environment records.
+- Keep optimization policy in descriptors, tuning files, dispatch, and
+  documented gate records; micro-kernels should stay as small and direct as the
+  target ISA allows.
+
+Non-goals for 0.1.x:
+
+- No external BLAS, LAPACK, Accelerate, OpenBLAS, MKL, BLIS, MPS, cuBLAS, or
+  accelerator library may become a Zynum compute path.
+- Do not add new public environment-variable controls beyond
+  `ZYNUM_MAXIMUM_THREADS`.
+- Do not broaden dispatch gates based on single-point local wins.
 
 ## Near Term
 
@@ -78,7 +116,8 @@ Before a stable 1.0 release:
 - Public API naming must be reviewed and documented as stable.
 - ABI compatibility policy must be written and tied to release notes.
 - Threading and environment variable semantics must be stable.
-- Supported target matrix must be explicit for ARM, x86, GPU, and NPU targets.
+- Supported target matrix must be explicit for ARM, x86, operating systems, and
+  compiler target-feature profiles.
 - Native performance claims must be tied to reproducible benchmark data with
   recorded fresh-process isolation when comparators are involved.
 - Binary distribution guidance must explain LGPL dynamic/static linking and

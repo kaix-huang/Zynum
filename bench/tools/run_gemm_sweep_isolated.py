@@ -13,10 +13,13 @@ import tempfile
 import time
 from pathlib import Path
 
-
 DEFAULT_ACCELERATE = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 DEFAULT_OPENBLAS = "/opt/homebrew/opt/openblas/lib/libopenblas.dylib"
 DEFAULT_SHAPES = [
+    "m1_n1_k1:1:1:1",
+    "m8_n8_k8:8:8:8",
+    "m31_n31_k31:31:31:31",
+    "m33_n33_k33:33:33:33",
     "sq64:64:64:64",
     "sq96:96:96:96",
     "sq128:128:128:128",
@@ -26,13 +29,21 @@ DEFAULT_SHAPES = [
     "sq512:512:512:512",
     "sq768:768:768:768",
     "sq1024:1024:1024:1024",
+    "m63_n65_k17:63:65:17",
+    "m65_n63_k33:65:63:33",
+    "m127_n129_k31:127:129:31",
+    "m129_n127_k33:129:127:33",
+    "m1_n4096_k256:1:4096:256",
+    "m4096_n1_k256:4096:1:256",
     "m1024_n64_k1024:1024:64:1024",
     "m2048_n64_k512:2048:64:512",
     "m4096_n32_k256:4096:32:256",
+    "m2048_n17_k257:2048:17:257",
     "m512_n64_k2048:512:64:2048",
     "m64_n1024_k1024:64:1024:1024",
     "m64_n2048_k512:64:2048:512",
     "m32_n4096_k256:32:4096:256",
+    "m17_n2048_k257:17:2048:257",
     "m64_n512_k2048:64:512:2048",
     "m1024_n1024_k64:1024:1024:64",
     "m1024_n1024_k128:1024:1024:128",
@@ -45,6 +56,8 @@ DEFAULT_SHAPES = [
     "m256_n512_k768:256:512:768",
     "m768_n512_k256:768:512:256",
     "m512_n768_k256:512:768:256",
+    "m384_n640_k96:384:640:96",
+    "m640_n384_k96:640:384:96",
 ]
 
 
@@ -71,7 +84,9 @@ def parse_args():
         help="Run each fresh-process benchmark this many times and keep the best GF/s row for each kind/shape.",
     )
     p.add_argument("--csv", required=True)
-    p.add_argument("--kind", action="append", choices=["sgemm", "dgemm", "cgemm", "zgemm"])
+    p.add_argument(
+        "--kind", action="append", choices=["sgemm", "dgemm", "cgemm", "zgemm"]
+    )
     p.add_argument(
         "--isolate-kind",
         action="store_true",
@@ -135,6 +150,22 @@ def zig_version():
     return result.stdout.strip()
 
 
+def environment_snapshot(names):
+    return {name: os.environ.get(name, "unset") for name in names}
+
+
+def zynum_maximum_threads():
+    detected = max(1, os.cpu_count() or 1)
+    value = os.environ.get("ZYNUM_MAXIMUM_THREADS")
+    if not value:
+        return detected
+    try:
+        parsed = int(value, 10)
+    except ValueError:
+        return detected
+    return parsed if parsed > 0 else detected
+
+
 def existing_libs(args):
     libs = [("zynum-blas", args.zynum_blas)]
     candidates = [("Accelerate", args.accelerate), ("OpenBLAS", args.openblas)]
@@ -151,7 +182,18 @@ def existing_libs(args):
 
 def best_rows_csv(inputs, output):
     best = {}
-    fieldnames = ["kind", "shape_index", "label", "m", "n", "k", "library", "gflops", "best_ns", "reps"]
+    fieldnames = [
+        "kind",
+        "shape_index",
+        "label",
+        "m",
+        "n",
+        "k",
+        "library",
+        "gflops",
+        "best_ns",
+        "reps",
+    ]
     for csv_path in inputs:
         with open(csv_path, newline="") as inp:
             for row in csv.DictReader(inp):
@@ -187,7 +229,6 @@ def run_one_process(args, name, path, out, kind=None, shapes=None):
         cmd += ["--shape", shape]
 
     env = os.environ.copy()
-    env.setdefault("ZYNUM_BLAS_GEMM_POOL", "0")
     env.setdefault("OPENBLAS_DYNAMIC", "0")
 
     print(f"[isolated {name}] {' '.join(cmd)}", file=sys.stderr, flush=True)
@@ -214,7 +255,18 @@ def run_one(args, name, path, tmp_dir, kind=None, shapes=None):
 
 
 def merge(rows_by_lib, output_path, shape_indexes):
-    fieldnames = ["kind", "shape_index", "label", "m", "n", "k", "library", "gflops", "best_ns", "reps"]
+    fieldnames = [
+        "kind",
+        "shape_index",
+        "label",
+        "m",
+        "n",
+        "k",
+        "library",
+        "gflops",
+        "best_ns",
+        "reps",
+    ]
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
@@ -222,7 +274,9 @@ def merge(rows_by_lib, output_path, shape_indexes):
             with open(csv_path, newline="") as inp:
                 for row in csv.DictReader(inp):
                     shape_key = (row["label"], row["m"], row["n"], row["k"])
-                    row["shape_index"] = shape_indexes.get(shape_key, row["shape_index"])
+                    row["shape_index"] = shape_indexes.get(
+                        shape_key, row["shape_index"]
+                    )
                     row["library"] = name
                     writer.writerow(row)
 
@@ -230,15 +284,13 @@ def merge(rows_by_lib, output_path, shape_indexes):
 def write_metadata(args, libs, shape_specs, output_path):
     output = Path(output_path)
     env_names = [
-        "ZYNUM_BLAS_AMX",
-        "ZYNUM_BLAS_GEMM_POOL",
-        "ZYNUM_BLAS_GEMM_IO",
-        "ZYNUM_BLAS_NUM_THREADS",
+        "ZYNUM_MAXIMUM_THREADS",
         "OPENBLAS_DYNAMIC",
         "OPENBLAS_NUM_THREADS",
         "VECLIB_MAXIMUM_THREADS",
         "MKL_DYNAMIC",
         "MKL_NUM_THREADS",
+        "OMP_NUM_THREADS",
         "ZIG_GLOBAL_CACHE_DIR",
     ]
     metadata = {
@@ -246,13 +298,15 @@ def write_metadata(args, libs, shape_specs, output_path):
         "argv": sys.argv,
         "cwd": os.getcwd(),
         "zig_version": zig_version(),
+        "detected_cpu_count": os.cpu_count(),
+        "zynum_maximum_threads": zynum_maximum_threads(),
         "reps": args.reps,
         "process_repeats": args.process_repeats,
         "isolate_kind": args.isolate_kind,
         "isolate_shape": args.isolate_shape,
         "kinds": args.kind,
         "shapes": shape_specs,
-        "environment": {name: os.environ.get(name) for name in env_names if os.environ.get(name) is not None},
+        "environment": environment_snapshot(env_names),
         "binaries": {
             "gemm_sweep": {
                 "path": args.gemm_sweep,
@@ -276,7 +330,11 @@ def write_metadata(args, libs, shape_specs, output_path):
 def main():
     args = parse_args()
     libs = existing_libs(args)
-    isolated_kinds = ["sgemm", "dgemm", "cgemm", "zgemm"] if args.isolate_kind and not args.kind else [None]
+    isolated_kinds = (
+        ["sgemm", "dgemm", "cgemm", "zgemm"]
+        if args.isolate_kind and not args.kind
+        else [None]
+    )
     shape_specs = args.shape or DEFAULT_SHAPES
     if args.isolate_shape:
         shape_groups = [[shape] for shape in shape_specs]
@@ -288,7 +346,9 @@ def main():
         for name, path in libs:
             for kind in isolated_kinds:
                 for shapes in shape_groups:
-                    rows_by_lib.append((name, run_one(args, name, path, tmp_dir, kind, shapes)))
+                    rows_by_lib.append(
+                        (name, run_one(args, name, path, tmp_dir, kind, shapes))
+                    )
         merge(rows_by_lib, args.csv, shape_index_map(shape_specs))
     write_metadata(args, libs, shape_specs, args.csv)
 

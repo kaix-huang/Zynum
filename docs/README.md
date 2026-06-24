@@ -2,8 +2,10 @@
 
 Welcome to the Zynum documentation portal.
 
-**Repository:** <https://github.com/kaix-huang/Zynum>  
-**Current release line:** `0.0.1-beta`  
+**Repository:** <https://github.com/kaix-huang/Zynum>
+
+**Current release line:** `0.1.x` development
+
 **Current shipping module:** Zynum BLAS (`zynum-blas`)
 
 Zynum is a Zig-native numerical runtime project. The beta release focuses on a
@@ -57,8 +59,8 @@ flowchart TD
   caveats.
 - `../examples/README.md` — runnable Zig, C/CBLAS, and Fortran matrix
   multiplication examples.
-- `roadmap.md` — beta line priorities, future modules, and the path toward a
-  stable 1.0 contract.
+- `roadmap.md` — `0.1.x` BLAS completion/performance goals, beta line
+  priorities, future modules, and the path toward a stable 1.0 contract.
 - `open_source_release_checklist.md` — repository hygiene, validation commands,
   compatibility review, benchmark evidence, and GitHub settings.
 
@@ -89,6 +91,7 @@ flowchart TD
 | Run C/Fortran examples | See `../examples/README.md` |
 | Run a quick benchmark | `zig build bench --release=fast -- --size 1024 --reps 10` |
 | Run a GEMM sweep | `zig build bench-gemm-sweep --release=fast -- --reps 30` |
+| Run a Level 1/2 sweep | `zig build bench-level12-sweep --release=fast -- --size 1024 --reps 60` |
 | Plot a GEMM sweep | `python3 bench/tools/plot_gemm_sweep.py zig-out/gemm_sweep.csv zig-out/gemm_sweep.svg` |
 | Prepare a public release | Review `open_source_release_checklist.md` |
 
@@ -98,7 +101,7 @@ flowchart TD
 | --- | --- | --- |
 | Public Zig API | `development_and_usage.md`, `architecture.md` | Tests, README/docs, changelog if user-visible |
 | BLAS ABI export | `fortran_compatibility.md`, `architecture.md` | ABI tests, generated headers, export counts |
-| GEMM kernel | `common/gemm_optimization_notes.md`, architecture-specific notes | Correctness tests, benchmarks, dispatch notes |
+| GEMM kernel | `common/gemm_optimization_notes.md`, architecture-specific notes | Correctness tests, descriptor/tuning notes, benchmarks |
 | Benchmark claim | `common/benchmarking.md` | Commands, environment, CSV path, target/CPU details |
 | New numerical module | `architecture.md`, `roadmap.md` | New source root, tests, docs, package surface |
 | Release prep | `open_source_release_checklist.md` | Validation, GitHub settings, release notes |

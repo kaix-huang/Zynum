@@ -6,11 +6,11 @@ GEMM tasks are often too small for generic asynchronous scheduling overhead.
 ## Current Policy
 
 - Correctness code should not depend on global async state.
-- GEMM default parallelism uses explicit dispatch policy.
-- Experimental `std.Io` worker strategies are controlled by
-  `ZYNUM_BLAS_GEMM_IO`.
-- Persistent worker experiments must stay opt-in until they are proven not to
-  pollute long benchmark sweeps or comparator libraries.
+- GEMM parallelism uses explicit dispatch policy.
+- Parallel GEMM work should prefer `std.Io.Threaded` with
+  `std.Io.Group.concurrent` for CPU-bound helper tasks.
+- Worker strategy is internal implementation policy and must not be selected by
+  Zynum environment variables.
 
 ## Why This Matters
 
@@ -29,22 +29,24 @@ making them default.
 
 - Thread-count policy: `src/blas/runtime.zig`.
 - GEMM dispatch: `src/blas/gemm/dispatch.zig`.
-- Worker-pool experiments: `src/blas/gemm/pool.zig`.
-- Benchmark isolation warning: `bench/gemm_sweep.zig`.
+- Process-lifetime GEMM workers: `src/blas/gemm/pool.zig`.
+- Fresh-process comparator isolation: `bench/tools/run_gemm_sweep_isolated.py`.
 
 ## Development Rules
 
-- Keep stateful worker experiments behind environment variables.
+- Do not add environment variables for worker strategy; only
+  `ZYNUM_MAXIMUM_THREADS` may cap Zynum threads.
 - Do not unload a dynamic library while its worker threads may still be running.
 - Prefer small focused probes before full sweeps, then confirm with full sweeps.
-- Document the exact `ZYNUM_BLAS_GEMM_IO` mode used in benchmark notes.
+- Document target features, thread cap, and relevant dispatch predicates in
+  benchmark notes.
 - Treat process boundaries as the reliable cleanup boundary for reportable data.
 
 ## Recommended Validation
 
 ```sh
-ZYNUM_BLAS_GEMM_IO=0 zig build bench-gemm-sweep --release=fast -- --reps 30
-ZYNUM_BLAS_GEMM_IO=pool zig build bench-gemm-sweep --release=fast -- --reps 30
+ZYNUM_MAXIMUM_THREADS=1 zig build bench-gemm-sweep --release=fast -- --reps 30
+ZYNUM_MAXIMUM_THREADS=6 zig build bench-gemm-sweep --release=fast -- --reps 30
 ```
 
 For comparator numbers:
@@ -57,4 +59,4 @@ python3 bench/tools/run_gemm_sweep_isolated.py \
   --reps 30
 ```
 
-Keep the default path conservative until the isolated data is stable.
+Keep dispatch gates narrow until isolated data is stable.

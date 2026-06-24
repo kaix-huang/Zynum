@@ -182,7 +182,8 @@ pub fn main(init: std.process.Init) !void {
         libs[lib_count] = try loadLib("MKL", path);
         lib_count += 1;
     }
-    defer for (libs[0..lib_count]) |*lib| lib.dyn.close();
+    // Keep benchmark libraries loaded until process exit. Zynum and comparator
+    // BLAS implementations may own process-lifetime worker threads after use.
 
     std.debug.print("size={d} reps={d}\n", .{ size, reps });
     std.debug.print("library       dgemm GF/s   sgemm GF/s   daxpy GF/s\n", .{});

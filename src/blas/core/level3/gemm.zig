@@ -87,6 +87,10 @@ inline fn takeWorkspace(comptime T: type, workspace: []T, offset: *usize, len: u
     return workspace[start..offset.*];
 }
 
+inline fn loadF32x4(src: []const f32, index: usize) F32x4 {
+    return @as(*align(1) const F32x4, @ptrCast(&src[index])).*;
+}
+
 inline fn storeF32x4(dst: []f32, index: usize, value: F32x4) void {
     @as(*align(1) F32x4, @ptrCast(&dst[index])).* = value;
 }
@@ -206,16 +210,9 @@ fn gemmNoTransComplexF32(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF3
     }
 }
 
-inline fn useCompactComplexF32Workspace(m: usize, n: usize, k: usize) bool {
-    return m == n and n == k and m <= 512;
-}
-
-inline fn useCompactComplexF64Workspace(m: usize, n: usize, k: usize) bool {
-    return m == n and n == k and m <= 384;
-}
-
 inline fn useExpandedComplexF32Real(m: usize, n: usize, k: usize) bool {
-    if (m == n and n == k and m <= 384) return true;
+    // Default square CGEMM up to 384 is faster on the compact 3M path: it
+    // avoids expanded-real's larger materialization/scatter cost.
     if ((m <= 64 and n >= 1024 and k >= 256 and k <= 1024)) return true;
     if (m == n and m == 128 and k >= 2048) return true;
     // Expanded-real maps one CGEMM to one larger SGEMM.  It avoids the
@@ -228,14 +225,14 @@ inline fn useExpandedComplexF32Real(m: usize, n: usize, k: usize) bool {
     const expanded_real_elems = 4 *| m *| k + 2 *| k *| n + 2 *| m *| n;
     if (expanded_real_elems > 16 * 1024 * 1024 / @sizeOf(f32)) return false;
     if (m == n and m >= 512 and k <= 64) return true;
-    if (m != n and m <= 512 and n <= 512 and k >= 512) return true;
-    return n >= 4 *| m and k <= 256;
+    if (m != n and m <= 512 and n <= 512 and k >= 512 and (m >= 128 or k <= 1024)) return true;
+    return n >= 4 *| m and k < 256;
 }
 
 inline fn useExpandedComplexF64Real(m: usize, n: usize, k: usize) bool {
-    // ZGEMM already beats Accelerate on the default sweep with the 3M
-    // path, so the expanded-real gate stays conservative.
-    return (m == n and n == k and m <= 192) or (m <= 32 and n >= 2048 and k <= 512);
+    // Keep expanded-real only for the smallest default square ZGEMM cases;
+    // sq128/sq192 are faster on the compact 3M path.
+    return (m == n and n == k and m < 128) or (m <= 32 and n >= 2048 and k <= 512);
 }
 
 fn gemmNoTransComplexF32ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
@@ -294,8 +291,13 @@ fn gemmNoTransComplexF32ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
     gemmNoTransReal(f32, m2_i, n_, k2_i, 1, a2.ptr, m2_ld, b2.ptr, k2_ld, 0, c2.ptr, m2_ld);
 
     for (0..n) |j| {
-        for (0..m) |i| {
-            c[matIndex(ldc, i, j)] = .{ .re = c2[i + j * m2], .im = c2[m + i + j * m2] };
+        const base = j * m2;
+        var i: usize = 0;
+        while (i + 4 <= m) : (i += 4) {
+            storeC32x4(c, ldc, i, j, .{ .re = loadF32x4(c2, base + i), .im = loadF32x4(c2, base + m + i) });
+        }
+        while (i < m) : (i += 1) {
+            c[matIndex(ldc, i, j)] = .{ .re = c2[base + i], .im = c2[base + m + i] };
         }
     }
 }
@@ -320,7 +322,15 @@ fn gemmNoTransComplexF32ViaRealBuffers(m_: BlasInt, n_: BlasInt, k_: BlasInt, a:
     const k = toUsize(k_);
 
     for (0..k) |p| {
-        for (0..m) |i| {
+        var i: usize = 0;
+        while (i + 4 <= m) : (i += 4) {
+            const value = loadC32x4(a, lda, i, p);
+            const idx = i + p * m;
+            storeF32x4(ar, idx, value.re);
+            storeF32x4(ai, idx, value.re + value.im);
+            storeF32x4(am, idx, value.im - value.re);
+        }
+        while (i < m) : (i += 1) {
             const value = a[matIndex(lda, i, p)];
             const idx = i + p * m;
             ar[idx] = value.re;
@@ -329,7 +339,15 @@ fn gemmNoTransComplexF32ViaRealBuffers(m_: BlasInt, n_: BlasInt, k_: BlasInt, a:
         }
     }
     for (0..n) |j| {
-        for (0..k) |p| {
+        var p: usize = 0;
+        while (p + 4 <= k) : (p += 4) {
+            const value = loadC32x4(b, ldb, p, j);
+            const idx = p + j * k;
+            storeF32x4(br, idx, value.re);
+            storeF32x4(bi, idx, value.im);
+            storeF32x4(bp, idx, value.re + value.im);
+        }
+        while (p < k) : (p += 1) {
             const value = b[matIndex(ldb, p, j)];
             const idx = p + j * k;
             br[idx] = value.re;
@@ -346,7 +364,13 @@ fn gemmNoTransComplexF32ViaRealBuffers(m_: BlasInt, n_: BlasInt, k_: BlasInt, a:
     gemmNoTransReal(f32, m_, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
 
     for (0..n) |j| {
-        for (0..m) |i| {
+        var i: usize = 0;
+        while (i + 4 <= m) : (i += 4) {
+            const src = i + j * m;
+            const crv = loadF32x4(cr, src);
+            storeC32x4(c, ldc, i, j, .{ .re = crv - loadF32x4(tmp, src), .im = crv + loadF32x4(ci, src) });
+        }
+        while (i < m) : (i += 1) {
             const src = i + j * m;
             c[matIndex(ldc, i, j)] = .{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
         }
@@ -363,23 +387,6 @@ fn tryGemmNoTransComplexF32ViaReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha:
     const a_len = m * k;
     const b_len = k * n;
     const c_len = m * n;
-
-    if (useCompactComplexF32Workspace(m, n, k)) {
-        const workspace = acquireComplexWorkspace(f32, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
-        defer workspace.deinit();
-        var workspace_offset: usize = 0;
-        const ar = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
-        const ai = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
-        const am = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
-        const br = takeWorkspace(f32, workspace.data, &workspace_offset, b_len);
-        const bi = takeWorkspace(f32, workspace.data, &workspace_offset, b_len);
-        const bp = takeWorkspace(f32, workspace.data, &workspace_offset, b_len);
-        const cr = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
-        const ci = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
-        const tmp = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
-        gemmNoTransComplexF32ViaRealBuffers(m_, n_, k_, a, lda, b, ldb, c, ldc, ar, ai, am, br, bi, bp, cr, ci, tmp);
-        return true;
-    }
 
     const workspace = acquireComplexWorkspace(f32, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
     defer workspace.deinit();
@@ -625,23 +632,6 @@ fn tryGemmNoTransComplexF64ViaReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha:
     const a_len = m * k;
     const b_len = k * n;
     const c_len = m * n;
-
-    if (useCompactComplexF64Workspace(m, n, k)) {
-        const workspace = acquireComplexWorkspace(f64, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
-        defer workspace.deinit();
-        var workspace_offset: usize = 0;
-        const ar = takeWorkspace(f64, workspace.data, &workspace_offset, a_len);
-        const ai = takeWorkspace(f64, workspace.data, &workspace_offset, a_len);
-        const am = takeWorkspace(f64, workspace.data, &workspace_offset, a_len);
-        const br = takeWorkspace(f64, workspace.data, &workspace_offset, b_len);
-        const bi = takeWorkspace(f64, workspace.data, &workspace_offset, b_len);
-        const bp = takeWorkspace(f64, workspace.data, &workspace_offset, b_len);
-        const cr = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
-        const ci = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
-        const tmp = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
-        gemmNoTransComplexF64ViaRealBuffers(m_, n_, k_, a, lda, b, ldb, c, ldc, ar, ai, am, br, bi, bp, cr, ci, tmp);
-        return true;
-    }
 
     const workspace = acquireComplexWorkspace(f64, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
     defer workspace.deinit();

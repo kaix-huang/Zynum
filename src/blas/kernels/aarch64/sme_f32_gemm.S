@@ -13,6 +13,22 @@
 #define ZYNUM_SYMBOL(name) name
 #endif
 
+.macro ZYNUM_SME_ABI_SAVE
+    sub sp, sp, #64
+    stp d8, d9, [sp]
+    stp d10, d11, [sp, #16]
+    stp d12, d13, [sp, #32]
+    stp d14, d15, [sp, #48]
+.endm
+
+.macro ZYNUM_SME_ABI_RESTORE
+    ldp d8, d9, [sp]
+    ldp d10, d11, [sp, #16]
+    ldp d12, d13, [sp, #32]
+    ldp d14, d15, [sp, #48]
+    add sp, sp, #64
+.endm
+
 // Common ABI for the f32 SME kernels:
 //   x0=A, x1=packed B, x2=C, x3=m_full rows, x4=K,
 //   x5=lda bytes, x6=ldc bytes, x7=batch panel count when present.
@@ -31,6 +47,7 @@
 .p2align 2
 ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel_f32):
     rdsvl x14, #1         // x14 = SVL bytes; all tile strides derive from it.
+    ZYNUM_SME_ABI_SAVE
     smstart sm            // Enter SME streaming mode for streaming vectors.
     smstart za            // Enable ZA accumulator tile state.
     ptrue p0.s            // All f32 lanes active; full tiles only in assembly.
@@ -75,12 +92,14 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel_f32):
 5:
     smstop za             // Disable ZA before leaving the SME context.
     smstop sm             // Return to non-streaming mode for the caller.
+    ZYNUM_SME_ABI_RESTORE
     ret
 
 .globl ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel4m_f32)
 .p2align 2
 ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel4m_f32):
     rdsvl x14, #1         // x14 = SVL bytes; one f32 tile is x14/4 rows.
+    ZYNUM_SME_ABI_SAVE
     smstart sm            // Enter streaming mode.
     smstart za            // Enable ZA tiles for FMOPA accumulation.
     ptrue p0.s            // Use all lanes; no partial-row predicate here.
@@ -141,12 +160,14 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel4m_f32):
 17:
     smstop za             // Release ZA tile state.
     smstop sm             // Leave streaming mode.
+    ZYNUM_SME_ABI_RESTORE
     ret
 
 .globl ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel2x2_f32)
 .p2align 2
 ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel2x2_f32):
     rdsvl x14, #1         // x14 = SVL bytes, reused for A/B/C tile offsets.
+    ZYNUM_SME_ABI_SAVE
     smstart sm            // Streaming mode is required for SME FMOPA.
     smstart za            // ZA holds the four C subtiles.
     ptrue p0.s            // Full f32 tile predicate.
@@ -155,8 +176,8 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel2x2_f32):
     mul x15, x15, x6
 
     // 2M x 2N kernel.  za0/za1 accumulate the first N panel,
-    // za2/za3 the second.  K is unrolled by 2; unroll4 tested faster
-    // on a few short-wide probes but regressed the full sweep.
+    // za2/za3 the second.  This symbol uses a K-unroll2 main loop; the
+    // K-unroll4 variant is exposed as a separate symbol for the outer plan.
     lsl x3, x3, #2
     mov x7, #0
 31:
@@ -236,12 +257,14 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel2x2_f32):
 35:
     smstop za             // Clear ZA ownership before function return.
     smstop sm             // Restore non-streaming execution mode.
+    ZYNUM_SME_ABI_RESTORE
     ret
 
 .globl ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel1x2_f32)
 .p2align 2
 ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel1x2_f32):
     rdsvl x14, #1         // x14 = SVL bytes; one f32 tile is x14/4 rows.
+    ZYNUM_SME_ABI_SAVE
     smstart sm            // Enter streaming mode for SME vector length.
     smstart za            // Enable ZA tiles za0/za1.
     ptrue p0.s            // Full f32 tile predicate.
@@ -313,6 +336,7 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panel1x2_f32):
 87:
     smstop za             // Release ZA tile state.
     smstop sm             // Leave streaming mode.
+    ZYNUM_SME_ABI_RESTORE
     ret
 
 .globl ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panels2x2_f32)
@@ -331,6 +355,7 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panels2x2_f32):
     // Batched panels keep SM/ZA enabled across several adjacent 2N
     // panels.  This reduces smstart/smstop and call overhead while
     // preserving the same packed-B layout: [panel][K][2*tile cols].
+    ZYNUM_SME_ABI_SAVE
     smstart sm            // Keep streaming mode active across the panel batch.
     smstart za            // Keep ZA active across adjacent packed-B panels.
     ptrue p0.s            // Full f32 tile predicate.
@@ -422,6 +447,7 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panels2x2_f32):
 81:
     smstop za             // Release ZA after all batched panels complete.
     smstop sm             // Return to normal mode before restoring registers.
+    ZYNUM_SME_ABI_RESTORE
     ldp x19, x20, [sp], #16
     ret
 
@@ -438,9 +464,9 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panels2x2_u4_f32):
     mov x19, x7
     lsl x20, x3, #2
 
-    // Shape-gated 2M x 2N f32 variant with a K-unroll4 main loop.  The
-    // default unroll2 symbol remains the general path because unroll4 has
-    // historically regressed complete sweeps when used broadly.
+    // Alternate 2M x 2N f32 variant with a K-unroll4 main loop.  The caller
+    // selects this symbol explicitly through the higher-level execution plan.
+    ZYNUM_SME_ABI_SAVE
     smstart sm
     smstart za
     ptrue p0.s
@@ -582,5 +608,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_sgemm_panels2x2_u4_f32):
 99:
     smstop za
     smstop sm
+    ZYNUM_SME_ABI_RESTORE
     ldp x19, x20, [sp], #16
     ret
