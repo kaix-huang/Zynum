@@ -9,16 +9,12 @@ const builtin = @import("builtin");
 const scalar = @import("../../core/scalar.zig");
 const amx = @import("amx_gemm.zig");
 const features = @import("features.zig");
+const vector_matrix_asm = @import("vector_matrix_asm.zig");
 
 const BlasInt = scalar.BlasInt;
 const enable_amx_gemv_n = true;
 const enable_amx_gemv_t = false;
 const enable_sme2_gemv_t = true;
-const enable_asimd_gemv_t_n1 = false;
-const enable_asimd_gemv_t = false;
-const enable_sve_ger = false;
-const enable_asimd_ger = false;
-const enable_sme_ger = false;
 
 threadlocal var amx_gemv_b_ptr: ?[*]f64 = null;
 threadlocal var amx_gemv_b_len: usize = 0;
@@ -123,7 +119,8 @@ fn gemvNoTransAmxF64(
     return gemvNoTransPackedRowsF64(m, n, a, lda, b.ptr, c.ptr, y);
 }
 
-extern fn zynum_blas_sve_dgemv_t_f64(
+inline fn callGemvTransF64Kernel(
+    comptime kernel: anytype,
     m: usize,
     n: usize,
     alpha: f64,
@@ -131,39 +128,13 @@ extern fn zynum_blas_sve_dgemv_t_f64(
     lda_bytes: usize,
     x: [*]const f64,
     y: [*]f64,
-) callconv(.c) void;
+) void {
+    const Kernel = *const fn (usize, usize, f64, [*]const f64, usize, [*]const f64, [*]f64) callconv(.c) void;
+    @as(Kernel, @ptrCast(&kernel))(m, n, alpha, a, lda_bytes, x, y);
+}
 
-extern fn zynum_blas_sve_dgemv_t_f64_full_n8(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_sve_dgemv_t_f64_full_n8_acc2(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_sve_dgemv_t_f64_n16(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_sme2_dgemv_n_f64_256x1(
+inline fn callSme2GemvF64Kernel(
+    comptime kernel: anytype,
     m: usize,
     n: usize,
     alpha: f64,
@@ -172,52 +143,10 @@ extern fn zynum_blas_sme2_dgemv_n_f64_256x1(
     lda_bytes: usize,
     x: [*]const f64,
     y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_sme2_dgemv_t_f64_8x32(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    beta: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_asimd_dgemv_t_f64_n1(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_asimd_dgemv_t_f64(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_asimd_dgemv_n_f64(
-    m: usize,
-    n: usize,
-    alpha: f64,
-    a: [*]const f64,
-    lda_bytes: usize,
-    x: [*]const f64,
-    y: [*]f64,
-) callconv(.c) void;
-
-extern fn zynum_blas_sve_dger_f64(m: usize, n: usize, alpha: f64, x: [*]const f64, y: [*]const f64, a: [*]f64, lda_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_asimd_dger_f64(m: usize, n: usize, alpha: f64, x: [*]const f64, y: [*]const f64, a: [*]f64, lda_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_dger_f64(m: usize, n: usize, alpha: f64, x: [*]const f64, y: [*]const f64, a: [*]f64, lda_bytes: usize) callconv(.c) void;
+) void {
+    const Kernel = *const fn (usize, usize, f64, f64, [*]const f64, usize, [*]const f64, [*]f64) callconv(.c) void;
+    @as(Kernel, @ptrCast(&kernel))(m, n, alpha, beta, a, lda_bytes, x, y);
+}
 
 fn gerUnitRealSmeF64(
     m: usize,
@@ -228,21 +157,14 @@ fn gerUnitRealSmeF64(
     a: [*]f64,
     lda: BlasInt,
 ) bool {
-    if (comptime !enable_sme_ger) return false;
-    if (comptime !features.has_sme_f64f64) return false;
-    if (m == 0 or n == 0 or lda <= 0) return false;
-    if (m *| n < 1536 * 1536) return false;
-
-    const tile = @max(@as(usize, 1), features.streamingVectorBytes() / @sizeOf(f64));
-    if (tile == 0 or (m % tile) != 0 or (n % tile) != 0) return false;
-
-    const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
-    var sm_state: features.StreamingModeState = undefined;
-    sm_state.startSmZa();
-    defer sm_state.stopSmZa();
-
-    zynum_blas_sme_dger_f64(m, n, alpha, x, y, a, lda_bytes);
-    return true;
+    _ = m;
+    _ = n;
+    _ = alpha;
+    _ = x;
+    _ = y;
+    _ = a;
+    _ = lda;
+    return false;
 }
 
 fn gemvNoTransF64(
@@ -281,7 +203,7 @@ fn gemvNoTransSme2F64(
     sm_state.startSmZa();
     defer sm_state.stopSmZa();
 
-    zynum_blas_sme2_dgemv_n_f64_256x1(m, n, alpha, beta, a, lda_bytes, x, y);
+    callSme2GemvF64Kernel(vector_matrix_asm.sme2DgemvNF64256x1, m, n, alpha, beta, a, lda_bytes, x, y);
     return true;
 }
 
@@ -316,32 +238,25 @@ fn gemvTransF64(
     }
     if (m == 0 or n == 0 or lda <= 0) return false;
 
-    const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
     if (gemvTransSme2F64(m, n, alpha, a, lda, x, 1, y)) return true;
-    if (comptime enable_asimd_gemv_t_n1 and features.has_asimd) {
-        if (m >= 512 and n >= 8 and m <= 1536 and n <= 1536) {
-            zynum_blas_asimd_dgemv_t_f64_n1(m, n, alpha, a, lda_bytes, x, y);
-            return true;
-        }
-    }
     if (comptime features.has_sve) {
         if (m >= 256 and n >= 8 and n <= 1536) {
+            const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
             const sve_lanes = features.sveVectorBytes() / @sizeOf(f64);
             if (sve_lanes > 0 and (m % sve_lanes) == 0) {
+                const panel_n = n & ~@as(usize, 7);
                 if ((m % (2 * sve_lanes)) == 0) {
-                    zynum_blas_sve_dgemv_t_f64_full_n8_acc2(m, n, alpha, a, lda_bytes, x, y);
-                    return true;
+                    if (panel_n > 0) callGemvTransF64Kernel(vector_matrix_asm.sveDgemvTF64FullN8Acc2, m, panel_n, alpha, a, lda_bytes, x, y);
+                } else {
+                    if (panel_n > 0) callGemvTransF64Kernel(vector_matrix_asm.sveDgemvTF64FullN8, m, panel_n, alpha, a, lda_bytes, x, y);
                 }
-                zynum_blas_sve_dgemv_t_f64_full_n8(m, n, alpha, a, lda_bytes, x, y);
+                if (panel_n < n) {
+                    const tail_a = a + panel_n * @as(usize, @intCast(lda));
+                    callGemvTransF64Kernel(vector_matrix_asm.sveDgemvTF64, m, n - panel_n, alpha, tail_a, lda_bytes, x, y + panel_n);
+                }
                 return true;
             }
-            zynum_blas_sve_dgemv_t_f64(m, n, alpha, a, lda_bytes, x, y);
-            return true;
-        }
-    }
-    if (comptime enable_asimd_gemv_t and features.has_asimd) {
-        if (m >= 64 and n >= 8) {
-            zynum_blas_asimd_dgemv_t_f64(m, n, alpha, a, lda_bytes, x, y);
+            callGemvTransF64Kernel(vector_matrix_asm.sveDgemvTF64, m, n, alpha, a, lda_bytes, x, y);
             return true;
         }
     }
@@ -368,7 +283,7 @@ fn gemvTransSme2F64(
     sm_state.startSmZa();
     defer sm_state.stopSmZa();
 
-    zynum_blas_sme2_dgemv_t_f64_8x32(m, n, alpha, beta, a, lda_bytes, x, y);
+    callSme2GemvF64Kernel(vector_matrix_asm.sme2DgemvTF648x32, m, n, alpha, beta, a, lda_bytes, x, y);
     return true;
 }
 
@@ -479,20 +394,5 @@ pub fn gerUnitReal(
     if (T == f64) {
         if (gerUnitRealSmeF64(m, n, alpha, x, y, a, lda)) return true;
     }
-    if (comptime enable_sve_ger and features.has_sve) {
-        const sve_lanes = features.sveVectorBytes() / @sizeOf(f64);
-        if (T == f64 and sve_lanes > 0 and (m % sve_lanes) == 0 and m >= 256 and n >= 4 and m *| n >= 512 * 512 and lda > 0) {
-            const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
-            zynum_blas_sve_dger_f64(m, n, alpha, x, y, a, lda_bytes);
-            return true;
-        }
-    }
-    if (comptime !enable_asimd_ger) return false;
-    if (T != f64) return false;
-    if (comptime !features.has_asimd) return false;
-    if (m == 0 or n == 0 or lda <= 0) return false;
-
-    const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
-    zynum_blas_asimd_dger_f64(m, n, alpha, x, y, a, lda_bytes);
-    return true;
+    return false;
 }

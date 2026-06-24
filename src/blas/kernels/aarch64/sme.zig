@@ -7,6 +7,7 @@ const gemm_task = @import("../matrix_matrix/task.zig");
 const asimd = @import("asimd.zig");
 const amx = @import("amx_gemm.zig");
 const features = @import("features.zig");
+const sme_gemm_asm = @import("sme_gemm_asm.zig");
 const sve2 = @import("sve2.zig");
 
 const matIndex = gemm_task.matIndex;
@@ -77,21 +78,9 @@ fn acquireSmePack(comptime T: type, len: usize, cache_bytes: usize) ?PackWorkspa
     @compileError("SME pack workspace supports f32 and f64");
 }
 
-extern fn zynum_blas_sme_sgemm_panel_f32(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_sgemm_panel4m_f32(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_sgemm_panel2x2_f32(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_sgemm_panel1x2_f32(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_sgemm_panels2x2_f32(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize, panel_count: usize) callconv(.c) void;
-extern fn zynum_blas_sme_sgemm_panels2x2_u4_f32(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize, panel_count: usize) callconv(.c) void;
-extern fn zynum_blas_sme_dgemm_panel_f64(a: [*]const f64, b_pack: [*]const f64, c: [*]f64, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_dgemm_panel4m_f64(a: [*]const f64, b_pack: [*]const f64, c: [*]f64, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_dgemm_panel2x2_f64(a: [*]const f64, b_pack: [*]const f64, c: [*]f64, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_dgemm_panel4x2_f64(a: [*]const f64, b_pack: [*]const f64, c: [*]f64, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize) callconv(.c) void;
-extern fn zynum_blas_sme_dgemm_panels4x2_f64(a: [*]const f64, b_pack: [*]const f64, c: [*]f64, m_full: usize, k: usize, lda_bytes: usize, ldc_bytes: usize, panel_count: usize) callconv(.c) void;
-
 inline fn callSmeGemmPanel(
     comptime T: type,
-    comptime kernel: fn ([*]const T, [*]const T, [*]T, usize, usize, usize, usize) callconv(.c) void,
+    comptime kernel: anytype,
     a: [*]const T,
     b_pack: [*]const T,
     c: [*]T,
@@ -104,12 +93,13 @@ inline fn callSmeGemmPanel(
     sm_state.startSmZa();
     defer sm_state.stopSmZa();
 
-    kernel(a, b_pack, c, m_full, k, lda_bytes, ldc_bytes);
+    const Kernel = *const fn ([*]const T, [*]const T, [*]T, usize, usize, usize, usize) callconv(.c) void;
+    @as(Kernel, @ptrCast(&kernel))(a, b_pack, c, m_full, k, lda_bytes, ldc_bytes);
 }
 
 inline fn callSmeGemmPanelBatch(
     comptime T: type,
-    comptime kernel: fn ([*]const T, [*]const T, [*]T, usize, usize, usize, usize, usize) callconv(.c) void,
+    comptime kernel: anytype,
     a: [*]const T,
     b_pack: [*]const T,
     c: [*]T,
@@ -123,7 +113,8 @@ inline fn callSmeGemmPanelBatch(
     sm_state.startSmZa();
     defer sm_state.stopSmZa();
 
-    kernel(a, b_pack, c, m_full, k, lda_bytes, ldc_bytes, panel_count);
+    const Kernel = *const fn ([*]const T, [*]const T, [*]T, usize, usize, usize, usize, usize) callconv(.c) void;
+    @as(Kernel, @ptrCast(&kernel))(a, b_pack, c, m_full, k, lda_bytes, ldc_bytes, panel_count);
 }
 
 pub fn preferredColumnBlock(comptime T: type) usize {
@@ -391,11 +382,11 @@ fn noTransRealF32SmeDirectWithPack(task: gemm_task.Task(f32), tile: usize, b_pac
         if (full_rows_2m != 0) {
             const c_panel = task.c + matIndex(task.ldc, 0, batch_j);
             if (task.execution.f32_panel == .panels2x2_u4 and canUseF32Panels2x2U4(task, tile)) {
-                callSmeGemmPanelBatch(f32, zynum_blas_sme_sgemm_panels2x2_u4_f32, task.a, b_pack.ptr, c_panel, full_rows_2m, task.k, lda_bytes, ldc_bytes, batch_panels);
+                callSmeGemmPanelBatch(f32, sme_gemm_asm.sgemmPanels2x2U4F32, task.a, b_pack.ptr, c_panel, full_rows_2m, task.k, lda_bytes, ldc_bytes, batch_panels);
             } else if (batch_panels == 1) {
-                callSmeGemmPanel(f32, zynum_blas_sme_sgemm_panel2x2_f32, task.a, b_pack.ptr, c_panel, full_rows_2m, task.k, lda_bytes, ldc_bytes);
+                callSmeGemmPanel(f32, sme_gemm_asm.sgemmPanel2x2F32, task.a, b_pack.ptr, c_panel, full_rows_2m, task.k, lda_bytes, ldc_bytes);
             } else {
-                callSmeGemmPanelBatch(f32, zynum_blas_sme_sgemm_panels2x2_f32, task.a, b_pack.ptr, c_panel, full_rows_2m, task.k, lda_bytes, ldc_bytes, batch_panels);
+                callSmeGemmPanelBatch(f32, sme_gemm_asm.sgemmPanels2x2F32, task.a, b_pack.ptr, c_panel, full_rows_2m, task.k, lda_bytes, ldc_bytes, batch_panels);
             }
         }
 
@@ -404,14 +395,14 @@ fn noTransRealF32SmeDirectWithPack(task: gemm_task.Task(f32), tile: usize, b_pac
             const a_panel = task.a + matIndex(task.lda, full_rows_2m, 0);
             const c_panel = task.c + matIndex(task.ldc, full_rows_2m, batch_j);
             if (batch_panels == 1) {
-                callSmeGemmPanel(f32, zynum_blas_sme_sgemm_panel1x2_f32, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_2m, task.k, lda_bytes, ldc_bytes);
+                callSmeGemmPanel(f32, sme_gemm_asm.sgemmPanel1x2F32, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_2m, task.k, lda_bytes, ldc_bytes);
             } else {
                 var residual_panel_index: usize = 0;
                 var tail_j = batch_j;
                 while (residual_panel_index < batch_panels) : (residual_panel_index += 1) {
                     const panel_offset = residual_panel_index * panel2_elems;
                     const panel_c = task.c + matIndex(task.ldc, full_rows_2m, tail_j);
-                    callSmeGemmPanel(f32, zynum_blas_sme_sgemm_panel1x2_f32, a_panel, b_pack.ptr + panel_offset, panel_c, full_rows - full_rows_2m, task.k, lda_bytes, ldc_bytes);
+                    callSmeGemmPanel(f32, sme_gemm_asm.sgemmPanel1x2F32, a_panel, b_pack.ptr + panel_offset, panel_c, full_rows - full_rows_2m, task.k, lda_bytes, ldc_bytes);
                     tail_j += panel2_cols;
                 }
             }
@@ -432,12 +423,12 @@ fn noTransRealF32SmeDirectWithPack(task: gemm_task.Task(f32), tile: usize, b_pac
 
         if (full_rows_4m != 0) {
             const c_panel = task.c + matIndex(task.ldc, 0, j);
-            callSmeGemmPanel(f32, zynum_blas_sme_sgemm_panel4m_f32, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes);
+            callSmeGemmPanel(f32, sme_gemm_asm.sgemmPanel4mF32, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes);
         }
         if (full_rows_4m < full_rows) {
             const a_panel = task.a + matIndex(task.lda, full_rows_4m, 0);
             const c_panel = task.c + matIndex(task.ldc, full_rows_4m, j);
-            callSmeGemmPanel(f32, zynum_blas_sme_sgemm_panel_f32, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_4m, task.k, lda_bytes, ldc_bytes);
+            callSmeGemmPanel(f32, sme_gemm_asm.sgemmPanelF32, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_4m, task.k, lda_bytes, ldc_bytes);
         }
         tailRowsDirect(f32, task, b_pack, full_rows, j, tile);
     }
@@ -510,9 +501,9 @@ fn noTransRealF64SmeDirectWithPack(task: gemm_task.Task(f64), tile: usize, b_pac
         if (full_rows_4m != 0) {
             const c_panel = task.c + matIndex(task.ldc, 0, batch_j);
             if (batch_panels == 1) {
-                callSmeGemmPanel(f64, zynum_blas_sme_dgemm_panel4x2_f64, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes);
+                callSmeGemmPanel(f64, sme_gemm_asm.dgemmPanel4x2F64, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes);
             } else {
-                callSmeGemmPanelBatch(f64, zynum_blas_sme_dgemm_panels4x2_f64, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes, batch_panels);
+                callSmeGemmPanelBatch(f64, sme_gemm_asm.dgemmPanels4x2F64, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes, batch_panels);
             }
         }
 
@@ -523,7 +514,7 @@ fn noTransRealF64SmeDirectWithPack(task: gemm_task.Task(f64), tile: usize, b_pac
             if (full_rows_4m < full_rows_2m) {
                 const a_panel = task.a + matIndex(task.lda, full_rows_4m, 0);
                 const c_panel = task.c + matIndex(task.ldc, full_rows_4m, tail_j);
-                callSmeGemmPanel(f64, zynum_blas_sme_dgemm_panel2x2_f64, a_panel, b_pack.ptr + panel_offset, c_panel, full_rows_2m - full_rows_4m, task.k, lda_bytes, ldc_bytes);
+                callSmeGemmPanel(f64, sme_gemm_asm.dgemmPanel2x2F64, a_panel, b_pack.ptr + panel_offset, c_panel, full_rows_2m - full_rows_4m, task.k, lda_bytes, ldc_bytes);
             }
             tailRowsDirect(f64, task, b_pack[panel_offset .. panel_offset + panel_elems], full_rows_2m, tail_j, panel2_cols);
             tail_j += panel2_cols;
@@ -535,12 +526,12 @@ fn noTransRealF64SmeDirectWithPack(task: gemm_task.Task(f64), tile: usize, b_pac
 
         if (full_rows_4m != 0) {
             const c_panel = task.c + matIndex(task.ldc, 0, j);
-            callSmeGemmPanel(f64, zynum_blas_sme_dgemm_panel4m_f64, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes);
+            callSmeGemmPanel(f64, sme_gemm_asm.dgemmPanel4mF64, task.a, b_pack.ptr, c_panel, full_rows_4m, task.k, lda_bytes, ldc_bytes);
         }
         if (full_rows_4m < full_rows) {
             const a_panel = task.a + matIndex(task.lda, full_rows_4m, 0);
             const c_panel = task.c + matIndex(task.ldc, full_rows_4m, j);
-            callSmeGemmPanel(f64, zynum_blas_sme_dgemm_panel_f64, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_4m, task.k, lda_bytes, ldc_bytes);
+            callSmeGemmPanel(f64, sme_gemm_asm.dgemmPanelF64, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_4m, task.k, lda_bytes, ldc_bytes);
         }
         tailRowsDirect(f64, task, b_pack, full_rows, j, tile);
     }

@@ -13,7 +13,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .link_libc = true,
     });
-    const zynum_blas_mod = b.addModule("zynum-blas", .{
+    _ = b.addModule("zynum-blas", .{
         .root_source_file = b.path("src/blas.zig"),
         .target = target,
         .optimize = optimize,
@@ -37,24 +37,6 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .link_libc = true,
     });
-    if (target.result.cpu.arch == .aarch64) {
-        const sme_gemm_files = [_]std.Build.LazyPath{
-            b.path("src/blas/kernels/aarch64/sme_f32_gemm.S"),
-            b.path("src/blas/kernels/aarch64/sme_f64_gemm.S"),
-            b.path("src/blas/kernels/aarch64/vector_matrix_sve.S"),
-        };
-        const modules = [_]*std.Build.Module{
-            zynum_mod,
-            zynum_blas_mod,
-            blas_compat_mod,
-            fortran_compat_mod,
-            cblas_compat_mod,
-        };
-        for (modules) |mod| {
-            for (sme_gemm_files) |asm_file| mod.addAssemblyFile(asm_file);
-        }
-    }
-
     const lib = b.addLibrary(.{
         .name = "zynum_blas",
         .linkage = .dynamic,
