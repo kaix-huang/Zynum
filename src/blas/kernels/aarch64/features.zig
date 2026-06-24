@@ -44,10 +44,76 @@ pub fn streamingVectorBytes() usize {
     );
 }
 
-pub fn smstartZa() void {
-    if (comptime has_sme) asm volatile ("smstart za" ::: .{ .memory = true });
-}
+pub const StreamingModeState = struct {
+    saved_d8_d15: [8]u64 = undefined,
 
-pub fn smstopZa() void {
-    if (comptime has_sme) asm volatile ("smstop za" ::: .{ .memory = true });
-}
+    pub inline fn startSm(self: *StreamingModeState) void {
+        if (comptime !has_sme) return;
+        asm volatile (
+            \\stp d8, d9, [x10]
+            \\stp d10, d11, [x10, #16]
+            \\stp d12, d13, [x10, #32]
+            \\stp d14, d15, [x10, #48]
+            \\smstart sm
+            :
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+            : .{ .memory = true });
+    }
+
+    pub inline fn startSmZa(self: *StreamingModeState) void {
+        if (comptime !has_sme) return;
+        asm volatile (
+            \\stp d8, d9, [x10]
+            \\stp d10, d11, [x10, #16]
+            \\stp d12, d13, [x10, #32]
+            \\stp d14, d15, [x10, #48]
+            \\smstart sm
+            \\smstart za
+            :
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+            : .{ .memory = true });
+    }
+
+    pub inline fn stopSm(self: *StreamingModeState) void {
+        if (comptime !has_sme) return;
+        asm volatile (
+            \\smstop sm
+            \\ldp d8, d9, [x10]
+            \\ldp d10, d11, [x10, #16]
+            \\ldp d12, d13, [x10, #32]
+            \\ldp d14, d15, [x10, #48]
+            :
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+            : .{ .memory = true });
+    }
+
+    pub inline fn stopSmRetU64(self: *StreamingModeState, result_bits: u64) u64 {
+        if (comptime !has_sme) return result_bits;
+        return asm volatile (
+            \\mov x9, x11
+            \\smstop sm
+            \\ldp d8, d9, [x10]
+            \\ldp d10, d11, [x10, #16]
+            \\ldp d12, d13, [x10, #32]
+            \\ldp d14, d15, [x10, #48]
+            \\mov x0, x9
+            : [result] "={x0}" (-> u64),
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+              [result_bits] "{x11}" (result_bits),
+            : .{ .memory = true });
+    }
+
+    pub inline fn stopSmZa(self: *StreamingModeState) void {
+        if (comptime !has_sme) return;
+        asm volatile (
+            \\smstop za
+            \\smstop sm
+            \\ldp d8, d9, [x10]
+            \\ldp d10, d11, [x10, #16]
+            \\ldp d12, d13, [x10, #32]
+            \\ldp d14, d15, [x10, #48]
+            :
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+            : .{ .memory = true });
+    }
+};

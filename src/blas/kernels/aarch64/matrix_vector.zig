@@ -237,6 +237,10 @@ fn gerUnitRealSmeF64(
     if (tile == 0 or (m % tile) != 0 or (n % tile) != 0) return false;
 
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
+    var sm_state: features.StreamingModeState = undefined;
+    sm_state.startSmZa();
+    defer sm_state.stopSmZa();
+
     zynum_blas_sme_dger_f64(m, n, alpha, x, y, a, lda_bytes);
     return true;
 }
@@ -273,6 +277,10 @@ fn gemvNoTransSme2F64(
     if (features.streamingVectorBytes() != 64) return false;
     if (m < 512 or n < 512 or m > 1536 or n > 1536 or (m & 255) != 0) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
+    var sm_state: features.StreamingModeState = undefined;
+    sm_state.startSmZa();
+    defer sm_state.stopSmZa();
+
     zynum_blas_sme2_dgemv_n_f64_256x1(m, n, alpha, beta, a, lda_bytes, x, y);
     return true;
 }
@@ -356,6 +364,10 @@ fn gemvTransSme2F64(
     if (features.streamingVectorBytes() != 64) return false;
     if (m < 512 or n < 8 or m > 1536 or n > 1536 or (m & 31) != 0 or (n & 7) != 0) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(f64);
+    var sm_state: features.StreamingModeState = undefined;
+    sm_state.startSmZa();
+    defer sm_state.stopSmZa();
+
     zynum_blas_sme2_dgemv_t_f64_8x32(m, n, alpha, beta, a, lda_bytes, x, y);
     return true;
 }

@@ -45,7 +45,11 @@ pub fn axpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T
 pub fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T {
     if (comptime enable_sme_ddot and features.has_sme2) {
         if (T == f64 and n >= 512 * 1024 and features.streamingVectorBytes() == 64) {
-            return zynum_blas_sme_ddot_f64(n, x, y);
+            var sm_state: features.StreamingModeState = undefined;
+            sm_state.startSm();
+            const result = zynum_blas_sme_ddot_f64(n, x, y);
+            const stopped_result_bits = sm_state.stopSmRetU64(@bitCast(result));
+            return @bitCast(stopped_result_bits);
         }
     }
     if (comptime !enable_asimd_ddot) return null;

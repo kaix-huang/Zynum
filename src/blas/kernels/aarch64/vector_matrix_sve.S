@@ -13,21 +13,9 @@
 #define ZYNUM_SYMBOL(name) name
 #endif
 
-.macro ZYNUM_SME_ABI_SAVE
-    sub sp, sp, #64
-    stp d8, d9, [sp]
-    stp d10, d11, [sp, #16]
-    stp d12, d13, [sp, #32]
-    stp d14, d15, [sp, #48]
-.endm
-
-.macro ZYNUM_SME_ABI_RESTORE
-    ldp d8, d9, [sp]
-    ldp d10, d11, [sp, #16]
-    ldp d12, d13, [sp, #32]
-    ldp d14, d15, [sp, #48]
-    add sp, sp, #64
-.endm
+// SVE/ASIMD symbols in this file run in the normal non-streaming state.
+// SME/SME2 body symbols assume their Zig caller has already entered SM and,
+// for ZA users, enabled ZA through features.StreamingModeState.
 
 // void zynum_blas_sve_dgemv_t_f64(
 //     usize m, usize n, double alpha, const double *a, usize lda_bytes,
@@ -600,10 +588,6 @@ ZYNUM_SYMBOL(zynum_blas_sve_dgemv_t_f64_n16):
 ZYNUM_SYMBOL(zynum_blas_sme2_dgemv_n_f64_256x1):
     cbz x0, .Lsme2_n_done_return
     cbz x1, .Lsme2_n_done_return
-
-    ZYNUM_SME_ABI_SAVE
-    smstart sm
-    smstart za
     ptrue pn8.d
 
     mov x6, x2              // Current 256-row A panel.
@@ -739,10 +723,6 @@ ZYNUM_SYMBOL(zynum_blas_sme2_dgemv_n_f64_256x1):
     subs x14, x14, #256
     b.ne .Lsme2_n_rows256
 
-    smstop za
-    smstop sm
-    ZYNUM_SME_ABI_RESTORE
-
 .Lsme2_n_done_return:
     ret
 
@@ -758,10 +738,6 @@ ZYNUM_SYMBOL(zynum_blas_sme2_dgemv_n_f64_256x1):
 ZYNUM_SYMBOL(zynum_blas_sme2_dgemv_t_f64_8x32):
     cbz x0, .Lsme2_t_done_return
     cbz x1, .Lsme2_t_done_return
-
-    ZYNUM_SME_ABI_SAVE
-    smstart sm
-    smstart za
     ptrue pn8.d
 
     mov x7, x2              // Current 8-column A panel.
@@ -858,10 +834,6 @@ ZYNUM_SYMBOL(zynum_blas_sme2_dgemv_t_f64_8x32):
     add x7, x7, x6
     subs x15, x15, #8
     b.ne .Lsme2_t_cols
-
-    smstop za
-    smstop sm
-    ZYNUM_SME_ABI_RESTORE
 
 .Lsme2_t_done_return:
     ret
@@ -1611,8 +1583,6 @@ ZYNUM_SYMBOL(zynum_blas_sve_dscal_f64):
 ZYNUM_SYMBOL(zynum_blas_sme_dscal_f64):
     cbz x0, .Lsme_scal_done_return
     fmov x9, d0
-    ZYNUM_SME_ABI_SAVE
-    smstart sm
     fmov d4, x9
     mov z4.d, d4
     ptrue p0.d
@@ -1647,8 +1617,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_dscal_f64):
     st1d { z0.d }, p1, [x1]
 
 .Lsme_scal_done:
-    smstop sm
-    ZYNUM_SME_ABI_RESTORE
 
 .Lsme_scal_done_return:
     ret
@@ -1658,9 +1626,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_dscal_f64):
 .p2align 2
 ZYNUM_SYMBOL(zynum_blas_sme_ddot_f64):
     cbz x0, .Lsme_ddot_zero
-
-    ZYNUM_SME_ABI_SAVE
-    smstart sm
     ptrue p0.d
     cntd x6
     lsl x7, x6, #2
@@ -1709,8 +1674,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_ddot_f64):
     fadd z0.d, z0.d, z2.d
     faddv d16, p0, z0.d
     fmov x9, d16
-    smstop sm
-    ZYNUM_SME_ABI_RESTORE
     fmov d0, x9
     ret
 
@@ -1927,9 +1890,6 @@ ZYNUM_SYMBOL(zynum_blas_asimd_dasum_f64):
 .p2align 2
 ZYNUM_SYMBOL(zynum_blas_sme_dasum_f64):
     cbz x0, .Lsme_asum_zero
-
-    ZYNUM_SME_ABI_SAVE
-    smstart sm
     ptrue p0.d
     cntd x6
     lsl x7, x6, #2
@@ -1976,8 +1936,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_dasum_f64):
     fadd z0.d, z0.d, z2.d
     faddv d16, p0, z0.d
     fmov x9, d16
-    smstop sm
-    ZYNUM_SME_ABI_RESTORE
     fmov d0, x9
     ret
 
@@ -2356,9 +2314,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_dger_f64):
     cbz x1, .Lsme_ger_return
 
     rdsvl x14, #1
-    ZYNUM_SME_ABI_SAVE
-    smstart sm
-    smstart za
     ptrue p0.d
 
     lsr x15, x14, #3          // f64 elements per SME tile.
@@ -2417,9 +2372,6 @@ ZYNUM_SYMBOL(zynum_blas_sme_dger_f64):
     b .Lsme_ger_cols
 
 .Lsme_ger_done:
-    smstop za
-    smstop sm
-    ZYNUM_SME_ABI_RESTORE
 
 .Lsme_ger_return:
     ret
