@@ -15,8 +15,15 @@ Current release line: `0.0.1-beta`
   - `.zig-global-cache/`
   - `zig-out/`
   - `__pycache__/`
+  - `.DS_Store`
   - benchmark CSV/SVG artifacts unless they are curated docs assets under
     `docs/assets/`.
+- Keep machine-local instructions and private workflow notes out of source
+  control. Use `.git/info/exclude` for files such as `AGENTS.md` that are useful
+  on one workstation but should not appear in the public repository.
+- Keep raw profiler captures, LLDB transcripts, disassembly dumps, local sample
+  text files, and temporary probe binaries outside the public tree. Summarize
+  durable conclusions in optimization notes instead of committing raw captures.
 - Confirm these public-facing files are present:
   - `README.md`
   - `docs/README.md`
@@ -121,6 +128,25 @@ record:
 
 Cross-compilation and CI compile checks prove build coverage, not native
 throughput. Label unmeasured targets as unmeasured.
+
+## README Performance Charts Before Push
+
+Before pushing a change that affects kernels, benchmark tools, README
+performance claims, or release notes with performance summaries, refresh the
+README charts using `docs/common/benchmarking.md#readme-performance-charts`.
+
+The push-ready chart state is:
+
+- Old benchmark SVGs have been removed from `docs/assets/benchmarks/`.
+- The directory contains only the current curated README charts:
+  - `current_level1_all_types_three_libs.svg`
+  - `current_level2_all_types_three_libs.svg`
+  - `current_level3_all_types_more_shapes.svg`
+- Each chart visibly says `Higher is better`.
+- Bars and legends use `Zynum`, `Accelerate`, `OpenBLAS` order.
+- README displays all three charts, not only GEMM or only double-precision data.
+- The benchmark CSV files and metadata are retained outside source control unless
+  they are explicitly published as release artifacts.
 
 ## GitHub Setup
 

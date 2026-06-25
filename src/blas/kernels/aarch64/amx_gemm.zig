@@ -190,6 +190,24 @@ inline fn trn2F64(a: Vec2d, b: Vec2d) Vec2d {
 
 noinline fn amxSgemmMblocksN16(comptime m_blocks: usize, a: [*]const f32, b_pack: [*]const f32, c: [*]f32, k: usize, lda: usize, ldc: usize) void {
     var p: usize = 0;
+    while (p + 2 <= k) : (p += 2) {
+        amxLdy(ptrRowFlags(b_pack + (p + 0) * 16, 0, 0));
+        const init = p == 0;
+        inline for (0..m_blocks) |block| {
+            amxLdx(ptrRowFlags(a + block * 16 + (p + 0) * lda, 0, 0));
+            if (init) {
+                amxFma32(amxFma32RowOperand(block, true));
+            } else {
+                amxFma32(amxFma32RowOperand(block, false));
+            }
+        }
+
+        amxLdy(ptrRowFlags(b_pack + (p + 1) * 16, 0, 0));
+        inline for (0..m_blocks) |block| {
+            amxLdx(ptrRowFlags(a + block * 16 + (p + 1) * lda, 0, 0));
+            amxFma32(amxFma32RowOperand(block, false));
+        }
+    }
     while (p < k) : (p += 1) {
         amxLdy(ptrRowFlags(b_pack + p * 16, 0, 0));
         const skip_z = p == 0;
@@ -198,7 +216,7 @@ noinline fn amxSgemmMblocksN16(comptime m_blocks: usize, a: [*]const f32, b_pack
             if (skip_z) {
                 amxFma32(amxFma32RowOperand(block, true));
             } else {
-                amxMatfp(amxMatfp32RowOperand(block));
+                amxFma32(amxFma32RowOperand(block, false));
             }
         }
     }
@@ -217,6 +235,87 @@ inline fn amxSgemmMblocksN16Dispatch(a: [*]const f32, b_pack: [*]const f32, c: [
         2 => amxSgemmMblocksN16(2, a, b_pack, c, k, lda, ldc),
         3 => amxSgemmMblocksN16(3, a, b_pack, c, k, lda, ldc),
         4 => amxSgemmMblocksN16(4, a, b_pack, c, k, lda, ldc),
+        else => unreachable,
+    }
+}
+
+noinline fn amxSgemmMblocksN16BStride32(comptime m_blocks: usize, a: [*]const f32, b_pack: [*]const f32, c: [*]f32, k: usize, lda: usize, ldc: usize) void {
+    var p: usize = 0;
+    while (p + 2 <= k) : (p += 2) {
+        amxLdy(ptrRowFlags(b_pack + (p + 0) * 32, 0, 0));
+        const init = p == 0;
+        inline for (0..m_blocks) |block| {
+            amxLdx(ptrRowFlags(a + block * 16 + (p + 0) * lda, 0, 0));
+            if (init) {
+                amxFma32(amxFma32RowOperand(block, true));
+            } else {
+                amxFma32(amxFma32RowOperand(block, false));
+            }
+        }
+
+        amxLdy(ptrRowFlags(b_pack + (p + 1) * 32, 0, 0));
+        inline for (0..m_blocks) |block| {
+            amxLdx(ptrRowFlags(a + block * 16 + (p + 1) * lda, 0, 0));
+            amxFma32(amxFma32RowOperand(block, false));
+        }
+    }
+    while (p < k) : (p += 1) {
+        amxLdy(ptrRowFlags(b_pack + p * 32, 0, 0));
+        const skip_z = p == 0;
+        inline for (0..m_blocks) |block| {
+            amxLdx(ptrRowFlags(a + block * 16 + p * lda, 0, 0));
+            if (skip_z) {
+                amxFma32(amxFma32RowOperand(block, true));
+            } else {
+                amxFma32(amxFma32RowOperand(block, false));
+            }
+        }
+    }
+
+    var j: usize = 0;
+    while (j < 16) : (j += 1) {
+        inline for (0..m_blocks) |block| {
+            amxStz(ptrRowFlags(c + block * 16 + j * ldc, j * 4 + block, 0));
+        }
+    }
+}
+
+inline fn amxSgemmMblocksN16BStride32Dispatch(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, k: usize, lda: usize, ldc: usize, m_blocks: usize) void {
+    switch (m_blocks) {
+        1 => amxSgemmMblocksN16BStride32(1, a, b_pack, c, k, lda, ldc),
+        2 => amxSgemmMblocksN16BStride32(2, a, b_pack, c, k, lda, ldc),
+        3 => amxSgemmMblocksN16BStride32(3, a, b_pack, c, k, lda, ldc),
+        4 => amxSgemmMblocksN16BStride32(4, a, b_pack, c, k, lda, ldc),
+        else => unreachable,
+    }
+}
+
+fn amxSgemvMblocksN16(comptime m_blocks: usize, a: [*]const f32, b_pack: [*]const f32, c: [*]f32, k: usize, lda: usize) void {
+    var p: usize = 0;
+    while (p < k) : (p += 1) {
+        amxLdy(ptrRowFlags(b_pack + p * 16, 0, 0));
+        const skip_z = p == 0;
+        inline for (0..m_blocks) |block| {
+            amxLdx(ptrRowFlags(a + block * 16 + p * lda, 0, 0));
+            if (skip_z) {
+                amxFma32(amxFma32RowOperand(block, true));
+            } else {
+                amxMatfp(amxMatfp32RowOperand(block));
+            }
+        }
+    }
+
+    inline for (0..m_blocks) |block| {
+        amxStz(ptrRowFlags(c + block * 16, block, 0));
+    }
+}
+
+inline fn amxSgemvMblocksN16Dispatch(a: [*]const f32, b_pack: [*]const f32, c: [*]f32, k: usize, lda: usize, m_blocks: usize) void {
+    switch (m_blocks) {
+        1 => amxSgemvMblocksN16(1, a, b_pack, c, k, lda),
+        2 => amxSgemvMblocksN16(2, a, b_pack, c, k, lda),
+        3 => amxSgemvMblocksN16(3, a, b_pack, c, k, lda),
+        4 => amxSgemvMblocksN16(4, a, b_pack, c, k, lda),
         else => unreachable,
     }
 }
@@ -298,8 +397,8 @@ fn packB16F32_4x4(b_pack: [*]f32, b: [*]const f32, j_start: usize, k: usize, ldb
 fn packB32F32_4x4(b_pack: [*]f32, b: [*]const f32, j_start: usize, k: usize, ldb: usize) void {
     var p: usize = 0;
     while (p + 4 <= k) : (p += 4) {
-        var col: usize = 0;
-        while (col < 32) : (col += 4) {
+        inline for (0..8) |block| {
+            const col = block * 4;
             const v0 = loadF32x4(b + p + (j_start + col + 0) * ldb);
             const v1 = loadF32x4(b + p + (j_start + col + 1) * ldb);
             const v2 = loadF32x4(b + p + (j_start + col + 2) * ldb);
@@ -330,9 +429,11 @@ fn amxSgemmN16Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b:
     while (j < n) : (j += 16) {
         packB16F32_4x4(b_pack, b, j, k, ldb);
         var i: usize = 0;
-        while (i < m) : (i += 64) {
-            var m_blocks = (m - i) / 16;
-            if (m_blocks > 4) m_blocks = 4;
+        while (i + 64 <= m) : (i += 64) {
+            amxSgemmMblocksN16(4, a + i, b_pack, c + i + j * ldc, k, lda, ldc);
+        }
+        if (i < m) {
+            const m_blocks = (m - i) / 16;
             amxSgemmMblocksN16Dispatch(a + i, b_pack, c + i + j * ldc, k, lda, ldc, m_blocks);
         }
     }
@@ -345,8 +446,20 @@ fn amxSgemmN32Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b:
     while (j < n) : (j += 32) {
         packB32F32_4x4(b_pack, b, j, k, ldb);
         var i: usize = 0;
-        while (i < m) : (i += 32) {
-            amxSgemmM32N32(a + i, b_pack, c + i + j * ldc, k, lda, ldc);
+        if ((k & 1) != 0) {
+            while (i + 64 <= m) : (i += 64) {
+                amxSgemmMblocksN16BStride32(4, a + i, b_pack, c + i + j * ldc, k, lda, ldc);
+                amxSgemmMblocksN16BStride32(4, a + i, b_pack + 16, c + i + (j + 16) * ldc, k, lda, ldc);
+            }
+            if (i < m) {
+                const m_blocks = (m - i) / 16;
+                amxSgemmMblocksN16BStride32Dispatch(a + i, b_pack, c + i + j * ldc, k, lda, ldc, m_blocks);
+                amxSgemmMblocksN16BStride32Dispatch(a + i, b_pack + 16, c + i + (j + 16) * ldc, k, lda, ldc, m_blocks);
+            }
+        } else {
+            while (i < m) : (i += 32) {
+                amxSgemmM32N32(a + i, b_pack, c + i + j * ldc, k, lda, ldc);
+            }
         }
     }
 }
@@ -423,6 +536,26 @@ pub export fn zynum_blas_amx_sgemm_nn_f32_n32(m_: c_int, n_: c_int, k_: c_int, a
 
 pub export fn zynum_blas_amx_sgemm_nn_f32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
     return zynum_blas_amx_sgemm_nn_f32_n16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
+}
+
+pub fn sgemvN16PackedB(m_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b_pack: [*]const f32, c: [*]f32) c_int {
+    if (m_ <= 0 or k_ <= 0) return 1;
+    if ((m_ & 15) != 0) return 0;
+
+    const m: usize = @intCast(m_);
+    const k: usize = @intCast(k_);
+    const lda: usize = @intCast(lda_);
+
+    amxSet();
+    defer amxClr();
+
+    var i: usize = 0;
+    while (i < m) : (i += 64) {
+        var m_blocks = (m - i) / 16;
+        if (m_blocks > 4) m_blocks = 4;
+        amxSgemvMblocksN16Dispatch(a + i, b_pack, c + i, k, lda, m_blocks);
+    }
+    return 1;
 }
 
 fn amxDgemmMblocksN8(comptime m_blocks: usize, a: [*]const f64, b_pack: [*]const f64, c: [*]f64, k: usize, lda: usize, ldc: usize) void {

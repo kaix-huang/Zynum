@@ -9,6 +9,7 @@ import sys
 from collections import defaultdict
 
 COLORS = {
+    "Zynum": "#2563eb",
     "zynum-blas": "#2563eb",
     "Accelerate": "#dc2626",
     "OpenBLAS": "#16a34a",
@@ -16,8 +17,10 @@ COLORS = {
 }
 
 DISPLAY_NAMES = {
-    "zynum-blas": "Zynum BLAS",
+    "zynum-blas": "Zynum",
 }
+
+LIB_ORDER = ["Zynum", "zynum-blas", "Accelerate", "OpenBLAS", "MKL"]
 
 
 def display_name(value):
@@ -173,7 +176,7 @@ def main():
             )
 
     labels_by_index = {}
-    libs = []
+    seen_libs = []
     for row in rows:
         label = f"{row['label']}\\n{row['m']}x{row['n']}x{row['k']}"
         old_label = labels_by_index.get(row["shape_index"])
@@ -182,8 +185,10 @@ def main():
                 f"shape_index {row['shape_index']} maps to both {old_label!r} and {label!r}"
             )
         labels_by_index[row["shape_index"]] = label
-        if row["library"] not in libs:
-            libs.append(row["library"])
+        if row["library"] not in seen_libs:
+            seen_libs.append(row["library"])
+    libs = [lib for lib in LIB_ORDER if lib in seen_libs]
+    libs.extend(lib for lib in seen_libs if lib not in libs)
     sorted_indices = sorted(labels_by_index)
     expected_indices = list(range(len(sorted_indices)))
     if sorted_indices != expected_indices:
@@ -228,6 +233,7 @@ def main():
 """
     )
     title, subtitle = plot_heading(kinds, libs)
+    subtitle = "Higher is better. " + subtitle
     svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>')
     svg.append(f'<text x="40" y="42" class="title">{html.escape(title)}</text>')
     svg.append(f'<text x="40" y="66" class="subtitle">{html.escape(subtitle)}</text>')

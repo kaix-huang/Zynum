@@ -116,4 +116,38 @@ pub const StreamingModeState = struct {
             : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
             : .{ .memory = true });
     }
+
+    pub inline fn stopSmZaRetU64(self: *StreamingModeState, result_bits: u64) u64 {
+        if (comptime !has_sme) return result_bits;
+        return asm volatile (
+            \\mov x9, x11
+            \\smstop za
+            \\smstop sm
+            \\ldp d8, d9, [x10]
+            \\ldp d10, d11, [x10, #16]
+            \\ldp d12, d13, [x10, #32]
+            \\ldp d14, d15, [x10, #48]
+            \\mov x0, x9
+            : [result] "={x0}" (-> u64),
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+              [result_bits] "{x11}" (result_bits),
+            : .{ .memory = true });
+    }
+
+    pub inline fn stopSmZaRetU32(self: *StreamingModeState, result_bits: u32) u32 {
+        if (comptime !has_sme) return result_bits;
+        return asm volatile (
+            \\mov w9, w11
+            \\smstop za
+            \\smstop sm
+            \\ldp d8, d9, [x10]
+            \\ldp d10, d11, [x10, #16]
+            \\ldp d12, d13, [x10, #32]
+            \\ldp d14, d15, [x10, #48]
+            \\mov w0, w9
+            : [result] "={w0}" (-> u32),
+            : [saved] "{x10}" (@intFromPtr(&self.saved_d8_d15)),
+              [result_bits] "{w11}" (result_bits),
+            : .{ .memory = true });
+    }
 };

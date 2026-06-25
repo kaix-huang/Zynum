@@ -29,15 +29,28 @@ single C/Fortran-compatible, Zig-native numerical runtime spanning dense linear
 algebra, LAPACK-style decompositions, FFT, sparse kernels, CNN kernels, and
 Transformer workloads across portable and architecture-specific CPU kernels.
 
-![GEMM performance sweep on Apple M5](docs/assets/benchmarks/gemm_sweep_m5_all.svg)
+## Current Performance Snapshot
 
-<sub>Exploratory local snapshot: Apple M5/macOS, Zig 0.16.0,
-`--release=fast -Dcpu=apple_m4+sme2p1` because this Zig version does not yet
-name Apple M5 directly; SGEMM/DGEMM/CGEMM/ZGEMM default shape sweep, isolated
-comparator processes, `reps=30`, `process-repeats=2`, default comparator thread
-settings. Treat this as a quick visual performance signal, not a portable
-performance guarantee. See `docs/common/benchmarking.md` before quoting
-benchmark numbers.</sub>
+The charts below compare Zynum, Accelerate, and OpenBLAS in that order. Higher
+is better in every panel. These are local Apple Silicon benchmark snapshots with
+fresh-process comparator isolation, not portable performance guarantees; see
+`docs/common/benchmarking.md` before quoting numbers.
+
+![Level 1 current all-type performance](docs/assets/benchmarks/current_level1_all_types_three_libs.svg)
+
+<sub>Level 1 snapshot: real and complex f32/f64 vector routines plus copy paths;
+Accelerate does not export every extension symbol used by the all-type probe.</sub>
+
+![Level 2 current all-type performance](docs/assets/benchmarks/current_level2_all_types_three_libs.svg)
+
+<sub>Level 2 snapshot: real f32/f64 GEMV/SYMV/GER and complex f32/f64
+GEMV/HEMV/GERU/GERC at n=128, 256, and 512.</sub>
+
+![Level 3 current GEMM performance](docs/assets/benchmarks/current_level3_all_types_more_shapes.svg)
+
+<sub>Level 3 snapshot: SGEMM, DGEMM, CGEMM, and ZGEMM across the default GEMM
+sweep shape set, including square, remainder, skinny, wide, and K-varied
+column-major shapes.</sub>
 
 ## Highlights
 
@@ -374,11 +387,19 @@ src/blas/abi*                 Fortran and CBLAS compatibility ABI exports
 src/blas/gemm*                GEMM dispatch, task splitting, and worker experiments
 src/blas/kernels*             generic, AArch64, and x86_64 GEMM kernels
 include/zynum/blas*           generated compatibility headers and Fortran module
-bench*                        benchmark executables and helper scripts
-examples*                     Zig, C/CBLAS, and Fortran examples
-tools*                        project-level maintenance tools
-docs*                         architecture, usage, compatibility, roadmap, performance notes
+bench/*.zig                   benchmark executables and focused probe binaries
+bench/tools/*.py              isolated report, plotting, and benchmark-check helpers
+examples/*                    Zig, C/CBLAS, and Fortran examples
+tools/*                       project-level maintenance tools
+docs/*                        architecture, usage, compatibility, roadmap, performance notes
+docs/assets/benchmarks/*      curated README chart SVGs only
 ```
+
+Generated benchmark CSVs, raw traces, sampling output, disassembly notes,
+temporary binaries, machine-local instructions, and build products are not part
+of the public package. Keep them under ignored locations such as `zig-out/`,
+`.zig-cache/`, `/tmp`, or local Git excludes. Only curated documentation assets
+under `docs/assets/benchmarks/` should be checked in.
 
 ## Stability
 

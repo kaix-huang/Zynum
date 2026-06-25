@@ -446,6 +446,7 @@ fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
     if (task.alpha != 1 or task.beta != 0) return false;
     const n = task.n1 - task.n0;
     if (task.m % 16 != 0 or n % 16 != 0 or task.k == 0) return false;
+    if (task.k > 512) return false;
     if (task.execution.amx != .f32_n16 and task.execution.amx != .f32_n32) return false;
 
     const b_panel = task.b + matIndex(task.ldb, 0, task.n0);
@@ -464,10 +465,43 @@ fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
     };
 }
 
+fn noTransRealF32AmxFullPanels(task: gemm_task.Task(f32)) bool {
+    if (comptime builtin.target.os.tag != .macos) return false;
+    if (!task.allow_sme) return false;
+    if (task.alpha != 1 or task.beta != 0) return false;
+    const n = task.n1 - task.n0;
+    const n_full = n - n % 16;
+    if (n_full == 0 or n_full == n) return false;
+    if (task.m % 16 != 0 or task.k == 0) return false;
+    if (task.k > 512) return false;
+
+    const b_panel = task.b + matIndex(task.ldb, 0, task.n0);
+    const c_panel = task.c + matIndex(task.ldc, 0, task.n0);
+    const ok = amx.sgemmN16(
+        @intCast(task.m),
+        @intCast(n_full),
+        @intCast(task.k),
+        task.a,
+        @intCast(gemm_task.toUsize(task.lda)),
+        b_panel,
+        @intCast(gemm_task.toUsize(task.ldb)),
+        c_panel,
+        @intCast(gemm_task.toUsize(task.ldc)),
+        amx_fast_f32_pack_plan,
+    ) != 0;
+    if (!ok) return false;
+
+    var tail = task;
+    tail.n0 += n_full;
+    if (tail.n0 < tail.n1) asimd.noTransRealF32(tail);
+    return true;
+}
+
 fn noTransRealF32SmeDirect(task: gemm_task.Task(f32)) bool {
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;
     if (noTransRealF32Amx(task)) return true;
+    if (noTransRealF32AmxFullPanels(task)) return true;
 
     const tile = f32TileRows();
     if (!canUseSmeTile(f32, task, tile)) return false;

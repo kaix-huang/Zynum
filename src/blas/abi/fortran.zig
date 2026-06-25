@@ -37,6 +37,10 @@ fn reportXerbla(name: []const u8, info: BlasInt) void {
     std.debug.print(" ** On entry to {s} parameter number {d} had an illegal value\n", .{ routine_name, info });
 }
 
+inline fn copyContiguous(n: BlasInt, elem_size: usize, x: [*]const u8, y: [*]u8) void {
+    core.copyBytes(@as(usize, @intCast(n)) * elem_size, x, y);
+}
+
 test "xerbla routine names are trimmed" {
     const padded = [_]u8{ 'D', 'G', 'E', 'M', 'M', ' ' };
     const nul_terminated = [_]u8{ 'D', 'G', 'E', 'M', 'M', 0, 'X' };
@@ -101,17 +105,49 @@ pub export fn zswap_(n: *const BlasInt, x: [*]ComplexF64, incx: *const BlasInt, 
     core.swap(ComplexF64, n.*, x, incx.*, y, incy.*);
 }
 
+noinline fn scopySlow(n: BlasInt, x: [*]const f32, incx: BlasInt, y: [*]f32, incy: BlasInt) void {
+    core.copy(f32, n, x, incx, y, incy);
+}
 pub export fn scopy_(n: *const BlasInt, x: [*]const f32, incx: *const BlasInt, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
-    core.copy(f32, n.*, x, incx.*, y, incy.*);
+    if (n.* <= 0) return;
+    if (incx.* == 1 and incy.* == 1) {
+        copyContiguous(n.*, @sizeOf(f32), @ptrCast(x), @ptrCast(y));
+        return;
+    }
+    scopySlow(n.*, x, incx.*, y, incy.*);
+}
+noinline fn dcopySlow(n: BlasInt, x: [*]const f64, incx: BlasInt, y: [*]f64, incy: BlasInt) void {
+    core.copy(f64, n, x, incx, y, incy);
 }
 pub export fn dcopy_(n: *const BlasInt, x: [*]const f64, incx: *const BlasInt, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
-    core.copy(f64, n.*, x, incx.*, y, incy.*);
+    if (n.* <= 0) return;
+    if (incx.* == 1 and incy.* == 1) {
+        copyContiguous(n.*, @sizeOf(f64), @ptrCast(x), @ptrCast(y));
+        return;
+    }
+    dcopySlow(n.*, x, incx.*, y, incy.*);
+}
+noinline fn ccopySlow(n: BlasInt, x: [*]const ComplexF32, incx: BlasInt, y: [*]ComplexF32, incy: BlasInt) void {
+    core.copy(ComplexF32, n, x, incx, y, incy);
 }
 pub export fn ccopy_(n: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
-    core.copy(ComplexF32, n.*, x, incx.*, y, incy.*);
+    if (n.* <= 0) return;
+    if (incx.* == 1 and incy.* == 1) {
+        copyContiguous(n.*, @sizeOf(ComplexF32), @ptrCast(x), @ptrCast(y));
+        return;
+    }
+    ccopySlow(n.*, x, incx.*, y, incy.*);
+}
+noinline fn zcopySlow(n: BlasInt, x: [*]const ComplexF64, incx: BlasInt, y: [*]ComplexF64, incy: BlasInt) void {
+    core.copy(ComplexF64, n, x, incx, y, incy);
 }
 pub export fn zcopy_(n: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
-    core.copy(ComplexF64, n.*, x, incx.*, y, incy.*);
+    if (n.* <= 0) return;
+    if (incx.* == 1 and incy.* == 1) {
+        copyContiguous(n.*, @sizeOf(ComplexF64), @ptrCast(x), @ptrCast(y));
+        return;
+    }
+    zcopySlow(n.*, x, incx.*, y, incy.*);
 }
 
 pub export fn saxpy_(n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, y: [*]f32, incy: *const BlasInt) callconv(.c) void {

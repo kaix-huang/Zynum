@@ -73,6 +73,8 @@ pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T,
             if (!directKernelAllowed(T, desc, shape, alpha, beta)) return std.math.minInt(i64) / 2;
             result += 500;
             if (selectAmx(T, shape) != .none) result += 420;
+            if (T == f32 and shape.m >= 512 and shape.n <= desc.tile.n_panel * 4 and shape.k >= 256) result += 380;
+            if (T == f32 and shape.m >= 256 and shape.n >= 256 and shape.k >= 512) result += 420;
             if (squareish) result += 180;
             if (work >= 128 * 1024 * 1024) result += 260;
             if (requested_threads <= 1 and work <= 512 * 512 * 512) result += 120;
@@ -113,19 +115,20 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
         const square512_chunk = shape.m == 512 and shape.k == 512 and shape.n <= 128;
         const square1024_chunk = shape.m == 1024 and shape.k == 1024 and shape.n <= 128;
         const narrow_n64_chunk = shape.m >= 1024 and shape.n == 32;
-        const tall_panel = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 256 and shape.k <= 1024 and !square512_chunk and !square1024_chunk and !narrow_n64_chunk;
+        const tall_panel = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 256 and shape.k <= 1024 and !square512_chunk and !square1024_chunk;
         const high_k_small = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
         const high_k_m512_n32 = shape.m == 512 and shape.n == 32 and shape.k == 2048;
+        const low_k_large_n32 = shape.m >= 256 and shape.n >= 256 and shape.k <= 256;
+        const tall_n16 = shape.m >= 512 and shape.n == 16 and shape.k >= 128 and shape.k <= 1024;
         const high_k_panel = shape.m >= 128 and shape.m <= 512 and shape.n >= 32 and shape.n <= 128 and shape.k >= 2048;
-        if (!short_wide and !square and !tall_panel and !high_k_small and !high_k_m512_n32 and !high_k_panel) return .none;
+        if (!short_wide and !square and !tall_panel and !high_k_small and !high_k_m512_n32 and !high_k_panel and !low_k_large_n32 and !tall_n16) return .none;
 
-        const low_k_large_n32 = shape.m >= 512 and shape.n >= 512 and shape.k <= 128;
         const square_n32 = square and (shape.m == 96 or shape.m == 128 or shape.m == 192 or shape.m == 256 or shape.m == 384 or shape.m == 512 or shape.m == 768);
         const short_wide_n32 = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
         const tall_panel_n32 = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 128 and shape.k <= 1024 and !square512_chunk and !square1024_chunk and !narrow_n64_chunk;
         const high_k_chunk_n32 = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
         const high_k_panel_n32 = high_k_panel;
-        if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or high_k_chunk_n32 or high_k_panel_n32)) {
+        if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or high_k_chunk_n32 or high_k_panel_n32 or narrow_n64_chunk)) {
             return .f32_n32;
         }
         return .f32_n16;
@@ -134,9 +137,11 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
         if ((shape.m & 7) != 0 or (shape.n & 7) != 0) return .none;
         const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64 and shape.m <= 384;
         const high_k_panel = shape.m >= 128 and shape.m <= 512 and shape.n >= 32 and shape.n <= 128 and shape.k >= 2048;
-        if (!square and !high_k_panel) return .none;
+        const tall_narrow_panel = shape.m >= 512 and shape.n >= 32 and shape.n <= 64 and shape.k >= 512 and shape.k <= 1024;
+        const low_k_large = shape.m >= 256 and shape.n >= 256 and shape.k <= 256;
+        if (!square and !high_k_panel and !tall_narrow_panel and !low_k_large) return .none;
         const square_large_n32 = square and shape.m >= 256;
-        if (((shape.m == 64 or shape.m == 96) or square_large_n32 or high_k_panel) and (shape.m & 15) == 0 and (shape.n & 31) == 0) return .f64_n32;
+        if (((shape.m == 64 or shape.m == 96) or square_large_n32 or high_k_panel or tall_narrow_panel or low_k_large) and (shape.m & 15) == 0 and (shape.n & 31) == 0) return .f64_n32;
         if ((shape.m & 31) == 0 and (shape.n & 15) == 0) return .f64_n16;
         return .f64_n8;
     }
@@ -184,7 +189,8 @@ fn selectBPack(comptime T: type, shape: Shape) gemm_task.BPackPath {
         const short_wide = shape.m <= 64 and shape.n >= 64 and shape.k >= 256;
         const tall_narrow = shape.n <= 64 and shape.m >= 512 and shape.k >= 256;
         const high_k_panel = shape.n <= 128 and shape.k >= 2048 and shape.m <= 512;
-        return if (short_wide or tall_narrow or high_k_panel) .transpose4 else .natural;
+        const mid_k_wide = shape.m >= 128 and shape.n >= 256 and shape.k >= 512;
+        return if (short_wide or tall_narrow or high_k_panel or mid_k_wide) .transpose4 else .natural;
     }
     if (T == f64) {
         return if (shape.m <= 64 and shape.n >= 64 and shape.k >= 256) .dynamic else .natural;
@@ -201,8 +207,10 @@ fn selectF32SmePanel(shape: Shape, tile: usize) gemm_task.SmeF32Panel {
     const min_mn = @min(shape.m, shape.n);
     const max_mn = @max(shape.m, shape.n);
     const squareish = min_mn >= 96 and max_mn <= min_mn * 2 and shape.k >= 96 and shape.k <= 512;
-    const high_k_single_panel = shape.n == panel2_cols and shape.m >= 96 and shape.m <= 256 and shape.k >= 2048;
-    return if (squareish or high_k_single_panel) .panels2x2_u4 else .panels2x2;
+    const high_k_squareish = min_mn >= 128 and max_mn <= min_mn * 2 and shape.k >= 768;
+    const high_k_single_panel = shape.n == panel2_cols and shape.m >= 96 and shape.m <= 1024 and shape.k >= 1024;
+    if (squareish or high_k_squareish or high_k_single_panel) return .panels2x2_u4;
+    return .panels2x2;
 }
 
 fn selectSmePanelBatch(comptime T: type, desc: catalog.Descriptor, shape: Shape, requested_threads: usize, performance_l2_bytes: usize) usize {

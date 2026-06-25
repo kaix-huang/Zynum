@@ -167,7 +167,7 @@ def zynum_maximum_threads():
 
 
 def existing_libs(args):
-    libs = [("zynum-blas", args.zynum_blas)]
+    libs = [("Zynum", args.zynum_blas)]
     candidates = [("Accelerate", args.accelerate), ("OpenBLAS", args.openblas)]
     if args.mkl:
         candidates.append(("MKL", args.mkl))

@@ -441,6 +441,7 @@ pub noinline fn sgemmPanels2x2U4F32(a: [*]const f32, b_pack: [*]const f32, c: [*
         \\92:
         \\cmp x9, #4
         \\b.lo 93f
+        \\prfm pldl1keep, [x11, #512]
         \\ld1w { z0.s }, p0/z, [x10]
         \\add x13, x10, x14
         \\ld1w { z1.s }, p0/z, [x13]

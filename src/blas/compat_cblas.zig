@@ -31,7 +31,13 @@ pub const CblasRight = compat.CblasRight;
 /// Test-callable CBLAS entry points backed by the ABI implementation.
 pub const cblas_dcopy = compat.cblas_dcopy;
 pub const cblas_daxpy = compat.cblas_daxpy;
+pub const cblas_caxpy = compat.cblas_caxpy;
+pub const cblas_zaxpy = compat.cblas_zaxpy;
+pub const cblas_caxpby = compat.cblas_caxpby;
+pub const cblas_zaxpby = compat.cblas_zaxpby;
 pub const cblas_dscal = compat.cblas_dscal;
+pub const cblas_cscal = compat.cblas_cscal;
+pub const cblas_zscal = compat.cblas_zscal;
 pub const cblas_ddot = compat.cblas_ddot;
 pub const cblas_dnrm2 = compat.cblas_dnrm2;
 pub const cblas_dasum = compat.cblas_dasum;

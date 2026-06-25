@@ -91,6 +91,7 @@ fn desiredThreadCount(comptime T: type, desc: catalog.Descriptor, requested_thre
     const shape: tuning.Shape = .{ .m = m, .n = n, .k = k };
     const min_dim = tuning.min3(m, n, k);
     const squareish = tuning.isSquareish(shape);
+    if (T == f32 and allow_direct_kernel and m >= 1024 and m < 4096 and n <= 32 and k >= 128 and k <= 512) return 1;
     if (allow_direct_kernel and squareish and T == f32 and work <= 128 * 128 * 128) return 1;
     const vector_edge = (m == 1 or n == 1) and k >= 128 and work >= 128 * 1024;
     const parallel_threshold: usize = if (vector_edge)
@@ -116,7 +117,8 @@ fn desiredThreadCount(comptime T: type, desc: catalog.Descriptor, requested_thre
     if (min_dim <= desc.tile.n_panel and k <= 128) {
         threads = @min(threads, 2);
     } else if (tuning.isNarrowN(desc, n) and m >= 512 and k >= desc.bounds.min_k_block * 8) {
-        threads = @min(threads, 4);
+        const narrow_cap: usize = if (T == f32 and allow_direct_kernel and n <= desc.tile.n_panel * 2 and k >= 512) 2 else 4;
+        threads = @min(threads, narrow_cap);
     } else if (min_dim >= 256 and squareish and k <= 256) {
         threads = @min(threads, 4);
     }
@@ -131,6 +133,10 @@ fn requestedThreadCountForPlan(m: usize, n: usize, k: usize) usize {
         return runtime.defaultGemmThreadLimit();
     }
     return requested;
+}
+
+fn forceSingleThreadPlan(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T) bool {
+    return T == f32 and alpha == 1 and beta == 0 and m >= 1024 and m < 4096 and n <= 32 and k >= 128 and k <= 512;
 }
 
 fn rowMinBlock(desc: catalog.Descriptor, m: usize, k: usize) usize {
@@ -274,6 +280,7 @@ pub fn noTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alph
         if (gemm_kernels.tryNoTransRealF32Fast(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
     }
 
-    const plan = selectNoTransReal(T, m, n, k, alpha, beta, requestedThreadCountForPlan(m, n, k));
+    const requested_threads = if (forceSingleThreadPlan(T, m, n, k, alpha, beta)) @as(usize, 1) else requestedThreadCountForPlan(m, n, k);
+    const plan = selectNoTransReal(T, m, n, k, alpha, beta, requested_threads);
     runPlannedTasks(T, plan, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }

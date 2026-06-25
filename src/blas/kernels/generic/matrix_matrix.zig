@@ -21,9 +21,9 @@ pub fn noTransReal(comptime T: type, task: gemm_task.Task(T)) void {
 
 pub fn noTransRealF32(task: gemm_task.Task(f32)) void {
     const n = task.n1 - task.n0;
+    if (task.m == 1 and task.k >= 16) return basic.rowVectorColumns(f32, task);
     if (task.m == 1 and n >= 8 and task.k >= 16) return basic.f32x4x8(task);
     if (task.m == 1 and n >= 4 and task.k >= 16) return basic.f32x4x4(task);
-    if (task.m == 1 and task.k >= 16) return basic.rowVectorColumns(f32, task);
     if (n == 1 and task.m >= 8 and task.k >= 16) return basic.f32x8x1(task);
     if (task.m >= 4 and n >= 8 and task.k >= 8) return basic.f32x4x8(task);
     if (task.m >= 4 and n >= 4) return basic.f32x4x4(task);
@@ -32,9 +32,9 @@ pub fn noTransRealF32(task: gemm_task.Task(f32)) void {
 
 pub fn noTransRealF64(task: gemm_task.Task(f64)) void {
     const n = task.n1 - task.n0;
+    if (task.m == 1 and task.k >= 16) return basic.rowVectorColumns(f64, task);
     if (task.m == 1 and n >= 6 and task.k >= 16) return basic.f64x2x6(task);
     if (task.m == 1 and n >= 4 and task.k >= 16) return basic.f64x2x4(task);
-    if (task.m == 1 and task.k >= 16) return basic.rowVectorColumns(f64, task);
     if (n == 1 and task.m >= 4 and task.k >= 16) return basic.f64x4x1(task);
     if (task.m >= 2 and n >= 6 and task.k >= 8) return basic.f64x2x6(task);
     if (task.m >= 2 and n >= 4) return basic.f64x2x4(task);

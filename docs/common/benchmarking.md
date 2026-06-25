@@ -98,6 +98,17 @@ zig build bench-gemm-sweep --release=fast -- --reps 30
 python3 bench/tools/plot_gemm_sweep.py zig-out/gemm_sweep.csv zig-out/gemm_sweep.svg
 ```
 
+Use the CSV checker to turn a comparator sweep into a pass/fail gate. The
+strict form requires Zynum to be at least as fast as the fastest requested
+comparator for every selected `(kind, shape)` group:
+
+```sh
+python3 bench/tools/check_gemm_sweep.py zig-out/gemm_sweep.csv
+```
+
+Use `--ratio 0.98` only when the benchmark note explicitly accepts a 2%
+measurement tolerance. The default `--ratio 1.0` is the no-slower-than gate.
+
 Use custom shapes for focused testing:
 
 ```sh
@@ -145,6 +156,14 @@ repeatable improvement over the shared Zig vector fallback. Keep rejected ASIMD,
 SVE, SME, or AMX candidates disabled behind internal predicates rather than
 leaving a slower path active by default.
 
+Level 1/2 low-latency threading changes need extra scrutiny. Some retained paths
+use process-lifetime `std.Io.Threaded` helpers and per-helper futex publication,
+so a single isolated process can still contain warm helper state after the first
+measured repetition. For short paths such as DGER 128, keep the final evidence as
+multiple fresh processes per library, not only one process with many repetitions.
+Record both the best retained sample and nearby slow outliers when they affect
+the dispatch decision.
+
 When adding a full-call Level 2 kernel that bypasses core beta scaling or task
 splitting, such as an SME2 GEMV-N or GEMV-T kernel, record both the focused
 comparator result and the reason the full-call gate belongs before the shared
@@ -183,9 +202,92 @@ parallel call. Comparator libraries may also initialize their own dispatch or
 worker state lazily. Do not rely on single-process mixed-library sweeps for
 published comparator numbers; use fresh-process isolation instead.
 
+When a comparator appears faster only in occasional low-tail samples, repeat the
+same library/path in several fresh processes before changing a gate. The 2026
+Level 2 DGER work showed that thread placement, helper warm state, and comparator
+worker policy can move 128x128 timings by more than the intended optimization
+margin.
+
 A reportable isolated run should include process repeats, the exact CSV path, and
 the per-library command line. Focused reruns should use the same environment as
 the full sweep unless the difference is explicitly part of the experiment.
+
+## README Performance Charts
+
+The README performance charts are curated documentation assets. Refresh them
+only from fresh-process reports, and keep the chart convention stable:
+
+- Every chart must visibly state `Higher is better`.
+- Library order must be `Zynum`, `Accelerate`, then `OpenBLAS`.
+- Level 1 and Level 2 charts must include real and complex f32/f64 coverage, not
+  only double-precision cases.
+- Level 3 must include SGEMM, DGEMM, CGEMM, and ZGEMM across the default GEMM
+  sweep shapes unless the README caption explicitly says otherwise.
+- Remove old performance SVGs from `docs/assets/benchmarks/` before copying the
+  refreshed current charts, so the README does not drift between stale images.
+
+On the Apple Silicon development machine used for the current README snapshot,
+build the benchmark artifacts with the measured target first:
+
+```sh
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+zig build-exe bench/level1_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/level1_probe
+zig build-exe bench/dcopy_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/dcopy_probe
+```
+
+Run with `ZYNUM_MAXIMUM_THREADS` unset unless the benchmark note explicitly
+states a single-thread experiment. Pin comparator library thread settings:
+
+```sh
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_level1_report.py \
+  --level1-probe zig-out/perf-report/bin/level1_probe \
+  --copy-probe zig-out/perf-report/bin/dcopy_probe \
+  --csv zig-out/perf-report/level1_all_types_three_libs.csv \
+  --process-repeats 3 \
+  --skip-missing
+
+python3 bench/tools/plot_level1_report.py \
+  zig-out/perf-report/level1_all_types_three_libs.csv \
+  --bars-svg zig-out/perf-report/level1_all_types_three_libs_bars.svg \
+  --ratio-svg zig-out/perf-report/level1_all_types_three_libs_ratio.svg
+
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_level2_report.py \
+  --csv zig-out/perf-report/level2_all_types_three_libs.csv \
+  --skip-missing
+
+python3 bench/tools/plot_level2_report.py \
+  zig-out/perf-report/level2_all_types_three_libs.csv \
+  --bars-svg zig-out/perf-report/level2_all_types_three_libs_bars.svg
+
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_gemm_sweep_isolated.py \
+  --gemm-sweep zig-out/bin/gemm-sweep \
+  --zynum-blas zig-out/lib/libzynum_blas.dylib \
+  --reps 6 \
+  --process-repeats 2 \
+  --isolate-kind \
+  --csv zig-out/perf-report/level3_all_types_more_shapes_three_libs.csv \
+  --skip-missing
+
+python3 bench/tools/plot_gemm_sweep.py \
+  zig-out/perf-report/level3_all_types_more_shapes_three_libs.csv \
+  zig-out/perf-report/level3_all_types_more_shapes_three_libs_lines.svg
+```
+
+Then replace the checked-in README image assets:
+
+```sh
+find docs/assets/benchmarks -maxdepth 1 -type f -name '*.svg' -delete
+cp zig-out/perf-report/level1_all_types_three_libs_bars.svg docs/assets/benchmarks/current_level1_all_types_three_libs.svg
+cp zig-out/perf-report/level2_all_types_three_libs_bars.svg docs/assets/benchmarks/current_level2_all_types_three_libs.svg
+cp zig-out/perf-report/level3_all_types_more_shapes_three_libs_lines.svg docs/assets/benchmarks/current_level3_all_types_more_shapes.svg
+```
+
+Keep CSV and metadata files under `zig-out/perf-report/` unless a release note
+explicitly links them as external artifacts. The repository should normally track
+only the three curated SVG files under `docs/assets/benchmarks/`.
 
 ## Default Sweep Shape Classes
 

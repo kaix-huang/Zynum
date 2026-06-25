@@ -80,18 +80,21 @@ helpers where practical; for example GEMV and GER fallback code calls Level 1
 General strides, complex values, packed/banded storage, and conjugating variants
 stay on the scalar portable loops.
 
-`src/blas/core/pool.zig` owns the optional core `std.Io.Threaded` runner used by
-large contiguous Level 1 kernels and selected Level 2 kernels. Level 2 direct
-parallelism is only for column-disjoint work such as real unit-stride GER and
-large transposed GEMV, or for kernels such as SYMV that use explicit per-task
-reduction storage before writing the shared output.
+`src/blas/core/pool.zig` owns the optional core `std.Io.Threaded` runners used
+by large contiguous Level 1 kernels and selected Level 2 kernels. The normal
+path uses `std.Io.Group.concurrent`; narrow measured paths may use internal
+low-latency helper publication while still relying on `std.Io.Threaded` for
+helper lifecycle. Level 2 direct parallelism is only for column-disjoint work
+such as real unit-stride GER and large transposed GEMV, or for kernels such as
+SYMV that use explicit per-task reduction storage before writing the shared
+output.
 
 Level 1/2 architecture kernels use the same operand categories in architecture
 subdirectories. `src/blas/kernels/aarch64/vector_unary.zig` owns single-vector
 feature gates such as scale and reductions,
 `src/blas/kernels/aarch64/vector_binary.zig` owns two-vector kernels such as
 copy, axpy, and dot, and `src/blas/kernels/aarch64/matrix_vector.zig` owns GEMV
-and GER dispatch to assembly helpers in `vector_matrix_sve.S`. Keep experimental
+and GER dispatch to assembly helpers in `vector_matrix_asm.zig`. Keep experimental
 ASIMD/SVE/SME kernels behind shape and feature predicates until focused
 benchmarks show they beat the shared Zig vector fallback. SME kernels that
 mutate existing matrices must preserve BLAS additive semantics; for example GER

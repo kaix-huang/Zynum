@@ -22,6 +22,106 @@ fn expectComplexF64SliceApprox(expected: []const cblas.ComplexF64, actual: []con
     for (expected, actual) |want, got| try expectComplexF64Approx(want, got);
 }
 
+fn referenceComplexScal(comptime T: type, n: usize, alpha: T, x: []T, incx: isize) void {
+    for (0..n) |i| {
+        const idx = ref.vectorIndex(n, incx, i);
+        x[idx] = ref.mul(T, alpha, x[idx]);
+    }
+}
+
+fn referenceComplexAxpy(comptime T: type, n: usize, alpha: T, x: []const T, incx: isize, y: []T, incy: isize) void {
+    for (0..n) |i| {
+        const ix = ref.vectorIndex(n, incx, i);
+        const iy = ref.vectorIndex(n, incy, i);
+        y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), y[iy]);
+    }
+}
+
+fn referenceComplexAxpby(comptime T: type, n: usize, alpha: T, x: []const T, incx: isize, beta: T, y: []T, incy: isize) void {
+    for (0..n) |i| {
+        const ix = ref.vectorIndex(n, incx, i);
+        const iy = ref.vectorIndex(n, incy, i);
+        y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), ref.mul(T, beta, y[iy]));
+    }
+}
+
+fn expectCblasComplexScalCase(comptime T: type, n: usize, incx: isize, alpha: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0x5ca1_1234);
+    const len = ref.vectorStorageLen(n, incx);
+    const x = try std.testing.allocator.alloc(T, len);
+    defer std.testing.allocator.free(x);
+    const expected = try std.testing.allocator.alloc(T, len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    @memcpy(expected, x);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_cscal(@intCast(n), &alpha, x.ptr, @intCast(incx));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zscal(@intCast(n), &alpha, x.ptr, @intCast(incx));
+    } else {
+        @compileError("complex scal test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexScal(T, n, alpha, expected, incx);
+
+    for (expected, x) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
+fn expectCblasComplexAxpyCase(comptime T: type, n: usize, incx: isize, incy: isize, alpha: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0xca90_74b5);
+    const x_len = ref.vectorStorageLen(n, incx);
+    const y_len = ref.vectorStorageLen(n, incy);
+    const x = try std.testing.allocator.alloc(T, x_len);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    @memcpy(expected, y);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_caxpy(@intCast(n), &alpha, x.ptr, @intCast(incx), y.ptr, @intCast(incy));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zaxpy(@intCast(n), &alpha, x.ptr, @intCast(incx), y.ptr, @intCast(incy));
+    } else {
+        @compileError("complex axpy test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexAxpy(T, n, alpha, x, incx, expected, incy);
+
+    for (expected, y) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
+fn expectCblasComplexAxpbyCase(comptime T: type, n: usize, incx: isize, incy: isize, alpha: T, beta: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0xcab9_1234);
+    const x_len = ref.vectorStorageLen(n, incx);
+    const y_len = ref.vectorStorageLen(n, incy);
+    const x = try std.testing.allocator.alloc(T, x_len);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    @memcpy(expected, y);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_caxpby(@intCast(n), &alpha, x.ptr, @intCast(incx), &beta, y.ptr, @intCast(incy));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zaxpby(@intCast(n), &alpha, x.ptr, @intCast(incx), &beta, y.ptr, @intCast(incy));
+    } else {
+        @compileError("complex axpby test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexAxpby(T, n, alpha, x, incx, beta, expected, incy);
+
+    for (expected, y) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
 fn makeTriangularDiagSafe(a: []cblas.ComplexF64, n: usize, lda: usize) void {
     for (0..n) |i| {
         const step = @as(f64, @floatFromInt(i));
@@ -147,6 +247,27 @@ test "cblas row-major cgemm wrapper" {
         try std.testing.expectApproxEqAbs(want.re, got.re, 1e-4);
         try std.testing.expectApproxEqAbs(want.im, got.im, 1e-4);
     }
+}
+
+test "cblas complex scal with complex alpha supports strides" {
+    try expectCblasComplexScalCase(cblas.ComplexF32, 9, 1, complexF32(-0.75, 0.5), @as(f32, 1e-5));
+    try expectCblasComplexScalCase(cblas.ComplexF32, 7, 2, complexF32(0.25, -1.25), @as(f32, 1e-5));
+    try expectCblasComplexScalCase(cblas.ComplexF32, 7, -2, complexF32(1.5, 0.375), @as(f32, 1e-5));
+    try expectCblasComplexScalCase(cblas.ComplexF64, 9, 1, complexF64(-0.75, 0.5), @as(f64, 1e-12));
+    try expectCblasComplexScalCase(cblas.ComplexF64, 7, 2, complexF64(0.25, -1.25), @as(f64, 1e-12));
+    try expectCblasComplexScalCase(cblas.ComplexF64, 7, -2, complexF64(1.5, 0.375), @as(f64, 1e-12));
+}
+
+test "cblas complex axpy and axpby with complex alpha support strides" {
+    try expectCblasComplexAxpyCase(cblas.ComplexF32, 8, 1, 1, complexF32(-0.75, 0.5), @as(f32, 1e-5));
+    try expectCblasComplexAxpyCase(cblas.ComplexF32, 7, 2, -2, complexF32(0.25, -1.25), @as(f32, 1e-5));
+    try expectCblasComplexAxpyCase(cblas.ComplexF64, 8, 1, 1, complexF64(-0.75, 0.5), @as(f64, 1e-12));
+    try expectCblasComplexAxpyCase(cblas.ComplexF64, 7, 2, -2, complexF64(0.25, -1.25), @as(f64, 1e-12));
+
+    try expectCblasComplexAxpbyCase(cblas.ComplexF32, 8, 1, 1, complexF32(-0.75, 0.5), complexF32(0.25, -0.125), @as(f32, 1e-5));
+    try expectCblasComplexAxpbyCase(cblas.ComplexF32, 7, -2, 2, complexF32(0.25, -1.25), complexF32(-0.5, 0.75), @as(f32, 1e-5));
+    try expectCblasComplexAxpbyCase(cblas.ComplexF64, 8, 1, 1, complexF64(-0.75, 0.5), complexF64(0.25, -0.125), @as(f64, 1e-12));
+    try expectCblasComplexAxpbyCase(cblas.ComplexF64, 7, -2, 2, complexF64(0.25, -1.25), complexF64(-0.5, 0.75), @as(f64, 1e-12));
 }
 
 test "cblas amax empty input returns cblas zero index" {

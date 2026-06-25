@@ -100,6 +100,26 @@ inline fn storeF64x2(dst: []f64, index: usize, value: F64x2) void {
 }
 
 pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    if (n_ == 1 and k_ > 0) {
+        level2.gemv(T, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
+        return;
+    }
+    if (T == f32 and m_ == 1 and lda == 1 and ldc == 1 and k_ >= 128) {
+        level2.gemv(T, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
+        return;
+    }
+    if (T == f32 and n_ == 17 and m_ >= 1024 and k_ >= 128) {
+        gemm_dispatcher.noTransReal(T, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        level2.gemv(T, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, 16), 1, beta, c + matIndex(ldc, 0, 16), 1);
+        return;
+    }
+    if (T == f32 and n_ > 1 and n_ <= 17 and n_ != 16 and m_ >= 1024 and k_ >= 128) {
+        const n = toUsize(n_);
+        for (0..n) |j| {
+            level2.gemv(T, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, j), 1, beta, c + matIndex(ldc, 0, j), 1);
+        }
+        return;
+    }
     gemm_dispatcher.noTransReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 

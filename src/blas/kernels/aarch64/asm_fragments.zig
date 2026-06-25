@@ -13,6 +13,12 @@ pub const ptrue_p0_s =
     \\
 ;
 
+pub const ptrue_pn8_s =
+    \\
+    \\ptrue pn8.s
+    \\
+;
+
 pub const ptrue_p0_d =
     \\
     \\ptrue p0.d

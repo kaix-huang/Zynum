@@ -278,13 +278,17 @@ env -u ZYNUM_MAXIMUM_THREADS \
     --skip-missing
 ```
 
-Plot:
+Plot local artifact:
 
 ```sh
 python3 bench/tools/plot_gemm_sweep.py \
   zig-out/gemm_sweep_m5_final.csv \
-  docs/assets/benchmarks/gemm_sweep_m5_final.svg
+  zig-out/gemm_sweep_m5_final.svg
 ```
+
+Curated README performance charts are refreshed separately with the current
+all-level process in `docs/common/benchmarking.md#readme-performance-charts`;
+do not keep historical one-off sweep SVGs under `docs/assets/benchmarks/`.
 
 Summary for 168 complete points (`sgemm`, `dgemm`, `cgemm`, `zgemm` across 42
 default shapes):
@@ -318,6 +322,122 @@ kernel mechanics:
   retain only hard safety caps and hardware-state requirements.
 
 The validation commands above were rerun after this refactor.
+
+## 2026-06-24 Apple M5 Focused AMX Gate Update
+
+Validation commands:
+
+```sh
+zig fmt --check build.zig build.zig.zon src test bench examples tools
+zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+python3 -m py_compile bench/tools/check_gemm_sweep.py
+```
+
+Focused isolated command:
+
+```sh
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_gemm_sweep_isolated.py \
+    --gemm-sweep zig-out/bin/gemm-sweep \
+    --zynum-blas zig-out/lib/libzynum_blas.dylib \
+    --accelerate /System/Library/Frameworks/Accelerate.framework/Accelerate \
+    --openblas /opt/homebrew/opt/openblas/lib/libopenblas.dylib \
+    --csv zig-out/gemm_dispatch_focus_after2.csv \
+    --kind sgemm --kind dgemm \
+    --shape m1024_n1024_k64:1024:1024:64 \
+    --shape m1024_n1024_k128:1024:1024:128 \
+    --shape m1024_n1024_k256:1024:1024:256 \
+    --shape m1536_n256_k256:1536:256:256 \
+    --shape m256_n1536_k256:256:1536:256 \
+    --shape m1024_n64_k1024:1024:64:1024 \
+    --shape m2048_n64_k512:2048:64:512 \
+    --shape m512_n64_k2048:512:64:2048 \
+    --reps 30 --process-repeats 2 --isolate-shape --skip-missing
+```
+
+Strict checker result:
+
+```sh
+python3 bench/tools/check_gemm_sweep.py zig-out/gemm_dispatch_focus_after2.csv --worst 30
+# checked=16 passed=12 failed=4 missing=0 ratio=1
+```
+
+Retained default gates:
+
+- `sgemm`, no-transpose real, `alpha=1,beta=0`, AMX `f32_n32` when
+  `m >= 256`, `n >= 256`, `k <= 256`, and the existing AMX alignment checks
+  pass. Focused isolated wins include `m1024_n1024_k64/128/256` and
+  `m1536_n256_k256`; `m256_n1536_k256` remained slightly below Accelerate
+  (`0.953x`) but was well above OpenBLAS.
+- `dgemm`, no-transpose real, `alpha=1,beta=0`, AMX `f64_n32` when
+  `m >= 256`, `n >= 256`, `k <= 256`, and alignment checks pass. Focused
+  isolated data passed every tested low-K point versus both Accelerate and
+  OpenBLAS.
+- `dgemm`, no-transpose real, `alpha=1,beta=0`, AMX `f64_n32` for
+  tall/narrow high-K panels with `m >= 512`, `32 <= n <= 64`, and
+  `512 <= k <= 1024`, plus existing alignment checks. Focused isolated data
+  passed `m1024_n64_k1024`, `m2048_n64_k512`, and `m512_n64_k2048`.
+
+Rejected or still-open experiments:
+
+- Disabling the `sgemm sq128` pre-planner AMX shortcut was slower than the
+  existing shortcut, so the shortcut remains.
+- Forcing `sgemm m1024_n64_k1024` from AMX `f32_n32` to `f32_n16` was slower.
+- SGEMM narrow-N/high-K remains below Accelerate for
+  `m1024_n64_k1024`, `m2048_n64_k512`, and `m512_n64_k2048`; the latter two are
+  close in focused isolation, but the first remains a major gap.
+- The focused gates improve selected default points but do not support a full
+  default-sweep claim that Zynum is no slower than Accelerate/OpenBLAS.
+
+## 2026-06-25 Apple M5 Follow-up
+
+Validation commands:
+
+```sh
+zig fmt --check build.zig build.zig.zon src test bench examples tools
+zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+```
+
+Retained cleanup rules:
+
+- Generic real GEMM now routes `m == 1`, `k >= 16` to the existing
+  `rowVectorColumns` fallback before the tiled generic kernels. Focused isolated
+  probes improved the default row-vector shapes, but they remain well below
+  Accelerate/OpenBLAS.
+- Real no-transpose GEMM with `n == 1` and `k > 0` may reuse the core Level 2
+  GEMV path. The `k > 0` predicate is required so GEMM `k == 0` keeps the
+  original `beta*C` scaling semantics.
+- SGEMM narrow-N/high-K direct-kernel planning caps the retained local f32 gate
+  at two threads when `n <= 2 * desc.tile.n_panel`, `m >= 512`, and `k >= 512`.
+  A one-thread cap was tested and rejected because it regressed nearby default
+  shapes.
+
+Focused CSVs:
+
+```text
+zig-out/perf-report/gemm_m1_sgemm_after.csv
+zig-out/perf-report/gemm_m1_dgemm_after.csv
+zig-out/perf-report/gemm_n1_sgemm_after.csv
+zig-out/perf-report/gemm_n1_dgemm_after.csv
+zig-out/perf-report/gemm_sgemm_narrow_cap2_after.csv
+zig-out/perf-report/gemm_sgemm_narrow_cap1_after.csv
+```
+
+Final quick full-sweep CSV:
+
+```text
+zig-out/perf-report/level3_after_final_fast.csv
+```
+
+Environment: `ZYNUM_MAXIMUM_THREADS=unset`, detected max threads 10,
+`OPENBLAS_DYNAMIC=0`, `OPENBLAS_NUM_THREADS=10`,
+`VECLIB_MAXIMUM_THREADS=10`, `OMP_NUM_THREADS=10`.
+
+The quick full sweep still had 101/168 points below the fastest comparator.
+The retained narrow-N cap improved the focused `sgemm m2048_n64_k512` and
+`sgemm m512_n64_k2048` points to near parity, but it did not close
+`sgemm m1024_n64_k1024`, the vector-edge GEMM cases, small square latency, or
+the complex GEMM gaps. This pass does not support a broad no-slower-than claim.
 
 ## Current Priorities
 
