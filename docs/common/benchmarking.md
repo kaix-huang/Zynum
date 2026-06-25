@@ -22,6 +22,11 @@ environment, target, raw data, and isolation level are reproducible.
 7. Re-test outliers in isolation before using them to justify a gate.
 8. Keep optimization gates narrower than the measured evidence. Do not retain a
    default gate from one lucky focused run.
+9. Discard timing data from any run with possible numerical pollution. If a
+   kernel later proves to have missing register preservation, stale scalar
+   return state, incorrect hardware-state cleanup, or invalid inline-assembly
+   memory ordering, rerun every affected benchmark before using it for either a
+   promotion or a rollback.
 
 ## Evidence Chain
 
@@ -41,15 +46,12 @@ build coverage, not throughput.
 
 ## Runtime Environment
 
-Record every runtime variable that can affect dispatch, threading, or comparator
+Record every runtime variable that can affect Zynum's thread cap or comparator
 behavior. Record variables that are intentionally unset as `unset`.
 
 | Variable | Applies to | Record because |
 | --- | --- | --- |
-| `ZYNUM_BLAS_NUM_THREADS` | Zynum | User thread-count override. |
-| `ZYNUM_BLAS_GEMM_POOL` | Zynum | Enables/disables stateful GEMM worker-pool experiments. |
-| `ZYNUM_BLAS_GEMM_IO` | Zynum | Selects experimental GEMM IO/splitting behavior. |
-| `ZYNUM_BLAS_AMX` | Zynum on Apple Silicon | Controls Apple AMX experiments. |
+| `ZYNUM_MAXIMUM_THREADS` | Zynum | Maximum number of threads Zynum may use; unset means runtime CPU count. |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS | Comparator thread count. |
 | `OPENBLAS_DYNAMIC` | OpenBLAS | Dynamic thread-count policy. |
 | `VECLIB_MAXIMUM_THREADS` | Accelerate/vecLib | Comparator thread limit on macOS. |
@@ -60,16 +62,14 @@ behavior. Record variables that are intentionally unset as `unset`.
 Recommended single-process smoke baseline:
 
 ```sh
-export ZYNUM_BLAS_GEMM_POOL=0
-export ZYNUM_BLAS_GEMM_IO=0
 export OPENBLAS_DYNAMIC=0
 export MKL_DYNAMIC=FALSE
 ```
 
-Set thread counts explicitly for every library in a comparison:
+Set thread caps explicitly for every library in a comparison:
 
 ```sh
-export ZYNUM_BLAS_NUM_THREADS=6
+export ZYNUM_MAXIMUM_THREADS=6
 export OPENBLAS_NUM_THREADS=6
 export VECLIB_MAXIMUM_THREADS=6
 export MKL_NUM_THREADS=6
@@ -98,6 +98,17 @@ zig build bench-gemm-sweep --release=fast -- --reps 30
 python3 bench/tools/plot_gemm_sweep.py zig-out/gemm_sweep.csv zig-out/gemm_sweep.svg
 ```
 
+Use the CSV checker to turn a comparator sweep into a pass/fail gate. The
+strict form requires Zynum to be at least as fast as the fastest requested
+comparator for every selected `(kind, shape)` group:
+
+```sh
+python3 bench/tools/check_gemm_sweep.py zig-out/gemm_sweep.csv
+```
+
+Use `--ratio 0.98` only when the benchmark note explicitly accepts a 2%
+measurement tolerance. The default `--ratio 1.0` is the no-slower-than gate.
+
 Use custom shapes for focused testing:
 
 ```sh
@@ -107,6 +118,58 @@ zig build bench-gemm-sweep --release=fast -- \
   --shape m128_n128_k4096:128:128:4096 \
   --reps 100
 ```
+
+## Level 1/2 Sweep
+
+Use `bench-level12-sweep` for focused Level 1 and Level 2 tuning gates. The
+benchmark exercises contiguous f64 BLAS ABI paths including copy, scal, axpy,
+dot, asum, nrm2, GEMV, SYMV, and GER:
+
+```sh
+zig build bench-level12-sweep -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast -- --size 1024 --reps 120
+```
+
+The `--size` value is the matrix dimension for Level 2 cases. Level 1 cases use
+`size * size` elements so the same sweep stresses comparable memory footprints;
+for example `--size 1024` measures Level 1 vectors with 1,048,576 f64 elements,
+not 1024 elements.
+
+Use `--case <name>` to isolate a single kernel while tuning noisy paths such as
+`dgemv_t` or `dger`:
+
+```sh
+zig-out/bin/level12-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib --size 1024 --reps 240 --case dgemv_t
+```
+
+For reportable comparator data, run one library per process by passing the
+library under test as `--zynum-blas`; the tool label is reused, so record the
+path in the benchmark notes:
+
+```sh
+zig-out/bin/level12-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib --size 1024 --reps 120
+zig-out/bin/level12-sweep --zynum-blas /System/Library/Frameworks/Accelerate.framework/Accelerate --size 1024 --reps 120
+zig-out/bin/level12-sweep --zynum-blas /opt/homebrew/opt/openblas/lib/libopenblas.dylib --size 1024 --reps 120
+```
+
+Level 1/2 architecture gates must be retained only when the focused sweep shows
+repeatable improvement over the shared Zig vector fallback. Keep rejected ASIMD,
+SVE, SME, or AMX candidates disabled behind internal predicates rather than
+leaving a slower path active by default.
+
+Level 1/2 low-latency threading changes need extra scrutiny. Some retained paths
+use process-lifetime `std.Io.Threaded` helpers and per-helper futex publication,
+so a single isolated process can still contain warm helper state after the first
+measured repetition. For short paths such as DGER 128, keep the final evidence as
+multiple fresh processes per library, not only one process with many repetitions.
+Record both the best retained sample and nearby slow outliers when they affect
+the dispatch decision.
+
+When adding a full-call Level 2 kernel that bypasses core beta scaling or task
+splitting, such as an SME2 GEMV-N or GEMV-T kernel, record both the focused
+comparator result and the reason the full-call gate belongs before the shared
+parallel path. Sampling, LLDB disassembly, and comparator traces are acceptable
+supporting evidence, but the retained gate must still be narrower than the
+benchmarked shapes and ISA assumptions.
 
 ## Fresh-Process Sweep
 
@@ -125,23 +188,106 @@ Isolation levels:
 
 - Level 0: one process loads all libraries. Use only for smoke checks and tool
   validation.
-- Level 1: one process loads all libraries with stateful Zynum workers disabled.
-  Use for quick local comparisons, not for published comparator claims.
+- Level 1: one process loads all libraries for quick local comparisons. Use this
+  for smoke checks, not for published comparator claims.
 - Level 2: one fresh process per library. Use this as the default reportable
   comparator level.
 - Level 3: one fresh process per library, kind, and shape. Use this for outliers,
   shape-gate promotion, and cases where cache or worker history may explain a
   result.
 
-`ZYNUM_BLAS_GEMM_POOL` and non-default `ZYNUM_BLAS_GEMM_IO` modes can leave
-worker state alive in the process. Do not mix those modes with comparator
-libraries in the same process when collecting reportable numbers. If a stateful
-mode is being evaluated, report it as a Zynum-only experiment unless a
-fresh-process comparator sweep is also recorded.
+Zynum GEMM and selected Level 1/2 kernels may keep process-lifetime
+`std.Io.Threaded` worker state or cached temporary workspaces after the first
+parallel call. Comparator libraries may also initialize their own dispatch or
+worker state lazily. Do not rely on single-process mixed-library sweeps for
+published comparator numbers; use fresh-process isolation instead.
+
+When a comparator appears faster only in occasional low-tail samples, repeat the
+same library/path in several fresh processes before changing a gate. The 2026
+Level 2 DGER work showed that thread placement, helper warm state, and comparator
+worker policy can move 128x128 timings by more than the intended optimization
+margin.
 
 A reportable isolated run should include process repeats, the exact CSV path, and
 the per-library command line. Focused reruns should use the same environment as
 the full sweep unless the difference is explicitly part of the experiment.
+
+## README Performance Charts
+
+The README performance charts are curated documentation assets. Refresh them
+only from fresh-process reports, and keep the chart convention stable:
+
+- Every chart must visibly state `Higher is better`.
+- Library order must be `Zynum`, `Accelerate`, then `OpenBLAS`.
+- Level 1 and Level 2 charts must include real and complex f32/f64 coverage, not
+  only double-precision cases.
+- Level 3 must include SGEMM, DGEMM, CGEMM, and ZGEMM across the default GEMM
+  sweep shapes unless the README caption explicitly says otherwise.
+- Remove old performance SVGs from `docs/assets/benchmarks/` before copying the
+  refreshed current charts, so the README does not drift between stale images.
+
+On the Apple Silicon development machine used for the current README snapshot,
+build the benchmark artifacts with the measured target first:
+
+```sh
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+zig build-exe bench/level1_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/level1_probe
+zig build-exe bench/dcopy_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/dcopy_probe
+```
+
+Run with `ZYNUM_MAXIMUM_THREADS` unset unless the benchmark note explicitly
+states a single-thread experiment. Pin comparator library thread settings:
+
+```sh
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_level1_report.py \
+  --level1-probe zig-out/perf-report/bin/level1_probe \
+  --copy-probe zig-out/perf-report/bin/dcopy_probe \
+  --csv zig-out/perf-report/level1_all_types_three_libs.csv \
+  --process-repeats 3 \
+  --skip-missing
+
+python3 bench/tools/plot_level1_report.py \
+  zig-out/perf-report/level1_all_types_three_libs.csv \
+  --bars-svg zig-out/perf-report/level1_all_types_three_libs_bars.svg \
+  --ratio-svg zig-out/perf-report/level1_all_types_three_libs_ratio.svg
+
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_level2_report.py \
+  --csv zig-out/perf-report/level2_all_types_three_libs.csv \
+  --skip-missing
+
+python3 bench/tools/plot_level2_report.py \
+  zig-out/perf-report/level2_all_types_three_libs.csv \
+  --bars-svg zig-out/perf-report/level2_all_types_three_libs_bars.svg
+
+env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
+  python3 bench/tools/run_gemm_sweep_isolated.py \
+  --gemm-sweep zig-out/bin/gemm-sweep \
+  --zynum-blas zig-out/lib/libzynum_blas.dylib \
+  --reps 6 \
+  --process-repeats 2 \
+  --isolate-kind \
+  --csv zig-out/perf-report/level3_all_types_more_shapes_three_libs.csv \
+  --skip-missing
+
+python3 bench/tools/plot_gemm_sweep.py \
+  zig-out/perf-report/level3_all_types_more_shapes_three_libs.csv \
+  zig-out/perf-report/level3_all_types_more_shapes_three_libs_lines.svg
+```
+
+Then replace the checked-in README image assets:
+
+```sh
+find docs/assets/benchmarks -maxdepth 1 -type f -name '*.svg' -delete
+cp zig-out/perf-report/level1_all_types_three_libs_bars.svg docs/assets/benchmarks/current_level1_all_types_three_libs.svg
+cp zig-out/perf-report/level2_all_types_three_libs_bars.svg docs/assets/benchmarks/current_level2_all_types_three_libs.svg
+cp zig-out/perf-report/level3_all_types_more_shapes_three_libs_lines.svg docs/assets/benchmarks/current_level3_all_types_more_shapes.svg
+```
+
+Keep CSV and metadata files under `zig-out/perf-report/` unless a release note
+explicitly links them as external artifacts. The repository should normally track
+only the three curated SVG files under `docs/assets/benchmarks/`.
 
 ## Default Sweep Shape Classes
 
@@ -170,7 +316,7 @@ a record in the relevant optimization notes. The record should include:
   isolated CSV if comparators are mentioned, and summary output.
 - Runtime environment: all Zynum and comparator variables from the table above.
 - Rollback rule: what observation should disable, narrow, or move the gate behind
-  an environment variable.
+  an internal dispatch predicate or explicit non-env API/build option.
 
 Do not broaden a gate because a single machine, shape, or non-isolated run looked
 better. CPU model names are acceptable in benchmark labels, but dispatch logic
@@ -185,7 +331,7 @@ benchmark.
 
 | Target family | Minimum validation | Reportable performance evidence |
 | --- | --- | --- |
-| `aarch64-macos` Apple Silicon | Native correctness tests for the selected `-Dcpu`; record `ZYNUM_BLAS_AMX`, thread count, and comparator settings. | Native focused runs plus full fresh-process sweep. Use Accelerate/OpenBLAS comparator data only when thread counts and isolation are recorded. |
+| `aarch64-macos` Apple Silicon | Native correctness tests for the selected `-Dcpu`; record target features, `ZYNUM_MAXIMUM_THREADS`, detected CPU count, and comparator settings. | Native focused runs plus full fresh-process sweep. Use Accelerate/OpenBLAS comparator data only when thread counts and isolation are recorded. |
 | `aarch64-linux-gnu` ASIMD/SVE2/SME | Correctness on matching hardware or a clearly labeled cross-target check. | Native hardware sweep for the advertised feature set. Do not infer SVE2/SME throughput from ASIMD-only hosts or emulators. |
 | `x86_64-linux-gnu` baseline/AVX/AVX2/AVX512 | Correctness for the selected `-Dcpu`; compile checks may cover unsupported local features. | Native Intel and/or AMD measurements for the feature tier being claimed, with MKL/OpenBLAS thread counts pinned. |
 | Other supported build targets | Correctness or compile coverage as available. | Mark as unmeasured until a native fresh-process sweep exists. |
@@ -199,18 +345,25 @@ Re-test when:
 - A long sweep disagrees with focused single-shape runs.
 - A result changes when benchmark order changes.
 - A stateful worker option was enabled.
+- Correctness, scalar return values, or unrelated comparator timings change
+  after an SME, AMX, or other stateful instruction path has run in the same
+  process.
 
 Do not merge a performance gate based only on one lucky focused benchmark.
+Do not keep a pessimistic rollback based on a contaminated run; use it only as a
+pointer to shapes that need fresh correctness and isolated benchmark evidence.
 
 ## Regression Criteria
 
 A performance change is usually acceptable only when:
 
 - Correctness tests pass.
+- Correctness still passes after any stateful kernel path used by the benchmark
+  has run, including SME streaming-mode and AMX-state paths.
 - Target shapes improve repeatedly.
 - Non-target shapes do not show broad regressions.
 - Full sweep data does not introduce catastrophic slow points.
 - The retained rule is narrower than the evidence.
 
-When in doubt, keep the optimization behind an explicit environment variable
-until more data exists.
+When in doubt, keep the optimization behind an internal dispatch predicate or
+explicit non-environment API/build option until more data exists.

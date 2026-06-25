@@ -31,7 +31,13 @@ pub const CblasRight = abi.CblasRight;
 /// CBLAS entry points re-exported for test modules.
 pub const cblas_dcopy = abi.cblas_dcopy;
 pub const cblas_daxpy = abi.cblas_daxpy;
+pub const cblas_caxpy = abi.cblas_caxpy;
+pub const cblas_zaxpy = abi.cblas_zaxpy;
+pub const cblas_caxpby = abi.cblas_caxpby;
+pub const cblas_zaxpby = abi.cblas_zaxpby;
 pub const cblas_dscal = abi.cblas_dscal;
+pub const cblas_cscal = abi.cblas_cscal;
+pub const cblas_zscal = abi.cblas_zscal;
 pub const cblas_ddot = abi.cblas_ddot;
 pub const cblas_dnrm2 = abi.cblas_dnrm2;
 pub const cblas_dasum = abi.cblas_dasum;

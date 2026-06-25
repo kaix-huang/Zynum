@@ -7,14 +7,24 @@ This document covers x86_64-specific GEMM work in Zynum BLAS.
 Current source locations:
 
 - `src/blas/kernels/x86_64/features.zig`: compile-time feature probes.
-- `src/blas/kernels/x86_64/simd.zig`: packed-B SGEMM/DGEMM vector backend.
+- `src/blas/kernels/x86_64/simd.zig`: thin packed-B SGEMM/DGEMM wrapper that
+  selects lane and panel parameters from x86_64 target features.
+- `src/blas/kernels/matrix_matrix/packed_simd.zig`: shared fixed-width packed-B SIMD
+  skeleton used by the x86_64 wrapper.
+- `src/blas/kernels/matrix_matrix/epilogue.zig`: shared real-GEMM alpha/beta write-back
+  helpers.
 
-The backend currently selects vector width from target features:
+The wrapper currently selects vector width from target features:
 
 - SSE2: 128-bit lanes.
 - AVX or AVX2: 256-bit lanes.
 - AVX512F: 512-bit lanes.
 - FMA: use multiply-add lowering where available.
+
+The x86_64 file should stay a configuration and feature-boundary layer. Packed
+panel preparation, the K loop, scalar/vector row tails, and generic fallback for
+tail columns live in the shared `packed_simd.zig` skeleton unless native x86
+evidence justifies a different instruction sequence.
 
 ## Dispatch Rules
 
@@ -62,7 +72,9 @@ the feature tier being enabled by default.
 
 - The current development machine may cross-compile x86_64 but cannot produce
   real AVX2/AVX512 performance numbers.
-- Tail columns still need better packed handling.
+- Tail columns still use the generic fallback from the shared packed-SIMD
+  skeleton; packed partial-column handling still needs native measurement before
+  becoming default.
 - AVX512 mask-tail paths are not complete.
 - AVX2 and AVX512 probably need separate tile choices.
 - MKL and OpenBLAS threading defaults differ, so comparator benchmarks must pin
@@ -73,10 +85,14 @@ the feature tier being enabled by default.
 Compile checks:
 
 ```sh
-zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline
-zig build test -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast
-zig build test -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast
+zig build -Dtarget=x86_64-linux-gnu -Dcpu=baseline --summary failures
+zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
+zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast --summary failures
 ```
+
+Run `zig build test ...` only on a host that can execute the selected x86_64
+target binaries, or under an explicitly documented runner/emulator. Cross-target
+builds from Apple Silicon are compile coverage only.
 
 Linux benchmark with MKL:
 
@@ -92,9 +108,7 @@ zig build bench-gemm-sweep \
 Recommended environment:
 
 ```sh
-export ZYNUM_BLAS_GEMM_POOL=0
-export ZYNUM_BLAS_GEMM_IO=0
-export ZYNUM_BLAS_NUM_THREADS=1
+export ZYNUM_MAXIMUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
 export OPENBLAS_DYNAMIC=0
 export MKL_NUM_THREADS=1
@@ -112,12 +126,14 @@ claims.
    sweeps, fresh-process comparator data, and recorded runtime environment.
 2. Add stack packing for small and medium shapes only behind documented shape
    predicates.
-3. Implement packed partial-column tail handling and record the tail-shape
-   boundary.
+3. Implement packed partial-column tail handling through shared
+   `packed_simd.zig` prologue/epilogue hooks where possible, and record the
+   tail-shape boundary.
 4. Add AVX512 mask load/store tail paths with separate native AVX512 evidence.
 5. Split AVX2/FMA and AVX512/FMA tile choices when native data justifies the
    separate gates.
-6. Benchmark alpha/beta write-back paths separately.
+6. Benchmark alpha/beta write-back paths separately, but keep shared formulas in
+   `src/blas/kernels/matrix_matrix/epilogue.zig`.
 7. Compare against MKL and OpenBLAS with pinned thread counts and isolated
    processes.
 

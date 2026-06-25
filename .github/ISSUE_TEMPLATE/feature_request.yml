@@ -28,7 +28,7 @@ body:
         - FFT module
         - Sparse module
         - CNN or Transformer acceleration
-        - ARM, x86, GPU, or NPU backend
+        - CPU kernel, target feature, or platform support
         - Build, packaging, or CI
         - Documentation
         - Other

@@ -9,6 +9,7 @@ import sys
 from collections import defaultdict
 
 COLORS = {
+    "Zynum": "#2563eb",
     "zynum-blas": "#2563eb",
     "Accelerate": "#dc2626",
     "OpenBLAS": "#16a34a",
@@ -16,8 +17,10 @@ COLORS = {
 }
 
 DISPLAY_NAMES = {
-    "zynum-blas": "Zynum BLAS",
+    "zynum-blas": "Zynum",
 }
+
+LIB_ORDER = ["Zynum", "zynum-blas", "Accelerate", "OpenBLAS", "MKL"]
 
 
 def display_name(value):
@@ -68,23 +71,32 @@ def polyline(points):
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
 
 
-def plot_heading(kinds):
+def library_heading(libs):
+    names = [display_name(str(lib)) for lib in libs]
+    if not names:
+        return "GEMM Libraries"
+    if len(names) == 1:
+        return names[0]
+    return " vs ".join(names)
+
+
+def plot_heading(kinds, libs):
     kind_set = set(kinds)
-    library_text = "Zynum BLAS vs Accelerate vs OpenBLAS"
+    library_text = library_heading(libs)
     if kind_set == {"cgemm", "zgemm"}:
         return (
             f"Complex GEMM Performance Sweep: {library_text}",
-            "Best-of-reps GF/s for CGEMM/ZGEMM across square, skinny, wide, and K-varied column-major shapes",
+            "Best-of-reps GF/s for CGEMM/ZGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
         )
     if kind_set == {"sgemm", "dgemm"}:
         return (
             f"Real GEMM Performance Sweep: {library_text}",
-            "Best-of-reps GF/s for SGEMM/DGEMM across square, skinny, wide, and K-varied column-major shapes",
+            "Best-of-reps GF/s for SGEMM/DGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
         )
     kind_text = "/".join(kind.upper() for kind in kinds)
     return (
         f"{kind_text} Performance Sweep: {library_text}",
-        "Best-of-reps GF/s across square, skinny, wide, and K-varied column-major GEMM shapes",
+        "Best-of-reps GF/s across square, remainder, skinny, wide, and K-varied column-major GEMM shapes",
     )
 
 
@@ -164,7 +176,7 @@ def main():
             )
 
     labels_by_index = {}
-    libs = []
+    seen_libs = []
     for row in rows:
         label = f"{row['label']}\\n{row['m']}x{row['n']}x{row['k']}"
         old_label = labels_by_index.get(row["shape_index"])
@@ -173,8 +185,10 @@ def main():
                 f"shape_index {row['shape_index']} maps to both {old_label!r} and {label!r}"
             )
         labels_by_index[row["shape_index"]] = label
-        if row["library"] not in libs:
-            libs.append(row["library"])
+        if row["library"] not in seen_libs:
+            seen_libs.append(row["library"])
+    libs = [lib for lib in LIB_ORDER if lib in seen_libs]
+    libs.extend(lib for lib in seen_libs if lib not in libs)
     sorted_indices = sorted(labels_by_index)
     expected_indices = list(range(len(sorted_indices)))
     if sorted_indices != expected_indices:
@@ -188,7 +202,7 @@ def main():
         if row["kind"] not in kinds:
             kinds.append(row["kind"])
 
-    width = 1800
+    width = max(1800, 90 * len(labels) + 170)
     panel_height = 260
     panel_gap = 110
     top0 = 110
@@ -218,7 +232,8 @@ def main():
 </style>
 """
     )
-    title, subtitle = plot_heading(kinds)
+    title, subtitle = plot_heading(kinds, libs)
+    subtitle = "Higher is better. " + subtitle
     svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>')
     svg.append(f'<text x="40" y="42" class="title">{html.escape(title)}</text>')
     svg.append(f'<text x="40" y="66" class="subtitle">{html.escape(subtitle)}</text>')

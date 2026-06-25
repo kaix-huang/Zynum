@@ -6,9 +6,7 @@ const builtin = @import("builtin");
 
 pub const gemm_parallel_work_threshold: usize = 192 * 192 * 192;
 pub const medium_gemm_work_threshold: usize = 768 * 768 * 768;
-pub const medium_gemm_thread_cap: usize = 6;
-pub const default_gemm_thread_cap: usize = 6;
-pub const thread_env_name = "ZYNUM_BLAS_NUM_THREADS";
+pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";
 
 var max_threads_override = std.atomic.Value(usize).init(0);
 var total_threads_cache = std.atomic.Value(usize).init(0);
@@ -30,7 +28,7 @@ fn envThreadLimit() usize {
     const cached = env_threads_cache.load(.monotonic);
     if (cached != 0) return cached - 1;
 
-    const raw = std.c.getenv(thread_env_name) orelse {
+    const raw = std.c.getenv(maximum_threads_env_name) orelse {
         env_threads_cache.store(1, .monotonic);
         return 0;
     };
@@ -115,10 +113,7 @@ pub fn cacheLineBytes() usize {
 }
 
 pub fn defaultGemmThreadLimit() usize {
-    const performance_threads = performanceThreadCount();
-    if (performance_threads == 0) return @min(default_gemm_thread_cap, totalThreadCount());
-    const efficiency_threads = efficiencyThreadCount();
-    return @min(performance_threads + @min(efficiency_threads, 2), totalThreadCount());
+    return maxThreads();
 }
 
 pub fn gemmThreadCount(m: usize, n: usize, k: usize) usize {
@@ -127,13 +122,7 @@ pub fn gemmThreadCount(m: usize, n: usize, k: usize) usize {
     const work = m *| n *| k;
     if (work < gemm_parallel_work_threshold) return 1;
 
-    const override = maxThreadsOverride();
-    const limit = if (override != 0) override else blk: {
-        const env_limit = envThreadLimit();
-        if (env_limit != 0) break :blk env_limit;
-        const default_limit = if (work < medium_gemm_work_threshold) medium_gemm_thread_cap else default_gemm_thread_cap;
-        break :blk @min(default_limit, defaultGemmThreadLimit());
-    };
+    const limit = maxThreads();
     if (limit <= 1) return 1;
     return @max(@as(usize, 1), @min(limit, n));
 }

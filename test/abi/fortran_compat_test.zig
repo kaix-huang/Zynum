@@ -45,6 +45,118 @@ fn expectComplexApprox(comptime T: type, expected: T, actual: T, tol: anytype) !
     try std.testing.expectApproxEqAbs(expected.im, actual.im, tol);
 }
 
+fn referenceComplexScal(comptime T: type, n: usize, alpha: T, x: []T, incx: isize) void {
+    for (0..n) |i| {
+        const idx = ref.vectorIndex(n, incx, i);
+        x[idx] = ref.mul(T, alpha, x[idx]);
+    }
+}
+
+fn referenceComplexAxpy(comptime T: type, n: usize, alpha: T, x: []const T, incx: isize, y: []T, incy: isize) void {
+    for (0..n) |i| {
+        const ix = ref.vectorIndex(n, incx, i);
+        const iy = ref.vectorIndex(n, incy, i);
+        y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), y[iy]);
+    }
+}
+
+fn referenceComplexAxpby(comptime T: type, n: usize, alpha: T, x: []const T, incx: isize, beta: T, y: []T, incy: isize) void {
+    for (0..n) |i| {
+        const ix = ref.vectorIndex(n, incx, i);
+        const iy = ref.vectorIndex(n, incy, i);
+        y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), ref.mul(T, beta, y[iy]));
+    }
+}
+
+fn expectComplexScalCase(comptime T: type, n: usize, incx: isize, alpha: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0x537a_6c31);
+    const len = ref.vectorStorageLen(n, incx);
+    const x = try std.testing.allocator.alloc(T, len);
+    defer std.testing.allocator.free(x);
+    const expected = try std.testing.allocator.alloc(T, len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    @memcpy(expected, x);
+
+    var nn: fortran.BlasInt = @intCast(n);
+    var ix: fortran.BlasInt = @intCast(incx);
+    var alpha_arg = alpha;
+    if (T == fortran.ComplexF32) {
+        fortran.cscal_(&nn, &alpha_arg, x.ptr, &ix);
+    } else if (T == fortran.ComplexF64) {
+        fortran.zscal_(&nn, &alpha_arg, x.ptr, &ix);
+    } else {
+        @compileError("complex scal test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexScal(T, n, alpha, expected, incx);
+
+    for (expected, x) |want, got| try expectComplexApprox(T, want, got, tol);
+}
+
+fn expectComplexAxpyCase(comptime T: type, n: usize, incx: isize, incy: isize, alpha: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0xa01a_78b5);
+    const x_len = ref.vectorStorageLen(n, incx);
+    const y_len = ref.vectorStorageLen(n, incy);
+    const x = try std.testing.allocator.alloc(T, x_len);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    @memcpy(expected, y);
+
+    var nn: fortran.BlasInt = @intCast(n);
+    var ix: fortran.BlasInt = @intCast(incx);
+    var iy: fortran.BlasInt = @intCast(incy);
+    var alpha_arg = alpha;
+    if (T == fortran.ComplexF32) {
+        fortran.caxpy_(&nn, &alpha_arg, x.ptr, &ix, y.ptr, &iy);
+    } else if (T == fortran.ComplexF64) {
+        fortran.zaxpy_(&nn, &alpha_arg, x.ptr, &ix, y.ptr, &iy);
+    } else {
+        @compileError("complex axpy test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexAxpy(T, n, alpha, x, incx, expected, incy);
+
+    for (expected, y) |want, got| try expectComplexApprox(T, want, got, tol);
+}
+
+fn expectComplexAxpbyCase(comptime T: type, n: usize, incx: isize, incy: isize, alpha: T, beta: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0xa9b5_1234);
+    const x_len = ref.vectorStorageLen(n, incx);
+    const y_len = ref.vectorStorageLen(n, incy);
+    const x = try std.testing.allocator.alloc(T, x_len);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    @memcpy(expected, y);
+
+    var nn: fortran.BlasInt = @intCast(n);
+    var ix: fortran.BlasInt = @intCast(incx);
+    var iy: fortran.BlasInt = @intCast(incy);
+    var alpha_arg = alpha;
+    var beta_arg = beta;
+    if (T == fortran.ComplexF32) {
+        fortran.caxpby_(&nn, &alpha_arg, x.ptr, &ix, &beta_arg, y.ptr, &iy);
+    } else if (T == fortran.ComplexF64) {
+        fortran.zaxpby_(&nn, &alpha_arg, x.ptr, &ix, &beta_arg, y.ptr, &iy);
+    } else {
+        @compileError("complex axpby test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexAxpby(T, n, alpha, x, incx, beta, expected, incy);
+
+    for (expected, y) |want, got| try expectComplexApprox(T, want, got, tol);
+}
+
 fn sampleComplexValue(comptime T: type, row: usize, col: usize, salt: usize) T {
     return complexValue(T, sampleValue(f64, row, col, salt), sampleValue(f64, row, col, salt + 11));
 }
@@ -223,6 +335,27 @@ test "dgemm column major no transpose" {
     try std.testing.expectApproxEqAbs(@as(f64, 100), result_matrix[1], 1e-12);
     try std.testing.expectApproxEqAbs(@as(f64, 103), result_matrix[2], 1e-12);
     try std.testing.expectApproxEqAbs(@as(f64, 136), result_matrix[3], 1e-12);
+}
+
+test "complex scal with complex alpha supports strides" {
+    try expectComplexScalCase(fortran.ComplexF32, 9, 1, complexValue(fortran.ComplexF32, -0.75, 0.5), @as(f32, 1e-5));
+    try expectComplexScalCase(fortran.ComplexF32, 7, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), @as(f32, 1e-5));
+    try expectComplexScalCase(fortran.ComplexF32, 7, -2, complexValue(fortran.ComplexF32, 1.5, 0.375), @as(f32, 1e-5));
+    try expectComplexScalCase(fortran.ComplexF64, 9, 1, complexValue(fortran.ComplexF64, -0.75, 0.5), @as(f64, 1e-12));
+    try expectComplexScalCase(fortran.ComplexF64, 7, 2, complexValue(fortran.ComplexF64, 0.25, -1.25), @as(f64, 1e-12));
+    try expectComplexScalCase(fortran.ComplexF64, 7, -2, complexValue(fortran.ComplexF64, 1.5, 0.375), @as(f64, 1e-12));
+}
+
+test "complex axpy and axpby with complex alpha support strides" {
+    try expectComplexAxpyCase(fortran.ComplexF32, 8, 1, 1, complexValue(fortran.ComplexF32, -0.75, 0.5), @as(f32, 1e-5));
+    try expectComplexAxpyCase(fortran.ComplexF32, 7, 2, -2, complexValue(fortran.ComplexF32, 0.25, -1.25), @as(f32, 1e-5));
+    try expectComplexAxpyCase(fortran.ComplexF64, 8, 1, 1, complexValue(fortran.ComplexF64, -0.75, 0.5), @as(f64, 1e-12));
+    try expectComplexAxpyCase(fortran.ComplexF64, 7, 2, -2, complexValue(fortran.ComplexF64, 0.25, -1.25), @as(f64, 1e-12));
+
+    try expectComplexAxpbyCase(fortran.ComplexF32, 8, 1, 1, complexValue(fortran.ComplexF32, -0.75, 0.5), complexValue(fortran.ComplexF32, 0.25, -0.125), @as(f32, 1e-5));
+    try expectComplexAxpbyCase(fortran.ComplexF32, 7, -2, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), complexValue(fortran.ComplexF32, -0.5, 0.75), @as(f32, 1e-5));
+    try expectComplexAxpbyCase(fortran.ComplexF64, 8, 1, 1, complexValue(fortran.ComplexF64, -0.75, 0.5), complexValue(fortran.ComplexF64, 0.25, -0.125), @as(f64, 1e-12));
+    try expectComplexAxpbyCase(fortran.ComplexF64, 7, -2, 2, complexValue(fortran.ComplexF64, 0.25, -1.25), complexValue(fortran.ComplexF64, -0.5, 0.75), @as(f64, 1e-12));
 }
 
 test "sgemm and dgemm no-trans padded alpha beta tile tails" {
@@ -468,6 +601,14 @@ test "parallel sgemm and dgemm column split matches reference" {
     defer fortran.setMaxThreads(0);
     try expectGemmNoTransCase(f32, allocator, 96, 97, 96, 96, 96, 96, 0.75, -0.25);
     try expectGemmNoTransCase(f64, allocator, 96, 97, 96, 96, 96, 96, 0.75, -0.25);
+}
+
+test "parallel sgemm and dgemm row split matches reference" {
+    const allocator = std.testing.allocator;
+    fortran.setMaxThreads(10);
+    defer fortran.setMaxThreads(0);
+    try expectGemmNoTransCase(f32, allocator, 512, 16, 1024, 512, 1024, 512, 1, 0);
+    try expectGemmNoTransCase(f64, allocator, 512, 16, 1024, 512, 1024, 512, 1, 0);
 }
 
 test "dgemm invalid parameter leaves output unchanged" {

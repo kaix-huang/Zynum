@@ -17,20 +17,40 @@ implementation with a Zig-first API, standard CBLAS/Fortran ABI symbols,
 generated C/Fortran compatibility files, examples, tests, benchmarks, and
 architecture-aware GEMM kernels.
 
+The active `0.1.x` development line is focused on finishing the complete BLAS
+surface and making performance competitive with vendor BLAS libraries. Its
+primary native performance gate is Apple's latest production silicon: the 0.1
+target is to beat Accelerate across the documented BLAS benchmark suite with
+fresh-process evidence. This is an engineering target, not a blanket performance
+claim for the current checkout.
+
 The long-term direction is broader than BLAS: Zynum is designed to grow into a
 single C/Fortran-compatible, Zig-native numerical runtime spanning dense linear
 algebra, LAPACK-style decompositions, FFT, sparse kernels, CNN kernels, and
-Transformer workloads across ARM, x86, GPU, and NPU backends.
+Transformer workloads across portable and architecture-specific CPU kernels.
 
-![GEMM performance sweep on Apple M5](docs/assets/benchmarks/gemm_sweep_m5_all.svg)
+## Current Performance Snapshot
 
-<sub>Exploratory local snapshot: Apple M5/macOS, Zig 0.16.0,
-`--release=fast -Dcpu=apple_m4+sme2p1` because this Zig version does not yet
-name Apple M5 directly; SGEMM/DGEMM/CGEMM/ZGEMM default shape sweep, isolated
-comparator processes, `reps=30`, `process-repeats=2`, default comparator thread
-settings. Treat this as a quick visual performance signal, not a portable
-performance guarantee. See `docs/common/benchmarking.md` before quoting
-benchmark numbers.</sub>
+The charts below compare Zynum, Accelerate, and OpenBLAS in that order. Higher
+is better in every panel. These are local Apple Silicon benchmark snapshots with
+fresh-process comparator isolation, not portable performance guarantees; see
+`docs/common/benchmarking.md` before quoting numbers.
+
+![Level 1 current all-type performance](docs/assets/benchmarks/current_level1_all_types_three_libs.svg)
+
+<sub>Level 1 snapshot: real and complex f32/f64 vector routines plus copy paths;
+Accelerate does not export every extension symbol used by the all-type probe.</sub>
+
+![Level 2 current all-type performance](docs/assets/benchmarks/current_level2_all_types_three_libs.svg)
+
+<sub>Level 2 snapshot: real f32/f64 GEMV/SYMV/GER and complex f32/f64
+GEMV/HEMV/GERU/GERC at n=128, 256, and 512.</sub>
+
+![Level 3 current GEMM performance](docs/assets/benchmarks/current_level3_all_types_more_shapes.svg)
+
+<sub>Level 3 snapshot: SGEMM, DGEMM, CGEMM, and ZGEMM across the default GEMM
+sweep shape set, including square, remainder, skinny, wide, and K-varied
+column-major shapes.</sub>
 
 ## Highlights
 
@@ -42,6 +62,21 @@ benchmark numbers.</sub>
 | GEMM optimization | Portable backend plus selected AArch64 and x86_64 fast paths, feature-aware dispatch, task splitting, packing, threading experiments, and benchmark tooling. |
 | Reproducibility | CI checks, generated-header drift detection, compatibility tests, example smoke tests, benchmark methodology docs, and isolated comparator runners. |
 | Future stack | Project layout reserves clean module boundaries for LAPACK, FFT, sparse, CNN, Transformer, tensor, and random-number modules. |
+
+## 0.1.x Target
+
+The `0.1.x` line is scoped to Zynum BLAS:
+
+- Complete every BLAS Level 1, Level 2, and Level 3 routine across real and
+  complex types, including CBLAS, Fortran ABI, generated C headers, and generated
+  Fortran module declarations.
+- Support ARM and x86 CPUs through portable fallbacks and feature-aware kernels
+  for AArch64 ASIMD/SVE/SVE2/AMX/SME and x86_64 SSE/AVX/AVX2/AVX512 tiers.
+- Use the latest Apple Silicon machines as the primary performance gate, with
+  the goal that Zynum beats Accelerate across the documented BLAS benchmark
+  suite before 0.1 is considered complete.
+- Keep performance claims tied to reproducible benchmark commands, CSV artifacts,
+  thread counts, target features, and fresh-process comparator isolation.
 
 ## Current Module Matrix
 
@@ -262,18 +297,15 @@ See `examples/README.md` for C and Fortran commands.
 
 ## Runtime Controls
 
-Zynum BLAS uses module-scoped environment variables. Set them before the first
-BLAS call in a process.
+Zynum BLAS has a single project-specific environment variable. Set it before the
+first BLAS call in a process.
 
 | Variable | Accepted values | Meaning |
 | --- | --- | --- |
-| `ZYNUM_BLAS_NUM_THREADS` | Positive integer | Overrides the runtime thread limit. By default, GEMM uses host detection and internal caps. |
-| `ZYNUM_BLAS_AMX` | `1`, `true`, `on`; `0`, `false`, `off`, `no` | Controls experimental Apple AMX paths where available. The unset default is automatic. |
-| `ZYNUM_BLAS_GEMM_POOL` | `1`, `true`, `on`; `0`, `false`, `off`, `no` | Opts into or disables the experimental persistent GEMM batch worker pool. |
-| `ZYNUM_BLAS_GEMM_IO` | `group-concurrent`, `group-async`, `future-concurrent`, `future-async`, `persistent-pool`, `0`, `off` | Selects experimental `std.Io` worker strategies for GEMM experiments. |
+| `ZYNUM_MAXIMUM_THREADS` | Positive integer | Caps the number of threads Zynum may use. When unset, the cap defaults to the runtime CPU count. GEMM may still choose fewer threads by internal heuristics. |
 
-Experimental switches are not stable API. They are intended for benchmarking,
-kernel development, and dispatch investigation.
+Instruction-set selection, AMX/SME use, and `std.Io` worker strategy are handled
+internally and are not controlled by environment variables.
 
 ## Tests And Validation
 
@@ -355,11 +387,19 @@ src/blas/abi*                 Fortran and CBLAS compatibility ABI exports
 src/blas/gemm*                GEMM dispatch, task splitting, and worker experiments
 src/blas/kernels*             generic, AArch64, and x86_64 GEMM kernels
 include/zynum/blas*           generated compatibility headers and Fortran module
-bench*                        benchmark executables and helper scripts
-examples*                     Zig, C/CBLAS, and Fortran examples
-tools*                        project-level maintenance tools
-docs*                         architecture, usage, compatibility, roadmap, performance notes
+bench/*.zig                   benchmark executables and focused probe binaries
+bench/tools/*.py              isolated report, plotting, and benchmark-check helpers
+examples/*                    Zig, C/CBLAS, and Fortran examples
+tools/*                       project-level maintenance tools
+docs/*                        architecture, usage, compatibility, roadmap, performance notes
+docs/assets/benchmarks/*      curated README chart SVGs only
 ```
+
+Generated benchmark CSVs, raw traces, sampling output, disassembly notes,
+temporary binaries, machine-local instructions, and build products are not part
+of the public package. Keep them under ignored locations such as `zig-out/`,
+`.zig-cache/`, `/tmp`, or local Git excludes. Only curated documentation assets
+under `docs/assets/benchmarks/` should be checked in.
 
 ## Stability
 
