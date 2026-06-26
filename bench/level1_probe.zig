@@ -210,8 +210,10 @@ pub fn main(init: std.process.Init) !void {
     var sink: f64 = 0;
     var checksum: f64 = 0;
 
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
     const pid = std.c.getpid();
-    std.debug.print("pid={d} op={s} n={d} seconds={d} lib={s}\n", .{ pid, @tagName(selected), n, seconds, path });
+    try stdout_writer.interface.print("pid={d} op={s} n={d} seconds={d} lib={s}\n", .{ pid, @tagName(selected), n, seconds, path });
     const start = std.Io.Clock.awake.now(init.io).nanoseconds;
     const deadline = start + @as(i128, seconds) * std.time.ns_per_s;
     var iters: u64 = 0;
@@ -395,5 +397,6 @@ pub fn main(init: std.process.Init) !void {
     const elapsed_s = @as(f64, @floatFromInt(elapsed_ns)) / @as(f64, std.time.ns_per_s);
     const gops = @as(f64, @floatFromInt(iters)) * workPerIter(selected, n) / elapsed_s / 1.0e9;
     const gbps = @as(f64, @floatFromInt(iters)) * bytesPerIter(selected, n) / elapsed_s / 1.0e9;
-    std.debug.print("iters={d} elapsed_ns={d} rate_Gops={d:.3} bandwidth_GBps={d:.3} checksum={d:.6}\n", .{ iters, elapsed_ns, gops, gbps, checksum });
+    try stdout_writer.interface.print("iters={d} elapsed_ns={d} rate_Gops={d:.3} bandwidth_GBps={d:.3} checksum={d:.6}\n", .{ iters, elapsed_ns, gops, gbps, checksum });
+    try stdout_writer.flush();
 }

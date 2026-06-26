@@ -13,7 +13,7 @@ def parse_args():
         description="Check GEMM sweep CSV rows against the fastest comparator library."
     )
     parser.add_argument("csv", help="Path to a gemm_sweep CSV file.")
-    parser.add_argument("--zynum", default="zynum-blas", help="Library label for Zynum rows.")
+    parser.add_argument("--zynum", default="Zynum", help="Library label for Zynum rows.")
     parser.add_argument(
         "--comparator",
         action="append",
@@ -73,6 +73,8 @@ def main():
     checked = 0
     for key, by_library in groups.items():
         zynum = by_library.get(args.zynum)
+        if zynum is None and args.zynum == "Zynum":
+            zynum = by_library.get("zynum-blas")
         if zynum is None:
             missing.append((key, args.zynum))
             continue

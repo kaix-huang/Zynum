@@ -174,7 +174,7 @@ def existing_libs(args):
     for name, path in candidates:
         if not path:
             continue
-        if args.skip_missing and name != "Accelerate" and not Path(path).exists():
+        if args.skip_missing and not Path(path).exists():
             continue
         libs.append((name, path))
     return libs

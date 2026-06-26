@@ -185,12 +185,15 @@ pub fn main(init: std.process.Init) !void {
     // Keep benchmark libraries loaded until process exit. Zynum and comparator
     // BLAS implementations may own process-lifetime worker threads after use.
 
-    std.debug.print("size={d} reps={d}\n", .{ size, reps });
-    std.debug.print("library       dgemm GF/s   sgemm GF/s   daxpy GF/s\n", .{});
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
+    try stdout_writer.interface.print("size={d} reps={d}\n", .{ size, reps });
+    try stdout_writer.interface.print("library       dgemm GF/s   sgemm GF/s   daxpy GF/s\n", .{});
     for (libs[0..lib_count]) |lib| {
         const dg = try benchDgemm(allocator, init.io, lib, size, reps);
         const sg = try benchSgemm(allocator, init.io, lib, size, reps);
         const ax = try benchDaxpy(allocator, init.io, lib, size * size, reps);
-        std.debug.print("{s:<12} {d:>10.2}   {d:>10.2}   {d:>10.2}\n", .{ lib.name, dg, sg, ax });
+        try stdout_writer.interface.print("{s:<12} {d:>10.2}   {d:>10.2}   {d:>10.2}\n", .{ lib.name, dg, sg, ax });
     }
+    try stdout_writer.flush();
 }

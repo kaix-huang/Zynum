@@ -7,7 +7,10 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const zynum_dep = b.dependency("zynum", .{});
+    const zynum_dep = b.dependency("zynum", .{
+        .target = target,
+        .optimize = optimize,
+    });
 
     const exe = b.addExecutable(.{
         .name = "zynum-zig-matrix-multiply",

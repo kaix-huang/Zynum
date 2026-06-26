@@ -283,7 +283,7 @@ def main():
 
     rows = []
     for library_name, library_path in libraries(args):
-        if args.skip_missing and library_name != "Accelerate" and not Path(library_path).exists():
+        if args.skip_missing and not Path(library_path).exists():
             continue
         for group, op, kind in COPY_OPS:
             row = run_copy_op(args, library_name, library_path, group, op, kind)

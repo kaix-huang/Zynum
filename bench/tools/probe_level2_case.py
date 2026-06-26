@@ -106,7 +106,6 @@ def main():
                 ptr(matrix),
                 ctypes.byref(ni),
                 ptr(x),
-                ptr(x),
                 ctypes.byref(one),
                 ctypes.byref(beta),
                 ptr(y),

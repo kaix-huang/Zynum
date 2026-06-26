@@ -148,7 +148,7 @@ fn benchDdot(allocator: std.mem.Allocator, io: std.Io, lib: Lib, n: usize, reps:
         sink += lib.ddot(&ni, x.ptr, &inc, y.ptr, &inc);
         best = @min(best, nowNs(io) - start);
     }
-    if (sink == 42.424242) std.debug.print("", .{});
+    std.mem.doNotOptimizeAway(sink);
     return .{ .ns = best, .work = 2.0 * @as(f64, @floatFromInt(n)) };
 }
 
@@ -165,7 +165,7 @@ fn benchDasum(allocator: std.mem.Allocator, io: std.Io, lib: Lib, n: usize, reps
         sink += lib.dasum(&ni, x.ptr, &inc);
         best = @min(best, nowNs(io) - start);
     }
-    if (sink == 42.424242) std.debug.print("", .{});
+    std.mem.doNotOptimizeAway(sink);
     return .{ .ns = best, .work = @floatFromInt(n) };
 }
 
@@ -182,7 +182,7 @@ fn benchDnrm2(allocator: std.mem.Allocator, io: std.Io, lib: Lib, n: usize, reps
         sink += lib.dnrm2(&ni, x.ptr, &inc);
         best = @min(best, nowNs(io) - start);
     }
-    if (sink == 42.424242) std.debug.print("", .{});
+    std.mem.doNotOptimizeAway(sink);
     return .{ .ns = best, .work = 2.0 * @as(f64, @floatFromInt(n)) };
 }
 
@@ -265,14 +265,33 @@ fn benchDger(allocator: std.mem.Allocator, io: std.Io, lib: Lib, n: usize, reps:
     return .{ .ns = best, .work = 2.0 * @as(f64, @floatFromInt(n)) * @as(f64, @floatFromInt(n)) };
 }
 
-fn emitResult(name: []const u8, lib_name: []const u8, result: Result) void {
+fn emitResult(writer: *std.Io.Writer, name: []const u8, lib_name: []const u8, result: Result) !void {
     const seconds = @as(f64, @floatFromInt(result.ns)) / 1e9;
     const rate = result.work / seconds / 1e9;
-    std.debug.print("{s},{s},{d},{d:.6}\n", .{ name, lib_name, result.ns, rate });
+    try writer.print("{s},{s},{d},{d:.6}\n", .{ name, lib_name, result.ns, rate });
 }
 
 fn shouldRun(case_filter: ?[]const u8, name: []const u8) bool {
     return case_filter == null or std.mem.eql(u8, case_filter.?, name);
+}
+
+fn knownCase(name: []const u8) bool {
+    const cases = [_][]const u8{
+        "dcopy",
+        "dscal",
+        "daxpy",
+        "ddot",
+        "dasum",
+        "dnrm2",
+        "dgemv_n",
+        "dgemv_t",
+        "dsymv",
+        "dger",
+    };
+    for (cases) |case| {
+        if (std.mem.eql(u8, name, case)) return true;
+    }
+    return false;
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -309,6 +328,12 @@ pub fn main(init: std.process.Init) !void {
         usage();
         return error.BadArgument;
     }
+    if (case_filter) |case| {
+        if (!knownCase(case)) {
+            usage();
+            return error.BadArgument;
+        }
+    }
 
     var libs: [3]Lib = undefined;
     var lib_count: usize = 0;
@@ -325,17 +350,20 @@ pub fn main(init: std.process.Init) !void {
     // Keep benchmark libraries loaded until process exit. Zynum and comparator
     // BLAS implementations may own process-lifetime worker threads after use.
 
-    std.debug.print("case,library,best_ns,rate_Gops\n", .{});
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
+    try stdout_writer.interface.print("case,library,best_ns,rate_Gops\n", .{});
     for (libs[0..lib_count]) |lib| {
-        if (shouldRun(case_filter, "dcopy")) emitResult("dcopy", lib.name, try benchDcopy(allocator, init.io, lib, size * size, reps));
-        if (shouldRun(case_filter, "dscal")) emitResult("dscal", lib.name, try benchDscal(allocator, init.io, lib, size * size, reps));
-        if (shouldRun(case_filter, "daxpy")) emitResult("daxpy", lib.name, try benchDaxpy(allocator, init.io, lib, size * size, reps));
-        if (shouldRun(case_filter, "ddot")) emitResult("ddot", lib.name, try benchDdot(allocator, init.io, lib, size * size, reps));
-        if (shouldRun(case_filter, "dasum")) emitResult("dasum", lib.name, try benchDasum(allocator, init.io, lib, size * size, reps));
-        if (shouldRun(case_filter, "dnrm2")) emitResult("dnrm2", lib.name, try benchDnrm2(allocator, init.io, lib, size * size, reps));
-        if (shouldRun(case_filter, "dgemv_n")) emitResult("dgemv_n", lib.name, try benchDgemv(allocator, init.io, lib, size, reps, 'N'));
-        if (shouldRun(case_filter, "dgemv_t")) emitResult("dgemv_t", lib.name, try benchDgemv(allocator, init.io, lib, size, reps, 'T'));
-        if (shouldRun(case_filter, "dsymv")) emitResult("dsymv", lib.name, try benchDsymv(allocator, init.io, lib, size, reps));
-        if (shouldRun(case_filter, "dger")) emitResult("dger", lib.name, try benchDger(allocator, init.io, lib, size, reps));
+        if (shouldRun(case_filter, "dcopy")) try emitResult(&stdout_writer.interface, "dcopy", lib.name, try benchDcopy(allocator, init.io, lib, size * size, reps));
+        if (shouldRun(case_filter, "dscal")) try emitResult(&stdout_writer.interface, "dscal", lib.name, try benchDscal(allocator, init.io, lib, size * size, reps));
+        if (shouldRun(case_filter, "daxpy")) try emitResult(&stdout_writer.interface, "daxpy", lib.name, try benchDaxpy(allocator, init.io, lib, size * size, reps));
+        if (shouldRun(case_filter, "ddot")) try emitResult(&stdout_writer.interface, "ddot", lib.name, try benchDdot(allocator, init.io, lib, size * size, reps));
+        if (shouldRun(case_filter, "dasum")) try emitResult(&stdout_writer.interface, "dasum", lib.name, try benchDasum(allocator, init.io, lib, size * size, reps));
+        if (shouldRun(case_filter, "dnrm2")) try emitResult(&stdout_writer.interface, "dnrm2", lib.name, try benchDnrm2(allocator, init.io, lib, size * size, reps));
+        if (shouldRun(case_filter, "dgemv_n")) try emitResult(&stdout_writer.interface, "dgemv_n", lib.name, try benchDgemv(allocator, init.io, lib, size, reps, 'N'));
+        if (shouldRun(case_filter, "dgemv_t")) try emitResult(&stdout_writer.interface, "dgemv_t", lib.name, try benchDgemv(allocator, init.io, lib, size, reps, 'T'));
+        if (shouldRun(case_filter, "dsymv")) try emitResult(&stdout_writer.interface, "dsymv", lib.name, try benchDsymv(allocator, init.io, lib, size, reps));
+        if (shouldRun(case_filter, "dger")) try emitResult(&stdout_writer.interface, "dger", lib.name, try benchDger(allocator, init.io, lib, size, reps));
     }
+    try stdout_writer.flush();
 }

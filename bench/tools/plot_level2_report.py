@@ -122,7 +122,7 @@ def plot(rows, output_path):
 """,
         '<rect width="100%" height="100%" fill="#fff"/>',
         '<text x="38" y="42" class="title">Level 2 current performance - real and complex types</text>',
-        '<text x="38" y="66" class="sub">Higher is better. Fresh process per library and size, metric = Gops. Panels: n=128/256/512; bars ordered Zynum, Accelerate, OpenBLAS.</text>',
+        '<text x="38" y="66" class="sub">Higher is better. Fresh process per library and size, metric = Gops. Panels use the CSV n values; bars ordered Zynum, Accelerate, OpenBLAS.</text>',
     ]
 
     for index, lib in enumerate(LIB_ORDER):

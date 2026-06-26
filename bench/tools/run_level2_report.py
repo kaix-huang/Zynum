@@ -477,7 +477,7 @@ def run_controller(args):
     for n in sizes:
         reps = args.reps_small if n <= 256 else args.reps_large
         for library_name, library_path in selected_libraries:
-            if args.skip_missing and library_name != "Accelerate" and not Path(library_path).exists():
+            if args.skip_missing and not Path(library_path).exists():
                 continue
             print(
                 f"[level2 {library_name}] n={n} reps={reps} path={library_path}",
