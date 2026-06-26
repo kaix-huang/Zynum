@@ -11,6 +11,7 @@
 
 const aliasing = @import("aliasing.zig");
 const core = @import("../core.zig");
+const std = @import("std");
 const views = @import("views.zig");
 
 /// Errors returned by checked public Zig BLAS operations.
@@ -126,7 +127,7 @@ fn matrixVectorExpectedResultLength(matrix: anytype) Error!views.BlasInt {
 fn matrixProductElementCount(result_matrix: anytype) Error!usize {
     const rows = try checkedNonNegativeLength(result_matrix.row_count);
     const cols = try checkedNonNegativeLength(result_matrix.column_count);
-    return rows * cols;
+    return std.math.mul(usize, rows, cols) catch error.InvalidLength;
 }
 
 fn checkMatrixVectorShapes(input_matrix: anytype, input_vector: anytype, result_vector: anytype) Error!views.BlasInt {

@@ -61,6 +61,14 @@ DEFAULT_SHAPES = [
 ]
 
 
+def default_zynum_blas():
+    if sys.platform == "darwin":
+        return "zig-out/lib/libzynum_blas.dylib"
+    if sys.platform == "win32":
+        return "zig-out/bin/zynum_blas.dll"
+    return "zig-out/lib/libzynum_blas.so"
+
+
 def parse_args():
     p = argparse.ArgumentParser(
         description="Run gemm-sweep with one BLAS library per fresh OS process and merge the CSV output."
@@ -71,7 +79,7 @@ def parse_args():
         "--zynum",
         "--zig",
         dest="zynum_blas",
-        default="zig-out/lib/libzynum_blas.dylib",
+        default=default_zynum_blas(),
     )
     p.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     p.add_argument("--openblas", default=DEFAULT_OPENBLAS)

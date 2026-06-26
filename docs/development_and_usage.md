@@ -21,7 +21,7 @@ zig build --release=fast test
 zig build
 zig build generate-headers
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-python3 -m py_compile bench/tools/*.py
+env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
 ```
 
 Useful target checks:
@@ -300,7 +300,7 @@ APIs/build options, not process environment.
 
 | Variable | Purpose |
 | --- | --- |
-| `ZYNUM_MAXIMUM_THREADS` | Positive integer cap on the number of threads Zynum may use. When unset, the cap defaults to the runtime CPU count. |
+| `ZYNUM_MAXIMUM_THREADS` | Positive integer cap on the number of threads Zynum may use. Values above the runtime CPU count are capped to that count. When unset, the cap defaults to the runtime CPU count. |
 
 Benchmarking baseline:
 

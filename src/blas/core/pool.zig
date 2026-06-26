@@ -47,6 +47,8 @@ fn ensureWorkerQoS() void {
 }
 
 fn ensureIoThreaded() bool {
+    if (configuredHelperCount() == 0) return false;
+
     const state = io_init_state.load(.acquire);
     if (state == 2) return true;
     if (state == 3) return false;
@@ -115,6 +117,8 @@ fn runPersistentWorker(worker_id: usize) void {
 }
 
 fn ensurePersistentWorkers() bool {
+    if (configuredHelperCount() == 0) return false;
+
     const state = persistent_init_state.load(.acquire);
     if (state == 2) return true;
     if (state == 3) return false;
@@ -174,7 +178,8 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
     const workers = persistent_worker_count.load(.acquire);
     if (workers == 0) return false;
     const task_helpers: u32 = @intCast(count - 1);
-    const active_helpers = @min(workers, task_helpers);
+    const allowed_helpers: u32 = @intCast(configuredHelperCount());
+    const active_helpers = @min(@min(workers, task_helpers), allowed_helpers);
     if (active_helpers == 0) return false;
     const first_helper: u32 = if (count == 3 and workers >= active_helpers + 2) 2 else 0;
 

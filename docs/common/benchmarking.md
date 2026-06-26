@@ -51,7 +51,7 @@ behavior. Record variables that are intentionally unset as `unset`.
 
 | Variable | Applies to | Record because |
 | --- | --- | --- |
-| `ZYNUM_MAXIMUM_THREADS` | Zynum | Maximum number of threads Zynum may use; unset means runtime CPU count. |
+| `ZYNUM_MAXIMUM_THREADS` | Zynum | Maximum number of threads Zynum may use; values above the runtime CPU count are capped to that count; unset means runtime CPU count. |
 | `OPENBLAS_NUM_THREADS` | OpenBLAS | Comparator thread count. |
 | `OPENBLAS_DYNAMIC` | OpenBLAS | Dynamic thread-count policy. |
 | `VECLIB_MAXIMUM_THREADS` | Accelerate/vecLib | Comparator thread limit on macOS. |

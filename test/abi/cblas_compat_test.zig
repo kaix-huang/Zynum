@@ -172,11 +172,35 @@ fn fillColMajorTriBand(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: re
     }
 }
 
+fn fillRowMajorTriBand(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: ref.Diag, a: []T, n: usize, k: usize, lda: usize) void {
+    for (0..a.len) |i| a[i] = ref.fromParts(T, -4100 - @as(f64, @floatFromInt(i)), 4100);
+    for (0..n) |row| {
+        for (0..n) |col| {
+            if (ref.triBandIndexRowMajor(uplo, k, lda, row, col)) |idx| {
+                a[idx] = rng.scalar(T);
+                if (row == col and diag == .non_unit) a[idx] = ref.add(T, a[idx], ref.fromParts(T, 2.0 + @as(f64, @floatFromInt(row)), -0.25));
+            }
+        }
+    }
+}
+
 fn fillTriPacked(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: ref.Diag, ap: []T, n: usize) void {
     for (0..ap.len) |i| ap[i] = ref.fromParts(T, 5000 + @as(f64, @floatFromInt(i)), -5000);
     for (0..n) |col| {
         for (0..n) |row| {
             if (ref.triPackedIndex(uplo, n, row, col)) |idx| {
+                ap[idx] = rng.scalar(T);
+                if (row == col and diag == .non_unit) ap[idx] = ref.add(T, ap[idx], ref.fromParts(T, 2.5 + @as(f64, @floatFromInt(row)), 0.5));
+            }
+        }
+    }
+}
+
+fn fillTriPackedRowMajor(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: ref.Diag, ap: []T, n: usize) void {
+    for (0..ap.len) |i| ap[i] = ref.fromParts(T, 5100 + @as(f64, @floatFromInt(i)), -5100);
+    for (0..n) |row| {
+        for (0..n) |col| {
+            if (ref.triPackedIndexRowMajor(uplo, n, row, col)) |idx| {
                 ap[idx] = rng.scalar(T);
                 if (row == col and diag == .non_unit) ap[idx] = ref.add(T, ap[idx], ref.fromParts(T, 2.5 + @as(f64, @floatFromInt(row)), 0.5));
             }
@@ -582,6 +606,42 @@ test "cblas col-major complex packed banded level2 reference" {
     ref.tpsvColMajor(T, .upper, .conj_trans, .unit, n, &tp, &tp_solve, 1);
     cblas.cblas_ztbsv(cblas.CblasColMajor, cblas.CblasLower, cblas.CblasConjTrans, cblas.CblasNonUnit, n, k, &tb, lda, &expected_tb, -2);
     cblas.cblas_ztpsv(cblas.CblasColMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, n, &tp, &expected_tp, 1);
+    try expectComplexF64SliceApprox(&tb_solve, &expected_tb);
+    try expectComplexF64SliceApprox(&tp_solve, &expected_tp);
+}
+
+test "cblas row-major complex banded packed triangular conjugate transpose reference" {
+    const T = cblas.ComplexF64;
+    const n = 5;
+    const k = 2;
+    const lda = k + 1;
+    var rng = ref.Rng.init(0x5eed_0302);
+
+    var tb: [n * lda]T = undefined;
+    var tp: [n * (n + 1) / 2]T = undefined;
+    var tx: [ref.vectorStorageLen(n, 2)]T = undefined;
+    var tpx: [ref.vectorStorageLen(n, -1)]T = undefined;
+    var work: [n]T = undefined;
+    fillRowMajorTriBand(T, &rng, .upper, .non_unit, &tb, n, k, lda);
+    fillTriPackedRowMajor(T, &rng, .lower, .unit, &tp, n);
+    ref.fillVector(T, &rng, &tx, n, 2);
+    ref.fillVector(T, &rng, &tpx, n, -1);
+
+    var expected_tb = tx;
+    var expected_tp = tpx;
+    ref.tbmvRowMajor(T, .upper, .conj_trans, .non_unit, n, k, &tb, lda, &expected_tb, 2, &work);
+    ref.tpmvRowMajor(T, .lower, .conj_trans, .unit, n, &tp, &expected_tp, -1, &work);
+    cblas.cblas_ztbmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasNonUnit, n, k, &tb, lda, &tx, 2);
+    cblas.cblas_ztpmv(cblas.CblasRowMajor, cblas.CblasLower, cblas.CblasConjTrans, cblas.CblasUnit, n, &tp, &tpx, -1);
+    try expectComplexF64SliceApprox(&expected_tb, &tx);
+    try expectComplexF64SliceApprox(&expected_tp, &tpx);
+
+    var tb_solve = expected_tb;
+    var tp_solve = expected_tp;
+    ref.tbsvRowMajor(T, .upper, .conj_trans, .non_unit, n, k, &tb, lda, &tb_solve, 2);
+    ref.tpsvRowMajor(T, .lower, .conj_trans, .unit, n, &tp, &tp_solve, -1);
+    cblas.cblas_ztbsv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasNonUnit, n, k, &tb, lda, &expected_tb, 2);
+    cblas.cblas_ztpsv(cblas.CblasRowMajor, cblas.CblasLower, cblas.CblasConjTrans, cblas.CblasUnit, n, &tp, &expected_tp, -1);
     try expectComplexF64SliceApprox(&tb_solve, &expected_tb);
     try expectComplexF64SliceApprox(&tp_solve, &expected_tp);
 }

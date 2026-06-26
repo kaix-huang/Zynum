@@ -36,7 +36,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .link_libc = true,
     });
-    _ = b.addModule("zynum-blas", .{
+    const zynum_blas_mod = b.addModule("zynum-blas", .{
         .root_source_file = b.path("src/blas.zig"),
         .target = target,
         .optimize = optimize,
@@ -101,10 +101,24 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .link_libc = true,
-            .imports = &.{.{ .name = "zynum", .module = zynum_mod }},
+            .imports = &.{
+                .{ .name = "zynum", .module = zynum_mod },
+            },
         }),
     });
     const run_modern_tests = b.addRunArtifact(modern_tests);
+
+    const blas_module_tests = b.addTest(.{
+        .name = "zynum-blas-module-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("test/api/zynum_blas_module_test.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+            .imports = &.{.{ .name = "zynum-blas", .module = zynum_blas_mod }},
+        }),
+    });
+    const run_blas_module_tests = b.addRunArtifact(blas_module_tests);
 
     const fortran_tests = b.addTest(.{
         .name = "zynum-blas-fortran-compat-tests",
@@ -155,6 +169,7 @@ pub fn build(b: *std.Build) void {
 
     const test_step = b.step("test", "Run correctness tests");
     test_step.dependOn(&run_modern_tests.step);
+    test_step.dependOn(&run_blas_module_tests.step);
     test_step.dependOn(&run_fortran_tests.step);
     test_step.dependOn(&run_cblas_tests.step);
     test_step.dependOn(&run_header_smoke_tests.step);
@@ -179,10 +194,7 @@ pub fn build(b: *std.Build) void {
     const bench_mkl = b.option([]const u8, "bench-mkl", "Path to an MKL shared library exporting Fortran BLAS symbols for the bench step");
     addOptionalBenchLibrary(run_bench, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
     addOptionalBenchLibrary(run_bench, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
-    if (bench_mkl) |path| {
-        run_bench.addArg("--mkl");
-        run_bench.addArg(path);
-    }
+    addOptionalBenchLibrary(run_bench, "--mkl", bench_mkl, null);
     if (b.args) |args| run_bench.addArgs(args);
     run_bench.step.dependOn(b.getInstallStep());
 
@@ -207,10 +219,7 @@ pub fn build(b: *std.Build) void {
     run_gemm_sweep.addArg("zig-out/gemm_sweep.csv");
     addOptionalBenchLibrary(run_gemm_sweep, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
     addOptionalBenchLibrary(run_gemm_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
-    if (bench_mkl) |path| {
-        run_gemm_sweep.addArg("--mkl");
-        run_gemm_sweep.addArg(path);
-    }
+    addOptionalBenchLibrary(run_gemm_sweep, "--mkl", bench_mkl, null);
     if (b.args) |args| run_gemm_sweep.addArgs(args);
     run_gemm_sweep.step.dependOn(b.getInstallStep());
 

@@ -368,6 +368,44 @@ pub fn triPackedValueColMajor(comptime T: type, uplo: Uplo, diag: Diag, trans: T
     return value;
 }
 
+pub fn triBandIndexRowMajor(uplo: Uplo, k: usize, lda: usize, row: usize, col: usize) ?usize {
+    if (uplo == .upper) {
+        if (row > col or row + k < col) return null;
+        return row * lda + (col - row);
+    }
+    if (row < col or col + k < row) return null;
+    return row * lda + (k + col - row);
+}
+
+pub fn triPackedIndexRowMajor(uplo: Uplo, n: usize, row: usize, col: usize) ?usize {
+    if (uplo == .upper) {
+        if (row > col) return null;
+        return row * n - row * (row + 1) / 2 + col;
+    }
+    if (row < col) return null;
+    return row * (row + 1) / 2 + col;
+}
+
+pub fn triBandValueRowMajor(comptime T: type, uplo: Uplo, diag: Diag, trans: Trans, k: usize, a: []const T, lda: usize, row: usize, col: usize) T {
+    const ar = if (trans == .no_trans) row else col;
+    const ac = if (trans == .no_trans) col else row;
+    if (ar == ac and diag == .unit) return one(T);
+    const idx = triBandIndexRowMajor(uplo, k, lda, ar, ac) orelse return zero(T);
+    var value = a[idx];
+    if (trans == .conj_trans) value = conj(T, value);
+    return value;
+}
+
+pub fn triPackedValueRowMajor(comptime T: type, uplo: Uplo, diag: Diag, trans: Trans, n: usize, ap: []const T, row: usize, col: usize) T {
+    const ar = if (trans == .no_trans) row else col;
+    const ac = if (trans == .no_trans) col else row;
+    if (ar == ac and diag == .unit) return one(T);
+    const idx = triPackedIndexRowMajor(uplo, n, ar, ac) orelse return zero(T);
+    var value = ap[idx];
+    if (trans == .conj_trans) value = conj(T, value);
+    return value;
+}
+
 pub fn trmvColMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: usize, a: []const T, lda: usize, x: []T, incx: isize, work: []T) void {
     for (0..n) |i| {
         var sum = zero(T);
@@ -399,6 +437,24 @@ pub fn tpmvColMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: u
     for (0..n) |i| {
         var sum = zero(T);
         for (0..n) |j| sum = add(T, sum, mul(T, triPackedValueColMajor(T, uplo, diag, trans, n, ap, i, j), vectorGet(T, x, n, incx, j)));
+        work[i] = sum;
+    }
+    for (0..n) |i| vectorSet(T, x, n, incx, i, work[i]);
+}
+
+pub fn tbmvRowMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: usize, k: usize, a: []const T, lda: usize, x: []T, incx: isize, work: []T) void {
+    for (0..n) |i| {
+        var sum = zero(T);
+        for (0..n) |j| sum = add(T, sum, mul(T, triBandValueRowMajor(T, uplo, diag, trans, k, a, lda, i, j), vectorGet(T, x, n, incx, j)));
+        work[i] = sum;
+    }
+    for (0..n) |i| vectorSet(T, x, n, incx, i, work[i]);
+}
+
+pub fn tpmvRowMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: usize, ap: []const T, x: []T, incx: isize, work: []T) void {
+    for (0..n) |i| {
+        var sum = zero(T);
+        for (0..n) |j| sum = add(T, sum, mul(T, triPackedValueRowMajor(T, uplo, diag, trans, n, ap, i, j), vectorGet(T, x, n, incx, j)));
         work[i] = sum;
     }
     for (0..n) |i| vectorSet(T, x, n, incx, i, work[i]);
@@ -483,6 +539,46 @@ pub fn tpsvColMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: u
             var value = vectorGet(T, x, n, incx, i);
             for (0..i) |j| value = sub(T, value, mul(T, triPackedValueColMajor(T, uplo, diag, trans, n, ap, i, j), vectorGet(T, x, n, incx, j)));
             if (diag == .non_unit) value = divv(T, value, triPackedValueColMajor(T, uplo, diag, trans, n, ap, i, i));
+            vectorSet(T, x, n, incx, i, value);
+        }
+    }
+}
+
+pub fn tbsvRowMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: usize, k: usize, a: []const T, lda: usize, x: []T, incx: isize) void {
+    if (opTriUpper(uplo, trans)) {
+        var rr = n;
+        while (rr > 0) {
+            rr -= 1;
+            var value = vectorGet(T, x, n, incx, rr);
+            for (rr + 1..n) |j| value = sub(T, value, mul(T, triBandValueRowMajor(T, uplo, diag, trans, k, a, lda, rr, j), vectorGet(T, x, n, incx, j)));
+            if (diag == .non_unit) value = divv(T, value, triBandValueRowMajor(T, uplo, diag, trans, k, a, lda, rr, rr));
+            vectorSet(T, x, n, incx, rr, value);
+        }
+    } else {
+        for (0..n) |i| {
+            var value = vectorGet(T, x, n, incx, i);
+            for (0..i) |j| value = sub(T, value, mul(T, triBandValueRowMajor(T, uplo, diag, trans, k, a, lda, i, j), vectorGet(T, x, n, incx, j)));
+            if (diag == .non_unit) value = divv(T, value, triBandValueRowMajor(T, uplo, diag, trans, k, a, lda, i, i));
+            vectorSet(T, x, n, incx, i, value);
+        }
+    }
+}
+
+pub fn tpsvRowMajor(comptime T: type, uplo: Uplo, trans: Trans, diag: Diag, n: usize, ap: []const T, x: []T, incx: isize) void {
+    if (opTriUpper(uplo, trans)) {
+        var rr = n;
+        while (rr > 0) {
+            rr -= 1;
+            var value = vectorGet(T, x, n, incx, rr);
+            for (rr + 1..n) |j| value = sub(T, value, mul(T, triPackedValueRowMajor(T, uplo, diag, trans, n, ap, rr, j), vectorGet(T, x, n, incx, j)));
+            if (diag == .non_unit) value = divv(T, value, triPackedValueRowMajor(T, uplo, diag, trans, n, ap, rr, rr));
+            vectorSet(T, x, n, incx, rr, value);
+        }
+    } else {
+        for (0..n) |i| {
+            var value = vectorGet(T, x, n, incx, i);
+            for (0..i) |j| value = sub(T, value, mul(T, triPackedValueRowMajor(T, uplo, diag, trans, n, ap, i, j), vectorGet(T, x, n, incx, j)));
+            if (diag == .non_unit) value = divv(T, value, triPackedValueRowMajor(T, uplo, diag, trans, n, ap, i, i));
             vectorSet(T, x, n, incx, i, value);
         }
     }

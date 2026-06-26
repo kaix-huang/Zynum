@@ -174,7 +174,8 @@ repeated packing across splits. Large square matrices can benefit from more
 parallel work.
 
 Use `ZYNUM_MAXIMUM_THREADS` for explicit thread-cap experiments. When unset, the
-cap is the runtime CPU count; GEMM dispatch may choose fewer threads internally.
+cap is the runtime CPU count. Values above the runtime CPU count are capped to
+that count; GEMM dispatch may choose fewer threads internally.
 
 Current default planner notes for Apple Silicon:
 
@@ -330,7 +331,7 @@ Validation commands:
 ```sh
 zig fmt --check build.zig build.zig.zon src test bench examples tools
 zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
-python3 -m py_compile bench/tools/check_gemm_sweep.py
+env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/check_gemm_sweep.py
 ```
 
 Focused isolated command:

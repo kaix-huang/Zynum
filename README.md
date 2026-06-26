@@ -302,7 +302,7 @@ first BLAS call in a process.
 
 | Variable | Accepted values | Meaning |
 | --- | --- | --- |
-| `ZYNUM_MAXIMUM_THREADS` | Positive integer | Caps the number of threads Zynum may use. When unset, the cap defaults to the runtime CPU count. GEMM may still choose fewer threads by internal heuristics. |
+| `ZYNUM_MAXIMUM_THREADS` | Positive integer | Caps the number of threads Zynum may use. Values above the runtime CPU count are capped to that count. When unset, the cap defaults to the runtime CPU count. GEMM may still choose fewer threads by internal heuristics. |
 
 Instruction-set selection, AMX/SME use, and `std.Io` worker strategy are handled
 internally and are not controlled by environment variables.

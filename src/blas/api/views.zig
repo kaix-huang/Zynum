@@ -99,6 +99,11 @@ pub fn optionField(options: anytype, comptime name: []const u8, fallback: anytyp
     return if (@hasField(@TypeOf(options), name)) @field(options, name) else fallback;
 }
 
+fn defaultVectorLength(data_len: usize) Error!BlasInt {
+    if (data_len > @as(usize, @intCast(std.math.maxInt(BlasInt)))) return error.InvalidLength;
+    return @intCast(data_len);
+}
+
 /// Immutable strided vector view over caller-owned values.
 pub fn ConstVector(comptime T: type) type {
     comptime expectScalarType(T);
@@ -219,7 +224,7 @@ pub fn Matrix(comptime T: type) type {
 /// `stride`.
 pub fn constVector(comptime T: type, values: []const T, options: anytype) Error!ConstVector(T) {
     comptime expectScalarType(T);
-    const length: BlasInt = optionField(options, "length", @as(BlasInt, @intCast(values.len)));
+    const length: BlasInt = if (@hasField(@TypeOf(options), "length")) options.length else try defaultVectorLength(values.len);
     const stride: BlasInt = optionField(options, "stride", @as(BlasInt, 1));
     try validateVectorStorage(values.len, length, stride);
     return .{ .values = values, .length = length, .stride = stride };
@@ -229,7 +234,7 @@ pub fn constVector(comptime T: type, values: []const T, options: anytype) Error!
 /// `stride`.
 pub fn vector(comptime T: type, values: []T, options: anytype) Error!Vector(T) {
     comptime expectScalarType(T);
-    const length: BlasInt = optionField(options, "length", @as(BlasInt, @intCast(values.len)));
+    const length: BlasInt = if (@hasField(@TypeOf(options), "length")) options.length else try defaultVectorLength(values.len);
     const stride: BlasInt = optionField(options, "stride", @as(BlasInt, 1));
     try validateVectorStorage(values.len, length, stride);
     return .{ .values = values, .length = length, .stride = stride };

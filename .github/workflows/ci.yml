@@ -65,7 +65,7 @@ jobs:
         run: zig fmt --check build.zig build.zig.zon src test bench examples tools
 
       - name: Check Python benchmark tools compile
-        run: python3 -m py_compile bench/tools/*.py
+        run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
 
       - name: Regenerate compatibility headers
         run: zig build generate-headers --summary failures

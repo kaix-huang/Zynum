@@ -65,7 +65,7 @@ inline fn asumUnitRealDisabled(comptime T: type, n: usize, x: [*]const T) ?T {
 }
 
 pub fn scalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
-    if (comptime !(enable_asimd_dscal and features.has_asimd) and !(enable_sme_dscal and features.has_sme) and !(enable_sve_dscal and features.has_sve)) {
+    if (comptime !(enable_asimd_dscal and features.has_asimd) and !(enable_sme_dscal and features.has_sme2) and !(enable_sve_dscal and features.has_sve)) {
         return scalUnitRealDisabled(T, n, alpha, x);
     }
     if (comptime enable_asimd_dscal and features.has_asimd) {
@@ -74,7 +74,7 @@ pub fn scalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
             return true;
         }
     }
-    if (comptime enable_sme_dscal and features.has_sme) {
+    if (comptime enable_sme_dscal and features.has_sme2) {
         if (T == f32 and n >= 64 * 1024 and features.streamingVectorBytes() == 64) {
             var sm_state: features.StreamingModeState = undefined;
             sm_state.startSmZa();

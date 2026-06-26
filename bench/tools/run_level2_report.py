@@ -33,11 +33,19 @@ class ComplexF64(ctypes.Structure):
     _fields_ = [("re", ctypes.c_double), ("im", ctypes.c_double)]
 
 
+def default_zynum_blas():
+    if sys.platform == "darwin":
+        return "zig-out/lib/libzynum_blas.dylib"
+    if sys.platform == "win32":
+        return "zig-out/bin/zynum_blas.dll"
+    return "zig-out/lib/libzynum_blas.so"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run representative Level 2 fresh-process probes and write a report CSV."
     )
-    parser.add_argument("--zynum", default="zig-out/lib/libzynum_blas.dylib")
+    parser.add_argument("--zynum", default=default_zynum_blas())
     parser.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     parser.add_argument("--openblas", default=DEFAULT_OPENBLAS)
     parser.add_argument("--n", action="append", type=int, default=[])

@@ -63,6 +63,14 @@ RESULT_RE = re.compile(
 )
 
 
+def default_zynum_blas():
+    if sys.platform == "darwin":
+        return "zig-out/lib/libzynum_blas.dylib"
+    if sys.platform == "win32":
+        return "zig-out/bin/zynum_blas.dll"
+    return "zig-out/lib/libzynum_blas.so"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run representative Level 1 fresh-process probes and write a report CSV."
@@ -71,7 +79,7 @@ def parse_args():
         "--level1-probe", default="zig-out/perf-report/bin/level1_probe"
     )
     parser.add_argument("--copy-probe", default="zig-out/perf-report/bin/dcopy_probe")
-    parser.add_argument("--zynum", default="zig-out/lib/libzynum_blas.dylib")
+    parser.add_argument("--zynum", default=default_zynum_blas())
     parser.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     parser.add_argument("--openblas", default=DEFAULT_OPENBLAS)
     parser.add_argument("--n", type=int, default=1024 * 1024)

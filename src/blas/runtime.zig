@@ -49,9 +49,9 @@ pub fn totalThreadCount() usize {
 
 pub fn maxThreads() usize {
     const override = maxThreadsOverride();
-    if (override != 0) return override;
+    if (override != 0) return @min(override, totalThreadCount());
     const env_limit = envThreadLimit();
-    if (env_limit != 0) return env_limit;
+    if (env_limit != 0) return @min(env_limit, totalThreadCount());
     return totalThreadCount();
 }
 

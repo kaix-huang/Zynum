@@ -152,6 +152,41 @@ fn rowMajorConjTriValue(comptime T: type, uplo: c_int, diag: c_int, a: [*]const 
     return core.conj(T, a[a_row * ld + a_col]);
 }
 
+fn rowMajorTriBandIndex(uplo: c_int, k: usize, lda: BlasInt, row: usize, col: usize) ?usize {
+    const ld: usize = @intCast(lda);
+    if (uplo == CblasUpper) {
+        if (row > col or row + k < col) return null;
+        return row * ld + (col - row);
+    }
+    if (row < col or col + k < row) return null;
+    return row * ld + (k + col - row);
+}
+
+fn rowMajorTriPackedIndex(uplo: c_int, n: usize, row: usize, col: usize) ?usize {
+    if (uplo == CblasUpper) {
+        if (row > col) return null;
+        return row * n - row * (row + 1) / 2 + col;
+    }
+    if (row < col) return null;
+    return row * (row + 1) / 2 + col;
+}
+
+fn rowMajorConjTriBandValue(comptime T: type, uplo: c_int, diag: c_int, k: usize, a: [*]const T, lda: BlasInt, row: usize, col: usize) T {
+    if (row == col and diag == CblasUnit) return core.one(T);
+    const a_row = col;
+    const a_col = row;
+    const idx = rowMajorTriBandIndex(uplo, k, lda, a_row, a_col) orelse return core.zero(T);
+    return core.conj(T, a[idx]);
+}
+
+fn rowMajorConjTriPackedValue(comptime T: type, uplo: c_int, diag: c_int, n: usize, ap: [*]const T, row: usize, col: usize) T {
+    if (row == col and diag == CblasUnit) return core.one(T);
+    const a_row = col;
+    const a_col = row;
+    const idx = rowMajorTriPackedIndex(uplo, n, a_row, a_col) orelse return core.zero(T);
+    return core.conj(T, ap[idx]);
+}
+
 fn rowMajorConjTransOpUpper(uplo: c_int) bool {
     return uplo == CblasLower;
 }
@@ -203,6 +238,112 @@ fn rowMajorConjTrsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, a: 
                 value = core.sub(T, value, core.mul(T, rowMajorConjTriValue(T, uplo, diag, a, lda, i, j), core.vectorGet(T, x, sx, j, incx_)));
             }
             if (diag != CblasUnit) value = core.divv(T, value, rowMajorConjTriValue(T, uplo, diag, a, lda, i, i));
+            core.vectorSet(T, x, sx, i, incx_, value);
+        }
+    }
+}
+
+fn rowMajorConjTbmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, k_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
+    if (n_ <= 0 or k_ < 0 or lda <= 0 or incx_ == 0) return;
+    const n: usize = @intCast(n_);
+    const k: usize = @intCast(k_);
+    const sx = core.startIndex(n_, incx_);
+    if (rowMajorConjTransOpUpper(uplo)) {
+        for (0..n) |i| {
+            var sum = core.zero(T);
+            for (i..n) |j| {
+                sum = core.add(T, sum, core.mul(T, rowMajorConjTriBandValue(T, uplo, diag, k, a, lda, i, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            core.vectorSet(T, x, sx, i, incx_, sum);
+        }
+    } else {
+        var rr = n;
+        while (rr > 0) {
+            rr -= 1;
+            var sum = core.zero(T);
+            for (0..rr + 1) |j| {
+                sum = core.add(T, sum, core.mul(T, rowMajorConjTriBandValue(T, uplo, diag, k, a, lda, rr, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            core.vectorSet(T, x, sx, rr, incx_, sum);
+        }
+    }
+}
+
+fn rowMajorConjTpmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, ap: [*]const T, x: [*]T, incx_: BlasInt) void {
+    if (n_ <= 0 or incx_ == 0) return;
+    const n: usize = @intCast(n_);
+    const sx = core.startIndex(n_, incx_);
+    if (rowMajorConjTransOpUpper(uplo)) {
+        for (0..n) |i| {
+            var sum = core.zero(T);
+            for (i..n) |j| {
+                sum = core.add(T, sum, core.mul(T, rowMajorConjTriPackedValue(T, uplo, diag, n, ap, i, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            core.vectorSet(T, x, sx, i, incx_, sum);
+        }
+    } else {
+        var rr = n;
+        while (rr > 0) {
+            rr -= 1;
+            var sum = core.zero(T);
+            for (0..rr + 1) |j| {
+                sum = core.add(T, sum, core.mul(T, rowMajorConjTriPackedValue(T, uplo, diag, n, ap, rr, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            core.vectorSet(T, x, sx, rr, incx_, sum);
+        }
+    }
+}
+
+fn rowMajorConjTbsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, k_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
+    if (n_ <= 0 or k_ < 0 or lda <= 0 or incx_ == 0) return;
+    const n: usize = @intCast(n_);
+    const k: usize = @intCast(k_);
+    const sx = core.startIndex(n_, incx_);
+    if (rowMajorConjTransOpUpper(uplo)) {
+        var rr = n;
+        while (rr > 0) {
+            rr -= 1;
+            var value = core.vectorGet(T, x, sx, rr, incx_);
+            for (rr + 1..n) |j| {
+                value = core.sub(T, value, core.mul(T, rowMajorConjTriBandValue(T, uplo, diag, k, a, lda, rr, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            if (diag != CblasUnit) value = core.divv(T, value, rowMajorConjTriBandValue(T, uplo, diag, k, a, lda, rr, rr));
+            core.vectorSet(T, x, sx, rr, incx_, value);
+        }
+    } else {
+        for (0..n) |i| {
+            var value = core.vectorGet(T, x, sx, i, incx_);
+            for (0..i) |j| {
+                value = core.sub(T, value, core.mul(T, rowMajorConjTriBandValue(T, uplo, diag, k, a, lda, i, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            if (diag != CblasUnit) value = core.divv(T, value, rowMajorConjTriBandValue(T, uplo, diag, k, a, lda, i, i));
+            core.vectorSet(T, x, sx, i, incx_, value);
+        }
+    }
+}
+
+fn rowMajorConjTpsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, ap: [*]const T, x: [*]T, incx_: BlasInt) void {
+    if (n_ <= 0 or incx_ == 0) return;
+    const n: usize = @intCast(n_);
+    const sx = core.startIndex(n_, incx_);
+    if (rowMajorConjTransOpUpper(uplo)) {
+        var rr = n;
+        while (rr > 0) {
+            rr -= 1;
+            var value = core.vectorGet(T, x, sx, rr, incx_);
+            for (rr + 1..n) |j| {
+                value = core.sub(T, value, core.mul(T, rowMajorConjTriPackedValue(T, uplo, diag, n, ap, rr, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            if (diag != CblasUnit) value = core.divv(T, value, rowMajorConjTriPackedValue(T, uplo, diag, n, ap, rr, rr));
+            core.vectorSet(T, x, sx, rr, incx_, value);
+        }
+    } else {
+        for (0..n) |i| {
+            var value = core.vectorGet(T, x, sx, i, incx_);
+            for (0..i) |j| {
+                value = core.sub(T, value, core.mul(T, rowMajorConjTriPackedValue(T, uplo, diag, n, ap, i, j), core.vectorGet(T, x, sx, j, incx_)));
+            }
+            if (diag != CblasUnit) value = core.divv(T, value, rowMajorConjTriPackedValue(T, uplo, diag, n, ap, i, i));
             core.vectorSet(T, x, sx, i, incx_, value);
         }
     }
@@ -780,23 +921,31 @@ pub export fn cblas_dtbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtbmv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ctbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF32, lda: c_int, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
-    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
-    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
-    var dd = diagChar(diag);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTbmv(ComplexF32, uplo, diag, nn, kk, a, aa, x, ix);
+        return;
+    }
+    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
+    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
+    var dd = diagChar(diag);
     f.ctbmv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ztbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF64, lda: c_int, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
-    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
-    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
-    var dd = diagChar(diag);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTbmv(ComplexF64, uplo, diag, nn, kk, a, aa, x, ix);
+        return;
+    }
+    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
+    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
+    var dd = diagChar(diag);
     f.ztbmv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 
@@ -817,19 +966,27 @@ pub export fn cblas_dtpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtpmv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ctpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF32, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    var nn = asBlasInt(n);
+    var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTpmv(ComplexF32, uplo, diag, nn, ap, x, ix);
+        return;
+    }
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
-    var nn = asBlasInt(n);
-    var ix = asBlasInt(incx);
     f.ctpmv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ztpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF64, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    var nn = asBlasInt(n);
+    var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTpmv(ComplexF64, uplo, diag, nn, ap, x, ix);
+        return;
+    }
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
-    var nn = asBlasInt(n);
-    var ix = asBlasInt(incx);
     f.ztpmv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 
@@ -899,23 +1056,31 @@ pub export fn cblas_dtbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtbsv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ctbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF32, lda: c_int, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
-    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
-    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
-    var dd = diagChar(diag);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTbsv(ComplexF32, uplo, diag, nn, kk, a, aa, x, ix);
+        return;
+    }
+    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
+    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
+    var dd = diagChar(diag);
     f.ctbsv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ztbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF64, lda: c_int, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
-    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
-    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
-    var dd = diagChar(diag);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTbsv(ComplexF64, uplo, diag, nn, kk, a, aa, x, ix);
+        return;
+    }
+    var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
+    var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
+    var dd = diagChar(diag);
     f.ztbsv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 
@@ -936,19 +1101,27 @@ pub export fn cblas_dtpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtpsv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ctpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF32, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    var nn = asBlasInt(n);
+    var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTpsv(ComplexF32, uplo, diag, nn, ap, x, ix);
+        return;
+    }
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
-    var nn = asBlasInt(n);
-    var ix = asBlasInt(incx);
     f.ctpsv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ztpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF64, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    var nn = asBlasInt(n);
+    var ix = asBlasInt(incx);
+    if (layout == CblasRowMajor and trans == CblasConjTrans) {
+        rowMajorConjTpsv(ComplexF64, uplo, diag, nn, ap, x, ix);
+        return;
+    }
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
-    var nn = asBlasInt(n);
-    var ix = asBlasInt(incx);
     f.ztpsv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 

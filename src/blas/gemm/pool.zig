@@ -54,6 +54,8 @@ fn runIoTask(kind: JobKind, tasks: *const anyopaque, index: usize) void {
 }
 
 fn ensureIoThreaded() bool {
+    if (configuredHelperCount() == 0) return false;
+
     const state = io_init_state.load(.acquire);
     if (state == 2) return true;
     if (state == 3) return false;

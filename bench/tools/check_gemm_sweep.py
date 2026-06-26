@@ -99,6 +99,9 @@ def main():
         f"checked={checked} passed={checked - len(failures)} "
         f"failed={len(failures)} missing={len(missing)} ratio={args.ratio:.6g}"
     )
+    no_checks = checked == 0
+    if no_checks:
+        print("no matching Zynum/comparator groups were checked", file=sys.stderr)
 
     for ratio, key, zynum, best in failures[: args.worst]:
         kind, label, m, n, k = key
@@ -112,6 +115,8 @@ def main():
         kind, shape, m, n, k = key
         print(f"MISSING {label} {kind} {shape} m={m} n={n} k={k}")
 
+    if no_checks:
+        return 2
     return 1 if failures or missing else 0
 
 

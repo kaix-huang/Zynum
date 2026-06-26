@@ -46,7 +46,7 @@ only when needed.
 
 ```sh
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-python3 -m py_compile bench/tools/*.py
+env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
 zig build test --summary failures
 zig build --release=safe test --summary failures
 zig build --release=fast test --summary failures
