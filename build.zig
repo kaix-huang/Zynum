@@ -3,6 +3,29 @@
 
 const std = @import("std");
 
+fn disabledBenchPath(path: []const u8) bool {
+    return path.len == 0 or std.mem.eql(u8, path, "none");
+}
+
+fn absoluteFileExists(path: []const u8) bool {
+    const path_c = std.posix.toPosixPath(path) catch return false;
+    return std.c.access(&path_c, std.posix.F_OK) == 0;
+}
+
+fn addOptionalBenchLibrary(run: *std.Build.Step.Run, flag: []const u8, explicit_path: ?[]const u8, default_path: ?[]const u8) void {
+    if (explicit_path) |path| {
+        if (disabledBenchPath(path)) return;
+        run.addArg(flag);
+        run.addArg(path);
+        return;
+    }
+    if (default_path) |path| {
+        if (!absoluteFileExists(path)) return;
+        run.addArg(flag);
+        run.addArg(path);
+    }
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
@@ -154,20 +177,8 @@ pub fn build(b: *std.Build) void {
     const bench_openblas = b.option([]const u8, "bench-openblas", "Path to an OpenBLAS shared library for the bench step");
     const bench_accelerate = b.option([]const u8, "bench-accelerate", "Path to Accelerate for the bench step");
     const bench_mkl = b.option([]const u8, "bench-mkl", "Path to an MKL shared library exporting Fortran BLAS symbols for the bench step");
-    if (bench_openblas) |path| {
-        run_bench.addArg("--openblas");
-        run_bench.addArg(path);
-    } else if (target.result.os.tag == .macos) {
-        run_bench.addArg("--openblas");
-        run_bench.addArg("/opt/homebrew/opt/openblas/lib/libopenblas.dylib");
-    }
-    if (bench_accelerate) |path| {
-        run_bench.addArg("--accelerate");
-        run_bench.addArg(path);
-    } else if (target.result.os.tag == .macos) {
-        run_bench.addArg("--accelerate");
-        run_bench.addArg("/System/Library/Frameworks/Accelerate.framework/Accelerate");
-    }
+    addOptionalBenchLibrary(run_bench, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalBenchLibrary(run_bench, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     if (bench_mkl) |path| {
         run_bench.addArg("--mkl");
         run_bench.addArg(path);
@@ -194,20 +205,8 @@ pub fn build(b: *std.Build) void {
     run_gemm_sweep.addFileArg(lib.getEmittedBin());
     run_gemm_sweep.addArg("--csv");
     run_gemm_sweep.addArg("zig-out/gemm_sweep.csv");
-    if (bench_openblas) |path| {
-        run_gemm_sweep.addArg("--openblas");
-        run_gemm_sweep.addArg(path);
-    } else if (target.result.os.tag == .macos) {
-        run_gemm_sweep.addArg("--openblas");
-        run_gemm_sweep.addArg("/opt/homebrew/opt/openblas/lib/libopenblas.dylib");
-    }
-    if (bench_accelerate) |path| {
-        run_gemm_sweep.addArg("--accelerate");
-        run_gemm_sweep.addArg(path);
-    } else if (target.result.os.tag == .macos) {
-        run_gemm_sweep.addArg("--accelerate");
-        run_gemm_sweep.addArg("/System/Library/Frameworks/Accelerate.framework/Accelerate");
-    }
+    addOptionalBenchLibrary(run_gemm_sweep, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalBenchLibrary(run_gemm_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     if (bench_mkl) |path| {
         run_gemm_sweep.addArg("--mkl");
         run_gemm_sweep.addArg(path);
@@ -232,23 +231,33 @@ pub fn build(b: *std.Build) void {
     const run_level12_sweep = b.addRunArtifact(level12_sweep);
     run_level12_sweep.addArg("--zynum-blas");
     run_level12_sweep.addFileArg(lib.getEmittedBin());
-    if (bench_openblas) |path| {
-        run_level12_sweep.addArg("--openblas");
-        run_level12_sweep.addArg(path);
-    } else if (target.result.os.tag == .macos) {
-        run_level12_sweep.addArg("--openblas");
-        run_level12_sweep.addArg("/opt/homebrew/opt/openblas/lib/libopenblas.dylib");
-    }
-    if (bench_accelerate) |path| {
-        run_level12_sweep.addArg("--accelerate");
-        run_level12_sweep.addArg(path);
-    } else if (target.result.os.tag == .macos) {
-        run_level12_sweep.addArg("--accelerate");
-        run_level12_sweep.addArg("/System/Library/Frameworks/Accelerate.framework/Accelerate");
-    }
+    addOptionalBenchLibrary(run_level12_sweep, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalBenchLibrary(run_level12_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     if (b.args) |args| run_level12_sweep.addArgs(args);
     run_level12_sweep.step.dependOn(b.getInstallStep());
 
     const level12_sweep_step = b.step("bench-level12-sweep", "Sweep representative BLAS Level 1/2 kernels");
     level12_sweep_step.dependOn(&run_level12_sweep.step);
+
+    const level1_probe = b.addExecutable(.{
+        .name = "level1-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/level1_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    b.installArtifact(level1_probe);
+
+    const dcopy_probe = b.addExecutable(.{
+        .name = "dcopy-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/dcopy_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    b.installArtifact(dcopy_probe);
 }

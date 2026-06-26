@@ -366,6 +366,10 @@ Start with `docs/README.md`. Useful entry points:
 
 | Document | Purpose |
 | --- | --- |
+| `docs/users/README.md` | User-focused guide for build, install, Zig API, C/Fortran calls, examples, and runtime controls. |
+| `docs/contributors/README.md` | Contributor workflow, validation gates, ABI maintenance, and benchmark evidence expectations. |
+| `docs/internals/README.md` | Internal design map for facades, source ownership, core/ABI/kernel boundaries, and threading policy. |
+| `docs/performance/README.md` | Performance documentation map and public evidence boundary. |
 | `docs/development_and_usage.md` | Local development, package dependency setup, typed Zig API, aliasing, and extension workflow. |
 | `docs/architecture.md` | Module boundaries, source ownership, ABI layering, GEMM dispatch, and file-split rules. |
 | `docs/fortran_compatibility.md` | CBLAS/Fortran ABI details, generated headers, integer width notes, and complex scalar caveats. |

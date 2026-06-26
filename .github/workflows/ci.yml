@@ -16,6 +16,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  ZIG_GLOBAL_CACHE_DIR: .zig-cache/global
+  ZIG_LOCAL_CACHE_DIR: .zig-cache/local
+
 jobs:
   test:
     name: ${{ matrix.os }} / ${{ matrix.target }}
@@ -27,20 +31,45 @@ jobs:
           - os: macos-15
             target: native
           - os: macos-15
-            target: aarch64-macos-apple-m4
+            target: aarch64-macos-apple-m4-sme2p1
           - os: ubuntu-24.04
             target: native
           - os: ubuntu-24.04
             target: x86_64-linux-baseline
+          - os: ubuntu-24.04
+            target: x86_64-linux-v3
+          - os: ubuntu-24.04
+            target: x86_64-linux-v4
     steps:
       - uses: actions/checkout@v4
+
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.16.0
+
+      - uses: actions/cache@v4
+        with:
+          path: .zig-cache
+          key: zig-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.target }}-
+            zig-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Install Fortran compiler on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
       - name: Check formatting
         run: zig fmt --check build.zig build.zig.zon src test bench examples tools
+
+      - name: Check Python benchmark tools compile
+        run: python3 -m py_compile bench/tools/*.py
+
       - name: Regenerate compatibility headers
-        run: zig build generate-headers
+        run: zig build generate-headers --summary failures
+
       - name: Check generated headers are up to date
         run: |
           if [ -n "$(git status --porcelain -- include/zynum/blas)" ]; then
@@ -49,21 +78,63 @@ jobs:
             git --no-pager status --short -- include/zynum/blas
             exit 1
           fi
-      - name: Test native
+
+      - name: Test Debug native
         if: matrix.target == 'native'
         run: zig build test --summary failures
-      - name: Build Apple M4 target
-        if: matrix.target == 'aarch64-macos-apple-m4'
-        run: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast --summary failures
+
+      - name: Test ReleaseSafe native
+        if: matrix.target == 'native'
+        run: zig build --release=safe test --summary failures
+
+      - name: Test ReleaseFast native
+        if: matrix.target == 'native'
+        run: zig build --release=fast test --summary failures
+
+      - name: Test Apple M4 SME2.1 target when runnable
+        if: matrix.target == 'aarch64-macos-apple-m4-sme2p1' && runner.arch == 'ARM64'
+        run: zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+
+      - name: Build Apple M4 SME2.1 target
+        if: matrix.target == 'aarch64-macos-apple-m4-sme2p1' && runner.arch != 'ARM64'
+        run: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+
       - name: Test x86_64 baseline target
         if: matrix.target == 'x86_64-linux-baseline'
         run: zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline --summary failures
+
+      - name: Build x86_64 v3 target
+        if: matrix.target == 'x86_64-linux-v3'
+        run: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
+
+      - name: Build x86_64 v4 target
+        if: matrix.target == 'x86_64-linux-v4'
+        run: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast --summary failures
+
       - name: Build install artifacts
         if: matrix.target == 'native'
         run: zig build --summary failures
+
+      - name: Check ABI symbols
+        if: matrix.target == 'native'
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            dynlib=zig-out/lib/libzynum_blas.dylib
+            dynamic_symbols() { nm -gU "$dynlib"; }
+          else
+            dynlib=zig-out/lib/libzynum_blas.so
+            dynamic_symbols() { nm -D --defined-only "$dynlib"; }
+          fi
+          staticlib=zig-out/lib/libzynum_blas.a
+          for sym in dgemm_ cblas_dgemm cdotc_sub_ zher2k_; do
+            dynamic_symbols | grep -q "$sym"
+            nm -g "$staticlib" | grep -q "$sym"
+          done
+
       - name: Run Zig example
         if: matrix.target == 'native'
         run: zig build --build-file examples/zig/build.zig run
+
       - name: Run CBLAS example
         if: matrix.target == 'native'
         run: |
@@ -73,17 +144,61 @@ jobs:
             -Wl,-rpath,zig-out/lib \
             -o zig-out/examples/cblas-dgemm
           zig-out/examples/cblas-dgemm
-      - name: Run Fortran example when gfortran is available
+
+      - name: Run Fortran example
+        if: matrix.target == 'native' && runner.os == 'Linux'
+        run: |
+          mkdir -p zig-out/examples/fortran-mod
+          gfortran -std=f2008 -J zig-out/examples/fortran-mod \
+            -c zig-out/include/zynum/blas/blas.f90 \
+            -o zig-out/examples/zynum_blas_fortran.o
+          gfortran -std=f2008 -I zig-out/examples/fortran-mod \
+            examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
+            -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
+            -o zig-out/examples/fortran-dgemm
+          zig-out/examples/fortran-dgemm
+
+      - name: Run benchmark executable smoke tests
         if: matrix.target == 'native'
         run: |
-          if command -v gfortran >/dev/null 2>&1; then
-            mkdir -p zig-out/examples/fortran-mod
-            gfortran -std=f2008 -J zig-out/examples/fortran-mod \
-              -c zig-out/include/zynum/blas/blas.f90 \
-              -o zig-out/examples/zynum_blas_fortran.o
-            gfortran -std=f2008 -I zig-out/examples/fortran-mod \
-              examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
-              -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
-              -o zig-out/examples/fortran-dgemm
-            zig-out/examples/fortran-dgemm
+          zig build bench -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 2 --reps 1
+          zig build bench-gemm-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --kind dgemm --shape tiny:2:2:2 --reps 1
+          zig build bench-level12-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 4 --reps 1 --case dcopy
+
+      - name: Run probe smoke tests
+        if: matrix.target == 'native'
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ]; then
+            dynlib=zig-out/lib/libzynum_blas.dylib
+          else
+            dynlib=zig-out/lib/libzynum_blas.so
           fi
+          zig-out/bin/level1-probe --lib "$dynlib" --op ddot --n 4 --seconds 0
+          zig-out/bin/dcopy-probe --lib "$dynlib" --kind d --n 4 --seconds 0
+
+      - name: Run Python benchmark tool smoke tests
+        if: matrix.target == 'native'
+        run: |
+          mkdir -p zig-out/ci
+          python3 - <<'PY'
+          from pathlib import Path
+          Path("zig-out/ci/gemm_fixture.csv").write_text(
+              "kind,shape_index,label,m,n,k,library,gflops,best_ns,reps\n"
+              "dgemm,0,tiny,2,2,2,zynum-blas,1.0,1,1\n"
+              "dgemm,0,tiny,2,2,2,OpenBLAS,0.5,2,1\n"
+          )
+          Path("zig-out/ci/level1_fixture.csv").write_text(
+              "group,op,library,metric,n,seconds,status,bandwidth_gbps,rate_gops\n"
+              "real_f64,ddot,Zynum,gops,4,1,ok,,1.0\n"
+              "real_f64,ddot,OpenBLAS,gops,4,1,ok,,0.5\n"
+          )
+          Path("zig-out/ci/level2_fixture.csv").write_text(
+              "case,kind,library,n,status,rate_gops\n"
+              "dgemv_n,real_f64,Zynum,4,ok,1.0\n"
+              "dgemv_n,real_f64,OpenBLAS,4,ok,0.5\n"
+          )
+          PY
+          python3 bench/tools/check_gemm_sweep.py zig-out/ci/gemm_fixture.csv --comparator OpenBLAS
+          python3 bench/tools/plot_gemm_sweep.py zig-out/ci/gemm_fixture.csv zig-out/ci/gemm_fixture.svg
+          python3 bench/tools/plot_level1_report.py zig-out/ci/level1_fixture.csv --bars-svg zig-out/ci/level1_bars.svg --ratio-svg zig-out/ci/level1_ratio.svg
+          python3 bench/tools/plot_level2_report.py zig-out/ci/level2_fixture.csv --bars-svg zig-out/ci/level2_bars.svg

@@ -23,6 +23,15 @@ const matIndex = indexing.matIndex;
 const triValue = level2.triValue;
 const trsv = level2.trsv;
 
+fn scaleDenseMatrix(comptime T: type, m: usize, n: usize, alpha: T, b: [*]T, ldb: BlasInt) void {
+    if (isOne(T, alpha)) return;
+    for (0..n) |j| {
+        for (0..m) |i| {
+            b[matIndex(ldb, i, j)] = mul(T, alpha, b[matIndex(ldb, i, j)]);
+        }
+    }
+}
+
 pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
@@ -49,18 +58,13 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
-    if (!isOne(T, alpha)) {
-        for (0..n) |j| {
-            for (0..m) |i| {
-                b[matIndex(ldb, i, j)] = mul(T, alpha, b[matIndex(ldb, i, j)]);
-            }
-        }
-    }
     if (side == .left) {
+        scaleDenseMatrix(T, m, n, alpha, b, ldb);
         for (0..n) |j| trsv(T, uplo, trans_, diag, m_, a, lda, b + matIndex(ldb, 0, j), 1);
     } else {
         const row = std.heap.page_allocator.alloc(T, n) catch return;
         defer std.heap.page_allocator.free(row);
+        scaleDenseMatrix(T, m, n, alpha, b, ldb);
         const right_trans: Order = switch (trans_) {
             .no_trans => .trans,
             .trans => .no_trans,

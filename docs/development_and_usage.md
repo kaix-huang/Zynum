@@ -16,9 +16,12 @@ Use Zig 0.16.0 or newer in the 0.16 series.
 
 ```sh
 zig build test
+zig build --release=safe test
+zig build --release=fast test
 zig build
 zig build generate-headers
 zig fmt --check build.zig build.zig.zon src test bench examples tools
+python3 -m py_compile bench/tools/*.py
 ```
 
 Useful target checks:

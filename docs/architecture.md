@@ -60,10 +60,13 @@ needed, expose it explicitly through `Into` or `WithWorkspace` APIs.
 - `src/blas/core/indexing.zig` owns vector, dense, packed, and banded indexing.
 - `src/blas/core/operands.zig` owns unchecked internal operand structs.
 - `src/blas/core/operations.zig` owns readable execution entry points.
-- `src/blas/core/level1.zig` owns portable BLAS Level 1 behavior.
-- `src/blas/core/level2.zig` and `src/blas/core/level3.zig` are stable internal
-  facades; `src/blas/core/level2/` and `src/blas/core/level3/` group portable
-  implementations by operation family.
+- `src/blas/core/level1.zig`, `src/blas/core/level2.zig`, and
+  `src/blas/core/level3.zig` are stable internal facades.
+- `src/blas/core/level1/`, `src/blas/core/level2/`, and
+  `src/blas/core/level3/` group portable implementations by operation family.
+  Level 1 currently keeps its BLAS entry semantics and contiguous fast paths in
+  `level1/operations.zig`; split it further by operation family when another
+  independently testable group is added or when reviewability suffers.
 
 The typed Zig API validates inputs. Core operands do not validate inputs and
 should remain small data carriers.

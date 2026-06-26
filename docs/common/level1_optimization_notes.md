@@ -9,9 +9,11 @@ architecture notes when they become permanent dispatch rules.
 
 Current Level 1 performance code is split across:
 
-- `src/blas/core/level1.zig`: BLAS semantics, strides, complex behavior,
-  contiguous fast-path dispatch, portable Zig vector loops, tail handling, and
-  coarse parallel splitting.
+- `src/blas/core/level1.zig`: stable Level 1 facade used by API, ABI, and other
+  core levels.
+- `src/blas/core/level1/operations.zig`: BLAS semantics, strides, complex
+  behavior, contiguous fast-path dispatch, portable Zig vector loops, tail
+  handling, and coarse parallel splitting.
 - `src/blas/core/pool.zig`: shared `std.Io.Threaded` task runner for large
   contiguous Level 1 work.
 - `src/blas/kernels/vector_unary.zig`: architecture facade for one-vector

@@ -670,6 +670,19 @@ test "level1 double vector fallback smoke" {
     try std.testing.expectEqual(@as(f64, 99), copied[3]);
     try std.testing.expectEqual(@as(f64, 3), copied[4]);
 
+    var self_copy = [_]f64{ 1, 2, 3, 4 };
+    var copy4: fortran.BlasInt = 4;
+    fortran.dcopy_(&copy4, &self_copy, &inc1, &self_copy, &inc1);
+    try std.testing.expectEqualSlices(f64, &[_]f64{ 1, 2, 3, 4 }, &self_copy);
+
+    var overlap_forward = [_]f64{ 1, 2, 3, 4, 5 };
+    fortran.dcopy_(&copy4, overlap_forward[0..].ptr, &inc1, overlap_forward[1..].ptr, &inc1);
+    try std.testing.expectEqualSlices(f64, &[_]f64{ 1, 1, 2, 3, 4 }, &overlap_forward);
+
+    var overlap_backward = [_]f64{ 1, 2, 3, 4, 5 };
+    fortran.dcopy_(&copy4, overlap_backward[1..].ptr, &inc1, overlap_backward[0..].ptr, &inc1);
+    try std.testing.expectEqualSlices(f64, &[_]f64{ 2, 3, 4, 5, 5 }, &overlap_backward);
+
     var alpha: f64 = 2;
     var y = [_]f64{ 10, -5, 20, -5, 30 };
     fortran.daxpy_(&n, &alpha, &source, &inc2, &y, &inc2);
