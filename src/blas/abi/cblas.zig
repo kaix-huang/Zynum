@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const types = @import("../types.zig");
-const core = @import("../core.zig");
+const core = @import("../core/raw.zig");
 const f = @import("fortran.zig");
 
 pub const BlasInt = types.BlasInt;

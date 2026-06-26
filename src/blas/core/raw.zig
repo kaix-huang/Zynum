@@ -1,15 +1,18 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-pub const raw = @import("core/raw.zig");
+//! Internal raw BLAS facade for ABI wrappers.
+//!
+//! This surface intentionally exposes scalar helpers, BLAS indexing helpers,
+//! and the unchecked Level 1-3 entry points used by Fortran BLAS and CBLAS ABI
+//! bindings. Public checked views and structured operation operands stay behind
+//! `src/blas/core.zig` and `src/blas/api.zig`.
 
-pub const scalar = raw.scalar;
-pub const indexing = raw.indexing;
-pub const operands = @import("core/operands.zig");
-pub const operations = @import("core/operations.zig");
-pub const level1 = raw.level1;
-pub const level2 = raw.level2;
-pub const level3 = raw.level3;
+pub const scalar = @import("scalar.zig");
+pub const indexing = @import("indexing.zig");
+pub const level1 = @import("level1.zig");
+pub const level2 = @import("level2.zig");
+pub const level3 = @import("level3.zig");
 
 pub const BlasInt = scalar.BlasInt;
 pub const ComplexF32 = scalar.ComplexF32;
@@ -24,19 +27,6 @@ pub const Order = scalar.Order;
 pub const Uplo = scalar.Uplo;
 pub const Diag = scalar.Diag;
 pub const Side = scalar.Side;
-
-pub const ConstVector = operands.ConstVector;
-pub const Vector = operands.Vector;
-pub const ConstMatrix = operands.ConstMatrix;
-pub const Matrix = operands.Matrix;
-pub const VectorSwap = operands.VectorSwap;
-pub const VectorCopy = operands.VectorCopy;
-pub const VectorScale = operands.VectorScale;
-pub const ScaledVectorAdd = operands.ScaledVectorAdd;
-pub const VectorLinearCombination = operands.VectorLinearCombination;
-pub const VectorDot = operands.VectorDot;
-pub const MatrixVectorProduct = operands.MatrixVectorProduct;
-pub const MatrixProduct = operands.MatrixProduct;
 
 pub const isComplex = scalar.isComplex;
 pub const Real = scalar.Real;
@@ -101,16 +91,6 @@ pub const rotgReal = level1.rotgReal;
 pub const rotgComplex = level1.rotgComplex;
 pub const rotm = level1.rotm;
 pub const rotmg = level1.rotmg;
-
-pub const swapVectorViews = operations.swapVectors;
-pub const copyVectorView = operations.copyVector;
-pub const scaleVectorView = operations.scaleVector;
-pub const addScaledVectorView = operations.addScaledVector;
-pub const combineVectorViews = operations.combineVectors;
-pub const dotProductView = operations.dotProduct;
-pub const euclideanNormView = operations.euclideanNorm;
-pub const multiplyMatrixVector = operations.multiplyMatrixVector;
-pub const multiplyMatrices = operations.multiplyMatrices;
 
 pub const matrixValue = level2.matrixValue;
 pub const symValue = level2.symValue;

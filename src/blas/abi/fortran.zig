@@ -3,7 +3,7 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
-const core = @import("../core.zig");
+const core = @import("../core/raw.zig");
 
 pub const BlasInt = core.BlasInt;
 pub const ComplexF32 = core.ComplexF32;

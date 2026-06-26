@@ -24,10 +24,13 @@ Stable import roots should stay as facades:
 - `src/blas.zig`
 - `src/blas/api.zig`
 - `src/blas/core.zig`
+- `src/blas/core/raw.zig`
 - `src/blas/core/level1.zig`
 - `src/blas/core/level2.zig`
 - `src/blas/core/level3.zig`
 
 Concrete implementations should live below those facades, grouped by operation
 family or backend responsibility. Preserve facade exports when moving code so
-typed APIs, ABI wrappers, and tests do not learn implementation paths.
+typed APIs, ABI wrappers, and tests do not learn implementation paths. Keep ABI
+wrappers on `src/blas/core/raw.zig`; public checked operations should continue
+to use `src/blas/core.zig` or the public API facade.

@@ -344,12 +344,14 @@ the abbreviation is the natural numerical term.
 ## Adding Or Changing ABI Exports
 
 1. Update `src/blas/abi/fortran.zig` or `src/blas/abi/cblas.zig`.
-2. Run `zig build generate-headers`.
-3. Review generated files under `include/zynum/blas/`.
-4. Add ABI compatibility tests in `test/abi/fortran_compat_test.zig` or
+2. Keep ABI wrappers calling through `src/blas/core/raw.zig`; do not import the
+   wider checked-operation facade from ABI files.
+3. Run `zig build generate-headers`.
+4. Review generated files under `include/zynum/blas/`.
+5. Add ABI compatibility tests in `test/abi/fortran_compat_test.zig` or
    `test/abi/cblas_compat_test.zig`; add generated-header smoke tests under
    `test/headers/`.
-5. Run `zig build test`.
+6. Run `zig build test`.
 
 Do not rename standard BLAS ABI symbols. The shared library name is
 `zynum_blas`, but functions such as `dgemm_` and `cblas_dgemm` remain standard.

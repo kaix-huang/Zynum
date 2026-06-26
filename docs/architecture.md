@@ -54,10 +54,14 @@ needed, expose it explicitly through `Into` or `WithWorkspace` APIs.
 
 ## Core Reference Layer
 
-- `src/blas/core.zig` is the internal BLAS semantics facade.
+- `src/blas/core.zig` is the internal BLAS semantics facade. It extends the
+  raw ABI facade with unchecked operands and structured operation entry points.
 - `src/blas/core/scalar.zig` owns scalar arithmetic, complex helpers, BLAS
   character parsing, and enum aliases.
 - `src/blas/core/indexing.zig` owns vector, dense, packed, and banded indexing.
+- `src/blas/core/raw.zig` is the narrow unchecked facade for ABI wrappers. It
+  re-exports scalar helpers, indexing helpers, and raw Level 1-3 BLAS entry
+  points, but it does not expose checked public views or structured operations.
 - `src/blas/core/operands.zig` owns unchecked internal operand structs.
 - `src/blas/core/operations.zig` owns readable execution entry points.
 - `src/blas/core/level1.zig`, `src/blas/core/level2.zig`, and
@@ -69,7 +73,9 @@ needed, expose it explicitly through `Into` or `WithWorkspace` APIs.
   independently testable group is added or when reviewability suffers.
 
 The typed Zig API validates inputs. Core operands do not validate inputs and
-should remain small data carriers.
+should remain small data carriers. ABI wrappers should import
+`src/blas/core/raw.zig` instead of the wider `src/blas/core.zig` facade so the
+external ABI path stays independent of checked public API conveniences.
 
 Level 1 and Level 2 keep BLAS argument semantics, stride handling, complex
 fallbacks, and portable scalar loops in the core operation files. Common
@@ -203,6 +209,8 @@ Compatibility is intentionally layered:
 1. ABI implementation files mirror external symbol contracts:
    - `src/blas/abi/fortran.zig` exports classic Fortran BLAS symbols.
    - `src/blas/abi/cblas.zig` exports CBLAS symbols.
+   These files should call through `src/blas/core/raw.zig` for unchecked BLAS
+   semantics instead of importing the wider core facade.
 2. `src/blas/compat.zig` is the native library export root for `libzynum_blas`.
    It exists to pull both ABI modules into the shared/static library build and
    should stay minimal.
