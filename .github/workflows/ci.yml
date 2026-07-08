@@ -64,8 +64,11 @@ jobs:
       - name: Check formatting
         run: zig fmt --check build.zig build.zig.zon src test bench examples tools
 
-      - name: Check Python benchmark tools compile
-        run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
+      - name: Check Python tools compile
+        run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py tools/*.py
+
+      - name: Check package paths
+        run: python3 tools/check_package_paths.py --archive zig-out/ci/zynum-source.tar.gz
 
       - name: Regenerate compatibility headers
         run: zig build generate-headers --summary failures
@@ -120,16 +123,29 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = "macOS" ]; then
             dynlib=zig-out/lib/libzynum_blas.dylib
-            dynamic_symbols() { nm -gU "$dynlib"; }
           else
             dynlib=zig-out/lib/libzynum_blas.so
-            dynamic_symbols() { nm -D --defined-only "$dynlib"; }
           fi
-          staticlib=zig-out/lib/libzynum_blas.a
-          for sym in dgemm_ cblas_dgemm cdotc_sub_ zher2k_; do
-            dynamic_symbols | grep -q "$sym"
-            nm -g "$staticlib" | grep -q "$sym"
-          done
+          python3 tools/check_abi_manifest.py \
+            --manifest include/zynum/blas/abi_manifest.json \
+            --dynamic "$dynlib" \
+            --static zig-out/lib/libzynum_blas.a
+
+      - name: Check install metadata
+        if: matrix.target == 'native'
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          pc = Path("zig-out/lib/pkgconfig/zynum_blas.pc")
+          text = pc.read_text()
+          assert "Name: zynum_blas" in text
+          assert "-lzynum_blas" in text
+          assert "Cflags:" in text
+          PY
+          if command -v pkg-config >/dev/null 2>&1; then
+            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --exists zynum_blas
+            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
+          fi
 
       - name: Run Zig example
         if: matrix.target == 'native'
@@ -183,9 +199,9 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           Path("zig-out/ci/gemm_fixture.csv").write_text(
-              "kind,shape_index,label,m,n,k,library,gflops,best_ns,reps\n"
-              "dgemm,0,tiny,2,2,2,zynum-blas,1.0,1,1\n"
-              "dgemm,0,tiny,2,2,2,OpenBLAS,0.5,2,1\n"
+              "kind,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,process_repeats,check\n"
+              "dgemm,0,tiny,2,2,2,zynum-blas,1.0,1,1,1,1,1,1,checked-ok\n"
+              "dgemm,0,tiny,2,2,2,OpenBLAS,0.5,2,2,2,2,1,1,checked-ok\n"
           )
           Path("zig-out/ci/level1_fixture.csv").write_text(
               "group,op,library,metric,n,seconds,status,bandwidth_gbps,rate_gops\n"

@@ -1,0 +1,87 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+name: Release Artifacts
+
+permissions:
+  contents: read
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  ZIG_GLOBAL_CACHE_DIR: .zig-cache/global
+  ZIG_LOCAL_CACHE_DIR: .zig-cache/local
+
+jobs:
+  artifacts:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            artifact: zynum-blas-macos
+            dynlib: zig-out/lib/libzynum_blas.dylib
+          - os: ubuntu-24.04
+            artifact: zynum-blas-linux
+            dynlib: zig-out/lib/libzynum_blas.so
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - uses: actions/cache@v4
+        with:
+          path: .zig-cache
+          key: zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Install Fortran compiler on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Regenerate compatibility files
+        run: zig build generate-headers --summary failures
+
+      - name: Test
+        run: zig build test --summary failures
+
+      - name: Build install tree
+        run: zig build --release=fast --summary failures
+
+      - name: Check ABI manifest
+        run: |
+          python3 tools/check_abi_manifest.py \
+            --manifest include/zynum/blas/abi_manifest.json \
+            --dynamic "${{ matrix.dynlib }}" \
+            --static zig-out/lib/libzynum_blas.a
+
+      - name: Pack source archive
+        run: python3 tools/check_package_paths.py --archive "dist/zynum-source-${{ matrix.artifact }}.tar.gz"
+
+      - name: Pack artifact
+        run: |
+          mkdir -p dist
+          tar -czf "dist/${{ matrix.artifact }}.tar.gz" \
+            -C zig-out lib include
+          shasum -a 256 "dist/${{ matrix.artifact }}.tar.gz" > "dist/${{ matrix.artifact }}.tar.gz.sha256"
+          shasum -a 256 "dist/zynum-source-${{ matrix.artifact }}.tar.gz" > "dist/zynum-source-${{ matrix.artifact }}.tar.gz.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            dist/${{ matrix.artifact }}.tar.gz
+            dist/${{ matrix.artifact }}.tar.gz.sha256
+            dist/zynum-source-${{ matrix.artifact }}.tar.gz
+            dist/zynum-source-${{ matrix.artifact }}.tar.gz.sha256
