@@ -38,6 +38,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
     const test_optimize = b.option(std.builtin.OptimizeMode, "test-optimize", "Optimize mode for correctness tests") orelse .ReleaseSafe;
+    const host_tool_smoke = b.option(bool, "host-tool-smoke", "Run host Python/C/C++/Fortran smoke checks as part of the test step") orelse true;
 
     const zynum_mod = b.addModule("zynum", .{
         .root_source_file = b.path("src/zynum.zig"),
@@ -241,10 +242,12 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_fortran_tests.step);
     test_step.dependOn(&run_cblas_tests.step);
     test_step.dependOn(&run_header_smoke_tests.step);
-    test_step.dependOn(&abi_manifest_smoke_test.step);
-    test_step.dependOn(&c_header_smoke_test.step);
-    test_step.dependOn(&cpp_header_smoke_test.step);
-    test_step.dependOn(&fortran_module_smoke_test.step);
+    if (host_tool_smoke) {
+        test_step.dependOn(&abi_manifest_smoke_test.step);
+        test_step.dependOn(&c_header_smoke_test.step);
+        test_step.dependOn(&cpp_header_smoke_test.step);
+        test_step.dependOn(&fortran_module_smoke_test.step);
+    }
 
     const bench = b.addExecutable(.{
         .name = "bench-zynum-blas",

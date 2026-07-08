@@ -21,25 +21,9 @@ env:
   ZIG_LOCAL_CACHE_DIR: .zig-cache/local
 
 jobs:
-  test:
-    name: ${{ matrix.os }} / ${{ matrix.target }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-15
-            target: native
-          - os: macos-15
-            target: aarch64-macos-apple-m4-sme2p1
-          - os: ubuntu-24.04
-            target: native
-          - os: ubuntu-24.04
-            target: x86_64-linux-baseline
-          - os: ubuntu-24.04
-            target: x86_64-linux-v3
-          - os: ubuntu-24.04
-            target: x86_64-linux-v4
+  source-checks:
+    name: Source checks
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -50,16 +34,9 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .zig-cache
-          key: zig-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          key: zig-source-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
           restore-keys: |
-            zig-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.target }}-
-            zig-${{ runner.os }}-${{ runner.arch }}-0.16.0-
-
-      - name: Install Fortran compiler on Ubuntu
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gfortran
+            zig-source-${{ runner.os }}-${{ runner.arch }}-0.16.0-
 
       - name: Check formatting
         run: zig fmt --check build.zig build.zig.zon src test bench examples tools
@@ -82,57 +59,90 @@ jobs:
             exit 1
           fi
 
-      - name: Test Debug native
-        if: matrix.target == 'native'
-        run: zig build test --summary failures
+  target-tests:
+    name: ${{ matrix.name }}
+    needs: source-checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS / aarch64 baseline
+            os: macos-15
+            cache_target: macos-aarch64-baseline
+            target_args: -Dtarget=aarch64-macos -Dcpu=baseline
+            host_tool_smoke: true
+            install: true
+            dynlib: zig-out/lib/libzynum_blas.dylib
+            full_smoke: false
+          - name: Linux / x86_64 baseline
+            os: ubuntu-24.04
+            cache_target: linux-x86_64-baseline
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=baseline
+            host_tool_smoke: true
+            install: true
+            dynlib: zig-out/lib/libzynum_blas.so
+            full_smoke: true
+          - name: Linux / ARM64 baseline
+            os: ubuntu-24.04-arm
+            cache_target: linux-arm64-baseline
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=baseline
+            host_tool_smoke: true
+            install: true
+            dynlib: zig-out/lib/libzynum_blas.so
+            full_smoke: false
+          - name: Windows / x86_64 baseline
+            os: windows-2025
+            cache_target: windows-x86_64-baseline
+            target_args: -Dtarget=x86_64-windows-gnu -Dcpu=baseline
+            host_tool_smoke: false
+            install: false
+            dynlib: ""
+            full_smoke: false
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Test ReleaseSafe native
-        if: matrix.target == 'native'
-        run: zig build --release=safe test --summary failures
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
 
-      - name: Test ReleaseFast native
-        if: matrix.target == 'native'
-        run: zig build --release=fast test --summary failures
+      - uses: actions/cache@v4
+        with:
+          path: .zig-cache
+          key: zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-
+            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-
 
-      - name: Test Apple M4 SME2.1 target when runnable
-        if: matrix.target == 'aarch64-macos-apple-m4-sme2p1' && runner.arch == 'ARM64'
-        run: zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+      - name: Install Fortran compiler on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
 
-      - name: Build Apple M4 SME2.1 target
-        if: matrix.target == 'aarch64-macos-apple-m4-sme2p1' && runner.arch != 'ARM64'
-        run: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+      - name: Test Debug target
+        run: zig build test ${{ matrix.target_args }} -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
 
-      - name: Test x86_64 baseline target
-        if: matrix.target == 'x86_64-linux-baseline'
-        run: zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline --summary failures
+      - name: Test ReleaseSafe target
+        run: zig build --release=safe test ${{ matrix.target_args }} -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
 
-      - name: Build x86_64 v3 target
-        if: matrix.target == 'x86_64-linux-v3'
-        run: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
-
-      - name: Build x86_64 v4 target
-        if: matrix.target == 'x86_64-linux-v4'
-        run: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast --summary failures
+      - name: Test ReleaseFast target
+        run: zig build --release=fast test ${{ matrix.target_args }} -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
 
       - name: Build install artifacts
-        if: matrix.target == 'native'
-        run: zig build --summary failures
+        if: matrix.install
+        run: zig build ${{ matrix.target_args }} --release=fast --summary failures
 
       - name: Check ABI symbols
-        if: matrix.target == 'native'
+        if: matrix.install
         run: |
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            dynlib=zig-out/lib/libzynum_blas.dylib
-          else
-            dynlib=zig-out/lib/libzynum_blas.so
-          fi
           python3 tools/check_abi_manifest.py \
             --manifest include/zynum/blas/abi_manifest.json \
-            --dynamic "$dynlib" \
+            --dynamic "${{ matrix.dynlib }}" \
             --static zig-out/lib/libzynum_blas.a
 
       - name: Check install metadata
-        if: matrix.target == 'native'
+        if: matrix.install
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -148,11 +158,11 @@ jobs:
           fi
 
       - name: Run Zig example
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: zig build --build-file examples/zig/build.zig run
 
       - name: Run CBLAS example
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: |
           mkdir -p zig-out/examples
           cc -std=c11 examples/cblas/dgemm.c \
@@ -162,7 +172,7 @@ jobs:
           zig-out/examples/cblas-dgemm
 
       - name: Run Fortran example
-        if: matrix.target == 'native' && runner.os == 'Linux'
+        if: matrix.full_smoke && runner.os == 'Linux'
         run: |
           mkdir -p zig-out/examples/fortran-mod
           gfortran -std=f2008 -J zig-out/examples/fortran-mod \
@@ -175,25 +185,20 @@ jobs:
           zig-out/examples/fortran-dgemm
 
       - name: Run benchmark executable smoke tests
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: |
           zig build bench -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 2 --reps 1
           zig build bench-gemm-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --kind dgemm --shape tiny:2:2:2 --reps 1
-          zig build bench-level12-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 4 --reps 1 --case dcopy
+          zig build bench-vector-matrix-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 4 --reps 1 --case dcopy
 
       - name: Run probe smoke tests
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: |
-          if [ "${{ runner.os }}" = "macOS" ]; then
-            dynlib=zig-out/lib/libzynum_blas.dylib
-          else
-            dynlib=zig-out/lib/libzynum_blas.so
-          fi
-          zig-out/bin/level1-probe --lib "$dynlib" --op ddot --n 4 --seconds 0
-          zig-out/bin/dcopy-probe --lib "$dynlib" --kind d --n 4 --seconds 0
+          zig-out/bin/level1-probe --lib "${{ matrix.dynlib }}" --op ddot --n 4 --seconds 0
+          zig-out/bin/dcopy-probe --lib "${{ matrix.dynlib }}" --kind d --n 4 --seconds 0
 
       - name: Run Python benchmark tool smoke tests
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: |
           mkdir -p zig-out/ci
           python3 - <<'PY'
@@ -218,3 +223,41 @@ jobs:
           python3 bench/tools/plot_gemm_sweep.py zig-out/ci/gemm_fixture.csv zig-out/ci/gemm_fixture.svg
           python3 bench/tools/plot_level1_report.py zig-out/ci/level1_fixture.csv --bars-svg zig-out/ci/level1_bars.svg --ratio-svg zig-out/ci/level1_ratio.svg
           python3 bench/tools/plot_level2_report.py zig-out/ci/level2_fixture.csv --bars-svg zig-out/ci/level2_bars.svg
+
+  feature-compile:
+    name: ${{ matrix.name }}
+    needs: source-checks
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS / Apple M4 SME2.1 compile
+            os: macos-15
+            cache_target: macos-apple-m4-sme2p1
+            command: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+          - name: Linux / x86_64 v3 compile
+            os: ubuntu-24.04
+            cache_target: linux-x86_64-v3
+            command: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
+          - name: Linux / x86_64 v4 compile
+            os: ubuntu-24.04
+            cache_target: linux-x86_64-v4
+            command: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast --summary failures
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - uses: actions/cache@v4
+        with:
+          path: .zig-cache
+          key: zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-
+            zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Build target
+        run: ${{ matrix.command }}
