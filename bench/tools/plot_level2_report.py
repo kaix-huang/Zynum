@@ -8,11 +8,13 @@ import html
 import math
 from pathlib import Path
 
-LIB_ORDER = ["Zynum", "Accelerate", "OpenBLAS"]
+LIB_ORDER = ["Zynum", "Accelerate", "OpenBLAS", "MKL", "AOCL-BLIS"]
 COLORS = {
     "Zynum": "#2563eb",
     "Accelerate": "#dc2626",
     "OpenBLAS": "#16a34a",
+    "MKL": "#7c3aed",
+    "AOCL-BLIS": "#ea580c",
 }
 CASE_ORDER = [
     "sgemv_n",
@@ -91,8 +93,19 @@ def read_rows(path):
     return rows
 
 
+def libraries_for(rows):
+    seen = []
+    for row in rows:
+        if row["library"] not in seen:
+            seen.append(row["library"])
+    libs = [lib for lib in LIB_ORDER if lib in seen]
+    libs.extend(lib for lib in seen if lib not in libs)
+    return libs
+
+
 def plot(rows, output_path):
     sizes = sorted({row["n"] for row in rows})
+    libs = libraries_for(rows)
     values = {(row["n"], row["case"], row["library"]): row for row in rows}
     width = 2400
     left = 90
@@ -122,12 +135,15 @@ def plot(rows, output_path):
 """,
         '<rect width="100%" height="100%" fill="#fff"/>',
         '<text x="38" y="42" class="title">Level 2 current performance - real and complex types</text>',
-        '<text x="38" y="66" class="sub">Higher is better. Fresh process per library and size, metric = Gops. Panels: n=128/256/512; bars ordered Zynum, Accelerate, OpenBLAS.</text>',
+        '<text x="38" y="66" class="sub">Higher is better. Fresh process per library and size, metric = Gops. Panels use the CSV n values; bars follow the legend order.</text>',
     ]
 
-    for index, lib in enumerate(LIB_ORDER):
-        x = 1710 + index * 190
-        svg.append(f'<rect x="{x}" y="43" width="20" height="13" fill="{COLORS[lib]}"/>')
+    legend_spacing = 170
+    legend_x = max(38, width - len(libs) * legend_spacing - 35)
+    for index, lib in enumerate(libs):
+        x = legend_x + index * legend_spacing
+        color = COLORS.get(lib, "#6b7280")
+        svg.append(f'<rect x="{x}" y="43" width="20" height="13" fill="{color}"/>')
         svg.append(f'<text x="{x + 28}" y="55" class="legend">{lib}</text>')
 
     for panel_index, n in enumerate(sizes):
@@ -152,11 +168,11 @@ def plot(rows, output_path):
             f'<line x1="{left}" y1="{top + panel_height}" x2="{left + chart_width}" y2="{top + panel_height}" class="axis"/>'
         )
         slot = chart_width / len(CASE_ORDER)
-        bar_width = min(26, slot * 0.60 / len(LIB_ORDER))
+        bar_width = min(26, slot * 0.70 / max(1, len(libs)))
         for case_index, case in enumerate(CASE_ORDER):
             cx = left + slot * case_index + slot / 2
-            start = cx - bar_width * len(LIB_ORDER) / 2
-            for lib_index, lib in enumerate(LIB_ORDER):
+            start = cx - bar_width * len(libs) / 2
+            for lib_index, lib in enumerate(libs):
                 row = values.get((n, case, lib))
                 if row is None:
                     continue
@@ -164,8 +180,9 @@ def plot(rows, output_path):
                 x = start + lib_index * bar_width
                 y = sy(value, top, panel_height, max_value)
                 h = top + panel_height - y
+                color = COLORS.get(lib, "#6b7280")
                 svg.append(
-                    f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_width - 2:.1f}" height="{h:.1f}" fill="{COLORS[lib]}"><title>{html.escape(case)} {lib} n={n}: {value:.3f} Gops</title></rect>'
+                    f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_width - 2:.1f}" height="{h:.1f}" fill="{color}"><title>{html.escape(case)} {lib} n={n}: {value:.3f} Gops</title></rect>'
                 )
                 label_y = max(top + 9, y - 4)
                 svg.append(

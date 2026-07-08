@@ -5,6 +5,7 @@ const std = @import("std");
 
 const BlasInt = i32;
 const CopyFn = *const fn (*const BlasInt, [*]const u8, *const BlasInt, [*]u8, *const BlasInt) callconv(.c) void;
+const ShutdownFn = *const fn () callconv(.c) void;
 
 fn usage() void {
     std.debug.print("usage: dcopy-probe --lib path [--kind s|d|c|z] [--n elems] [--seconds s]\n", .{});
@@ -60,7 +61,10 @@ pub fn main(init: std.process.Init) !void {
     };
 
     var dyn = try std.DynLib.open(path);
-    defer dyn.close();
+    defer {
+        if (dyn.lookup(ShutdownFn, "zynum_blas_shutdown")) |shutdown| shutdown();
+        dyn.close();
+    }
     const copy_fn = dyn.lookup(CopyFn, kind.symbol) orelse return error.MissingCopy;
 
     const byte_count = n * kind.elem_size;
@@ -73,8 +77,10 @@ pub fn main(init: std.process.Init) !void {
     var inc: BlasInt = 1;
     copy_fn(&ni, x.ptr, &inc, y.ptr, &inc);
 
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
     const pid = std.c.getpid();
-    std.debug.print("pid={d} symbol={s} n={d} elem_size={d} seconds={d} lib={s}\n", .{ pid, kind.symbol, n, kind.elem_size, seconds, path });
+    try stdout_writer.interface.print("pid={d} symbol={s} n={d} elem_size={d} seconds={d} lib={s}\n", .{ pid, kind.symbol, n, kind.elem_size, seconds, path });
     const start = std.Io.Clock.awake.now(init.io).nanoseconds;
     const deadline = start + @as(i128, seconds) * std.time.ns_per_s;
     var iters: u64 = 0;
@@ -86,5 +92,6 @@ pub fn main(init: std.process.Init) !void {
     for (y[0..@min(y.len, 64)]) |v| checksum +%= v;
     const bytes = @as(f64, @floatFromInt(iters)) * @as(f64, @floatFromInt(byte_count)) * 2;
     const gbps = bytes / (@as(f64, @floatFromInt(elapsed_ns)) / @as(f64, std.time.ns_per_s)) / 1.0e9;
-    std.debug.print("iters={d} elapsed_ns={d} bandwidth_GBps={d:.3} checksum={d}\n", .{ iters, elapsed_ns, gbps, checksum });
+    try stdout_writer.interface.print("iters={d} elapsed_ns={d} bandwidth_GBps={d:.3} checksum={d}\n", .{ iters, elapsed_ns, gbps, checksum });
+    try stdout_writer.flush();
 }

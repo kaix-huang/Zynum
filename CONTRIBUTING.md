@@ -16,15 +16,19 @@ Use Zig 0.16.0 or newer in the 0.16 series.
 
 ```sh
 zig fmt --check build.zig build.zig.zon src test bench examples tools
+python3 -m py_compile bench/tools/*.py
 zig build test --summary failures
+zig build --release=safe test --summary failures
+zig build --release=fast test --summary failures
 zig build generate-headers --summary failures
+zig build --summary failures
 ```
 
 For AArch64 performance work, test both the native target and the explicit
 Apple/SME target you are tuning:
 
 ```sh
-zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast
+zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
 ```
 
 ## Contribution Rules
@@ -41,7 +45,12 @@ zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast
 ## Pull Request Checklist
 
 - `zig fmt --check build.zig build.zig.zon src test bench examples tools` passes.
-- `zig build test --summary failures` passes.
+- `python3 -m py_compile bench/tools/*.py` passes when Python benchmark tooling changes.
+- `zig build test --summary failures` and
+  `zig build --release=safe test --summary failures` pass when checked API
+  behavior changes.
+- `zig build --release=fast test --summary failures` passes when performance
+  dispatch, kernels, or ReleaseFast-only code paths change.
 - `zig build generate-headers --summary failures` has been run when ABI exports change.
 - Public documentation is updated for user-visible changes.
 - Benchmarks include enough context to reproduce the result.

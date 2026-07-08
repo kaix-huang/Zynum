@@ -16,15 +16,18 @@ Use Zig 0.16.0 or newer in the 0.16 series.
 
 ```sh
 zig build test
+zig build --release=safe test
+zig build --release=fast test
 zig build
 zig build generate-headers
 zig fmt --check build.zig build.zig.zon src test bench examples tools
+env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
 ```
 
 Useful target checks:
 
 ```sh
-zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast
+zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
 zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline
 zig build test -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast
 ```
@@ -46,12 +49,19 @@ location:
 zig build --prefix /tmp/zynum-install
 ```
 
-Compatibility headers and the generated Fortran module are installed by
-default. Disable that installation when only Zig modules or library artifacts are
-needed:
+Compatibility headers, the generated Fortran module, the ABI manifest, and the
+`pkg-config` file are installed by default. Disable that installation when only
+Zig modules or library artifacts are needed:
 
 ```sh
 zig build -Dcompat-headers=false
+```
+
+After installation, C and Fortran builds that use `pkg-config` can query the
+library flags:
+
+```sh
+PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
 ```
 
 ## Package Imports
@@ -220,8 +230,14 @@ try blas.matrixMultiply(.{
 });
 ```
 
-Debug, ReleaseSafe, and ReleaseSmall builds check dimensions, storage, and
-unsupported aliasing. ReleaseFast removes those checks.
+All builds check cheap structural shape fields such as lengths, strides, leading
+dimensions, and matrix dimensions. Debug, ReleaseSafe, and ReleaseSmall builds
+also check backing storage capacity and unsupported aliasing; ReleaseFast omits
+those capacity and alias checks.
+
+The repository test step uses ReleaseSafe test modules by default so these
+checks remain covered by `zig build test`. Use `-Dtest-optimize=ReleaseFast`
+when intentionally validating the reduced capacity/alias checking contract.
 
 ## Aliasing Model
 
@@ -230,9 +246,14 @@ overlap input buffers unless the operation is inherently in-place.
 
 Use these API families intentionally:
 
-- In-place: `scaleVector`.
-- Out-of-place helper: `scaleVectorInto`.
-- Workspace-driven aliasing support: `matrixMultiplyWithWorkspace`.
+- In-place operations such as `scaleVector` allow their natural self-aliasing.
+- BLAS-shaped vector operations such as `swapVectors`, `copyVector`, and
+  `addScaledVector` operate over the shared prefix length of their vector
+  arguments.
+- `Into` vector operations such as `scaleVectorInto` require equal input and
+  result lengths so the output view is fully defined.
+- Workspace-driven aliasing support such as `matrixMultiplyWithWorkspace` uses
+  caller-provided temporary storage.
 
 Workspace lengths are queryable:
 
@@ -297,7 +318,7 @@ APIs/build options, not process environment.
 
 | Variable | Purpose |
 | --- | --- |
-| `ZYNUM_MAXIMUM_THREADS` | Positive integer cap on the number of threads Zynum may use. When unset, the cap defaults to the runtime CPU count. |
+| `ZYNUM_MAXIMUM_THREADS` | Positive integer cap on the number of threads Zynum may use. Values above the runtime CPU count are capped to that count. When unset, the cap defaults to the runtime CPU count. |
 
 Benchmarking baseline:
 
@@ -314,7 +335,7 @@ reproducibility rules.
 Representative BLAS Level 1/2 comparisons are available through:
 
 ```sh
-zig build bench-level12-sweep --release=fast -- --size 1024 --reps 60
+zig build bench-vector-matrix-sweep --release=fast -- --size 1024 --reps 60
 ```
 
 This sweep loads Zynum plus configured Accelerate/OpenBLAS comparator libraries
@@ -323,12 +344,32 @@ step as a local probe; use fresh-process isolation before making reportable
 claims because Zynum and comparator libraries may keep worker or dispatch state
 after their first call.
 
+## Dynamic BLAS Library Cleanup
+
+Processes that load Zynum BLAS with `dlopen` and then unload it with `dlclose`
+should call the exported cleanup hook before closing the handle:
+
+```c
+void zynum_blas_shutdown(void);
+```
+
+The Fortran-style symbol `zynum_blas_shutdown_` is exported as well. The hook
+clears cached workspace owned by the calling thread and stops the shared core
+`std.Io.Threaded` helper state used by selected Level 1, Level 2, and GEMM paths.
+Thread-local caches owned by other application threads are released when those
+threads exit, so embedders should call the hook after their BLAS-using threads are
+quiescent. Normal process exit does not need an explicit call, but dynamic
+benchmark probes and plugin-style embedders should call it before unloading the
+library.
+
 ## Adding A Public Zig Operation
 
-1. Add or reuse core operands in `src/blas/core/operands.zig`.
-2. Add a structured core entry point in `src/blas/core/operations.zig`.
-3. Implement the portable behavior in the relevant `src/blas/core/level*.zig`
-   file.
+1. Add or reuse core operands in `src/blas/core/checked/operands.zig`.
+2. Add a structured core entry point in `src/blas/core/checked/operations.zig`.
+3. Implement the portable behavior in the relevant semantic core module:
+   `src/blas/core/vector.zig`, `src/blas/core/matrix_vector.zig`,
+   `src/blas/core/matrix_matrix.zig`, or a focused leaf under the matching
+   directory.
 4. Add the public operation in `src/blas/api/operations.zig`.
 5. Re-export it from `src/blas/api.zig`, `src/blas.zig`, and, if it is part of
    the top-level convenience surface, `src/zynum.zig`.
@@ -341,12 +382,14 @@ the abbreviation is the natural numerical term.
 ## Adding Or Changing ABI Exports
 
 1. Update `src/blas/abi/fortran.zig` or `src/blas/abi/cblas.zig`.
-2. Run `zig build generate-headers`.
-3. Review generated files under `include/zynum/blas/`.
-4. Add ABI compatibility tests in `test/abi/fortran_compat_test.zig` or
+2. Keep ABI wrappers calling through `src/blas/core/unchecked.zig`; do not import the
+   wider checked-operation facade from ABI files.
+3. Run `zig build generate-headers`.
+4. Review generated files under `include/zynum/blas/`.
+5. Add ABI compatibility tests in `test/abi/fortran_compat_test.zig` or
    `test/abi/cblas_compat_test.zig`; add generated-header smoke tests under
    `test/headers/`.
-5. Run `zig build test`.
+6. Run `zig build test`.
 
 Do not rename standard BLAS ABI symbols. The shared library name is
 `zynum_blas`, but functions such as `dgemm_` and `cblas_dgemm` remain standard.
@@ -355,21 +398,21 @@ Do not rename standard BLAS ABI symbols. The shared library name is
 
 1. Decide whether the kernel can be represented by an existing shared body:
    fixed-width packed-B SIMD should prefer
-   `src/blas/kernels/matrix_matrix/packed_simd.zig`, and real-GEMM alpha/beta write-back
-   should use `src/blas/kernels/matrix_matrix/epilogue.zig`.
+   `src/blas/kernels/shared/matrix_matrix/packed_simd.zig`, and real-GEMM alpha/beta write-back
+   should use `src/blas/kernels/shared/matrix_matrix/epilogue.zig`.
 2. Put architecture-specific feature gates, hard feasibility checks, and
-   hardware state code under `src/blas/kernels/<arch>/`.
+   hardware state code under `src/blas/kernels/arch/<arch>/`.
 3. Add capability detection or compile-time feature checks in the architecture
    feature file.
-4. Add or update the descriptor in `src/blas/kernels/matrix_matrix/catalog.zig`. Prefer
+4. Add or update the descriptor in `src/blas/kernels/shared/matrix_matrix/catalog.zig`. Prefer
    parameter changes there for tile, packing, unroll, and minimum-work tuning.
-5. Add the candidate to `src/blas/kernels/matrix_matrix.zig` for the relevant target
+5. Add the candidate to `src/blas/kernels/dispatch/matrix_matrix.zig` for the relevant target
    feature set.
-6. Update `src/blas/kernels/matrix_matrix/tuning.zig` when the shape/scalar matching rule
+6. Update `src/blas/kernels/shared/matrix_matrix/tuning.zig` when the shape/scalar matching rule
    changes.
-7. Map the descriptor's `KernelId` in `src/blas/kernels/matrix_matrix/executor.zig`.
-8. Keep shared task fields in `src/blas/kernels/matrix_matrix/task.zig`.
-9. Keep task splitting and threading policy in `src/blas/gemm/dispatch.zig`.
+7. Map the descriptor's `KernelId` in `src/blas/kernels/shared/matrix_matrix/executor.zig`.
+8. Keep shared task fields in `src/blas/kernels/shared/matrix_matrix/task.zig`.
+9. Keep task splitting and threading policy in `src/blas/core/matrix_matrix/planner.zig`.
 10. Add correctness tests that hit the path where practical.
 11. Add benchmark commands and result summaries to the relevant docs.
 

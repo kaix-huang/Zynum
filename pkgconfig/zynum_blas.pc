@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: zynum_blas
+Description: Zynum BLAS compatibility library
+Version: 0.0.1-beta
+Libs: -L${libdir} -lzynum_blas
+Cflags: -I${includedir}

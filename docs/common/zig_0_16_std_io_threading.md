@@ -35,12 +35,23 @@ making them default.
   traffic to hide scheduler overhead.
 - Use process-lifetime `std.Io.Threaded` helpers only behind a dispatch gate that
   is narrower than the evidence. The Level 2 DGER/DSYMV low-latency paths in
-  `src/blas/core/pool.zig` are examples: helpers are created by
+  `src/blas/core/execution/thread_pool.zig` are examples: helpers are created by
   `std.Io.Threaded`, then reused with per-helper generations, futex wake/wait,
   and bounded spin waits.
+- Use a worker stack size that is valid on the target OS and threading runtime.
+  The H3C Linux/x86 nodes rejected 256 KiB worker stacks with `EINVAL`; the
+  shared core pool uses 512 KiB for `std.Io.Threaded` workers.
 - Prefer fixed task assignment over helper races for very small work. The DGER
   128/256 probes showed that waking extra helpers and letting them race on a
   shared claim counter was slower than publishing only the helpers needed.
+- Prefer fixed task assignment for large Level 1 hot-cache probes as well unless
+  a new design proves otherwise. A shared-generation claimed-worker experiment
+  reduced futex wake addresses but regressed copy, axpy, dot, and complex axpy
+  because it disturbed partition balance and wake timing.
+- On Linux/x86_64, persistent helpers may pin themselves to distinct CPUs from
+  the current `sched_getaffinity` mask when focused and full sweeps show a net
+  win. Do not pin the caller thread, and do not choose CPUs outside the
+  scheduler-provided affinity mask.
 - Keep caller participation unless measured otherwise. Fully offloading short
   BLAS calls made the caller pay publication and wait overhead without doing
   useful work.
@@ -57,16 +68,18 @@ making them default.
 - Do not promote a low-latency worker path from a single focused best result.
   Require repeated fresh-process samples, comparator reruns, and nearby-shape
   checks.
+- Do not unload a dynamically loaded Zynum BLAS library while persistent helper
+  threads are still running. Call the exported shutdown hook first when a probe
+  or embedding process uses `dlopen`/`dlclose`.
 
 ## Current Source Locations
 
 - Thread-count policy: `src/blas/runtime.zig`.
-- GEMM dispatch: `src/blas/gemm/dispatch.zig`.
-- Process-lifetime GEMM workers: `src/blas/gemm/pool.zig`.
-- Shared Level 1/2 runners and low-latency helpers:
-  `src/blas/core/pool.zig`.
-- Level 2 DGER task shaping: `src/blas/core/level2/rank_update.zig`.
-- Level 2 DSYMV task shaping: `src/blas/core/level2/symmetric.zig`.
+- GEMM planning: `src/blas/core/matrix_matrix/planner.zig`.
+- Shared Level 1/2/GEMM runners and low-latency helpers:
+  `src/blas/core/execution/thread_pool.zig`. Do not add a separate GEMM worker pool.
+- Level 2 DGER task shaping: `src/blas/core/matrix_vector/rank_update.zig`.
+- Level 2 DSYMV task shaping: `src/blas/core/matrix_vector/symmetric.zig`.
 - Fresh-process comparator isolation: `bench/tools/run_gemm_sweep_isolated.py`.
 
 ## Development Rules
@@ -74,6 +87,8 @@ making them default.
 - Do not add environment variables for worker strategy; only
   `ZYNUM_MAXIMUM_THREADS` may cap Zynum threads.
 - Do not unload a dynamic library while its worker threads may still be running.
+  Use `zynum_blas_shutdown` or `zynum_blas_shutdown_` before closing a Zynum
+  BLAS handle in dynamic benchmark probes.
 - Prefer small focused probes before full sweeps, then confirm with full sweeps.
 - Document target features, thread cap, and relevant dispatch predicates in
   benchmark notes.
@@ -82,9 +97,12 @@ making them default.
 ## Recommended Validation
 
 ```sh
-ZYNUM_MAXIMUM_THREADS=1 zig build bench-gemm-sweep --release=fast -- --reps 30
-ZYNUM_MAXIMUM_THREADS=6 zig build bench-gemm-sweep --release=fast -- --reps 30
+unset ZYNUM_MAXIMUM_THREADS
+zig build bench-gemm-sweep --release=fast -- --reps 30 --check
 ```
+
+Use `ZYNUM_MAXIMUM_THREADS=1` only for explicit single-thread verification, and
+use other caps only for labeled cap experiments.
 
 For comparator numbers:
 
@@ -93,7 +111,9 @@ python3 bench/tools/run_gemm_sweep_isolated.py \
   --gemm-sweep zig-out/bin/gemm-sweep \
   --zynum-blas zig-out/lib/libzynum_blas.dylib \
   --csv zig-out/gemm_sweep_io_check.csv \
-  --reps 30
+  --reps 30 \
+  --process-repeats 3 \
+  --check
 ```
 
 Keep dispatch gates narrow until isolated data is stable.

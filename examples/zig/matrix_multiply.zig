@@ -6,7 +6,7 @@ const zynum = @import("zynum");
 
 const blas = zynum.blas;
 
-pub fn main() !void {
+pub fn main(init: std.process.Init) !void {
     // Zynum matrix views use BLAS/Fortran column-major storage by default.
     const a_values = [_]f64{
         1.0, 4.0,
@@ -38,15 +38,18 @@ pub fn main() !void {
         .result_matrix = c,
     });
 
-    std.debug.print("C = A x B\n", .{});
-    printColumnMajorMatrix(2, 2, c_values[0..]);
+    var stdout_buffer: [256]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
+    try stdout_writer.interface.print("C = A x B\n", .{});
+    try printColumnMajorMatrix(&stdout_writer.interface, 2, 2, c_values[0..]);
+    try stdout_writer.flush();
 }
 
-fn printColumnMajorMatrix(rows: usize, cols: usize, values: []const f64) void {
+fn printColumnMajorMatrix(writer: *std.Io.Writer, rows: usize, cols: usize, values: []const f64) !void {
     for (0..rows) |row| {
         for (0..cols) |col| {
-            std.debug.print("{d:>8.1}", .{values[row + col * rows]});
+            try writer.print("{d:>8.1}", .{values[row + col * rows]});
         }
-        std.debug.print("\n", .{});
+        try writer.print("\n", .{});
     }
 }

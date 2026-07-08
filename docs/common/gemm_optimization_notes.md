@@ -7,26 +7,30 @@ Architecture-specific details belong in the AArch64 and x86_64 documents.
 
 GEMM responsibilities are split across:
 
-- `src/blas/core/level3.zig`: BLAS semantics and fast-path detection.
-- `src/blas/gemm/dispatch.zig`: shape policy, task splitting, and threading.
-- `src/blas/gemm/pool.zig`: optional worker-pool experiments.
-- `src/blas/kernels/matrix_matrix.zig`: target-feature candidate-set selection.
-- `src/blas/kernels/matrix_matrix/catalog.zig`: stable kernel descriptors with
+- `src/blas/core/matrix_matrix.zig`: BLAS semantics and fast-path detection.
+- `src/blas/core/matrix_matrix/planner.zig`: shape policy, task splitting, and threading.
+- `src/blas/core/execution/thread_pool.zig`: the single shared BLAS helper pool. GEMM planning
+  submits planned tasks here and must not grow a separate worker lifecycle.
+- `src/blas/kernels/dispatch/matrix_matrix.zig`: target-feature candidate-set selection.
+- `src/blas/kernels/shared/matrix_matrix/catalog.zig`: stable kernel descriptors with
   `KernelId`, tile, packing, ISA, and threshold metadata.
-- `src/blas/kernels/matrix_matrix/tuning.zig`: candidate scoring, shape/scalar
+- `src/blas/kernels/shared/matrix_matrix/tuning.zig`: candidate scoring, shape/scalar
   matching, and execution-plan parameter selection.
-- `src/blas/kernels/matrix_matrix/executor.zig`: runtime bridge from selected `KernelId`
+- `src/blas/kernels/shared/matrix_matrix/executor.zig`: runtime bridge from selected `KernelId`
   to implementation module.
-- `src/blas/kernels/matrix_matrix/packed_simd.zig`: shared fixed-width packed-B SIMD
+- `src/blas/kernels/shared/matrix_matrix/packed_simd.zig`: shared fixed-width packed-B SIMD
   skeleton. It owns panel preparation, K accumulation, row/tail handling, and
   write-back wrapping for ASIMD and x86 SIMD backends.
-- `src/blas/kernels/matrix_matrix/epilogue.zig`: shared real-GEMM scalar/vector
+- `src/blas/kernels/shared/matrix_matrix/packed_params.zig`: shared comptime lane, row-group,
+  panel-width, tail-lane, K-unroll, and stack-pack parameters for fixed-width
+  packed SIMD backends.
+- `src/blas/kernels/shared/matrix_matrix/epilogue.zig`: shared real-GEMM scalar/vector
   alpha/beta write-back helpers.
-- `src/blas/kernels/matrix_matrix/task.zig`: shared task description, selected runtime
+- `src/blas/kernels/shared/matrix_matrix/task.zig`: shared task description, selected runtime
   kernel id, and the `ExecutionPlan` consumed by kernels.
-- `src/blas/kernels/generic/matrix_matrix/basic.zig`: portable parameterized fallback kernels
+- `src/blas/kernels/shared/matrix_matrix/generic/basic.zig`: portable parameterized fallback kernels
   and vector-edge helpers that reuse shared epilogue rules where practical.
-- `src/blas/kernels/<arch>/`: architecture-specific kernels. These files may
+- `src/blas/kernels/arch/<arch>/`: architecture-specific kernels. These files may
   check ISA availability, OS support, alignment, tile feasibility, scalar
   correctness preconditions, state cleanup, and plan-selected hardware variants.
   They should configure shared kernel skeletons before duplicating loop bodies,
@@ -37,14 +41,15 @@ or public Zig API code. Performance tuning should prefer descriptor parameters
 and tuning scores before changing micro-kernel bodies. If a new optimized path
 needs a shape gate, pack-layout mode, panel variant, AMX/SME symbol, workspace
 budget, or thread assumption, add it to `catalog.zig`, `tuning.zig`,
-`dispatch.zig`, or `ExecutionPlan`; do not hide it inside
-`src/blas/kernels/<arch>/`.
+`planner.zig`, or `ExecutionPlan`; do not hide it inside
+`src/blas/kernels/arch/<arch>/`.
 
-Reusable kernel mechanics belong in `src/blas/kernels/matrix_matrix/`: shared packed-B
+Reusable kernel mechanics belong in `src/blas/kernels/shared/matrix_matrix/`: shared packed-B
 SIMD loops in `packed_simd.zig`, shared alpha/beta write-back in `epilogue.zig`,
-and descriptor-facing parameters in `catalog.zig`/`tuning.zig`. Architecture
-files should stay thin where possible: feature gates, comptime lane/tile choices,
-hard safety caps, and hardware state prologue/cleanup.
+fixed-width descriptor parameters in `packed_params.zig`, and descriptor-facing
+policy in `catalog.zig`/`tuning.zig`. Architecture files should stay thin where
+possible: feature gates, comptime lane/tile choices, hard safety caps, and
+hardware state prologue/cleanup.
 
 ## Dispatch Principles
 
@@ -59,6 +64,10 @@ hard safety caps, and hardware state prologue/cleanup.
 - Prefer a new comptime `Config` parameter or shared prologue/epilogue hook over
   cloning a micro-kernel body. Fork the loop only when the instruction sequence
   or hardware state model cannot be represented by the shared skeleton.
+- Keep fixed-width packed SIMD lane and panel constants in `packed_params.zig`
+  when they are shared by catalog descriptors and architecture wrappers. A
+  backend-specific file should only hold constants that are not descriptor
+  visible or are required by a non-shared instruction sequence.
 - Hardware-state prologue/epilogue code is part of the kernel contract, not a
   benchmark detail. SME, AMX, or similar stateful kernels must first prove that
   ABI-visible registers, scalar return registers, and memory ordering are
@@ -158,21 +167,70 @@ when matrix dimensions collapse to a row or column:
   A columns and updating C rows, which avoids the cache-unfriendly row-block dot
   pattern used by the older fallback.
 - `m == 1` or `n == 1`, `k >= 128`, and work at least `128 Ki` multiply-add
-  pairs: dispatch may request the default GEMM thread limit even though the
-  global `runtime.gemmThreadCount` would otherwise return one thread for
-  `n < 2`. This is only a task-planner rule; it does not add an environment
-  variable or a separate worker strategy.
+  pairs: GEMM planning may request the process thread limit even though its
+  base shape policy would otherwise return one thread for `n < 2`. This is
+  only a task-planner rule; it does not add an environment variable or a
+  separate worker strategy.
 
 Focused M5 probes showed these rules improve the worst vector-edge points, but
 they do not make those shapes competitive with Accelerate. Treat them as
 fallback cleanup, not as a broad comparator-performance claim.
+
+## 2026-07-05 Narrow-N f64 Route Cleanup
+
+The current real GEMM facade already had a narrow-N escape hatch that maps very
+small `n` to GEMV-like work. During the Level 3 pass, f32 had a special
+`n == 17` route that sends the first 16 columns through the GEMM planner and
+only handles the final column with GEMV. f64 did not: it sent every
+`2 <= n <= 17` column through GEMV, including the exact `n == 16` case that can
+use normal GEMM planning.
+
+Retained changes:
+
+- f64 `n == 17`, `m >= 1024`, `k >= 128` now mirrors the f32 route: first
+  16 columns use `planner.noTransReal`, and the final column uses GEMV.
+- f64 `n == 16` no longer matches the small-column GEMV loop and falls through
+  to the normal GEMM planner.
+
+Focused fresh-process evidence with `ZYNUM_MAXIMUM_THREADS` unset and
+comparator thread env pinned to 10:
+
+| Case | Before Zynum | After Zynum | Best comparator in after run |
+| --- | ---: | ---: | ---: |
+| `dgemm m2048_n17_k257` | 14.61 GF/s | 39.62-40.73 GF/s | 181.68 GF/s |
+| `dgemm m2048_n16_k257` | not in baseline focus | 31.38 GF/s | 236.94 GF/s |
+
+Evidence CSVs:
+
+- `zig-out/perf-report/level3_current_vector_edge_focus.csv`
+- `zig-out/perf-report/level3_after_f64_n17_planner16.csv`
+- `zig-out/perf-report/level3_after_f64_n16_n17_planner.csv`
+
+Rejected experiments:
+
+- Letting large tall GEMV-N bypass the AArch64 fixed-SIMD full/unit wrappers so
+  core row splitting could run regressed vector-edge GEMM. In the focused run,
+  `dgemm m4096_n1_k256` dropped from about 14.48 GF/s to 6.16 GF/s, while
+  `dgemm m2048_n17_k257` only improved by about 2%. The experiment was removed.
+- Sending large `n == 1` real GEMM through the GEMM planner instead of the
+  existing GEMV mapping also regressed both f32 and f64 vector-edge probes.
+  `level3_after_n1_planner_gate.csv` records the rejected run.
+
+Conclusion:
+
+- The f64 `n == 17` route fix is retained because it removes an inconsistent
+  cross-dtype dispatch rule and materially improves the current worst dgemm
+  narrow-N point.
+- It is not a comparator-completion claim. f64 narrow-N and vector-edge GEMM
+  remain far behind Accelerate on this machine and need a real tall/skinny
+  microkernel or a better GEMV-N path rather than task-count broadening.
 
 ## Alpha And Beta
 
 The `alpha=1,beta=0` path is often worth a dedicated store-only fast path.
 General alpha/beta handling must remain correct and should be benchmarked
 separately because it changes write-back cost. Real-GEMM scalar/vector write-back
-formulas live in `src/blas/kernels/matrix_matrix/epilogue.zig`; kernel files should call
+formulas live in `src/blas/kernels/shared/matrix_matrix/epilogue.zig`; kernel files should call
 those helpers instead of maintaining local copies. Preserve the `beta=0` path so
 kernels do not read old C values when BLAS semantics do not require it.
 
@@ -180,7 +238,7 @@ kernels do not read old C values when BLAS semantics do not require it.
 
 The current complex paths can use real GEMM transformations. This is useful for
 coverage, but it can repeat packing, allocate more workspace, and trigger
-multiple real GEMM dispatches.
+multiple real GEMM planner calls.
 
 Long-term complex GEMM should use dedicated packing and micro-kernels where the
 target architecture justifies the maintenance cost.
@@ -335,7 +393,7 @@ Retained:
   1462 GF/s to about 1539 GF/s in adjacent runs, though the retained combined
   probe still trails Accelerate on that shape.
 - `n == 17` f32 SGEMM with tall M now computes the first 16 columns through the
-  GEMM dispatcher and the final column through GEMV. The 5-repeat confirmation
+  GEMM planner and the final column through GEMV. The 5-repeat confirmation
   measured `m2048_n17_k257` at about 1104 GF/s versus Accelerate at about
   920 GF/s.
 - f32 AMX selection includes tall `n == 16`, `128 <= k <= 1024` shapes. This is
@@ -352,7 +410,7 @@ Rejected or deferred:
 - Routing medium-K 2:1 rectangles through the f32 U4 panel did not improve
   `m256_n512_k768` and was reverted.
 - Splitting `m256_n512_k768` into one task per 32-column panel, or capping this
-  shape at 8 threads, was slower than the retained dispatcher split.
+  shape at 8 threads, was slower than the retained planner split.
 - For `m2048_n32_k257`, forcing SME U4 instead of AMX N32 regressed the focused
   probe and also hurt the high-K `m1024_n32_k1024` control.
 

@@ -18,7 +18,7 @@ const Lib = struct {
 };
 
 fn usage() void {
-    std.debug.print("usage: bench-zynum-blas --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--size n] [--reps n]\n", .{});
+    std.debug.print("usage: bench-zynum-blas --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--aocl-blis path] [--size n] [--reps n]\n", .{});
 }
 
 fn loadLib(name: []const u8, path: []const u8) !Lib {
@@ -137,6 +137,7 @@ pub fn main(init: std.process.Init) !void {
     var accel_path: ?[]const u8 = null;
     var openblas_path: ?[]const u8 = null;
     var mkl_path: ?[]const u8 = null;
+    var aocl_blis_path: ?[]const u8 = null;
     var size: usize = 512;
     var reps: usize = 3;
 
@@ -152,6 +153,8 @@ pub fn main(init: std.process.Init) !void {
             openblas_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--mkl")) {
             mkl_path = args.next() orelse return error.MissingValue;
+        } else if (std.mem.eql(u8, arg, "--aocl-blis") or std.mem.eql(u8, arg, "--aocl")) {
+            aocl_blis_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--size")) {
             size = try std.fmt.parseInt(usize, args.next() orelse return error.MissingValue, 10);
         } else if (std.mem.eql(u8, arg, "--reps")) {
@@ -166,7 +169,7 @@ pub fn main(init: std.process.Init) !void {
         return error.BadArgument;
     }
 
-    var libs: [4]Lib = undefined;
+    var libs: [5]Lib = undefined;
     var lib_count: usize = 0;
     libs[lib_count] = try loadLib("zynum-blas", zynum_blas_path.?);
     lib_count += 1;
@@ -182,15 +185,22 @@ pub fn main(init: std.process.Init) !void {
         libs[lib_count] = try loadLib("MKL", path);
         lib_count += 1;
     }
+    if (aocl_blis_path) |path| {
+        libs[lib_count] = try loadLib("AOCL-BLIS", path);
+        lib_count += 1;
+    }
     // Keep benchmark libraries loaded until process exit. Zynum and comparator
     // BLAS implementations may own process-lifetime worker threads after use.
 
-    std.debug.print("size={d} reps={d}\n", .{ size, reps });
-    std.debug.print("library       dgemm GF/s   sgemm GF/s   daxpy GF/s\n", .{});
+    var stdout_buffer: [1024]u8 = undefined;
+    var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
+    try stdout_writer.interface.print("size={d} reps={d}\n", .{ size, reps });
+    try stdout_writer.interface.print("library       dgemm GF/s   sgemm GF/s   daxpy GF/s\n", .{});
     for (libs[0..lib_count]) |lib| {
         const dg = try benchDgemm(allocator, init.io, lib, size, reps);
         const sg = try benchSgemm(allocator, init.io, lib, size, reps);
         const ax = try benchDaxpy(allocator, init.io, lib, size * size, reps);
-        std.debug.print("{s:<12} {d:>10.2}   {d:>10.2}   {d:>10.2}\n", .{ lib.name, dg, sg, ax });
+        try stdout_writer.interface.print("{s:<12} {d:>10.2}   {d:>10.2}   {d:>10.2}\n", .{ lib.name, dg, sg, ax });
     }
+    try stdout_writer.flush();
 }

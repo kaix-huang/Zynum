@@ -31,6 +31,8 @@ typedef zynum_blas_complex_double zynum_blas_complexF64;
 int lsame_(const char *ca, const char *cb);
 void xerbla_(const char *srname, const zynum_blas_int *info);
 void xerbla_array_(const char *srname_array, const zynum_blas_int *srname_len, const zynum_blas_int *info);
+void zynum_blas_shutdown(void);
+void zynum_blas_shutdown_(void);
 float scabs1_(const zynum_blas_complex_float *z);
 double dcabs1_(const zynum_blas_complex_double *z);
 void sswap_(const zynum_blas_int *n, float *x, const zynum_blas_int *incx, float *y, const zynum_blas_int *incy);

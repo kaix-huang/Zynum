@@ -3,7 +3,8 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
-const core = @import("../core.zig");
+const core = @import("../core/unchecked.zig");
+pub const runtime = @import("../runtime.zig");
 
 pub const BlasInt = core.BlasInt;
 pub const ComplexF32 = core.ComplexF32;
@@ -37,8 +38,16 @@ fn reportXerbla(name: []const u8, info: BlasInt) void {
     std.debug.print(" ** On entry to {s} parameter number {d} had an illegal value\n", .{ routine_name, info });
 }
 
-inline fn copyContiguous(n: BlasInt, elem_size: usize, x: [*]const u8, y: [*]u8) void {
-    core.copyBytes(@as(usize, @intCast(n)) * elem_size, x, y);
+pub export fn zynum_blas_shutdown() callconv(.c) void {
+    core.shutdown();
+}
+
+pub export fn zynum_blas_shutdown_() callconv(.c) void {
+    core.shutdown();
+}
+
+inline fn copyContiguous(comptime T: type, n: BlasInt, x: [*]const T, y: [*]T) void {
+    core.copy(T, n, x, 1, y, 1);
 }
 
 test "xerbla routine names are trimmed" {
@@ -51,6 +60,27 @@ test "xerbla routine names are trimmed" {
 fn validTrans(p: [*]const u8) bool {
     return switch (core.fromChar(p)) {
         'N', 'T', 'C' => true,
+        else => false,
+    };
+}
+
+fn validUplo(p: [*]const u8) bool {
+    return switch (core.fromChar(p)) {
+        'U', 'L' => true,
+        else => false,
+    };
+}
+
+fn validDiag(p: [*]const u8) bool {
+    return switch (core.fromChar(p)) {
+        'N', 'U' => true,
+        else => false,
+    };
+}
+
+fn validSide(p: [*]const u8) bool {
+    return switch (core.fromChar(p)) {
+        'L', 'R' => true,
         else => false,
     };
 }
@@ -73,6 +103,178 @@ fn gemmError(ta: [*]const u8, tb: [*]const u8, m: BlasInt, n: BlasInt, k: BlasIn
     if (lda < max1(nrowa)) return 8;
     if (ldb < max1(nrowb)) return 10;
     if (ldc < max1(m)) return 13;
+    return 0;
+}
+
+fn triangularMatrixError(side: [*]const u8, uplo: [*]const u8, trans: [*]const u8, diag: [*]const u8, m: BlasInt, n: BlasInt, lda: BlasInt, ldb: BlasInt) BlasInt {
+    if (!validSide(side)) return 1;
+    if (!validUplo(uplo)) return 2;
+    if (!validTrans(trans)) return 3;
+    if (!validDiag(diag)) return 4;
+    if (m < 0) return 5;
+    if (n < 0) return 6;
+
+    const nrowa = if (core.fromChar(side) == 'L') m else n;
+    if (lda < max1(nrowa)) return 9;
+    if (ldb < max1(m)) return 11;
+    return 0;
+}
+
+fn matrixVectorError(trans: [*]const u8, m: BlasInt, n: BlasInt, lda: BlasInt, incx: BlasInt, incy: BlasInt) BlasInt {
+    if (!validTrans(trans)) return 1;
+    if (m < 0) return 2;
+    if (n < 0) return 3;
+    if (lda < max1(m)) return 6;
+    if (incx == 0) return 8;
+    if (incy == 0) return 11;
+    return 0;
+}
+
+fn bandMatrixVectorError(trans: [*]const u8, m: BlasInt, n: BlasInt, kl: BlasInt, ku: BlasInt, lda: BlasInt, incx: BlasInt, incy: BlasInt) BlasInt {
+    if (!validTrans(trans)) return 1;
+    if (m < 0) return 2;
+    if (n < 0) return 3;
+    if (kl < 0) return 4;
+    if (ku < 0) return 5;
+    if (lda < kl + ku + 1) return 8;
+    if (incx == 0) return 10;
+    if (incy == 0) return 13;
+    return 0;
+}
+
+fn symmetricVectorError(uplo: [*]const u8, n: BlasInt, lda: BlasInt, incx: BlasInt, incy: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (lda < max1(n)) return 5;
+    if (incx == 0) return 7;
+    if (incy == 0) return 10;
+    return 0;
+}
+
+fn bandSymmetricVectorError(uplo: [*]const u8, n: BlasInt, k: BlasInt, lda: BlasInt, incx: BlasInt, incy: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (k < 0) return 3;
+    if (lda < k + 1) return 6;
+    if (incx == 0) return 8;
+    if (incy == 0) return 11;
+    return 0;
+}
+
+fn packedSymmetricVectorError(uplo: [*]const u8, n: BlasInt, incx: BlasInt, incy: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (incx == 0) return 6;
+    if (incy == 0) return 9;
+    return 0;
+}
+
+fn triangularVectorError(uplo: [*]const u8, trans: [*]const u8, diag: [*]const u8, n: BlasInt, lda: BlasInt, incx: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (!validTrans(trans)) return 2;
+    if (!validDiag(diag)) return 3;
+    if (n < 0) return 4;
+    if (lda < max1(n)) return 6;
+    if (incx == 0) return 8;
+    return 0;
+}
+
+fn bandTriangularVectorError(uplo: [*]const u8, trans: [*]const u8, diag: [*]const u8, n: BlasInt, k: BlasInt, lda: BlasInt, incx: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (!validTrans(trans)) return 2;
+    if (!validDiag(diag)) return 3;
+    if (n < 0) return 4;
+    if (k < 0) return 5;
+    if (lda < k + 1) return 7;
+    if (incx == 0) return 9;
+    return 0;
+}
+
+fn packedTriangularVectorError(uplo: [*]const u8, trans: [*]const u8, diag: [*]const u8, n: BlasInt, incx: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (!validTrans(trans)) return 2;
+    if (!validDiag(diag)) return 3;
+    if (n < 0) return 4;
+    if (incx == 0) return 7;
+    return 0;
+}
+
+fn rankUpdateError(m: BlasInt, n: BlasInt, incx: BlasInt, incy: BlasInt, lda: BlasInt) BlasInt {
+    if (m < 0) return 1;
+    if (n < 0) return 2;
+    if (incx == 0) return 5;
+    if (incy == 0) return 7;
+    if (lda < max1(m)) return 9;
+    return 0;
+}
+
+fn symmetricRankError(uplo: [*]const u8, n: BlasInt, incx: BlasInt, lda: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (incx == 0) return 5;
+    if (lda < max1(n)) return 7;
+    return 0;
+}
+
+fn packedRankError(uplo: [*]const u8, n: BlasInt, incx: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (incx == 0) return 5;
+    return 0;
+}
+
+fn symmetricRank2Error(uplo: [*]const u8, n: BlasInt, incx: BlasInt, incy: BlasInt, lda: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (incx == 0) return 5;
+    if (incy == 0) return 7;
+    if (lda < max1(n)) return 9;
+    return 0;
+}
+
+fn packedRank2Error(uplo: [*]const u8, n: BlasInt, incx: BlasInt, incy: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (n < 0) return 2;
+    if (incx == 0) return 5;
+    if (incy == 0) return 7;
+    return 0;
+}
+
+fn symmetricMatrixError(side: [*]const u8, uplo: [*]const u8, m: BlasInt, n: BlasInt, lda: BlasInt, ldb: BlasInt, ldc: BlasInt) BlasInt {
+    if (!validSide(side)) return 1;
+    if (!validUplo(uplo)) return 2;
+    if (m < 0) return 3;
+    if (n < 0) return 4;
+
+    const nrowa = if (core.fromChar(side) == 'L') m else n;
+    if (lda < max1(nrowa)) return 7;
+    if (ldb < max1(m)) return 9;
+    if (ldc < max1(m)) return 12;
+    return 0;
+}
+
+fn rankKMatrixError(uplo: [*]const u8, trans: [*]const u8, n: BlasInt, k: BlasInt, lda: BlasInt, ldc: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (!validTrans(trans)) return 2;
+    if (n < 0) return 3;
+    if (k < 0) return 4;
+
+    const nrowa = if (core.fromChar(trans) == 'N') n else k;
+    if (lda < max1(nrowa)) return 7;
+    if (ldc < max1(n)) return 10;
+    return 0;
+}
+
+fn rank2KMatrixError(uplo: [*]const u8, trans: [*]const u8, n: BlasInt, k: BlasInt, lda: BlasInt, ldb: BlasInt, ldc: BlasInt) BlasInt {
+    if (!validUplo(uplo)) return 1;
+    if (!validTrans(trans)) return 2;
+    if (n < 0) return 3;
+    if (k < 0) return 4;
+
+    const nrow = if (core.fromChar(trans) == 'N') n else k;
+    if (lda < max1(nrow)) return 7;
+    if (ldb < max1(nrow)) return 9;
+    if (ldc < max1(n)) return 12;
     return 0;
 }
 
@@ -111,7 +313,7 @@ noinline fn scopySlow(n: BlasInt, x: [*]const f32, incx: BlasInt, y: [*]f32, inc
 pub export fn scopy_(n: *const BlasInt, x: [*]const f32, incx: *const BlasInt, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
     if (n.* <= 0) return;
     if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(n.*, @sizeOf(f32), @ptrCast(x), @ptrCast(y));
+        copyContiguous(f32, n.*, x, y);
         return;
     }
     scopySlow(n.*, x, incx.*, y, incy.*);
@@ -122,7 +324,7 @@ noinline fn dcopySlow(n: BlasInt, x: [*]const f64, incx: BlasInt, y: [*]f64, inc
 pub export fn dcopy_(n: *const BlasInt, x: [*]const f64, incx: *const BlasInt, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
     if (n.* <= 0) return;
     if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(n.*, @sizeOf(f64), @ptrCast(x), @ptrCast(y));
+        copyContiguous(f64, n.*, x, y);
         return;
     }
     dcopySlow(n.*, x, incx.*, y, incy.*);
@@ -133,7 +335,7 @@ noinline fn ccopySlow(n: BlasInt, x: [*]const ComplexF32, incx: BlasInt, y: [*]C
 pub export fn ccopy_(n: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
     if (n.* <= 0) return;
     if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(n.*, @sizeOf(ComplexF32), @ptrCast(x), @ptrCast(y));
+        copyContiguous(ComplexF32, n.*, x, y);
         return;
     }
     ccopySlow(n.*, x, incx.*, y, incy.*);
@@ -144,7 +346,7 @@ noinline fn zcopySlow(n: BlasInt, x: [*]const ComplexF64, incx: BlasInt, y: [*]C
 pub export fn zcopy_(n: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
     if (n.* <= 0) return;
     if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(n.*, @sizeOf(ComplexF64), @ptrCast(x), @ptrCast(y));
+        copyContiguous(ComplexF64, n.*, x, y);
         return;
     }
     zcopySlow(n.*, x, incx.*, y, incy.*);
@@ -320,216 +522,282 @@ pub export fn zdscal_(n: *const BlasInt, alpha: *const f64, x: [*]ComplexF64, in
 
 // Level 2 exports.
 pub export fn sgemv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, x: [*]const f32, incx: *const BlasInt, beta: *const f32, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("SGEMV ", matrixVectorError(t, m.*, n.*, lda.*, incx.*, incy.*))) return;
     core.gemv(f32, core.parseTrans(t), m.*, n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 pub export fn dgemv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, x: [*]const f64, incx: *const BlasInt, beta: *const f64, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("DGEMV ", matrixVectorError(t, m.*, n.*, lda.*, incx.*, incy.*))) return;
     core.gemv(f64, core.parseTrans(t), m.*, n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 pub export fn cgemv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, beta: *const ComplexF32, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("CGEMV ", matrixVectorError(t, m.*, n.*, lda.*, incx.*, incy.*))) return;
     core.gemv(ComplexF32, core.parseTrans(t), m.*, n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 pub export fn zgemv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, beta: *const ComplexF64, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("ZGEMV ", matrixVectorError(t, m.*, n.*, lda.*, incx.*, incy.*))) return;
     core.gemv(ComplexF64, core.parseTrans(t), m.*, n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 
 pub export fn sgbmv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, kl: *const BlasInt, ku: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, x: [*]const f32, incx: *const BlasInt, beta: *const f32, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("SGBMV ", bandMatrixVectorError(t, m.*, n.*, kl.*, ku.*, lda.*, incx.*, incy.*))) return;
     core.gbmv(f32, core.parseTrans(t), m.*, n.*, kl.*, ku.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 pub export fn dgbmv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, kl: *const BlasInt, ku: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, x: [*]const f64, incx: *const BlasInt, beta: *const f64, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("DGBMV ", bandMatrixVectorError(t, m.*, n.*, kl.*, ku.*, lda.*, incx.*, incy.*))) return;
     core.gbmv(f64, core.parseTrans(t), m.*, n.*, kl.*, ku.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 pub export fn cgbmv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, kl: *const BlasInt, ku: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, beta: *const ComplexF32, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("CGBMV ", bandMatrixVectorError(t, m.*, n.*, kl.*, ku.*, lda.*, incx.*, incy.*))) return;
     core.gbmv(ComplexF32, core.parseTrans(t), m.*, n.*, kl.*, ku.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 pub export fn zgbmv_(t: [*]const u8, m: *const BlasInt, n: *const BlasInt, kl: *const BlasInt, ku: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, beta: *const ComplexF64, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("ZGBMV ", bandMatrixVectorError(t, m.*, n.*, kl.*, ku.*, lda.*, incx.*, incy.*))) return;
     core.gbmv(ComplexF64, core.parseTrans(t), m.*, n.*, kl.*, ku.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*);
 }
 
 pub export fn ssymv_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, x: [*]const f32, incx: *const BlasInt, beta: *const f32, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("SSYMV ", symmetricVectorError(u, n.*, lda.*, incx.*, incy.*))) return;
     core.symv(f32, core.parseUplo(u), n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, false);
 }
 pub export fn dsymv_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, x: [*]const f64, incx: *const BlasInt, beta: *const f64, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("DSYMV ", symmetricVectorError(u, n.*, lda.*, incx.*, incy.*))) return;
     core.symv(f64, core.parseUplo(u), n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, false);
 }
 pub export fn chemv_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, beta: *const ComplexF32, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("CHEMV ", symmetricVectorError(u, n.*, lda.*, incx.*, incy.*))) return;
     core.symv(ComplexF32, core.parseUplo(u), n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, true);
 }
 pub export fn zhemv_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, beta: *const ComplexF64, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHEMV ", symmetricVectorError(u, n.*, lda.*, incx.*, incy.*))) return;
     core.symv(ComplexF64, core.parseUplo(u), n.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, true);
 }
 
 pub export fn ssbmv_(u: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, x: [*]const f32, incx: *const BlasInt, beta: *const f32, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("SSBMV ", bandSymmetricVectorError(u, n.*, k.*, lda.*, incx.*, incy.*))) return;
     core.sbmv(f32, core.parseUplo(u), n.*, k.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, false);
 }
 pub export fn dsbmv_(u: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, x: [*]const f64, incx: *const BlasInt, beta: *const f64, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("DSBMV ", bandSymmetricVectorError(u, n.*, k.*, lda.*, incx.*, incy.*))) return;
     core.sbmv(f64, core.parseUplo(u), n.*, k.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, false);
 }
 pub export fn chbmv_(u: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, beta: *const ComplexF32, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("CHBMV ", bandSymmetricVectorError(u, n.*, k.*, lda.*, incx.*, incy.*))) return;
     core.sbmv(ComplexF32, core.parseUplo(u), n.*, k.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, true);
 }
 pub export fn zhbmv_(u: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, beta: *const ComplexF64, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHBMV ", bandSymmetricVectorError(u, n.*, k.*, lda.*, incx.*, incy.*))) return;
     core.sbmv(ComplexF64, core.parseUplo(u), n.*, k.*, alpha.*, a, lda.*, x, incx.*, beta.*, y, incy.*, true);
 }
 
 pub export fn sspmv_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, ap: [*]const f32, x: [*]const f32, incx: *const BlasInt, beta: *const f32, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("SSPMV ", packedSymmetricVectorError(u, n.*, incx.*, incy.*))) return;
     core.spmv(f32, core.parseUplo(u), n.*, alpha.*, ap, x, incx.*, beta.*, y, incy.*, false);
 }
 pub export fn dspmv_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, ap: [*]const f64, x: [*]const f64, incx: *const BlasInt, beta: *const f64, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("DSPMV ", packedSymmetricVectorError(u, n.*, incx.*, incy.*))) return;
     core.spmv(f64, core.parseUplo(u), n.*, alpha.*, ap, x, incx.*, beta.*, y, incy.*, false);
 }
 pub export fn chpmv_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF32, ap: [*]const ComplexF32, x: [*]const ComplexF32, incx: *const BlasInt, beta: *const ComplexF32, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("CHPMV ", packedSymmetricVectorError(u, n.*, incx.*, incy.*))) return;
     core.spmv(ComplexF32, core.parseUplo(u), n.*, alpha.*, ap, x, incx.*, beta.*, y, incy.*, true);
 }
 pub export fn zhpmv_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF64, ap: [*]const ComplexF64, x: [*]const ComplexF64, incx: *const BlasInt, beta: *const ComplexF64, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHPMV ", packedSymmetricVectorError(u, n.*, incx.*, incy.*))) return;
     core.spmv(ComplexF64, core.parseUplo(u), n.*, alpha.*, ap, x, incx.*, beta.*, y, incy.*, true);
 }
 
 pub export fn strmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const f32, lda: *const BlasInt, x: [*]f32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("STRMV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trmv(f32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 pub export fn dtrmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const f64, lda: *const BlasInt, x: [*]f64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("DTRMV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trmv(f64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 pub export fn ctrmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]ComplexF32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("CTRMV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trmv(ComplexF32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 pub export fn ztrmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]ComplexF64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTRMV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trmv(ComplexF64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 
 pub export fn stbmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const f32, lda: *const BlasInt, x: [*]f32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("STBMV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbmv(f32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 pub export fn dtbmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const f64, lda: *const BlasInt, x: [*]f64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("DTBMV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbmv(f64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 pub export fn ctbmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]ComplexF32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("CTBMV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbmv(ComplexF32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 pub export fn ztbmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]ComplexF64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTBMV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbmv(ComplexF64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 
 pub export fn stpmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const f32, x: [*]f32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("STPMV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpmv(f32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 pub export fn dtpmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const f64, x: [*]f64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("DTPMV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpmv(f64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 pub export fn ctpmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const ComplexF32, x: [*]ComplexF32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("CTPMV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpmv(ComplexF32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 pub export fn ztpmv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const ComplexF64, x: [*]ComplexF64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTPMV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpmv(ComplexF64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 
 pub export fn strsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const f32, lda: *const BlasInt, x: [*]f32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("STRSV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trsv(f32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 pub export fn dtrsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const f64, lda: *const BlasInt, x: [*]f64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("DTRSV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trsv(f64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 pub export fn ctrsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]ComplexF32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("CTRSV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trsv(ComplexF32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 pub export fn ztrsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]ComplexF64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTRSV ", triangularVectorError(u, t, d, n.*, lda.*, incx.*))) return;
     core.trsv(ComplexF64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, a, lda.*, x, incx.*);
 }
 
 pub export fn stbsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const f32, lda: *const BlasInt, x: [*]f32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("STBSV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbsv(f32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 pub export fn dtbsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const f64, lda: *const BlasInt, x: [*]f64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("DTBSV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbsv(f64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 pub export fn ctbsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const ComplexF32, lda: *const BlasInt, x: [*]ComplexF32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("CTBSV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbsv(ComplexF32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 pub export fn ztbsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, k: *const BlasInt, a: [*]const ComplexF64, lda: *const BlasInt, x: [*]ComplexF64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTBSV ", bandTriangularVectorError(u, t, d, n.*, k.*, lda.*, incx.*))) return;
     core.tbsv(ComplexF64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, k.*, a, lda.*, x, incx.*);
 }
 
 pub export fn stpsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const f32, x: [*]f32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("STPSV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpsv(f32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 pub export fn dtpsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const f64, x: [*]f64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("DTPSV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpsv(f64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 pub export fn ctpsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const ComplexF32, x: [*]ComplexF32, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("CTPSV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpsv(ComplexF32, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 pub export fn ztpsv_(u: [*]const u8, t: [*]const u8, d: [*]const u8, n: *const BlasInt, ap: [*]const ComplexF64, x: [*]ComplexF64, incx: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTPSV ", packedTriangularVectorError(u, t, d, n.*, incx.*))) return;
     core.tpsv(ComplexF64, core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), n.*, ap, x, incx.*);
 }
 
 pub export fn sger_(m: *const BlasInt, n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, y: [*]const f32, incy: *const BlasInt, a: [*]f32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("SGER  ", rankUpdateError(m.*, n.*, incx.*, incy.*, lda.*))) return;
     core.ger(f32, m.*, n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*, false);
 }
 pub export fn dger_(m: *const BlasInt, n: *const BlasInt, alpha: *const f64, x: [*]const f64, incx: *const BlasInt, y: [*]const f64, incy: *const BlasInt, a: [*]f64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("DGER  ", rankUpdateError(m.*, n.*, incx.*, incy.*, lda.*))) return;
     core.ger(f64, m.*, n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*, false);
 }
 pub export fn cgeru_(m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]const ComplexF32, incy: *const BlasInt, a: [*]ComplexF32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("CGERU ", rankUpdateError(m.*, n.*, incx.*, incy.*, lda.*))) return;
     core.ger(ComplexF32, m.*, n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*, false);
 }
 pub export fn zgeru_(m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]const ComplexF64, incy: *const BlasInt, a: [*]ComplexF64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("ZGERU ", rankUpdateError(m.*, n.*, incx.*, incy.*, lda.*))) return;
     core.ger(ComplexF64, m.*, n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*, false);
 }
 pub export fn cgerc_(m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]const ComplexF32, incy: *const BlasInt, a: [*]ComplexF32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("CGERC ", rankUpdateError(m.*, n.*, incx.*, incy.*, lda.*))) return;
     core.ger(ComplexF32, m.*, n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*, true);
 }
 pub export fn zgerc_(m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]const ComplexF64, incy: *const BlasInt, a: [*]ComplexF64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("ZGERC ", rankUpdateError(m.*, n.*, incx.*, incy.*, lda.*))) return;
     core.ger(ComplexF64, m.*, n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*, true);
 }
 
 pub export fn ssyr_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, a: [*]f32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("SSYR  ", symmetricRankError(u, n.*, incx.*, lda.*))) return;
     core.syr(f32, core.parseUplo(u), n.*, alpha.*, x, incx.*, a, lda.*);
 }
 pub export fn dsyr_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, x: [*]const f64, incx: *const BlasInt, a: [*]f64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("DSYR  ", symmetricRankError(u, n.*, incx.*, lda.*))) return;
     core.syr(f64, core.parseUplo(u), n.*, alpha.*, x, incx.*, a, lda.*);
 }
 pub export fn cher_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, x: [*]const ComplexF32, incx: *const BlasInt, a: [*]ComplexF32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("CHER  ", symmetricRankError(u, n.*, incx.*, lda.*))) return;
     core.her(ComplexF32, core.parseUplo(u), n.*, alpha.*, x, incx.*, a, lda.*);
 }
 pub export fn zher_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, x: [*]const ComplexF64, incx: *const BlasInt, a: [*]ComplexF64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHER  ", symmetricRankError(u, n.*, incx.*, lda.*))) return;
     core.her(ComplexF64, core.parseUplo(u), n.*, alpha.*, x, incx.*, a, lda.*);
 }
 
 pub export fn sspr_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, ap: [*]f32) callconv(.c) void {
+    if (reportError("SSPR  ", packedRankError(u, n.*, incx.*))) return;
     core.spr(f32, core.parseUplo(u), n.*, alpha.*, x, incx.*, ap);
 }
 pub export fn dspr_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, x: [*]const f64, incx: *const BlasInt, ap: [*]f64) callconv(.c) void {
+    if (reportError("DSPR  ", packedRankError(u, n.*, incx.*))) return;
     core.spr(f64, core.parseUplo(u), n.*, alpha.*, x, incx.*, ap);
 }
 pub export fn chpr_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, x: [*]const ComplexF32, incx: *const BlasInt, ap: [*]ComplexF32) callconv(.c) void {
+    if (reportError("CHPR  ", packedRankError(u, n.*, incx.*))) return;
     core.hpr(ComplexF32, core.parseUplo(u), n.*, alpha.*, x, incx.*, ap);
 }
 pub export fn zhpr_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, x: [*]const ComplexF64, incx: *const BlasInt, ap: [*]ComplexF64) callconv(.c) void {
+    if (reportError("ZHPR  ", packedRankError(u, n.*, incx.*))) return;
     core.hpr(ComplexF64, core.parseUplo(u), n.*, alpha.*, x, incx.*, ap);
 }
 
 pub export fn ssyr2_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, y: [*]const f32, incy: *const BlasInt, a: [*]f32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("SSYR2 ", symmetricRank2Error(u, n.*, incx.*, incy.*, lda.*))) return;
     core.syr2(f32, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*);
 }
 pub export fn dsyr2_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, x: [*]const f64, incx: *const BlasInt, y: [*]const f64, incy: *const BlasInt, a: [*]f64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("DSYR2 ", symmetricRank2Error(u, n.*, incx.*, incy.*, lda.*))) return;
     core.syr2(f64, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*);
 }
 pub export fn cher2_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]const ComplexF32, incy: *const BlasInt, a: [*]ComplexF32, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("CHER2 ", symmetricRank2Error(u, n.*, incx.*, incy.*, lda.*))) return;
     core.her2(ComplexF32, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*);
 }
 pub export fn zher2_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]const ComplexF64, incy: *const BlasInt, a: [*]ComplexF64, lda: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHER2 ", symmetricRank2Error(u, n.*, incx.*, incy.*, lda.*))) return;
     core.her2(ComplexF64, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, a, lda.*);
 }
 
 pub export fn sspr2_(u: [*]const u8, n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, y: [*]const f32, incy: *const BlasInt, ap: [*]f32) callconv(.c) void {
+    if (reportError("SSPR2 ", packedRank2Error(u, n.*, incx.*, incy.*))) return;
     core.spr2(f32, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, ap);
 }
 pub export fn dspr2_(u: [*]const u8, n: *const BlasInt, alpha: *const f64, x: [*]const f64, incx: *const BlasInt, y: [*]const f64, incy: *const BlasInt, ap: [*]f64) callconv(.c) void {
+    if (reportError("DSPR2 ", packedRank2Error(u, n.*, incx.*, incy.*))) return;
     core.spr2(f64, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, ap);
 }
 pub export fn chpr2_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]const ComplexF32, incy: *const BlasInt, ap: [*]ComplexF32) callconv(.c) void {
+    if (reportError("CHPR2 ", packedRank2Error(u, n.*, incx.*, incy.*))) return;
     core.hpr2(ComplexF32, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, ap);
 }
 pub export fn zhpr2_(u: [*]const u8, n: *const BlasInt, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]const ComplexF64, incy: *const BlasInt, ap: [*]ComplexF64) callconv(.c) void {
+    if (reportError("ZHPR2 ", packedRank2Error(u, n.*, incx.*, incy.*))) return;
     core.hpr2(ComplexF64, core.parseUplo(u), n.*, alpha.*, x, incx.*, y, incy.*, ap);
 }
 
@@ -552,85 +820,111 @@ pub export fn zgemm_(ta: [*]const u8, tb: [*]const u8, m: *const BlasInt, n: *co
 }
 
 pub export fn ssymm_(side: [*]const u8, u: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, b: [*]const f32, ldb: *const BlasInt, beta: *const f32, c: [*]f32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("SSYMM ", symmetricMatrixError(side, u, m.*, n.*, lda.*, ldb.*, ldc.*))) return;
     core.symm(f32, core.parseSide(side), core.parseUplo(u), m.*, n.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn dsymm_(side: [*]const u8, u: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, b: [*]const f64, ldb: *const BlasInt, beta: *const f64, c: [*]f64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("DSYMM ", symmetricMatrixError(side, u, m.*, n.*, lda.*, ldb.*, ldc.*))) return;
     core.symm(f64, core.parseSide(side), core.parseUplo(u), m.*, n.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn csymm_(side: [*]const u8, u: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, b: [*]const ComplexF32, ldb: *const BlasInt, beta: *const ComplexF32, c: [*]ComplexF32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("CSYMM ", symmetricMatrixError(side, u, m.*, n.*, lda.*, ldb.*, ldc.*))) return;
     core.symm(ComplexF32, core.parseSide(side), core.parseUplo(u), m.*, n.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn zsymm_(side: [*]const u8, u: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, b: [*]const ComplexF64, ldb: *const BlasInt, beta: *const ComplexF64, c: [*]ComplexF64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("ZSYMM ", symmetricMatrixError(side, u, m.*, n.*, lda.*, ldb.*, ldc.*))) return;
     core.symm(ComplexF64, core.parseSide(side), core.parseUplo(u), m.*, n.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn chemm_(side: [*]const u8, u: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, b: [*]const ComplexF32, ldb: *const BlasInt, beta: *const ComplexF32, c: [*]ComplexF32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("CHEMM ", symmetricMatrixError(side, u, m.*, n.*, lda.*, ldb.*, ldc.*))) return;
     core.symm(ComplexF32, core.parseSide(side), core.parseUplo(u), m.*, n.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, true);
 }
 pub export fn zhemm_(side: [*]const u8, u: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, b: [*]const ComplexF64, ldb: *const BlasInt, beta: *const ComplexF64, c: [*]ComplexF64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHEMM ", symmetricMatrixError(side, u, m.*, n.*, lda.*, ldb.*, ldc.*))) return;
     core.symm(ComplexF64, core.parseSide(side), core.parseUplo(u), m.*, n.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, true);
 }
 
 pub export fn ssyrk_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, beta: *const f32, c: [*]f32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("SSYRK ", rankKMatrixError(u, t, n.*, k.*, lda.*, ldc.*))) return;
     core.syrk(f32, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, beta.*, c, ldc.*, false);
 }
 pub export fn dsyrk_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, beta: *const f64, c: [*]f64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("DSYRK ", rankKMatrixError(u, t, n.*, k.*, lda.*, ldc.*))) return;
     core.syrk(f64, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, beta.*, c, ldc.*, false);
 }
 pub export fn csyrk_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, beta: *const ComplexF32, c: [*]ComplexF32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("CSYRK ", rankKMatrixError(u, t, n.*, k.*, lda.*, ldc.*))) return;
     core.syrk(ComplexF32, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, beta.*, c, ldc.*, false);
 }
 pub export fn zsyrk_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, beta: *const ComplexF64, c: [*]ComplexF64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("ZSYRK ", rankKMatrixError(u, t, n.*, k.*, lda.*, ldc.*))) return;
     core.syrk(ComplexF64, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, beta.*, c, ldc.*, false);
 }
 pub export fn cherk_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f32, a: [*]const ComplexF32, lda: *const BlasInt, beta: *const f32, c: [*]ComplexF32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("CHERK ", rankKMatrixError(u, t, n.*, k.*, lda.*, ldc.*))) return;
     core.syrk(ComplexF32, core.parseUplo(u), core.parseTrans(t), n.*, k.*, core.realScalar(ComplexF32, alpha.*), a, lda.*, core.realScalar(ComplexF32, beta.*), c, ldc.*, true);
 }
 pub export fn zherk_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f64, a: [*]const ComplexF64, lda: *const BlasInt, beta: *const f64, c: [*]ComplexF64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHERK ", rankKMatrixError(u, t, n.*, k.*, lda.*, ldc.*))) return;
     core.syrk(ComplexF64, core.parseUplo(u), core.parseTrans(t), n.*, k.*, core.realScalar(ComplexF64, alpha.*), a, lda.*, core.realScalar(ComplexF64, beta.*), c, ldc.*, true);
 }
 
 pub export fn ssyr2k_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, b: [*]const f32, ldb: *const BlasInt, beta: *const f32, c: [*]f32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("SSYR2K", rank2KMatrixError(u, t, n.*, k.*, lda.*, ldb.*, ldc.*))) return;
     core.syr2k(f32, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn dsyr2k_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, b: [*]const f64, ldb: *const BlasInt, beta: *const f64, c: [*]f64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("DSYR2K", rank2KMatrixError(u, t, n.*, k.*, lda.*, ldb.*, ldc.*))) return;
     core.syr2k(f64, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn csyr2k_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, b: [*]const ComplexF32, ldb: *const BlasInt, beta: *const ComplexF32, c: [*]ComplexF32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("CSYR2K", rank2KMatrixError(u, t, n.*, k.*, lda.*, ldb.*, ldc.*))) return;
     core.syr2k(ComplexF32, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn zsyr2k_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, b: [*]const ComplexF64, ldb: *const BlasInt, beta: *const ComplexF64, c: [*]ComplexF64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("ZSYR2K", rank2KMatrixError(u, t, n.*, k.*, lda.*, ldb.*, ldc.*))) return;
     core.syr2k(ComplexF64, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, b, ldb.*, beta.*, c, ldc.*, false);
 }
 pub export fn cher2k_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, b: [*]const ComplexF32, ldb: *const BlasInt, beta: *const f32, c: [*]ComplexF32, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("CHER2K", rank2KMatrixError(u, t, n.*, k.*, lda.*, ldb.*, ldc.*))) return;
     core.syr2k(ComplexF32, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, b, ldb.*, core.realScalar(ComplexF32, beta.*), c, ldc.*, true);
 }
 pub export fn zher2k_(u: [*]const u8, t: [*]const u8, n: *const BlasInt, k: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, b: [*]const ComplexF64, ldb: *const BlasInt, beta: *const f64, c: [*]ComplexF64, ldc: *const BlasInt) callconv(.c) void {
+    if (reportError("ZHER2K", rank2KMatrixError(u, t, n.*, k.*, lda.*, ldb.*, ldc.*))) return;
     core.syr2k(ComplexF64, core.parseUplo(u), core.parseTrans(t), n.*, k.*, alpha.*, a, lda.*, b, ldb.*, core.realScalar(ComplexF64, beta.*), c, ldc.*, true);
 }
 
 pub export fn strmm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, b: [*]f32, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("STRMM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trmm(f32, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 pub export fn dtrmm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, b: [*]f64, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("DTRMM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trmm(f64, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 pub export fn ctrmm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, b: [*]ComplexF32, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("CTRMM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trmm(ComplexF32, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 pub export fn ztrmm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, b: [*]ComplexF64, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTRMM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trmm(ComplexF64, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 
 pub export fn strsm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f32, a: [*]const f32, lda: *const BlasInt, b: [*]f32, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("STRSM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trsm(f32, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 pub export fn dtrsm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const f64, a: [*]const f64, lda: *const BlasInt, b: [*]f64, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("DTRSM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trsm(f64, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 pub export fn ctrsm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: *const BlasInt, b: [*]ComplexF32, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("CTRSM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trsm(ComplexF32, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 pub export fn ztrsm_(side: [*]const u8, u: [*]const u8, t: [*]const u8, d: [*]const u8, m: *const BlasInt, n: *const BlasInt, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: *const BlasInt, b: [*]ComplexF64, ldb: *const BlasInt) callconv(.c) void {
+    if (reportError("ZTRSM ", triangularMatrixError(side, u, t, d, m.*, n.*, lda.*, ldb.*))) return;
     core.trsm(ComplexF64, core.parseSide(side), core.parseUplo(u), core.parseTrans(t), core.parseDiag(d), m.*, n.*, alpha.*, a, lda.*, b, ldb.*);
 }
 

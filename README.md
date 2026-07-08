@@ -12,17 +12,18 @@
 **Repository:** <https://github.com/kaix-huang/Zynum>
 
 Zynum is a `0.0.1-beta` numerical computing project. The current shipping module
-is **Zynum BLAS** (`zynum-blas`): a full BLAS Level 1, Level 2, and Level 3
-implementation with a Zig-first API, standard CBLAS/Fortran ABI symbols,
-generated C/Fortran compatibility files, examples, tests, benchmarks, and
-architecture-aware GEMM kernels.
+is **Zynum BLAS** (`zynum-blas`): BLAS Level 1, Level 2, and Level 3 compatibility
+coverage with a Zig-first API, standard CBLAS/Fortran ABI symbols, generated
+C/Fortran compatibility files, examples, tests, benchmarks, and
+architecture-aware kernels.
 
 The active `0.1.x` development line is focused on finishing the complete BLAS
-surface and making performance competitive with vendor BLAS libraries. Its
-primary native performance gate is Apple's latest production silicon: the 0.1
-target is to beat Accelerate across the documented BLAS benchmark suite with
-fresh-process evidence. This is an engineering target, not a blanket performance
-claim for the current checkout.
+surface in practical edge cases and making performance competitive with vendor
+BLAS libraries. Its primary native performance gate is the documented Apple M5
+local gate as of 2026-07: the 0.1 target is to beat Accelerate across the
+documented BLAS benchmark suite with correctness-checked fresh-process evidence.
+This is an engineering target, not a blanket performance claim for the current
+checkout.
 
 The long-term direction is broader than BLAS: Zynum is designed to grow into a
 single C/Fortran-compatible, Zig-native numerical runtime spanning dense linear
@@ -57,7 +58,7 @@ column-major shapes.</sub>
 | Area | What Zynum provides today |
 | --- | --- |
 | Zig-native API | Typed `Vector` and `Matrix` views, checked dimensions in safe builds, descriptive operations such as `matrixMultiply`, `matrixVectorMultiply`, `addScaledVector`, and `scaleVectorInto`. |
-| Full BLAS coverage | BLAS Level 1, Level 2, and Level 3 compatibility through portable reference implementations and ABI wrappers. |
+| BLAS compatibility coverage | BLAS Level 1, Level 2, and Level 3 symbols and typed API coverage through portable implementations and ABI wrappers; 0.1.x continues tightening edge-case compatibility and performance. |
 | C/Fortran compatibility | Standard symbols such as `dgemm_`, `zaxpy_`, `cblas_dgemm`, and `cblas_zdotc_sub`; generated `blas.h`, `cblas.h`, and `blas.f90`. |
 | GEMM optimization | Portable backend plus selected AArch64 and x86_64 fast paths, feature-aware dispatch, task splitting, packing, threading experiments, and benchmark tooling. |
 | Reproducibility | CI checks, generated-header drift detection, compatibility tests, example smoke tests, benchmark methodology docs, and isolated comparator runners. |
@@ -72,9 +73,9 @@ The `0.1.x` line is scoped to Zynum BLAS:
   Fortran module declarations.
 - Support ARM and x86 CPUs through portable fallbacks and feature-aware kernels
   for AArch64 ASIMD/SVE/SVE2/AMX/SME and x86_64 SSE/AVX/AVX2/AVX512 tiers.
-- Use the latest Apple Silicon machines as the primary performance gate, with
-  the goal that Zynum beats Accelerate across the documented BLAS benchmark
-  suite before 0.1 is considered complete.
+- Use the documented Apple M5 local gate as of 2026-07 as the primary native
+  performance gate, with the goal that Zynum beats Accelerate across the
+  documented BLAS benchmark suite before 0.1 is considered complete.
 - Keep performance claims tied to reproducible benchmark commands, CSV artifacts,
   thread counts, target features, and fresh-process comparator isolation.
 
@@ -83,7 +84,7 @@ The `0.1.x` line is scoped to Zynum BLAS:
 | Module | Status | Scope |
 | --- | --- | --- |
 | `zynum` | Active | Top-level package facade for current and future numerical modules. |
-| `zynum-blas` | Beta | Full BLAS Level 1-3 API, typed Zig views, compatibility ABI, kernels, tests, examples, and benchmarks. |
+| `zynum-blas` | Beta | BLAS Level 1-3 compatibility coverage, typed Zig views, compatibility ABI, kernels, tests, examples, and benchmarks. |
 | `zynum-lapack` | Planned | Dense factorizations, solvers, eigenvalue/SVD routines, and LAPACK-compatible entry points. |
 | `zynum-fft` | Planned | FFT routines and compatibility layers. |
 | `zynum-sparse` | Planned | Sparse storage, sparse BLAS, and solver-oriented kernels. |
@@ -115,6 +116,8 @@ Build artifacts are installed under `zig-out/` by default:
 - `zig-out/include/zynum/blas/cblas.h`.
 - `zig-out/include/zynum/blas/blas.h`.
 - `zig-out/include/zynum/blas/blas.f90`.
+- `zig-out/include/zynum/blas/abi_manifest.json`.
+- `zig-out/lib/pkgconfig/zynum_blas.pc`.
 
 Use Zig's standard install options if you want a different prefix:
 
@@ -127,6 +130,13 @@ that installation when you only need Zig package and library artifacts:
 
 ```sh
 zig build -Dcompat-headers=false
+```
+
+C and Fortran builds that use `pkg-config` can consume the installed library
+metadata after setting `PKG_CONFIG_PATH` to the install prefix:
+
+```sh
+PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
 ```
 
 ## Use Zynum From Zig
@@ -193,8 +203,10 @@ when their build file exposes that module:
 ## Typed Vector And Matrix Views
 
 The Zig API uses typed views instead of raw BLAS argument lists. Views validate
-shape, storage, strides, and unsupported aliasing in Debug, ReleaseSafe, and
-ReleaseSmall builds; ReleaseFast removes those checks.
+cheap structural shape fields such as lengths, strides, leading dimensions, and
+matrix dimensions in every build. Debug, ReleaseSafe, and ReleaseSmall builds
+also validate backing storage capacity and unsupported aliasing; ReleaseFast
+keeps the structural checks but omits those capacity and alias checks.
 
 ```zig
 const zynum = @import("zynum");
@@ -302,7 +314,7 @@ first BLAS call in a process.
 
 | Variable | Accepted values | Meaning |
 | --- | --- | --- |
-| `ZYNUM_MAXIMUM_THREADS` | Positive integer | Caps the number of threads Zynum may use. When unset, the cap defaults to the runtime CPU count. GEMM may still choose fewer threads by internal heuristics. |
+| `ZYNUM_MAXIMUM_THREADS` | Positive integer | Caps the number of threads Zynum may use. Values above the runtime CPU count are capped to that count. When unset, the cap defaults to the runtime CPU count. GEMM may still choose fewer threads by internal heuristics. |
 
 Instruction-set selection, AMX/SME use, and `std.Io` worker strategy are handled
 internally and are not controlled by environment variables.
@@ -338,10 +350,10 @@ zig build bench --release=fast \
   -- --size 1024 --reps 10
 ```
 
-Full GEMM sweep:
+Single-process GEMM sweep smoke:
 
 ```sh
-zig build bench-gemm-sweep --release=fast -- --reps 30
+zig build bench-gemm-sweep --release=fast -- --reps 30 --check
 python3 bench/tools/plot_gemm_sweep.py zig-out/gemm_sweep.csv zig-out/gemm_sweep.svg
 ```
 
@@ -353,7 +365,9 @@ python3 bench/tools/run_gemm_sweep_isolated.py \
   --gemm-sweep zig-out/bin/gemm-sweep \
   --zynum-blas zig-out/lib/libzynum_blas.dylib \
   --csv zig-out/gemm_sweep_isolated.csv \
-  --reps 30
+  --reps 30 \
+  --process-repeats 3 \
+  --check
 ```
 
 Performance results are hardware-, target-, thread-, comparator-, and
@@ -366,8 +380,12 @@ Start with `docs/README.md`. Useful entry points:
 
 | Document | Purpose |
 | --- | --- |
+| `docs/users/README.md` | User-focused guide for build, install, Zig API, C/Fortran calls, examples, and runtime controls. |
+| `docs/contributors/README.md` | Contributor workflow, validation gates, ABI maintenance, and benchmark evidence expectations. |
+| `docs/internals/README.md` | Internal design map for facades, source ownership, core/ABI/kernel boundaries, and threading policy. |
+| `docs/performance/README.md` | Performance documentation map and public evidence boundary. |
 | `docs/development_and_usage.md` | Local development, package dependency setup, typed Zig API, aliasing, and extension workflow. |
-| `docs/architecture.md` | Module boundaries, source ownership, ABI layering, GEMM dispatch, and file-split rules. |
+| `docs/architecture.md` | Module boundaries, source ownership, ABI layering, GEMM planning, and file-split rules. |
 | `docs/fortran_compatibility.md` | CBLAS/Fortran ABI details, generated headers, integer width notes, and complex scalar caveats. |
 | `docs/common/benchmarking.md` | Benchmark methodology, comparator setup, isolated runs, and regression criteria. |
 | `docs/common/gemm_optimization_notes.md` | Cross-platform GEMM implementation principles. |
@@ -382,10 +400,9 @@ Start with `docs/README.md`. Useful entry points:
 src/zynum.zig                 top-level package facade
 src/blas.zig                  Zynum BLAS module root
 src/blas/api*                 typed Zig API views and operations
-src/blas/core*                portable BLAS semantics and reference paths
+src/blas/core*                portable BLAS semantics, planners, and reference paths
 src/blas/abi*                 Fortran and CBLAS compatibility ABI exports
-src/blas/gemm*                GEMM dispatch, task splitting, and worker experiments
-src/blas/kernels*             generic, AArch64, and x86_64 GEMM kernels
+src/blas/kernels*             shared, AArch64, and x86_64 vector/matrix kernels
 include/zynum/blas*           generated compatibility headers and Fortran module
 bench/*.zig                   benchmark executables and focused probe binaries
 bench/tools/*.py              isolated report, plotting, and benchmark-check helpers
@@ -410,7 +427,7 @@ change while the project is being shaped:
 - Zig API names and package layout.
 - Module boundaries between `zynum`, Zynum BLAS (`zynum-blas`), and future modules.
 - Runtime environment variable semantics.
-- GEMM dispatch thresholds, worker strategies, and performance policy.
+- GEMM planner thresholds, worker strategies, and performance policy.
 - Benchmark tooling output formats.
 
 The project aims to keep standard BLAS ABI symbols compatible unless a breaking

@@ -7,6 +7,7 @@ import csv
 import hashlib
 import json
 import os
+import platform
 import subprocess
 import sys
 import tempfile
@@ -60,6 +61,32 @@ DEFAULT_SHAPES = [
     "m640_n384_k96:640:384:96",
 ]
 
+CSV_FIELDNAMES = [
+    "kind",
+    "shape_index",
+    "label",
+    "m",
+    "n",
+    "k",
+    "library",
+    "gflops",
+    "best_ns",
+    "median_ns",
+    "p95_ns",
+    "max_ns",
+    "reps",
+    "process_repeats",
+    "check",
+]
+
+
+def default_zynum_blas():
+    if sys.platform == "darwin":
+        return "zig-out/lib/libzynum_blas.dylib"
+    if sys.platform == "win32":
+        return "zig-out/bin/zynum_blas.dll"
+    return "zig-out/lib/libzynum_blas.so"
+
 
 def parse_args():
     p = argparse.ArgumentParser(
@@ -71,19 +98,25 @@ def parse_args():
         "--zynum",
         "--zig",
         dest="zynum_blas",
-        default="zig-out/lib/libzynum_blas.dylib",
+        default=default_zynum_blas(),
     )
     p.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     p.add_argument("--openblas", default=DEFAULT_OPENBLAS)
     p.add_argument("--mkl")
+    p.add_argument("--aocl-blis")
     p.add_argument("--reps", type=int, default=30)
     p.add_argument(
         "--process-repeats",
         type=int,
         default=1,
-        help="Run each fresh-process benchmark this many times and keep the best GF/s row for each kind/shape.",
+        help="Run each fresh-process benchmark this many times and merge per-process timing distributions for each kind/shape.",
     )
     p.add_argument("--csv", required=True)
+    p.add_argument(
+        "--check",
+        action="store_true",
+        help="Ask gemm-sweep to run correctness checks before timing each row.",
+    )
     p.add_argument(
         "--kind", action="append", choices=["sgemm", "dgemm", "cgemm", "zgemm"]
     )
@@ -103,6 +136,20 @@ def parse_args():
     if args.process_repeats < 1:
         p.error("--process-repeats must be at least 1")
     return args
+
+
+def library_path_exists(path):
+    if Path(path).exists():
+        return True
+    return (
+        sys.platform == "darwin"
+        and path.startswith("/System/Library/Frameworks/")
+        and ".framework/" in path
+    )
+
+
+def library_disabled(path):
+    return not path or path == "none"
 
 
 def parse_shape_spec(spec):
@@ -150,8 +197,33 @@ def zig_version():
     return result.stdout.strip()
 
 
-def environment_snapshot(names):
-    return {name: os.environ.get(name, "unset") for name in names}
+def command_output(cmd):
+    try:
+        result = subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return None
+    return result.stdout.strip()
+
+
+def git_source_snapshot():
+    status = command_output(["git", "status", "--short"])
+    return {
+        "revision": command_output(["git", "rev-parse", "HEAD"]),
+        "branch": command_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
+        "dirty": bool(status),
+        "status_short": status,
+    }
+
+
+def child_environment_snapshot(names):
+    env = os.environ.copy()
+    env.setdefault("OPENBLAS_DYNAMIC", "0")
+    return {name: env.get(name, "unset") for name in names}
 
 
 def zynum_maximum_threads():
@@ -171,45 +243,74 @@ def existing_libs(args):
     candidates = [("Accelerate", args.accelerate), ("OpenBLAS", args.openblas)]
     if args.mkl:
         candidates.append(("MKL", args.mkl))
+    if args.aocl_blis:
+        candidates.append(("AOCL-BLIS", args.aocl_blis))
     for name, path in candidates:
-        if not path:
+        if library_disabled(path):
             continue
-        if args.skip_missing and name != "Accelerate" and not Path(path).exists():
+        if args.skip_missing and not library_path_exists(path):
             continue
         libs.append((name, path))
     return libs
 
 
 def best_rows_csv(inputs, output):
-    best = {}
-    fieldnames = [
-        "kind",
-        "shape_index",
-        "label",
-        "m",
-        "n",
-        "k",
-        "library",
-        "gflops",
-        "best_ns",
-        "reps",
-    ]
+    groups = {}
     for csv_path in inputs:
         with open(csv_path, newline="") as inp:
             for row in csv.DictReader(inp):
                 key = (row["kind"], row["label"], row["m"], row["n"], row["k"])
-                try:
-                    gflops = float(row["gflops"])
-                except ValueError:
-                    gflops = 0.0
-                old = best.get(key)
-                if old is None or gflops > float(old["gflops"]):
-                    best[key] = row
+                groups.setdefault(key, []).append(row)
     with open(output, "w", newline="") as out:
-        writer = csv.DictWriter(out, fieldnames=fieldnames)
+        writer = csv.DictWriter(out, fieldnames=CSV_FIELDNAMES, extrasaction="ignore")
         writer.writeheader()
-        for row in best.values():
-            writer.writerow(row)
+        for rows in groups.values():
+            writer.writerow(merge_repeat_rows(rows))
+
+
+def int_field(row, name, fallback_name="best_ns"):
+    try:
+        return int(row.get(name) or row.get(fallback_name) or 0)
+    except ValueError:
+        return 0
+
+
+def float_field(row, name):
+    try:
+        return float(row.get(name) or 0.0)
+    except ValueError:
+        return 0.0
+
+
+def percentile(sorted_values, percent):
+    if not sorted_values:
+        return 0
+    index = min(len(sorted_values) - 1, (len(sorted_values) * percent + 99) // 100 - 1)
+    return sorted_values[index]
+
+
+def merged_check_status(rows):
+    checks = {row.get("check", "unchecked") for row in rows}
+    if checks <= {"checked-ok", "sampled-ok"}:
+        return "checked-ok"
+    if checks == {"unchecked"}:
+        return "unchecked"
+    return sorted(checks)[0]
+
+
+def merge_repeat_rows(rows):
+    base = max(rows, key=lambda row: float_field(row, "gflops")).copy()
+    best_values = sorted(int_field(row, "best_ns") for row in rows)
+    median_values = sorted(int_field(row, "median_ns") for row in rows)
+    p95_values = sorted(int_field(row, "p95_ns") for row in rows)
+    max_values = sorted(int_field(row, "max_ns") for row in rows)
+    base["best_ns"] = str(best_values[0])
+    base["median_ns"] = str(percentile(median_values, 50))
+    base["p95_ns"] = str(percentile(p95_values, 95))
+    base["max_ns"] = str(max_values[-1])
+    base["process_repeats"] = str(len(rows))
+    base["check"] = merged_check_status(rows)
+    return base
 
 
 def run_one_process(args, name, path, out, kind=None, shapes=None):
@@ -227,6 +328,8 @@ def run_one_process(args, name, path, out, kind=None, shapes=None):
         cmd += ["--kind", selected_kind]
     for shape in shapes if shapes is not None else args.shape:
         cmd += ["--shape", shape]
+    if args.check:
+        cmd.append("--check")
 
     env = os.environ.copy()
     env.setdefault("OPENBLAS_DYNAMIC", "0")
@@ -255,20 +358,8 @@ def run_one(args, name, path, tmp_dir, kind=None, shapes=None):
 
 
 def merge(rows_by_lib, output_path, shape_indexes):
-    fieldnames = [
-        "kind",
-        "shape_index",
-        "label",
-        "m",
-        "n",
-        "k",
-        "library",
-        "gflops",
-        "best_ns",
-        "reps",
-    ]
     with open(output_path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES, extrasaction="ignore")
         writer.writeheader()
         for name, csv_path in rows_by_lib:
             with open(csv_path, newline="") as inp:
@@ -278,6 +369,11 @@ def merge(rows_by_lib, output_path, shape_indexes):
                         shape_key, row["shape_index"]
                     )
                     row["library"] = name
+                    row.setdefault("median_ns", row.get("best_ns", ""))
+                    row.setdefault("p95_ns", row.get("best_ns", ""))
+                    row.setdefault("max_ns", row.get("best_ns", ""))
+                    row.setdefault("process_repeats", "1")
+                    row.setdefault("check", "unchecked")
                     writer.writerow(row)
 
 
@@ -291,22 +387,28 @@ def write_metadata(args, libs, shape_specs, output_path):
         "MKL_DYNAMIC",
         "MKL_NUM_THREADS",
         "OMP_NUM_THREADS",
+        "BLIS_NUM_THREADS",
+        "AOCL_DYNAMIC",
         "ZIG_GLOBAL_CACHE_DIR",
     ]
     metadata = {
         "generated_at_unix": time.time(),
         "argv": sys.argv,
         "cwd": os.getcwd(),
+        "os": platform.platform(),
+        "python_version": sys.version,
         "zig_version": zig_version(),
+        "source": git_source_snapshot(),
         "detected_cpu_count": os.cpu_count(),
         "zynum_maximum_threads": zynum_maximum_threads(),
         "reps": args.reps,
         "process_repeats": args.process_repeats,
+        "correctness_check": "checked" if args.check else "unchecked",
         "isolate_kind": args.isolate_kind,
         "isolate_shape": args.isolate_shape,
         "kinds": args.kind,
         "shapes": shape_specs,
-        "environment": environment_snapshot(env_names),
+        "environment": child_environment_snapshot(env_names),
         "binaries": {
             "gemm_sweep": {
                 "path": args.gemm_sweep,

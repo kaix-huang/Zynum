@@ -7,13 +7,15 @@ import csv
 import sys
 from collections import defaultdict
 
+CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Check GEMM sweep CSV rows against the fastest comparator library."
     )
     parser.add_argument("csv", help="Path to a gemm_sweep CSV file.")
-    parser.add_argument("--zynum", default="zynum-blas", help="Library label for Zynum rows.")
+    parser.add_argument("--zynum", default="Zynum", help="Library label for Zynum rows.")
     parser.add_argument(
         "--comparator",
         action="append",
@@ -32,6 +34,11 @@ def parse_args():
         "--allow-missing-comparators",
         action="store_true",
         help="Skip groups with no requested comparator rows instead of failing.",
+    )
+    parser.add_argument(
+        "--allow-unchecked",
+        action="store_true",
+        help="Allow rows whose GEMM correctness check is absent or not checked.",
     )
     parser.add_argument("--worst", type=int, default=20, help="Number of worst rows to print.")
     return parser.parse_args()
@@ -61,6 +68,12 @@ def main():
         for row in csv.DictReader(f):
             if not row_allowed(args, row):
                 continue
+            if not args.allow_unchecked and row.get("check") not in CHECKED_STATUSES:
+                print(
+                    f"unchecked GEMM row is not eligible for comparison: {row}",
+                    file=sys.stderr,
+                )
+                return 2
             try:
                 row["gflops_value"] = float(row["gflops"])
             except (KeyError, ValueError):
@@ -73,6 +86,8 @@ def main():
     checked = 0
     for key, by_library in groups.items():
         zynum = by_library.get(args.zynum)
+        if zynum is None and args.zynum == "Zynum":
+            zynum = by_library.get("zynum-blas")
         if zynum is None:
             missing.append((key, args.zynum))
             continue
@@ -97,6 +112,9 @@ def main():
         f"checked={checked} passed={checked - len(failures)} "
         f"failed={len(failures)} missing={len(missing)} ratio={args.ratio:.6g}"
     )
+    no_checks = checked == 0
+    if no_checks:
+        print("no matching Zynum/comparator groups were checked", file=sys.stderr)
 
     for ratio, key, zynum, best in failures[: args.worst]:
         kind, label, m, n, k = key
@@ -110,6 +128,8 @@ def main():
         kind, shape, m, n, k = key
         print(f"MISSING {label} {kind} {shape} m={m} n={n} k={k}")
 
+    if no_checks:
+        return 2
     return 1 if failures or missing else 0
 
 

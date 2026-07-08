@@ -48,6 +48,16 @@ module zynum_blas_fortran
       integer(blasint), intent(in) :: info
     end subroutine xerbla_array
 
+    subroutine zynum_blas_shutdown() bind(C, name="zynum_blas_shutdown")
+      import :: c_int, c_float, c_double, c_char
+      import :: blasint, blas_complex_float, blas_complex_double
+    end subroutine zynum_blas_shutdown
+
+    subroutine zynum_blas_shutdown_() bind(C, name="zynum_blas_shutdown_")
+      import :: c_int, c_float, c_double, c_char
+      import :: blasint, blas_complex_float, blas_complex_double
+    end subroutine zynum_blas_shutdown_
+
     function scabs1( &
         z &
     ) bind(C, name="scabs1_") result(res)

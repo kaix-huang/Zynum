@@ -91,7 +91,7 @@ const default_shapes = [_]Shape{
 };
 
 fn usage() void {
-    std.debug.print("usage: gemm-sweep --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--reps n] [--csv path] [--kind sgemm|dgemm|cgemm|zgemm] [--shape label:m:n:k]\n", .{});
+    std.debug.print("usage: gemm-sweep --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--aocl-blis path] [--reps n] [--csv path] [--check] [--kind sgemm|dgemm|cgemm|zgemm] [--shape label:m:n:k]\n", .{});
 }
 
 fn parseShape(spec: []const u8) !Shape {
@@ -159,6 +159,82 @@ fn one(comptime T: type) T {
     return if (T == ComplexF32 or T == ComplexF64) .{ .re = 1, .im = 0 } else 1;
 }
 
+fn add(comptime T: type, a: T, b: T) T {
+    return if (T == ComplexF32 or T == ComplexF64)
+        .{ .re = a.re + b.re, .im = a.im + b.im }
+    else
+        a + b;
+}
+
+fn mul(comptime T: type, a: T, b: T) T {
+    return if (T == ComplexF32 or T == ComplexF64)
+        .{ .re = a.re * b.re - a.im * b.im, .im = a.re * b.im + a.im * b.re }
+    else
+        a * b;
+}
+
+fn absDiff(comptime T: type, a: T, b: T) f64 {
+    if (T == ComplexF32 or T == ComplexF64) {
+        const dr = @as(f64, @floatCast(a.re)) - @as(f64, @floatCast(b.re));
+        const di = @as(f64, @floatCast(a.im)) - @as(f64, @floatCast(b.im));
+        return @sqrt(dr * dr + di * di);
+    }
+    return @abs(@as(f64, @floatCast(a)) - @as(f64, @floatCast(b)));
+}
+
+fn sampleIndex(index: usize, len: usize) ?usize {
+    if (len == 0) return null;
+    return switch (index) {
+        0 => 0,
+        1 => len / 4,
+        2 => len / 2,
+        3 => (len - 1) - (len - 1) / 4,
+        4 => len - 1,
+        else => null,
+    };
+}
+
+fn checkGemmElement(comptime T: type, a: []const T, b: []const T, c: []const T, shape: Shape, row: usize, col: usize) !void {
+    const tolerance: f64 = if (T == f32 or T == ComplexF32) 1e-3 else 1e-9;
+    var expected = zero(T);
+    for (0..shape.k) |p| {
+        expected = add(T, expected, mul(T, a[row + p * shape.m], b[p + col * shape.k]));
+    }
+    const actual = c[row + col * shape.m];
+    if (absDiff(T, expected, actual) > tolerance * @as(f64, @floatFromInt(@max(@as(usize, 1), shape.k)))) {
+        return error.GemmCheckFailed;
+    }
+}
+
+fn checkGemmSamples(comptime T: type, a: []const T, b: []const T, c: []const T, shape: Shape) !void {
+    if (shape.m *| shape.n <= 4096) {
+        for (0..shape.n) |col| {
+            for (0..shape.m) |row| try checkGemmElement(T, a, b, c, shape, row, col);
+        }
+        return;
+    }
+
+    var checked: [25]struct { row: usize, col: usize } = undefined;
+    var checked_count: usize = 0;
+    for (0..5) |row_slot| {
+        const row = sampleIndex(row_slot, shape.m) orelse continue;
+        for (0..5) |col_slot| {
+            const col = sampleIndex(col_slot, shape.n) orelse continue;
+            var duplicate = false;
+            for (checked[0..checked_count]) |item| {
+                if (item.row == row and item.col == col) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) continue;
+            checked[checked_count] = .{ .row = row, .col = col };
+            checked_count += 1;
+            try checkGemmElement(T, a, b, c, shape, row, col);
+        }
+    }
+}
+
 fn nowNs(io: std.Io) i96 {
     return std.Io.Clock.awake.now(io).nanoseconds;
 }
@@ -171,9 +247,25 @@ fn gflops(elapsed_ns: i96, flop_factor: f64, m: usize, n: usize, k: usize) f64 {
 
 const BenchResult = struct {
     best_ns: i96,
+    median_ns: i96,
+    p95_ns: i96,
+    max_ns: i96,
+    check: []const u8,
 };
 
-fn benchGemm(comptime T: type, gemm: GemmFn(T), allocator: std.mem.Allocator, io: std.Io, shape: Shape, reps: usize) !BenchResult {
+fn sortTimings(values: []i96) void {
+    var i: usize = 1;
+    while (i < values.len) : (i += 1) {
+        const value = values[i];
+        var j = i;
+        while (j > 0 and values[j - 1] > value) : (j -= 1) {
+            values[j] = values[j - 1];
+        }
+        values[j] = value;
+    }
+}
+
+fn benchGemm(comptime T: type, gemm: GemmFn(T), allocator: std.mem.Allocator, io: std.Io, shape: Shape, reps: usize, check: bool) !BenchResult {
     const m_i: BlasInt = @intCast(shape.m);
     const n_i: BlasInt = @intCast(shape.n);
     const k_i: BlasInt = @intCast(shape.k);
@@ -192,16 +284,28 @@ fn benchGemm(comptime T: type, gemm: GemmFn(T), allocator: std.mem.Allocator, io
     var alpha: T = one(T);
     var beta: T = zero(T);
     gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &m_i, b.ptr, &k_i, &beta, c.ptr, &m_i);
+    if (check) try checkGemmSamples(T, a, b, c, shape);
 
-    var best: i96 = std.math.maxInt(i96);
-    for (0..reps) |_| {
+    if (reps == 0) return error.InvalidRepetitions;
+    const timings = try allocator.alloc(i96, reps);
+    defer allocator.free(timings);
+
+    for (0..reps) |rep| {
         @memset(c, zero(T));
         const start = nowNs(io);
         gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &m_i, b.ptr, &k_i, &beta, c.ptr, &m_i);
         const end = nowNs(io);
-        if (end > start) best = @min(best, end - start);
+        timings[rep] = if (end >= start) @max(@as(i96, 1), end - start) else 1;
     }
-    return .{ .best_ns = best };
+    sortTimings(timings);
+    const p95_index = @min(timings.len - 1, ((timings.len * 95) + 99) / 100 - 1);
+    return .{
+        .best_ns = timings[0],
+        .median_ns = timings[timings.len / 2],
+        .p95_ns = timings[p95_index],
+        .max_ns = timings[timings.len - 1],
+        .check = if (check) "checked-ok" else "unchecked",
+    };
 }
 
 fn csvEscape(writer: *std.Io.Writer, value: []const u8) !void {
@@ -225,7 +329,16 @@ fn writeCsvRow(writer: *std.Io.Writer, kind: []const u8, shape_index: usize, sha
     try writer.print(",{d},{d},{d},", .{ shape.m, shape.n, shape.k });
     try csvEscape(writer, lib_name);
     const measured_gflops = gflops(result.best_ns, flopFactorForKind(kind), shape.m, shape.n, shape.k);
-    try writer.print(",{d:.6},{d},{d}\n", .{ measured_gflops, result.best_ns, reps });
+    try writer.print(",{d:.6},{d},{d},{d},{d},{d},", .{
+        measured_gflops,
+        result.best_ns,
+        result.median_ns,
+        result.p95_ns,
+        result.max_ns,
+        reps,
+    });
+    try csvEscape(writer, result.check);
+    try writer.writeByte('\n');
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -234,6 +347,7 @@ pub fn main(init: std.process.Init) !void {
     var accel_path: ?[]const u8 = null;
     var openblas_path: ?[]const u8 = null;
     var mkl_path: ?[]const u8 = null;
+    var aocl_blis_path: ?[]const u8 = null;
     var csv_path: ?[]const u8 = null;
     var reps: usize = 5;
     var custom_shapes: [max_custom_shapes]Shape = undefined;
@@ -243,6 +357,7 @@ pub fn main(init: std.process.Init) !void {
     var run_dgemm = true;
     var run_cgemm = true;
     var run_zgemm = true;
+    var check = false;
 
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
@@ -256,10 +371,14 @@ pub fn main(init: std.process.Init) !void {
             openblas_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--mkl")) {
             mkl_path = args.next() orelse return error.MissingValue;
+        } else if (std.mem.eql(u8, arg, "--aocl-blis") or std.mem.eql(u8, arg, "--aocl")) {
+            aocl_blis_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--csv")) {
             csv_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--reps")) {
             reps = try std.fmt.parseInt(usize, args.next() orelse return error.MissingValue, 10);
+        } else if (std.mem.eql(u8, arg, "--check")) {
+            check = true;
         } else if (std.mem.eql(u8, arg, "--kind")) {
             const kind = args.next() orelse return error.MissingValue;
             if (!kind_filter_set) {
@@ -296,7 +415,7 @@ pub fn main(init: std.process.Init) !void {
     }
     if (!run_sgemm and !run_dgemm and !run_cgemm and !run_zgemm) return error.BadKind;
 
-    var libs: [4]LibSpec = undefined;
+    var libs: [5]LibSpec = undefined;
     var lib_count: usize = 0;
     libs[lib_count] = .{ .name = "zynum-blas", .path = zynum_blas_path.? };
     lib_count += 1;
@@ -312,12 +431,16 @@ pub fn main(init: std.process.Init) !void {
         libs[lib_count] = .{ .name = "MKL", .path = path };
         lib_count += 1;
     }
+    if (aocl_blis_path) |path| {
+        libs[lib_count] = .{ .name = "AOCL-BLIS", .path = path };
+        lib_count += 1;
+    }
 
     var csv_file = try std.Io.Dir.cwd().createFile(init.io, csv_path.?, .{ .truncate = true });
     defer csv_file.close(init.io);
     var buf: [8192]u8 = undefined;
     var writer = csv_file.writer(init.io, &buf);
-    try writer.interface.writeAll("kind,shape_index,label,m,n,k,library,gflops,best_ns,reps\n");
+    try writer.interface.writeAll("kind,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,check\n");
 
     const shapes: []const Shape = if (custom_shape_count == 0) default_shapes[0..] else custom_shapes[0..custom_shape_count];
     // Keep benchmark libraries loaded until process exit. Zynum and comparator
@@ -328,22 +451,22 @@ pub fn main(init: std.process.Init) !void {
         for (shapes, 0..) |shape, shape_index| {
             std.debug.print("[{d}/{d}] {s} m={d} n={d} k={d}\n", .{ shape_index + 1, shapes.len, shape.label, shape.m, shape.n, shape.k });
             if (run_sgemm) {
-                const sg = try benchGemm(f32, lib.sgemm, allocator, init.io, shape, reps);
+                const sg = try benchGemm(f32, lib.sgemm, allocator, init.io, shape, reps, check);
                 try writeCsvRow(&writer.interface, "sgemm", shape_index, shape, lib.name, sg, reps);
             }
 
             if (run_dgemm) {
-                const dg = try benchGemm(f64, lib.dgemm, allocator, init.io, shape, reps);
+                const dg = try benchGemm(f64, lib.dgemm, allocator, init.io, shape, reps, check);
                 try writeCsvRow(&writer.interface, "dgemm", shape_index, shape, lib.name, dg, reps);
             }
 
             if (run_cgemm) {
-                const cg = try benchGemm(ComplexF32, lib.cgemm, allocator, init.io, shape, reps);
+                const cg = try benchGemm(ComplexF32, lib.cgemm, allocator, init.io, shape, reps, check);
                 try writeCsvRow(&writer.interface, "cgemm", shape_index, shape, lib.name, cg, reps);
             }
 
             if (run_zgemm) {
-                const zg = try benchGemm(ComplexF64, lib.zgemm, allocator, init.io, shape, reps);
+                const zg = try benchGemm(ComplexF64, lib.zgemm, allocator, init.io, shape, reps, check);
                 try writeCsvRow(&writer.interface, "zgemm", shape_index, shape, lib.name, zg, reps);
             }
         }

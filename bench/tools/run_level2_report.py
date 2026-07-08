@@ -33,13 +33,23 @@ class ComplexF64(ctypes.Structure):
     _fields_ = [("re", ctypes.c_double), ("im", ctypes.c_double)]
 
 
+def default_zynum_blas():
+    if sys.platform == "darwin":
+        return "zig-out/lib/libzynum_blas.dylib"
+    if sys.platform == "win32":
+        return "zig-out/bin/zynum_blas.dll"
+    return "zig-out/lib/libzynum_blas.so"
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Run representative Level 2 fresh-process probes and write a report CSV."
     )
-    parser.add_argument("--zynum", default="zig-out/lib/libzynum_blas.dylib")
+    parser.add_argument("--zynum", default=default_zynum_blas())
     parser.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     parser.add_argument("--openblas", default=DEFAULT_OPENBLAS)
+    parser.add_argument("--mkl")
+    parser.add_argument("--aocl-blis")
     parser.add_argument("--n", action="append", type=int, default=[])
     parser.add_argument("--reps-small", type=int, default=260)
     parser.add_argument("--reps-large", type=int, default=130)
@@ -96,6 +106,8 @@ def environment_snapshot():
         "OMP_NUM_THREADS",
         "MKL_NUM_THREADS",
         "MKL_DYNAMIC",
+        "BLIS_NUM_THREADS",
+        "AOCL_DYNAMIC",
     ]
     return {name: os.environ.get(name, "unset") for name in names}
 
@@ -113,11 +125,26 @@ def zynum_maximum_threads_detected():
 
 
 def libraries(args):
-    return [
+    result = [
         ("Zynum", args.zynum),
         ("Accelerate", args.accelerate),
         ("OpenBLAS", args.openblas),
     ]
+    if args.mkl:
+        result.append(("MKL", args.mkl))
+    if args.aocl_blis:
+        result.append(("AOCL-BLIS", args.aocl_blis))
+    return result
+
+
+def library_available(path):
+    if Path(path).exists():
+        return True
+    try:
+        ctypes.CDLL(path)
+        return True
+    except OSError:
+        return False
 
 
 def next_fill(seed):
@@ -153,6 +180,118 @@ def copy_array(dst, src):
     ctypes.memmove(ctypes.addressof(dst), ctypes.addressof(src), ctypes.sizeof(src))
 
 
+def as_complex(value):
+    return complex(float(value.re), float(value.im))
+
+
+def write_complex(target, value):
+    target.re = value.real
+    target.im = value.imag
+
+
+def max_real_error(actual, expected):
+    return max((abs(float(actual[i]) - expected[i]) for i in range(len(expected))), default=0.0)
+
+
+def max_complex_error(actual, expected):
+    return max((abs(as_complex(actual[i]) - expected[i]) for i in range(len(expected))), default=0.0)
+
+
+def check_result(status, error=0.0, raw=""):
+    return {
+        "check_status": status,
+        "check_max_abs_error": f"{error:.9g}",
+        "check_raw_output": raw,
+    }
+
+
+def tolerance(kind, n):
+    if kind in ("f32", "c32"):
+        return 1e-3 * max(1, n)
+    return 1e-10 * max(1, n)
+
+
+def real_gemv_expected(matrix, x, y0, n, alpha, beta, trans):
+    out = []
+    for row in range(n):
+        total = 0.0
+        for col in range(n):
+            a = float(matrix[row + col * n] if trans == "N" else matrix[col + row * n])
+            total += a * float(x[col])
+        out.append(float(alpha) * total + float(beta) * float(y0[row]))
+    return out
+
+
+def real_symv_expected(matrix, x, y0, n, alpha, beta):
+    out = []
+    for row in range(n):
+        total = 0.0
+        for col in range(n):
+            a = matrix[row + col * n] if row <= col else matrix[col + row * n]
+            total += float(a) * float(x[col])
+        out.append(float(alpha) * total + float(beta) * float(y0[row]))
+    return out
+
+
+def real_ger_expected(matrix0, x, y, n, alpha):
+    out = [float(matrix0[i]) for i in range(n * n)]
+    for col in range(n):
+        for row in range(n):
+            out[row + col * n] += float(alpha) * float(x[row]) * float(y[col])
+    return out
+
+
+def complex_gemv_expected(matrix, x, y0, n, alpha, beta, trans):
+    alpha = as_complex(alpha)
+    beta = as_complex(beta)
+    out = []
+    for row in range(n):
+        total = 0j
+        for col in range(n):
+            a = as_complex(matrix[row + col * n] if trans == "N" else matrix[col + row * n])
+            total += a * as_complex(x[col])
+        out.append(alpha * total + beta * as_complex(y0[row]))
+    return out
+
+
+def complex_hemv_expected(matrix, x, y0, n, alpha, beta):
+    alpha = as_complex(alpha)
+    beta = as_complex(beta)
+    out = []
+    for row in range(n):
+        total = 0j
+        for col in range(n):
+            if row < col:
+                a = as_complex(matrix[row + col * n])
+            elif row == col:
+                a = complex(float(matrix[row + col * n].re), 0.0)
+            else:
+                a = as_complex(matrix[col + row * n]).conjugate()
+            total += a * as_complex(x[col])
+        out.append(alpha * total + beta * as_complex(y0[row]))
+    return out
+
+
+def complex_ger_expected(matrix0, x, y, n, alpha, conjugate_y):
+    alpha = as_complex(alpha)
+    out = [as_complex(matrix0[i]) for i in range(n * n)]
+    for col in range(n):
+        yv = as_complex(y[col]).conjugate() if conjugate_y else as_complex(y[col])
+        for row in range(n):
+            out[row + col * n] += alpha * as_complex(x[row]) * yv
+    return out
+
+
+def checked_vector(call, setup, actual, expected, kind, n, complex_values=False):
+    setup()
+    call()
+    error = max_complex_error(actual, expected) if complex_values else max_real_error(actual, expected)
+    limit = tolerance(kind, n)
+    if error > limit:
+        return check_result("correctness_failed", error, f"max_abs_error={error} tolerance={limit}")
+    return check_result("sampled-ok", error)
+
+
 def best_time(call, setup, reps):
     best = None
     for _ in range(reps):
@@ -165,7 +304,7 @@ def best_time(call, setup, reps):
     return best if best is not None else 0
 
 
-def emit(rows, case, kind, library_name, n, elapsed_ns, work):
+def emit(rows, case, kind, library_name, n, elapsed_ns, work, check):
     rate = work / (elapsed_ns / 1e9) / 1e9 if elapsed_ns > 0 else 0.0
     rows.append(
         {
@@ -177,7 +316,8 @@ def emit(rows, case, kind, library_name, n, elapsed_ns, work):
             "time_ns": elapsed_ns,
             "rate_gops": f"{rate:.6f}",
             "metric": "gops",
-            "status": "ok",
+            "status": "ok" if check["check_status"] == "sampled-ok" else "correctness_failed",
+            **check,
         }
     )
 
@@ -227,8 +367,16 @@ def run_worker(args):
                 ctypes.byref(one),
             )
 
+        check = checked_vector(
+            run_gemv_n,
+            setup_y,
+            y,
+            real_gemv_expected(matrix, x, y0, n, alpha.value, beta.value, "N"),
+            kind,
+            n,
+        )
         elapsed = best_time(run_gemv_n, setup_y, reps)
-        emit(rows, prefix + "gemv_n", kind, library_name, n, elapsed, 2 * n * n)
+        emit(rows, prefix + "gemv_n", kind, library_name, n, elapsed, 2 * n * n, check)
 
         def run_gemv_t():
             gemv(
@@ -245,8 +393,16 @@ def run_worker(args):
                 ctypes.byref(one),
             )
 
+        check = checked_vector(
+            run_gemv_t,
+            setup_y,
+            y,
+            real_gemv_expected(matrix, x, y0, n, alpha.value, beta.value, "T"),
+            kind,
+            n,
+        )
         elapsed = best_time(run_gemv_t, setup_y, reps)
-        emit(rows, prefix + "gemv_t", kind, library_name, n, elapsed, 2 * n * n)
+        emit(rows, prefix + "gemv_t", kind, library_name, n, elapsed, 2 * n * n, check)
 
         symv = getattr(lib, prefix + "symv_")
 
@@ -264,8 +420,16 @@ def run_worker(args):
                 ctypes.byref(one),
             )
 
+        check = checked_vector(
+            run_symv,
+            setup_y,
+            y,
+            real_symv_expected(matrix, x, y0, n, alpha.value, beta.value),
+            kind,
+            n,
+        )
         elapsed = best_time(run_symv, setup_y, reps)
-        emit(rows, prefix + "symv", kind, library_name, n, elapsed, 2 * n * n)
+        emit(rows, prefix + "symv", kind, library_name, n, elapsed, 2 * n * n, check)
 
         matrix0 = real_array(ctype, n * n, 0x123456789abcdef0)
         target = real_array(ctype, n * n, 0xfeedfacecafebeef)
@@ -288,8 +452,16 @@ def run_worker(args):
                 ctypes.byref(ni),
             )
 
+        check = checked_vector(
+            run_ger,
+            setup_a,
+            target,
+            real_ger_expected(matrix0, x, gy, n, alpha.value),
+            kind,
+            n,
+        )
         elapsed = best_time(run_ger, setup_a, reps)
-        emit(rows, prefix + "ger", kind, library_name, n, elapsed, 2 * n * n)
+        emit(rows, prefix + "ger", kind, library_name, n, elapsed, 2 * n * n, check)
 
     for kind, complex_type, prefix in [
         ("c32", ComplexF32, "c"),
@@ -321,8 +493,17 @@ def run_worker(args):
                 ctypes.byref(one),
             )
 
+        check = checked_vector(
+            run_gemv_n,
+            setup_y,
+            y,
+            complex_gemv_expected(matrix, x, y0, n, alpha, beta, "N"),
+            kind,
+            n,
+            complex_values=True,
+        )
         elapsed = best_time(run_gemv_n, setup_y, reps)
-        emit(rows, prefix + "gemv_n", kind, library_name, n, elapsed, 8 * n * n)
+        emit(rows, prefix + "gemv_n", kind, library_name, n, elapsed, 8 * n * n, check)
 
         def run_gemv_t():
             gemv(
@@ -339,8 +520,17 @@ def run_worker(args):
                 ctypes.byref(one),
             )
 
+        check = checked_vector(
+            run_gemv_t,
+            setup_y,
+            y,
+            complex_gemv_expected(matrix, x, y0, n, alpha, beta, "T"),
+            kind,
+            n,
+            complex_values=True,
+        )
         elapsed = best_time(run_gemv_t, setup_y, reps)
-        emit(rows, prefix + "gemv_t", kind, library_name, n, elapsed, 8 * n * n)
+        emit(rows, prefix + "gemv_t", kind, library_name, n, elapsed, 8 * n * n, check)
 
         hemv = getattr(lib, prefix + "hemv_")
 
@@ -358,8 +548,17 @@ def run_worker(args):
                 ctypes.byref(one),
             )
 
+        check = checked_vector(
+            run_hemv,
+            setup_y,
+            y,
+            complex_hemv_expected(matrix, x, y0, n, alpha, beta),
+            kind,
+            n,
+            complex_values=True,
+        )
         elapsed = best_time(run_hemv, setup_y, reps)
-        emit(rows, prefix + "hemv", kind, library_name, n, elapsed, 8 * n * n)
+        emit(rows, prefix + "hemv", kind, library_name, n, elapsed, 8 * n * n, check)
 
         matrix0 = complex_array(complex_type, n * n, 0x123456789abcdef0)
         target = complex_array(complex_type, n * n, 0xfeedfacecafebeef)
@@ -383,8 +582,17 @@ def run_worker(args):
                 ctypes.byref(ni),
             )
 
+        check = checked_vector(
+            run_geru,
+            setup_a,
+            target,
+            complex_ger_expected(matrix0, x, gy, n, alpha, False),
+            kind,
+            n,
+            complex_values=True,
+        )
         elapsed = best_time(run_geru, setup_a, reps)
-        emit(rows, prefix + "geru", kind, library_name, n, elapsed, 8 * n * n)
+        emit(rows, prefix + "geru", kind, library_name, n, elapsed, 8 * n * n, check)
 
         gerc = getattr(lib, prefix + "gerc_")
 
@@ -401,8 +609,17 @@ def run_worker(args):
                 ctypes.byref(ni),
             )
 
+        check = checked_vector(
+            run_gerc,
+            setup_a,
+            target,
+            complex_ger_expected(matrix0, x, gy, n, alpha, True),
+            kind,
+            n,
+            complex_values=True,
+        )
         elapsed = best_time(run_gerc, setup_a, reps)
-        emit(rows, prefix + "gerc", kind, library_name, n, elapsed, 8 * n * n)
+        emit(rows, prefix + "gerc", kind, library_name, n, elapsed, 8 * n * n, check)
 
     writer = csv.DictWriter(
         sys.stdout,
@@ -416,6 +633,9 @@ def run_worker(args):
             "rate_gops",
             "metric",
             "status",
+            "check_status",
+            "check_max_abs_error",
+            "check_raw_output",
         ],
     )
     writer.writeheader()
@@ -454,6 +674,7 @@ def write_metadata(args, output_path, selected_libraries, sizes):
         "sizes": sizes,
         "reps_small": args.reps_small,
         "reps_large": args.reps_large,
+        "correctness_check": "sampled per library/case/size before timing",
         "environment": environment_snapshot(),
         "libraries": [
             {
@@ -477,7 +698,7 @@ def run_controller(args):
     for n in sizes:
         reps = args.reps_small if n <= 256 else args.reps_large
         for library_name, library_path in selected_libraries:
-            if args.skip_missing and library_name != "Accelerate" and not Path(library_path).exists():
+            if args.skip_missing and not library_available(library_path):
                 continue
             print(
                 f"[level2 {library_name}] n={n} reps={reps} path={library_path}",
@@ -504,6 +725,9 @@ def run_controller(args):
         "rate_gops",
         "metric",
         "status",
+        "check_status",
+        "check_max_abs_error",
+        "check_raw_output",
     ]
     with output.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)

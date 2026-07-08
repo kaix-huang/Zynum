@@ -8,19 +8,22 @@ import math
 import sys
 from collections import defaultdict
 
+CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
+
 COLORS = {
     "Zynum": "#2563eb",
     "zynum-blas": "#2563eb",
     "Accelerate": "#dc2626",
     "OpenBLAS": "#16a34a",
     "MKL": "#7c3aed",
+    "AOCL-BLIS": "#ea580c",
 }
 
 DISPLAY_NAMES = {
     "zynum-blas": "Zynum",
 }
 
-LIB_ORDER = ["Zynum", "zynum-blas", "Accelerate", "OpenBLAS", "MKL"]
+LIB_ORDER = ["Zynum", "zynum-blas", "Accelerate", "OpenBLAS", "MKL", "AOCL-BLIS"]
 
 
 def display_name(value):
@@ -100,6 +103,10 @@ def plot_heading(kinds, libs):
     )
 
 
+def shape_work(shape):
+    return shape["m"] * shape["n"] * shape["k"]
+
+
 def draw_panel(
     kind, rows, labels, libs, panel_top, panel_height, chart_left, chart_width
 ):
@@ -129,7 +136,7 @@ def draw_panel(
 
     by_lib = defaultdict(dict)
     for row in rows:
-        by_lib[row["library"]][row["shape_index"]] = row["gflops"]
+        by_lib[row["library"]][row["plot_index"]] = row["gflops"]
 
     for lib in libs:
         values = by_lib.get(lib, {})
@@ -162,6 +169,10 @@ def main():
     rows = []
     with open(csv_path, newline="") as f:
         for raw in csv.DictReader(f):
+            if raw.get("check") not in CHECKED_STATUSES:
+                raise ValueError(
+                    f"GEMM plots require correctness checks; row has check={raw.get('check')!r}"
+                )
             rows.append(
                 {
                     "kind": raw["kind"],
@@ -175,27 +186,37 @@ def main():
                 }
             )
 
-    labels_by_index = {}
+    shapes_by_index = {}
     seen_libs = []
     for row in rows:
         label = f"{row['label']}\\n{row['m']}x{row['n']}x{row['k']}"
-        old_label = labels_by_index.get(row["shape_index"])
-        if old_label is not None and old_label != label:
+        shape = {
+            "shape_index": row["shape_index"],
+            "label": label,
+            "m": row["m"],
+            "n": row["n"],
+            "k": row["k"],
+        }
+        old_shape = shapes_by_index.get(row["shape_index"])
+        if old_shape is not None and old_shape != shape:
             raise ValueError(
-                f"shape_index {row['shape_index']} maps to both {old_label!r} and {label!r}"
+                f"shape_index {row['shape_index']} maps to both {old_shape!r} and {shape!r}"
             )
-        labels_by_index[row["shape_index"]] = label
+        shapes_by_index[row["shape_index"]] = shape
         if row["library"] not in seen_libs:
             seen_libs.append(row["library"])
     libs = [lib for lib in LIB_ORDER if lib in seen_libs]
     libs.extend(lib for lib in seen_libs if lib not in libs)
-    sorted_indices = sorted(labels_by_index)
-    expected_indices = list(range(len(sorted_indices)))
-    if sorted_indices != expected_indices:
-        raise ValueError(
-            f"shape_index values must be contiguous from 0; got {sorted_indices}"
-        )
-    labels = [labels_by_index[i] for i in sorted_indices]
+    ordered_shapes = sorted(
+        shapes_by_index.values(),
+        key=lambda shape: (shape_work(shape), max(shape["m"], shape["n"], shape["k"]), shape["shape_index"]),
+    )
+    plot_index_by_shape_index = {
+        shape["shape_index"]: index for index, shape in enumerate(ordered_shapes)
+    }
+    for row in rows:
+        row["plot_index"] = plot_index_by_shape_index[row["shape_index"]]
+    labels = [shape["label"] for shape in ordered_shapes]
 
     kinds = []
     for row in rows:
@@ -233,7 +254,7 @@ def main():
 """
     )
     title, subtitle = plot_heading(kinds, libs)
-    subtitle = "Higher is better. " + subtitle
+    subtitle = "Higher is better. Shapes are ordered by m*n*k so smaller cases stay at the front. " + subtitle
     svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>')
     svg.append(f'<text x="40" y="42" class="title">{html.escape(title)}</text>')
     svg.append(f'<text x="40" y="66" class="subtitle">{html.escape(subtitle)}</text>')
