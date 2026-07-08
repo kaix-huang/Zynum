@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const types = @import("../types.zig");
-const core = @import("../core/raw.zig");
+const core = @import("../core/unchecked.zig");
 const f = @import("fortran.zig");
+
+// CBLAS wrappers keep invalid enum/layout handling local: invalid CBLAS enum
+// parameters leave outputs unchanged and return silently. Numeric argument
+// validation is delegated to the Fortran ABI wrappers they call.
 
 pub const BlasInt = types.BlasInt;
 pub const ComplexF32 = types.ComplexF32;
@@ -21,39 +25,81 @@ pub const CblasUnit: c_int = 132;
 pub const CblasLeft: c_int = 141;
 pub const CblasRight: c_int = 142;
 
+fn validLayout(layout: c_int) bool {
+    return layout == CblasRowMajor or layout == CblasColMajor;
+}
+
+fn validTrans(trans: c_int) bool {
+    return trans == CblasNoTrans or trans == CblasTrans or trans == CblasConjTrans;
+}
+
+fn validUplo(uplo: c_int) bool {
+    return uplo == CblasUpper or uplo == CblasLower;
+}
+
+fn validDiag(diag: c_int) bool {
+    return diag == CblasNonUnit or diag == CblasUnit;
+}
+
+fn validSide(side: c_int) bool {
+    return side == CblasLeft or side == CblasRight;
+}
+
 fn transChar(trans: c_int) [1]u8 {
     return .{switch (trans) {
+        CblasNoTrans => 'N',
         CblasTrans => 'T',
         CblasConjTrans => 'C',
-        else => 'N',
+        else => 'X',
     }};
 }
 
 fn rowMajorGemvTrans(trans: c_int) [1]u8 {
     return .{switch (trans) {
         CblasNoTrans => 'T',
-        else => 'N',
+        CblasTrans, CblasConjTrans => 'N',
+        else => 'X',
     }};
 }
 
 fn uploChar(uplo: c_int) [1]u8 {
-    return .{if (uplo == CblasLower) 'L' else 'U'};
+    return .{switch (uplo) {
+        CblasUpper => 'U',
+        CblasLower => 'L',
+        else => 'X',
+    }};
 }
 
 fn rowMajorUploChar(uplo: c_int) [1]u8 {
-    return .{if (uplo == CblasLower) 'U' else 'L'};
+    return .{switch (uplo) {
+        CblasUpper => 'L',
+        CblasLower => 'U',
+        else => 'X',
+    }};
 }
 
 fn sideChar(side: c_int) [1]u8 {
-    return .{if (side == CblasRight) 'R' else 'L'};
+    return .{switch (side) {
+        CblasLeft => 'L',
+        CblasRight => 'R',
+        else => 'X',
+    }};
 }
 
 fn rowMajorSideChar(side: c_int) [1]u8 {
-    return .{if (side == CblasRight) 'L' else 'R'};
+    return .{switch (side) {
+        CblasLeft => 'R',
+        CblasRight => 'L',
+        else => 'X',
+    }};
 }
 
 fn diagChar(diag: c_int) [1]u8 {
-    return .{if (diag == CblasUnit) 'U' else 'N'};
+    return .{switch (diag) {
+        CblasNonUnit => 'N',
+        CblasUnit => 'U',
+        else => 'X',
+    }};
 }
 
 fn rowMajorTransChar(trans: c_int) [1]u8 {
@@ -61,7 +107,7 @@ fn rowMajorTransChar(trans: c_int) [1]u8 {
         CblasNoTrans => 'T',
         CblasTrans => 'N',
         CblasConjTrans => 'C',
-        else => 'N',
+        else => 'X',
     }};
 }
 
@@ -73,8 +119,12 @@ fn cblasIndex(i: BlasInt) c_int {
     return if (i <= 0) 0 else @intCast(i - 1);
 }
 
+fn max1(x: BlasInt) BlasInt {
+    return @max(@as(BlasInt, 1), x);
+}
+
 fn rowMajorConjGemv(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt) void {
-    if (m_ <= 0 or n_ <= 0 or incx_ == 0 or incy_ == 0) return;
+    if (m_ <= 0 or n_ <= 0 or lda < max1(n_) or incx_ == 0 or incy_ == 0) return;
     const m: usize = @intCast(m_);
     const n: usize = @intCast(n_);
     const sx = core.startIndex(m_, incx_);
@@ -96,7 +146,7 @@ fn rowMajorConjGemv(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]
 }
 
 fn rowMajorConjGbmv(comptime T: type, m_: BlasInt, n_: BlasInt, kl_: BlasInt, ku_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt) void {
-    if (m_ <= 0 or n_ <= 0 or kl_ < 0 or ku_ < 0 or incx_ == 0 or incy_ == 0) return;
+    if (m_ <= 0 or n_ <= 0 or kl_ < 0 or ku_ < 0 or lda < kl_ + ku_ + 1 or incx_ == 0 or incy_ == 0) return;
     const m: usize = @intCast(m_);
     const n: usize = @intCast(n_);
     const kl: usize = @intCast(kl_);
@@ -124,7 +174,7 @@ fn rowMajorConjGbmv(comptime T: type, m_: BlasInt, n_: BlasInt, kl_: BlasInt, ku
 }
 
 fn rowMajorGer(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt, conj_y: bool) void {
-    if (m_ <= 0 or n_ <= 0 or incx_ == 0 or incy_ == 0 or core.isZero(T, alpha)) return;
+    if (m_ <= 0 or n_ <= 0 or lda < max1(n_) or incx_ == 0 or incy_ == 0 or core.isZero(T, alpha)) return;
     const m: usize = @intCast(m_);
     const n: usize = @intCast(n_);
     const sx = core.startIndex(m_, incx_);
@@ -192,7 +242,7 @@ fn rowMajorConjTransOpUpper(uplo: c_int) bool {
 }
 
 fn rowMajorConjTrmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
-    if (n_ <= 0 or incx_ == 0) return;
+    if (!validUplo(uplo) or !validDiag(diag) or n_ <= 0 or lda < max1(n_) or incx_ == 0) return;
     const n: usize = @intCast(n_);
     const sx = core.startIndex(n_, incx_);
     if (rowMajorConjTransOpUpper(uplo)) {
@@ -217,7 +267,7 @@ fn rowMajorConjTrmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, a: 
 }
 
 fn rowMajorConjTrsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
-    if (n_ <= 0 or incx_ == 0) return;
+    if (!validUplo(uplo) or !validDiag(diag) or n_ <= 0 or lda < max1(n_) or incx_ == 0) return;
     const n: usize = @intCast(n_);
     const sx = core.startIndex(n_, incx_);
     if (rowMajorConjTransOpUpper(uplo)) {
@@ -244,7 +294,7 @@ fn rowMajorConjTrsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, a: 
 }
 
 fn rowMajorConjTbmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, k_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
-    if (n_ <= 0 or k_ < 0 or lda <= 0 or incx_ == 0) return;
+    if (!validUplo(uplo) or !validDiag(diag) or n_ <= 0 or k_ < 0 or lda < k_ + 1 or incx_ == 0) return;
     const n: usize = @intCast(n_);
     const k: usize = @intCast(k_);
     const sx = core.startIndex(n_, incx_);
@@ -270,7 +320,7 @@ fn rowMajorConjTbmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, k_:
 }
 
 fn rowMajorConjTpmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, ap: [*]const T, x: [*]T, incx_: BlasInt) void {
-    if (n_ <= 0 or incx_ == 0) return;
+    if (!validUplo(uplo) or !validDiag(diag) or n_ <= 0 or incx_ == 0) return;
     const n: usize = @intCast(n_);
     const sx = core.startIndex(n_, incx_);
     if (rowMajorConjTransOpUpper(uplo)) {
@@ -295,7 +345,7 @@ fn rowMajorConjTpmv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, ap:
 }
 
 fn rowMajorConjTbsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, k_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
-    if (n_ <= 0 or k_ < 0 or lda <= 0 or incx_ == 0) return;
+    if (!validUplo(uplo) or !validDiag(diag) or n_ <= 0 or k_ < 0 or lda < k_ + 1 or incx_ == 0) return;
     const n: usize = @intCast(n_);
     const k: usize = @intCast(k_);
     const sx = core.startIndex(n_, incx_);
@@ -323,7 +373,7 @@ fn rowMajorConjTbsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, k_:
 }
 
 fn rowMajorConjTpsv(comptime T: type, uplo: c_int, diag: c_int, n_: BlasInt, ap: [*]const T, x: [*]T, incx_: BlasInt) void {
-    if (n_ <= 0 or incx_ == 0) return;
+    if (!validUplo(uplo) or !validDiag(diag) or n_ <= 0 or incx_ == 0) return;
     const n: usize = @intCast(n_);
     const sx = core.startIndex(n_, incx_);
     if (rowMajorConjTransOpUpper(uplo)) {
@@ -653,6 +703,7 @@ pub export fn cblas_drotmg(d1: *f64, d2: *f64, x1: *f64, y1: f64, param: [*]f64)
 
 // Level 2 CBLAS wrappers.
 pub export fn cblas_sgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha: f32, a: [*]const f32, lda: c_int, x: [*]const f32, incx: c_int, beta: f32, y: [*]f32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
     var nn = asBlasInt(if (layout == CblasRowMajor) m else n);
     var tt = if (layout == CblasRowMajor) rowMajorGemvTrans(trans) else transChar(trans);
@@ -663,6 +714,7 @@ pub export fn cblas_sgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha
 }
 
 pub export fn cblas_dgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha: f64, a: [*]const f64, lda: c_int, x: [*]const f64, incx: c_int, beta: f64, y: [*]f64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
     var nn = asBlasInt(if (layout == CblasRowMajor) m else n);
     var tt = if (layout == CblasRowMajor) rowMajorGemvTrans(trans) else transChar(trans);
@@ -673,6 +725,7 @@ pub export fn cblas_dgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha
 }
 
 pub export fn cblas_cgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, x: [*]const ComplexF32, incx: c_int, beta: *const ComplexF32, y: [*]ComplexF32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     if (layout == CblasRowMajor and trans == CblasConjTrans) {
         rowMajorConjGemv(ComplexF32, asBlasInt(m), asBlasInt(n), alpha.*, a, asBlasInt(lda), x, asBlasInt(incx), beta.*, y, asBlasInt(incy));
         return;
@@ -687,6 +740,7 @@ pub export fn cblas_cgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha
 }
 
 pub export fn cblas_zgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, x: [*]const ComplexF64, incx: c_int, beta: *const ComplexF64, y: [*]ComplexF64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     if (layout == CblasRowMajor and trans == CblasConjTrans) {
         rowMajorConjGemv(ComplexF64, asBlasInt(m), asBlasInt(n), alpha.*, a, asBlasInt(lda), x, asBlasInt(incx), beta.*, y, asBlasInt(incy));
         return;
@@ -701,6 +755,7 @@ pub export fn cblas_zgemv(layout: c_int, trans: c_int, m: c_int, n: c_int, alpha
 }
 
 pub export fn cblas_sgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c_int, ku: c_int, alpha: f32, a: [*]const f32, lda: c_int, x: [*]const f32, incx: c_int, beta: f32, y: [*]f32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
     var nn = asBlasInt(if (layout == CblasRowMajor) m else n);
     var kll = asBlasInt(if (layout == CblasRowMajor) ku else kl);
@@ -713,6 +768,7 @@ pub export fn cblas_sgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c
 }
 
 pub export fn cblas_dgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c_int, ku: c_int, alpha: f64, a: [*]const f64, lda: c_int, x: [*]const f64, incx: c_int, beta: f64, y: [*]f64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
     var nn = asBlasInt(if (layout == CblasRowMajor) m else n);
     var kll = asBlasInt(if (layout == CblasRowMajor) ku else kl);
@@ -725,6 +781,7 @@ pub export fn cblas_dgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c
 }
 
 pub export fn cblas_cgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c_int, ku: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, x: [*]const ComplexF32, incx: c_int, beta: *const ComplexF32, y: [*]ComplexF32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
     var iy = asBlasInt(incy);
@@ -741,6 +798,7 @@ pub export fn cblas_cgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c
 }
 
 pub export fn cblas_zgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c_int, ku: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, x: [*]const ComplexF64, incx: c_int, beta: *const ComplexF64, y: [*]ComplexF64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
     var iy = asBlasInt(incy);
@@ -757,6 +815,7 @@ pub export fn cblas_zgbmv(layout: c_int, trans: c_int, m: c_int, n: c_int, kl: c
 }
 
 pub export fn cblas_ssymv(layout: c_int, uplo: c_int, n: c_int, alpha: f32, a: [*]const f32, lda: c_int, x: [*]const f32, incx: c_int, beta: f32, y: [*]f32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
@@ -765,6 +824,7 @@ pub export fn cblas_ssymv(layout: c_int, uplo: c_int, n: c_int, alpha: f32, a: [
     f.ssymv_(&uu, &nn, &alpha, a, &aa, x, &ix, &beta, y, &iy);
 }
 pub export fn cblas_dsymv(layout: c_int, uplo: c_int, n: c_int, alpha: f64, a: [*]const f64, lda: c_int, x: [*]const f64, incx: c_int, beta: f64, y: [*]f64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
@@ -773,6 +833,7 @@ pub export fn cblas_dsymv(layout: c_int, uplo: c_int, n: c_int, alpha: f64, a: [
     f.dsymv_(&uu, &nn, &alpha, a, &aa, x, &ix, &beta, y, &iy);
 }
 pub export fn cblas_chemv(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, x: [*]const ComplexF32, incx: c_int, beta: *const ComplexF32, y: [*]ComplexF32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
@@ -781,6 +842,7 @@ pub export fn cblas_chemv(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
     f.chemv_(&uu, &nn, alpha, a, &aa, x, &ix, beta, y, &iy);
 }
 pub export fn cblas_zhemv(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, x: [*]const ComplexF64, incx: c_int, beta: *const ComplexF64, y: [*]ComplexF64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
@@ -790,6 +852,7 @@ pub export fn cblas_zhemv(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
 }
 
 pub export fn cblas_ssbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha: f32, a: [*]const f32, lda: c_int, x: [*]const f32, incx: c_int, beta: f32, y: [*]f32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
@@ -799,6 +862,7 @@ pub export fn cblas_ssbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha:
     f.ssbmv_(&uu, &nn, &kk, &alpha, a, &aa, x, &ix, &beta, y, &iy);
 }
 pub export fn cblas_dsbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha: f64, a: [*]const f64, lda: c_int, x: [*]const f64, incx: c_int, beta: f64, y: [*]f64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
@@ -808,6 +872,7 @@ pub export fn cblas_dsbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha:
     f.dsbmv_(&uu, &nn, &kk, &alpha, a, &aa, x, &ix, &beta, y, &iy);
 }
 pub export fn cblas_chbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, x: [*]const ComplexF32, incx: c_int, beta: *const ComplexF32, y: [*]ComplexF32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
@@ -817,6 +882,7 @@ pub export fn cblas_chbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha:
     f.chbmv_(&uu, &nn, &kk, alpha, a, &aa, x, &ix, beta, y, &iy);
 }
 pub export fn cblas_zhbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, x: [*]const ComplexF64, incx: c_int, beta: *const ComplexF64, y: [*]ComplexF64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
@@ -827,6 +893,7 @@ pub export fn cblas_zhbmv(layout: c_int, uplo: c_int, n: c_int, k: c_int, alpha:
 }
 
 pub export fn cblas_sspmv(layout: c_int, uplo: c_int, n: c_int, alpha: f32, ap: [*]const f32, x: [*]const f32, incx: c_int, beta: f32, y: [*]f32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -834,6 +901,7 @@ pub export fn cblas_sspmv(layout: c_int, uplo: c_int, n: c_int, alpha: f32, ap: 
     f.sspmv_(&uu, &nn, &alpha, ap, x, &ix, &beta, y, &iy);
 }
 pub export fn cblas_dspmv(layout: c_int, uplo: c_int, n: c_int, alpha: f64, ap: [*]const f64, x: [*]const f64, incx: c_int, beta: f64, y: [*]f64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -841,6 +909,7 @@ pub export fn cblas_dspmv(layout: c_int, uplo: c_int, n: c_int, alpha: f64, ap: 
     f.dspmv_(&uu, &nn, &alpha, ap, x, &ix, &beta, y, &iy);
 }
 pub export fn cblas_chpmv(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF32, ap: [*]const ComplexF32, x: [*]const ComplexF32, incx: c_int, beta: *const ComplexF32, y: [*]ComplexF32, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -848,6 +917,7 @@ pub export fn cblas_chpmv(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
     f.chpmv_(&uu, &nn, alpha, ap, x, &ix, beta, y, &iy);
 }
 pub export fn cblas_zhpmv(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF64, ap: [*]const ComplexF64, x: [*]const ComplexF64, incx: c_int, beta: *const ComplexF64, y: [*]ComplexF64, incy: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -856,6 +926,7 @@ pub export fn cblas_zhpmv(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
 }
 
 pub export fn cblas_strmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const f32, lda: c_int, x: [*]f32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -865,6 +936,7 @@ pub export fn cblas_strmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.strmv_(&uu, &tt, &dd, &nn, a, &aa, x, &ix);
 }
 pub export fn cblas_dtrmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const f64, lda: c_int, x: [*]f64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -874,6 +946,7 @@ pub export fn cblas_dtrmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtrmv_(&uu, &tt, &dd, &nn, a, &aa, x, &ix);
 }
 pub export fn cblas_ctrmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const ComplexF32, lda: c_int, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
@@ -887,6 +960,7 @@ pub export fn cblas_ctrmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.ctrmv_(&uu, &tt, &dd, &nn, a, &aa, x, &ix);
 }
 pub export fn cblas_ztrmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const ComplexF64, lda: c_int, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
@@ -901,6 +975,7 @@ pub export fn cblas_ztrmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
 }
 
 pub export fn cblas_stbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const f32, lda: c_int, x: [*]f32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -911,6 +986,7 @@ pub export fn cblas_stbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.stbmv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_dtbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const f64, lda: c_int, x: [*]f64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -921,6 +997,7 @@ pub export fn cblas_dtbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtbmv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ctbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF32, lda: c_int, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
@@ -935,6 +1012,7 @@ pub export fn cblas_ctbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.ctbmv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ztbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF64, lda: c_int, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
@@ -950,6 +1028,7 @@ pub export fn cblas_ztbmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
 }
 
 pub export fn cblas_stpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const f32, x: [*]f32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -958,6 +1037,7 @@ pub export fn cblas_stpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.stpmv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_dtpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const f64, x: [*]f64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -966,6 +1046,7 @@ pub export fn cblas_dtpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtpmv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ctpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF32, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     if (layout == CblasRowMajor and trans == CblasConjTrans) {
@@ -978,6 +1059,7 @@ pub export fn cblas_ctpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.ctpmv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ztpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF64, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     if (layout == CblasRowMajor and trans == CblasConjTrans) {
@@ -991,6 +1073,7 @@ pub export fn cblas_ztpmv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
 }
 
 pub export fn cblas_strsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const f32, lda: c_int, x: [*]f32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -1000,6 +1083,7 @@ pub export fn cblas_strsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.strsv_(&uu, &tt, &dd, &nn, a, &aa, x, &ix);
 }
 pub export fn cblas_dtrsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const f64, lda: c_int, x: [*]f64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -1009,6 +1093,7 @@ pub export fn cblas_dtrsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtrsv_(&uu, &tt, &dd, &nn, a, &aa, x, &ix);
 }
 pub export fn cblas_ctrsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const ComplexF32, lda: c_int, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
@@ -1022,6 +1107,7 @@ pub export fn cblas_ctrsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.ctrsv_(&uu, &tt, &dd, &nn, a, &aa, x, &ix);
 }
 pub export fn cblas_ztrsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, a: [*]const ComplexF64, lda: c_int, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var aa = asBlasInt(lda);
     var ix = asBlasInt(incx);
@@ -1036,6 +1122,7 @@ pub export fn cblas_ztrsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
 }
 
 pub export fn cblas_stbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const f32, lda: c_int, x: [*]f32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -1046,6 +1133,7 @@ pub export fn cblas_stbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.stbsv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_dtbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const f64, lda: c_int, x: [*]f64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -1056,6 +1144,7 @@ pub export fn cblas_dtbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtbsv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ctbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF32, lda: c_int, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
@@ -1070,6 +1159,7 @@ pub export fn cblas_ctbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.ctbsv_(&uu, &tt, &dd, &nn, &kk, a, &aa, x, &ix);
 }
 pub export fn cblas_ztbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, k: c_int, a: [*]const ComplexF64, lda: c_int, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var kk = asBlasInt(k);
     var aa = asBlasInt(lda);
@@ -1085,6 +1175,7 @@ pub export fn cblas_ztbsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
 }
 
 pub export fn cblas_stpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const f32, x: [*]f32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -1093,6 +1184,7 @@ pub export fn cblas_stpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.stpsv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_dtpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const f64, x: [*]f64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var dd = diagChar(diag);
@@ -1101,6 +1193,7 @@ pub export fn cblas_dtpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.dtpsv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ctpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF32, x: [*]ComplexF32, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     if (layout == CblasRowMajor and trans == CblasConjTrans) {
@@ -1113,6 +1206,7 @@ pub export fn cblas_ctpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
     f.ctpsv_(&uu, &tt, &dd, &nn, ap, x, &ix);
 }
 pub export fn cblas_ztpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int, n: c_int, ap: [*]const ComplexF64, x: [*]ComplexF64, incx: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     if (layout == CblasRowMajor and trans == CblasConjTrans) {
@@ -1126,6 +1220,7 @@ pub export fn cblas_ztpsv(layout: c_int, uplo: c_int, trans: c_int, diag: c_int,
 }
 
 pub export fn cblas_sger(layout: c_int, m: c_int, n: c_int, alpha: f32, x: [*]const f32, incx: c_int, y: [*]const f32, incy: c_int, a: [*]f32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(m);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1135,6 +1230,7 @@ pub export fn cblas_sger(layout: c_int, m: c_int, n: c_int, alpha: f32, x: [*]co
 }
 
 pub export fn cblas_dger(layout: c_int, m: c_int, n: c_int, alpha: f64, x: [*]const f64, incx: c_int, y: [*]const f64, incy: c_int, a: [*]f64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(m);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1144,6 +1240,7 @@ pub export fn cblas_dger(layout: c_int, m: c_int, n: c_int, alpha: f64, x: [*]co
 }
 
 pub export fn cblas_cgeru(layout: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: c_int, y: [*]const ComplexF32, incy: c_int, a: [*]ComplexF32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(m);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1153,6 +1250,7 @@ pub export fn cblas_cgeru(layout: c_int, m: c_int, n: c_int, alpha: *const Compl
 }
 
 pub export fn cblas_zgeru(layout: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: c_int, y: [*]const ComplexF64, incy: c_int, a: [*]ComplexF64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(m);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1162,6 +1260,7 @@ pub export fn cblas_zgeru(layout: c_int, m: c_int, n: c_int, alpha: *const Compl
 }
 
 pub export fn cblas_cgerc(layout: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: c_int, y: [*]const ComplexF32, incy: c_int, a: [*]ComplexF32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(m);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1171,6 +1270,7 @@ pub export fn cblas_cgerc(layout: c_int, m: c_int, n: c_int, alpha: *const Compl
 }
 
 pub export fn cblas_zgerc(layout: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: c_int, y: [*]const ComplexF64, incy: c_int, a: [*]ComplexF64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var mm = asBlasInt(m);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1180,6 +1280,7 @@ pub export fn cblas_zgerc(layout: c_int, m: c_int, n: c_int, alpha: *const Compl
 }
 
 pub export fn cblas_ssyr(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*]const f32, incx: c_int, a: [*]f32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1187,6 +1288,7 @@ pub export fn cblas_ssyr(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*
     f.ssyr_(&uu, &nn, &alpha, x, &ix, a, &aa);
 }
 pub export fn cblas_dsyr(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*]const f64, incx: c_int, a: [*]f64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1194,6 +1296,7 @@ pub export fn cblas_dsyr(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*
     f.dsyr_(&uu, &nn, &alpha, x, &ix, a, &aa);
 }
 pub export fn cblas_cher(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*]const ComplexF32, incx: c_int, a: [*]ComplexF32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1201,6 +1304,7 @@ pub export fn cblas_cher(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*
     f.cher_(&uu, &nn, &alpha, x, &ix, a, &aa);
 }
 pub export fn cblas_zher(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*]const ComplexF64, incx: c_int, a: [*]ComplexF64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1209,24 +1313,28 @@ pub export fn cblas_zher(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*
 }
 
 pub export fn cblas_sspr(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*]const f32, incx: c_int, ap: [*]f32) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     f.sspr_(&uu, &nn, &alpha, x, &ix, ap);
 }
 pub export fn cblas_dspr(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*]const f64, incx: c_int, ap: [*]f64) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     f.dspr_(&uu, &nn, &alpha, x, &ix, ap);
 }
 pub export fn cblas_chpr(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*]const ComplexF32, incx: c_int, ap: [*]ComplexF32) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
     f.chpr_(&uu, &nn, &alpha, x, &ix, ap);
 }
 pub export fn cblas_zhpr(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*]const ComplexF64, incx: c_int, ap: [*]ComplexF64) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1234,6 +1342,7 @@ pub export fn cblas_zhpr(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*
 }
 
 pub export fn cblas_ssyr2(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*]const f32, incx: c_int, y: [*]const f32, incy: c_int, a: [*]f32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1242,6 +1351,7 @@ pub export fn cblas_ssyr2(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [
     f.ssyr2_(&uu, &nn, &alpha, x, &ix, y, &iy, a, &aa);
 }
 pub export fn cblas_dsyr2(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*]const f64, incx: c_int, y: [*]const f64, incy: c_int, a: [*]f64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1250,6 +1360,7 @@ pub export fn cblas_dsyr2(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [
     f.dsyr2_(&uu, &nn, &alpha, x, &ix, y, &iy, a, &aa);
 }
 pub export fn cblas_cher2(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: c_int, y: [*]const ComplexF32, incy: c_int, a: [*]ComplexF32, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1258,6 +1369,7 @@ pub export fn cblas_cher2(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
     f.cher2_(&uu, &nn, alpha, x, &ix, y, &iy, a, &aa);
 }
 pub export fn cblas_zher2(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: c_int, y: [*]const ComplexF64, incy: c_int, a: [*]ComplexF64, lda: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1267,6 +1379,7 @@ pub export fn cblas_zher2(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
 }
 
 pub export fn cblas_sspr2(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [*]const f32, incx: c_int, y: [*]const f32, incy: c_int, ap: [*]f32) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1274,6 +1387,7 @@ pub export fn cblas_sspr2(layout: c_int, uplo: c_int, n: c_int, alpha: f32, x: [
     f.sspr2_(&uu, &nn, &alpha, x, &ix, y, &iy, ap);
 }
 pub export fn cblas_dspr2(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [*]const f64, incx: c_int, y: [*]const f64, incy: c_int, ap: [*]f64) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1281,6 +1395,7 @@ pub export fn cblas_dspr2(layout: c_int, uplo: c_int, n: c_int, alpha: f64, x: [
     f.dspr2_(&uu, &nn, &alpha, x, &ix, y, &iy, ap);
 }
 pub export fn cblas_chpr2(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF32, x: [*]const ComplexF32, incx: c_int, y: [*]const ComplexF32, incy: c_int, ap: [*]ComplexF32) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1288,6 +1403,7 @@ pub export fn cblas_chpr2(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
     f.chpr2_(&uu, &nn, alpha, x, &ix, y, &iy, ap);
 }
 pub export fn cblas_zhpr2(layout: c_int, uplo: c_int, n: c_int, alpha: *const ComplexF64, x: [*]const ComplexF64, incx: c_int, y: [*]const ComplexF64, incy: c_int, ap: [*]ComplexF64) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var nn = asBlasInt(n);
     var ix = asBlasInt(incx);
@@ -1297,6 +1413,7 @@ pub export fn cblas_zhpr2(layout: c_int, uplo: c_int, n: c_int, alpha: *const Co
 
 // Level 3 CBLAS wrappers.
 pub export fn cblas_sgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int, n: c_int, k: c_int, alpha: f32, a: [*]const f32, lda: c_int, b: [*]const f32, ldb: c_int, beta: f32, c: [*]f32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validTrans(transa) or !validTrans(transb)) return;
     var ta = if (layout == CblasRowMajor) transChar(transb) else transChar(transa);
     var tb = if (layout == CblasRowMajor) transChar(transa) else transChar(transb);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1309,6 +1426,7 @@ pub export fn cblas_sgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int,
 }
 
 pub export fn cblas_dgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int, n: c_int, k: c_int, alpha: f64, a: [*]const f64, lda: c_int, b: [*]const f64, ldb: c_int, beta: f64, c: [*]f64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validTrans(transa) or !validTrans(transb)) return;
     var ta = if (layout == CblasRowMajor) transChar(transb) else transChar(transa);
     var tb = if (layout == CblasRowMajor) transChar(transa) else transChar(transb);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1321,6 +1439,7 @@ pub export fn cblas_dgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int,
 }
 
 pub export fn cblas_cgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int, n: c_int, k: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]const ComplexF32, ldb: c_int, beta: *const ComplexF32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validTrans(transa) or !validTrans(transb)) return;
     var ta = if (layout == CblasRowMajor) transChar(transb) else transChar(transa);
     var tb = if (layout == CblasRowMajor) transChar(transa) else transChar(transb);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1333,6 +1452,7 @@ pub export fn cblas_cgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int,
 }
 
 pub export fn cblas_zgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int, n: c_int, k: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]const ComplexF64, ldb: c_int, beta: *const ComplexF64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validTrans(transa) or !validTrans(transb)) return;
     var ta = if (layout == CblasRowMajor) transChar(transb) else transChar(transa);
     var tb = if (layout == CblasRowMajor) transChar(transa) else transChar(transb);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1345,6 +1465,7 @@ pub export fn cblas_zgemm(layout: c_int, transa: c_int, transb: c_int, m: c_int,
 }
 
 pub export fn cblas_ssymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: c_int, alpha: f32, a: [*]const f32, lda: c_int, b: [*]const f32, ldb: c_int, beta: f32, c: [*]f32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1356,6 +1477,7 @@ pub export fn cblas_ssymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: 
 }
 
 pub export fn cblas_dsymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: c_int, alpha: f64, a: [*]const f64, lda: c_int, b: [*]const f64, ldb: c_int, beta: f64, c: [*]f64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1367,6 +1489,7 @@ pub export fn cblas_dsymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: 
 }
 
 pub export fn cblas_csymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]const ComplexF32, ldb: c_int, beta: *const ComplexF32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1378,6 +1501,7 @@ pub export fn cblas_csymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: 
 }
 
 pub export fn cblas_zsymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]const ComplexF64, ldb: c_int, beta: *const ComplexF64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1389,6 +1513,7 @@ pub export fn cblas_zsymm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: 
 }
 
 pub export fn cblas_chemm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]const ComplexF32, ldb: c_int, beta: *const ComplexF32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1400,6 +1525,7 @@ pub export fn cblas_chemm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: 
 }
 
 pub export fn cblas_zhemm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]const ComplexF64, ldb: c_int, beta: *const ComplexF64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var mm = asBlasInt(if (layout == CblasRowMajor) n else m);
@@ -1411,6 +1537,7 @@ pub export fn cblas_zhemm(layout: c_int, side: c_int, uplo: c_int, m: c_int, n: 
 }
 
 pub export fn cblas_ssyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: f32, a: [*]const f32, lda: c_int, beta: f32, c: [*]f32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1421,6 +1548,7 @@ pub export fn cblas_ssyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k:
 }
 
 pub export fn cblas_dsyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: f64, a: [*]const f64, lda: c_int, beta: f64, c: [*]f64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1431,6 +1559,7 @@ pub export fn cblas_dsyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k:
 }
 
 pub export fn cblas_csyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, beta: *const ComplexF32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1441,6 +1570,7 @@ pub export fn cblas_csyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k:
 }
 
 pub export fn cblas_zsyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, beta: *const ComplexF64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1451,6 +1581,7 @@ pub export fn cblas_zsyrk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k:
 }
 
 pub export fn cblas_cherk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: f32, a: [*]const ComplexF32, lda: c_int, beta: f32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1461,6 +1592,7 @@ pub export fn cblas_cherk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k:
 }
 
 pub export fn cblas_zherk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: f64, a: [*]const ComplexF64, lda: c_int, beta: f64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1471,6 +1603,7 @@ pub export fn cblas_zherk(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k:
 }
 
 pub export fn cblas_ssyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: f32, a: [*]const f32, lda: c_int, b: [*]const f32, ldb: c_int, beta: f32, c: [*]f32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1482,6 +1615,7 @@ pub export fn cblas_ssyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k
 }
 
 pub export fn cblas_dsyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: f64, a: [*]const f64, lda: c_int, b: [*]const f64, ldb: c_int, beta: f64, c: [*]f64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1493,6 +1627,7 @@ pub export fn cblas_dsyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k
 }
 
 pub export fn cblas_csyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]const ComplexF32, ldb: c_int, beta: *const ComplexF32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1504,6 +1639,7 @@ pub export fn cblas_csyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k
 }
 
 pub export fn cblas_zsyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]const ComplexF64, ldb: c_int, beta: *const ComplexF64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1515,6 +1651,7 @@ pub export fn cblas_zsyr2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k
 }
 
 pub export fn cblas_cher2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]const ComplexF32, ldb: c_int, beta: f32, c: [*]ComplexF32, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1526,6 +1663,7 @@ pub export fn cblas_cher2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k
 }
 
 pub export fn cblas_zher2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]const ComplexF64, ldb: c_int, beta: f64, c: [*]ComplexF64, ldc: c_int) callconv(.c) void {
+    if (!validLayout(layout)) return;
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = if (layout == CblasRowMajor) rowMajorTransChar(trans) else transChar(trans);
     var nn = asBlasInt(n);
@@ -1537,6 +1675,7 @@ pub export fn cblas_zher2k(layout: c_int, uplo: c_int, trans: c_int, n: c_int, k
 }
 
 pub export fn cblas_strmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: f32, a: [*]const f32, lda: c_int, b: [*]f32, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1549,6 +1688,7 @@ pub export fn cblas_strmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_dtrmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: f64, a: [*]const f64, lda: c_int, b: [*]f64, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1561,6 +1701,7 @@ pub export fn cblas_dtrmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_ctrmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]ComplexF32, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1573,6 +1714,7 @@ pub export fn cblas_ctrmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_ztrmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]ComplexF64, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1585,6 +1727,7 @@ pub export fn cblas_ztrmm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_strsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: f32, a: [*]const f32, lda: c_int, b: [*]f32, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1597,6 +1740,7 @@ pub export fn cblas_strsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_dtrsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: f64, a: [*]const f64, lda: c_int, b: [*]f64, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1609,6 +1753,7 @@ pub export fn cblas_dtrsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_ctrsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: *const ComplexF32, a: [*]const ComplexF32, lda: c_int, b: [*]ComplexF32, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);
@@ -1621,6 +1766,7 @@ pub export fn cblas_ctrsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int
 }
 
 pub export fn cblas_ztrsm(layout: c_int, side: c_int, uplo: c_int, transa: c_int, diag: c_int, m: c_int, n: c_int, alpha: *const ComplexF64, a: [*]const ComplexF64, lda: c_int, b: [*]ComplexF64, ldb: c_int) callconv(.c) void {
+    if (!validLayout(layout) or !validSide(side) or !validUplo(uplo) or !validTrans(transa) or !validDiag(diag)) return;
     var ss = if (layout == CblasRowMajor) rowMajorSideChar(side) else sideChar(side);
     var uu = if (layout == CblasRowMajor) rowMajorUploChar(uplo) else uploChar(uplo);
     var tt = transChar(transa);

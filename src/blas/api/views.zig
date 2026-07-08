@@ -4,9 +4,10 @@
 //! Checked public vector and matrix views for the Zig BLAS API.
 //!
 //! Views describe caller-owned buffers; they never allocate or copy data. In
-//! checked builds they validate lengths, strides, leading dimensions, and buffer
-//! capacity before operations cross into the unchecked core layer. Matrices use
-//! BLAS-style column-major storage with an explicit leading dimension.
+//! all builds they validate cheap structural invariants such as lengths, strides,
+//! and leading dimensions. Debug, ReleaseSafe, and ReleaseSmall builds also check
+//! backing slice capacity before operations cross into the unchecked core layer.
+//! Matrices use BLAS-style column-major storage with an explicit leading dimension.
 
 const builtin = @import("builtin");
 const std = @import("std");
@@ -82,16 +83,18 @@ pub fn requiredMatrixStorageLength(row_count: BlasInt, column_count: BlasInt, le
     return @as(usize, @intCast(row_count)) + (@as(usize, @intCast(column_count - 1)) * @as(usize, @intCast(leading_dimension)));
 }
 
-/// Validate that a slice can back a vector view when runtime checks are enabled.
+/// Validate a vector view's structural fields in every build, and its backing
+/// slice capacity when runtime checks are enabled.
 pub fn validateVectorStorage(data_len: usize, length: BlasInt, stride: BlasInt) Error!void {
-    if (!runtime_checks_enabled) return;
-    if (data_len < try requiredVectorStorageLength(length, stride)) return error.BufferTooSmall;
+    const required_len = try requiredVectorStorageLength(length, stride);
+    if (runtime_checks_enabled and data_len < required_len) return error.BufferTooSmall;
 }
 
-/// Validate that a slice can back a matrix view when runtime checks are enabled.
+/// Validate a matrix view's structural fields in every build, and its backing
+/// slice capacity when runtime checks are enabled.
 pub fn validateMatrixStorage(data_len: usize, row_count: BlasInt, column_count: BlasInt, leading_dimension: BlasInt) Error!void {
-    if (!runtime_checks_enabled) return;
-    if (data_len < try requiredMatrixStorageLength(row_count, column_count, leading_dimension)) return error.BufferTooSmall;
+    const required_len = try requiredMatrixStorageLength(row_count, column_count, leading_dimension);
+    if (runtime_checks_enabled and data_len < required_len) return error.BufferTooSmall;
 }
 
 /// Read an optional field from an anonymous options struct with a typed fallback.

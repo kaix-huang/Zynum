@@ -1,16 +1,19 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-pub const unchecked = @import("core/unchecked.zig");
+//! Internal unchecked BLAS facade for ABI wrappers.
+//!
+//! This surface intentionally exposes scalar helpers, BLAS indexing helpers,
+//! and unchecked vector, matrix-vector, and matrix-matrix entry points used by
+//! Fortran BLAS and CBLAS ABI bindings. Public checked views and structured
+//! operation operands stay behind `src/blas/core.zig` and `src/blas/api.zig`.
 
-pub const scalar = unchecked.scalar;
-pub const indexing = unchecked.indexing;
-pub const execution = unchecked.execution;
-pub const operands = @import("core/checked/operands.zig");
-pub const operations = @import("core/checked/operations.zig");
-pub const vector = unchecked.vector;
-pub const matrix_vector = unchecked.matrix_vector;
-pub const matrix_matrix = unchecked.matrix_matrix;
+pub const scalar = @import("shared/scalar.zig");
+pub const indexing = @import("shared/indexing.zig");
+pub const execution = @import("execution/thread_pool.zig");
+pub const vector = @import("vector.zig");
+pub const matrix_vector = @import("matrix_vector.zig");
+pub const matrix_matrix = @import("matrix_matrix.zig");
 
 pub const BlasInt = scalar.BlasInt;
 pub const ComplexF32 = scalar.ComplexF32;
@@ -25,19 +28,6 @@ pub const Order = scalar.Order;
 pub const Uplo = scalar.Uplo;
 pub const Diag = scalar.Diag;
 pub const Side = scalar.Side;
-
-pub const ConstVector = operands.ConstVector;
-pub const Vector = operands.Vector;
-pub const ConstMatrix = operands.ConstMatrix;
-pub const Matrix = operands.Matrix;
-pub const VectorSwap = operands.VectorSwap;
-pub const VectorCopy = operands.VectorCopy;
-pub const VectorScale = operands.VectorScale;
-pub const ScaledVectorAdd = operands.ScaledVectorAdd;
-pub const VectorLinearCombination = operands.VectorLinearCombination;
-pub const VectorDot = operands.VectorDot;
-pub const MatrixVectorProduct = operands.MatrixVectorProduct;
-pub const MatrixProduct = operands.MatrixProduct;
 
 pub const isComplex = scalar.isComplex;
 pub const Real = scalar.Real;
@@ -103,16 +93,6 @@ pub const rotgComplex = vector.rotgComplex;
 pub const rotm = vector.rotm;
 pub const rotmg = vector.rotmg;
 
-pub const swapVectorViews = operations.swapVectors;
-pub const copyVectorView = operations.copyVector;
-pub const scaleVectorView = operations.scaleVector;
-pub const addScaledVectorView = operations.addScaledVector;
-pub const combineVectorViews = operations.combineVectors;
-pub const dotProductView = operations.dotProduct;
-pub const euclideanNormView = operations.euclideanNorm;
-pub const multiplyMatrixVector = operations.multiplyMatrixVector;
-pub const multiplyMatrices = operations.multiplyMatrices;
-
 pub const matrixValue = matrix_vector.matrixValue;
 pub const symValue = matrix_vector.symValue;
 pub const symPackedValue = matrix_vector.symPackedValue;
@@ -146,3 +126,9 @@ pub const syrk = matrix_matrix.syrk;
 pub const syr2k = matrix_matrix.syr2k;
 pub const trmm = matrix_matrix.trmm;
 pub const trsm = matrix_matrix.trsm;
+
+pub fn shutdown() void {
+    matrix_vector.freeCurrentThreadCaches();
+    matrix_matrix.freeCurrentThreadCaches();
+    execution.shutdown();
+}

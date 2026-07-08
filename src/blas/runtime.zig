@@ -4,9 +4,8 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-pub const gemm_parallel_work_threshold: usize = 192 * 192 * 192;
-pub const medium_gemm_work_threshold: usize = 768 * 768 * 768;
 pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";
+pub const worker_stack_size: usize = 512 * 1024;
 
 var max_threads_override = std.atomic.Value(usize).init(0);
 var total_threads_cache = std.atomic.Value(usize).init(0);
@@ -15,6 +14,9 @@ var efficiency_threads_cache = std.atomic.Value(usize).init(0);
 var performance_l2_cache = std.atomic.Value(usize).init(0);
 var cache_line_cache = std.atomic.Value(usize).init(0);
 var env_threads_cache = std.atomic.Value(usize).init(0);
+
+threadlocal var worker_qos_configured = false;
+threadlocal var worker_affinity_configured = false;
 
 pub fn setMaxThreads(n: usize) void {
     max_threads_override.store(n, .monotonic);
@@ -53,6 +55,12 @@ pub fn maxThreads() usize {
     const env_limit = envThreadLimit();
     if (env_limit != 0) return @min(env_limit, totalThreadCount());
     return totalThreadCount();
+}
+
+pub fn helperThreadCount(max_helpers: usize) usize {
+    const limit = maxThreads();
+    if (limit <= 1) return 0;
+    return @min(limit - 1, max_helpers);
 }
 
 pub fn hasExplicitThreadLimit() bool {
@@ -112,17 +120,54 @@ pub fn cacheLineBytes() usize {
     return value;
 }
 
-pub fn defaultGemmThreadLimit() usize {
-    return maxThreads();
+fn ensureWorkerQoS() void {
+    if (worker_qos_configured) return;
+    worker_qos_configured = true;
+    if (comptime builtin.os.tag == .macos) {
+        _ = std.c.pthread_set_qos_class_self_np(.USER_INITIATED, 0);
+    }
 }
 
-pub fn gemmThreadCount(m: usize, n: usize, k: usize) usize {
-    if (m == 0 or n < 2 or k == 0) return 1;
+fn cpuSetContains(set: std.posix.cpu_set_t, cpu: usize) bool {
+    const bits_per_word = @bitSizeOf(usize);
+    const word_index = cpu / bits_per_word;
+    const bit_index: std.math.Log2Int(usize) = @intCast(cpu % bits_per_word);
+    return word_index < set.len and ((set[word_index] & (@as(usize, 1) << bit_index)) != 0);
+}
 
-    const work = m *| n *| k;
-    if (work < gemm_parallel_work_threshold) return 1;
+fn cpuSetAdd(set: *std.posix.cpu_set_t, cpu: usize) void {
+    const bits_per_word = @bitSizeOf(usize);
+    const word_index = cpu / bits_per_word;
+    const bit_index: std.math.Log2Int(usize) = @intCast(cpu % bits_per_word);
+    if (word_index < set.len) set[word_index] |= @as(usize, 1) << bit_index;
+}
 
-    const limit = maxThreads();
-    if (limit <= 1) return 1;
-    return @max(@as(usize, 1), @min(limit, n));
+fn pickAllowedCpu(allowed: std.posix.cpu_set_t, ordinal: usize) ?usize {
+    const count = std.os.linux.CPU_COUNT(allowed);
+    if (count == 0) return null;
+    const target = ordinal % count;
+    var seen: usize = 0;
+    for (0..std.os.linux.CPU_SETSIZE) |cpu| {
+        if (!cpuSetContains(allowed, cpu)) continue;
+        if (seen == target) return cpu;
+        seen += 1;
+    }
+    return null;
+}
+
+fn ensureWorkerAffinity(ordinal: usize) void {
+    if (worker_affinity_configured) return;
+    worker_affinity_configured = true;
+    if (comptime builtin.os.tag != .linux) return;
+
+    const allowed = std.posix.sched_getaffinity(0) catch return;
+    const cpu = pickAllowedCpu(allowed, ordinal) orelse return;
+    var pinned: std.posix.cpu_set_t = [_]usize{0} ** (std.os.linux.CPU_SETSIZE / @sizeOf(usize));
+    cpuSetAdd(&pinned, cpu);
+    std.os.linux.sched_setaffinity(0, &pinned) catch {};
+}
+
+pub fn configureWorkerThread(affinity_ordinal: ?usize) void {
+    ensureWorkerQoS();
+    if (affinity_ordinal) |ordinal| ensureWorkerAffinity(ordinal);
 }

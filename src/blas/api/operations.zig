@@ -4,10 +4,10 @@
 //! User-facing checked BLAS operations for the Zig API.
 //!
 //! These functions translate checked public views into unchecked core operands,
-//! enforce shape and aliasing contracts in checked builds, and keep BLAS ABI
-//! spellings out of the descriptive Zig facade. Default output operations use a
-//! no-alias contract; `WithWorkspace` variants provide explicit temporary storage
-//! for caller-approved aliasing.
+//! enforce cheap shape contracts in every build and aliasing contracts in checked
+//! builds, and keep BLAS ABI spellings out of the descriptive Zig facade. Default
+//! output operations use a no-alias contract; `WithWorkspace` variants provide
+//! explicit temporary storage for caller-approved aliasing.
 
 const aliasing = @import("aliasing.zig");
 const core = @import("../core.zig");
@@ -25,13 +25,11 @@ fn assertSameScalar(comptime Expected: type, value: anytype) void {
 }
 
 fn checkedPairLength(first_length: views.BlasInt, second_length: views.BlasInt) Error!views.BlasInt {
-    if (!views.runtime_checks_enabled) return @min(first_length, second_length);
     if (first_length < 0 or second_length < 0) return error.InvalidLength;
     return @min(first_length, second_length);
 }
 
 fn requireEqualLength(first_length: views.BlasInt, second_length: views.BlasInt) Error!void {
-    if (!views.runtime_checks_enabled) return;
     if (first_length < 0 or second_length < 0) return error.InvalidLength;
     if (first_length != second_length) return error.DimensionMismatch;
 }
@@ -451,8 +449,8 @@ pub fn matrixVectorMultiply(arguments: anytype) Error!void {
     try input_vector.check();
     try result_vector.check();
 
+    _ = try checkMatrixVectorShapes(input_matrix, input_vector, result_vector);
     if (views.runtime_checks_enabled) {
-        _ = try checkMatrixVectorShapes(input_matrix, input_vector, result_vector);
         try aliasing.ensureNoVectorOverlap(T, result_vector, input_vector);
         try aliasing.ensureNoVectorMatrixOverlap(T, result_vector, input_matrix);
     }
@@ -480,10 +478,7 @@ pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
     try input_vector.check();
     try result_vector.check();
 
-    const result_length = if (views.runtime_checks_enabled)
-        try checkMatrixVectorShapes(input_matrix, input_vector, result_vector)
-    else
-        try matrixVectorExpectedResultLength(input_matrix);
+    const result_length = try checkMatrixVectorShapes(input_matrix, input_vector, result_vector);
     const required_workspace = try checkedNonNegativeLength(result_length);
     try ensureWorkspaceLength(workspace.len, required_workspace);
 
@@ -515,8 +510,8 @@ pub fn matrixMultiply(arguments: anytype) Error!void {
     try right_matrix.check();
     try result_matrix.check();
 
+    try checkMatrixProductShapes(left_matrix, right_matrix, result_matrix);
     if (views.runtime_checks_enabled) {
-        try checkMatrixProductShapes(left_matrix, right_matrix, result_matrix);
         try aliasing.ensureNoMatrixOverlap(T, result_matrix, left_matrix);
         try aliasing.ensureNoMatrixOverlap(T, result_matrix, right_matrix);
     }
@@ -543,7 +538,7 @@ pub fn matrixMultiplyWithWorkspace(arguments: anytype) Error!void {
     try left_matrix.check();
     try right_matrix.check();
     try result_matrix.check();
-    if (views.runtime_checks_enabled) try checkMatrixProductShapes(left_matrix, right_matrix, result_matrix);
+    try checkMatrixProductShapes(left_matrix, right_matrix, result_matrix);
 
     const required_workspace = try matrixProductElementCount(result_matrix);
     try ensureWorkspaceLength(workspace.len, required_workspace);
