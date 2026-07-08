@@ -13,6 +13,8 @@ COLORS = {
     "Zynum": "#2563eb",
     "Accelerate": "#dc2626",
     "OpenBLAS": "#16a34a",
+    "MKL": "#7c3aed",
+    "AOCL-BLIS": "#ea580c",
 }
 
 GROUP_TITLES = {
@@ -24,7 +26,7 @@ GROUP_TITLES = {
 }
 
 GROUP_ORDER = ["copy", "real_f32", "real_f64", "complex_f32", "complex_f64"]
-LIB_ORDER = ["Zynum", "Accelerate", "OpenBLAS"]
+LIB_ORDER = ["Zynum", "Accelerate", "OpenBLAS", "MKL", "AOCL-BLIS"]
 
 
 def parse_args():
@@ -111,9 +113,19 @@ def svg_header(width, height):
     ]
 
 
+def ordered_libraries(rows):
+    seen = []
+    for row in rows:
+        if row["library"] not in seen:
+            seen.append(row["library"])
+    libs = [lib for lib in LIB_ORDER if lib in seen]
+    libs.extend(lib for lib in seen if lib not in libs)
+    return libs
+
+
 def draw_legend(svg, x, y, libraries):
     for i, lib in enumerate(libraries):
-        lx = x + i * 150
+        lx = x + i * 145
         color = COLORS.get(lib, "#6b7280")
         svg.append(f'<rect x="{lx}" y="{y - 12}" width="18" height="12" fill="{color}"/>')
         svg.append(f'<text x="{lx + 26}" y="{y - 2}" class="legend">{html.escape(lib)}</text>')
@@ -205,7 +217,9 @@ def plot_bars(rows, output_path):
     svg.append(
         f'<text x="40" y="66" class="subtitle">Higher is better. Fresh process per library/op; n={",".join(map(str, n_values))}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
     )
-    draw_legend(svg, 930, 45, [lib for lib in LIB_ORDER if any(row["library"] == lib for row in rows)])
+    legend_libraries = ordered_libraries(rows)
+    legend_x = max(40, width - len(legend_libraries) * 145 - 35)
+    draw_legend(svg, legend_x, 45, legend_libraries)
     for index, group in enumerate(groups):
         top = top0 + index * (panel_height + panel_gap)
         draw_group_panel(svg, by_group[group], group, top, left, chart_width, panel_height)
@@ -260,7 +274,7 @@ def plot_ratio(rows, output_path):
     max_tick = ticks[-1]
     svg = svg_header(width, height)
     svg.append('<text x="40" y="42" class="title">Zynum vs Fastest Comparator Ratio</text>')
-    svg.append('<text x="40" y="66" class="subtitle">Higher is better. Ratio = Zynum metric / max(Accelerate, OpenBLAS). Values below 1.0 indicate a measured slower operation.</text>')
+    svg.append('<text x="40" y="66" class="subtitle">Higher is better. Ratio = Zynum metric / fastest non-Zynum comparator. Values below 1.0 indicate a measured slower operation.</text>')
     for tick in ticks:
         y = sy(tick, max_tick, top, chart_height)
         svg.append(f'<line x1="{left}" y1="{y:.1f}" x2="{left + chart_width}" y2="{y:.1f}" class="grid"/>')

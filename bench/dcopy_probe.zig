@@ -5,6 +5,7 @@ const std = @import("std");
 
 const BlasInt = i32;
 const CopyFn = *const fn (*const BlasInt, [*]const u8, *const BlasInt, [*]u8, *const BlasInt) callconv(.c) void;
+const ShutdownFn = *const fn () callconv(.c) void;
 
 fn usage() void {
     std.debug.print("usage: dcopy-probe --lib path [--kind s|d|c|z] [--n elems] [--seconds s]\n", .{});
@@ -60,7 +61,10 @@ pub fn main(init: std.process.Init) !void {
     };
 
     var dyn = try std.DynLib.open(path);
-    defer dyn.close();
+    defer {
+        if (dyn.lookup(ShutdownFn, "zynum_blas_shutdown")) |shutdown| shutdown();
+        dyn.close();
+    }
     const copy_fn = dyn.lookup(CopyFn, kind.symbol) orelse return error.MissingCopy;
 
     const byte_count = n * kind.elem_size;

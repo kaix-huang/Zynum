@@ -10,12 +10,25 @@ import time
 DEFAULT_ACCELERATE = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 
 
+class ComplexF64(ctypes.Structure):
+    _fields_ = [("re", ctypes.c_double), ("im", ctypes.c_double)]
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Run one Level 2 BLAS case in a tight loop.")
     parser.add_argument("--library", default=DEFAULT_ACCELERATE)
-    parser.add_argument("--case", choices=["sgemv_n", "sgemv_t", "sger", "ssymv"], required=True)
+    parser.add_argument(
+        "--case",
+        choices=["sgemv_n", "sgemv_t", "sger", "dger", "ssymv", "zgemv_n", "zgemv_t", "zgeru", "zgerc"],
+        required=True,
+    )
     parser.add_argument("--n", type=int, default=512)
     parser.add_argument("--seconds", type=float, default=10.0)
+    parser.add_argument(
+        "--no-reset",
+        action="store_true",
+        help="skip per-call output reset for profiling the BLAS call body",
+    )
     return parser.parse_args()
 
 
@@ -24,12 +37,22 @@ def next_fill(seed):
     return ((seed[0] >> 32) % 1000) / 1000.0 - 0.5
 
 
-def real_array(count, seed_value):
+def real_array(count, seed_value, ctype=ctypes.c_float):
     seed = [seed_value]
-    array_type = ctypes.c_float * count
+    array_type = ctype * count
     out = array_type()
     for index in range(count):
-        out[index] = ctypes.c_float(next_fill(seed))
+        out[index] = ctype(next_fill(seed))
+    return out
+
+
+def complex_f64_array(count, seed_value):
+    seed = [seed_value]
+    array_type = ComplexF64 * count
+    out = array_type()
+    for index in range(count):
+        out[index].re = ctypes.c_double(next_fill(seed))
+        out[index].im = ctypes.c_double(next_fill(seed))
     return out
 
 
@@ -47,22 +70,36 @@ def main():
     lib = ctypes.CDLL(args.library)
     ni = ctypes.c_int(n)
     one = ctypes.c_int(1)
-    trans = ctypes.create_string_buffer(b"T" if args.case == "sgemv_t" else b"N")
+    trans = ctypes.create_string_buffer(b"T" if args.case in ("sgemv_t", "zgemv_t") else b"N")
     uplo = ctypes.create_string_buffer(b"U")
     alpha = ctypes.c_float(0.7)
     beta = ctypes.c_float(0.3)
+    dalpha = ctypes.c_double(0.7)
+    zalpha = ComplexF64(0.7, -0.2)
+    zbeta = ComplexF64(0.3, 0.1)
     matrix = real_array(n * n, 0x3141592653589793)
     matrix0 = real_array(n * n, 0x123456789ABCDEF0)
     x = real_array(n, 0x2718281828459045)
     y0 = real_array(n, 0x1618033988749895)
     y = real_array(n, 0x1123581321345589)
     gy = real_array(n, 0x0102030405060708)
+    dmatrix = real_array(n * n, 0x3141592653589793, ctypes.c_double)
+    dmatrix0 = real_array(n * n, 0x123456789ABCDEF0, ctypes.c_double)
+    dx = real_array(n, 0x2718281828459045, ctypes.c_double)
+    dgy = real_array(n, 0x0102030405060708, ctypes.c_double)
+    zmatrix = complex_f64_array(n * n, 0x3141592653589793)
+    zmatrix0 = complex_f64_array(n * n, 0x123456789ABCDEF0)
+    zx = complex_f64_array(n, 0x2718281828459045)
+    zy0 = complex_f64_array(n, 0x1618033988749895)
+    zy = complex_f64_array(n, 0x1123581321345589)
+    zgy = complex_f64_array(n, 0x0102030405060708)
 
     if args.case in ("sgemv_n", "sgemv_t"):
         fn = lib.sgemv_
 
         def call():
-            copy_array(y, y0)
+            if not args.no_reset:
+                copy_array(y, y0)
             fn(
                 trans,
                 ctypes.byref(ni),
@@ -81,7 +118,8 @@ def main():
         fn = lib.sger_
 
         def call():
-            copy_array(matrix, matrix0)
+            if not args.no_reset:
+                copy_array(matrix, matrix0)
             fn(
                 ctypes.byref(ni),
                 ctypes.byref(ni),
@@ -94,11 +132,30 @@ def main():
                 ctypes.byref(ni),
             )
 
-    else:
+    elif args.case == "dger":
+        fn = lib.dger_
+
+        def call():
+            if not args.no_reset:
+                copy_array(dmatrix, dmatrix0)
+            fn(
+                ctypes.byref(ni),
+                ctypes.byref(ni),
+                ctypes.byref(dalpha),
+                ptr(dx),
+                ctypes.byref(one),
+                ptr(dgy),
+                ctypes.byref(one),
+                ptr(dmatrix),
+                ctypes.byref(ni),
+            )
+
+    elif args.case == "ssymv":
         fn = lib.ssymv_
 
         def call():
-            copy_array(y, y0)
+            if not args.no_reset:
+                copy_array(y, y0)
             fn(
                 uplo,
                 ctypes.byref(ni),
@@ -110,6 +167,44 @@ def main():
                 ctypes.byref(beta),
                 ptr(y),
                 ctypes.byref(one),
+            )
+
+    elif args.case in ("zgemv_n", "zgemv_t"):
+        fn = lib.zgemv_
+
+        def call():
+            if not args.no_reset:
+                copy_array(zy, zy0)
+            fn(
+                trans,
+                ctypes.byref(ni),
+                ctypes.byref(ni),
+                ctypes.byref(zalpha),
+                ptr(zmatrix),
+                ctypes.byref(ni),
+                ptr(zx),
+                ctypes.byref(one),
+                ctypes.byref(zbeta),
+                ptr(zy),
+                ctypes.byref(one),
+            )
+
+    else:
+        fn = lib.zgeru_ if args.case == "zgeru" else lib.zgerc_
+
+        def call():
+            if not args.no_reset:
+                copy_array(zmatrix, zmatrix0)
+            fn(
+                ctypes.byref(ni),
+                ctypes.byref(ni),
+                ctypes.byref(zalpha),
+                ptr(zx),
+                ctypes.byref(one),
+                ptr(zgy),
+                ctypes.byref(one),
+                ptr(zmatrix),
+                ctypes.byref(ni),
             )
 
     deadline = time.perf_counter() + args.seconds

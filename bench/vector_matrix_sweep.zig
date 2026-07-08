@@ -35,7 +35,7 @@ const Result = struct {
 };
 
 fn usage() void {
-    std.debug.print("usage: level12-sweep --zynum-blas path [--accelerate path] [--openblas path] [--reps n] [--size n] [--case name]\n", .{});
+    std.debug.print("usage: vector-matrix-sweep --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--aocl-blis path] [--reps n] [--size n] [--case name]\n", .{});
 }
 
 fn loadLib(name: []const u8, path: []const u8) !Lib {
@@ -299,6 +299,8 @@ pub fn main(init: std.process.Init) !void {
     var zynum_blas_path: ?[]const u8 = null;
     var accel_path: ?[]const u8 = null;
     var openblas_path: ?[]const u8 = null;
+    var mkl_path: ?[]const u8 = null;
+    var aocl_blis_path: ?[]const u8 = null;
     var reps: usize = 20;
     var size: usize = 1024;
     var case_filter: ?[]const u8 = null;
@@ -313,6 +315,10 @@ pub fn main(init: std.process.Init) !void {
             accel_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--openblas")) {
             openblas_path = args.next() orelse return error.MissingValue;
+        } else if (std.mem.eql(u8, arg, "--mkl")) {
+            mkl_path = args.next() orelse return error.MissingValue;
+        } else if (std.mem.eql(u8, arg, "--aocl-blis") or std.mem.eql(u8, arg, "--aocl")) {
+            aocl_blis_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--reps")) {
             reps = try std.fmt.parseInt(usize, args.next() orelse return error.MissingValue, 10);
         } else if (std.mem.eql(u8, arg, "--size")) {
@@ -335,7 +341,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
-    var libs: [3]Lib = undefined;
+    var libs: [5]Lib = undefined;
     var lib_count: usize = 0;
     libs[lib_count] = try loadLib("zynum-blas", zynum_blas_path.?);
     lib_count += 1;
@@ -345,6 +351,14 @@ pub fn main(init: std.process.Init) !void {
     }
     if (openblas_path) |path| {
         libs[lib_count] = try loadLib("OpenBLAS", path);
+        lib_count += 1;
+    }
+    if (mkl_path) |path| {
+        libs[lib_count] = try loadLib("MKL", path);
+        lib_count += 1;
+    }
+    if (aocl_blis_path) |path| {
+        libs[lib_count] = try loadLib("AOCL-BLIS", path);
         lib_count += 1;
     }
     // Keep benchmark libraries loaded until process exit. Zynum and comparator

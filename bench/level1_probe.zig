@@ -7,6 +7,7 @@ const BlasInt = i32;
 const C32 = extern struct { re: f32, im: f32 };
 const C64 = extern struct { re: f64, im: f64 };
 
+const ShutdownFn = *const fn () callconv(.c) void;
 const SscalFn = *const fn (*const BlasInt, *const f32, [*]f32, *const BlasInt) callconv(.c) void;
 const DscalFn = *const fn (*const BlasInt, *const f64, [*]f64, *const BlasInt) callconv(.c) void;
 const CsscalFn = *const fn (*const BlasInt, *const f32, [*]C32, *const BlasInt) callconv(.c) void;
@@ -23,6 +24,8 @@ const ZaxpbyFn = *const fn (*const BlasInt, *const C64, [*]const C64, *const Bla
 
 const SdotFn = *const fn (*const BlasInt, [*]const f32, *const BlasInt, [*]const f32, *const BlasInt) callconv(.c) f32;
 const DdotFn = *const fn (*const BlasInt, [*]const f64, *const BlasInt, [*]const f64, *const BlasInt) callconv(.c) f64;
+const CblasSdotFn = *const fn (BlasInt, [*]const f32, BlasInt, [*]const f32, BlasInt) callconv(.c) f32;
+const CblasDdotFn = *const fn (BlasInt, [*]const f64, BlasInt, [*]const f64, BlasInt) callconv(.c) f64;
 const CdotSubFn = *const fn (*const BlasInt, [*]const C32, *const BlasInt, [*]const C32, *const BlasInt, *C32) callconv(.c) void;
 const ZdotSubFn = *const fn (*const BlasInt, [*]const C64, *const BlasInt, [*]const C64, *const BlasInt, *C64) callconv(.c) void;
 const CblasCdotSubFn = *const fn (BlasInt, [*]const C32, BlasInt, [*]const C32, BlasInt, *C32) callconv(.c) void;
@@ -32,11 +35,19 @@ const SasumFn = *const fn (*const BlasInt, [*]const f32, *const BlasInt) callcon
 const DasumFn = *const fn (*const BlasInt, [*]const f64, *const BlasInt) callconv(.c) f64;
 const ScasumFn = *const fn (*const BlasInt, [*]const C32, *const BlasInt) callconv(.c) f32;
 const DzasumFn = *const fn (*const BlasInt, [*]const C64, *const BlasInt) callconv(.c) f64;
+const CblasSasumFn = *const fn (BlasInt, [*]const f32, BlasInt) callconv(.c) f32;
+const CblasDasumFn = *const fn (BlasInt, [*]const f64, BlasInt) callconv(.c) f64;
+const CblasScasumFn = *const fn (BlasInt, [*]const C32, BlasInt) callconv(.c) f32;
+const CblasDzasumFn = *const fn (BlasInt, [*]const C64, BlasInt) callconv(.c) f64;
 
 const Snrm2Fn = *const fn (*const BlasInt, [*]const f32, *const BlasInt) callconv(.c) f32;
 const Dnrm2Fn = *const fn (*const BlasInt, [*]const f64, *const BlasInt) callconv(.c) f64;
 const Scnrm2Fn = *const fn (*const BlasInt, [*]const C32, *const BlasInt) callconv(.c) f32;
 const Dznrm2Fn = *const fn (*const BlasInt, [*]const C64, *const BlasInt) callconv(.c) f64;
+const CblasSnrm2Fn = *const fn (BlasInt, [*]const f32, BlasInt) callconv(.c) f32;
+const CblasDnrm2Fn = *const fn (BlasInt, [*]const f64, BlasInt) callconv(.c) f64;
+const CblasScnrm2Fn = *const fn (BlasInt, [*]const C32, BlasInt) callconv(.c) f32;
+const CblasDznrm2Fn = *const fn (BlasInt, [*]const C64, BlasInt) callconv(.c) f64;
 
 const Op = enum {
     sscal,
@@ -203,7 +214,10 @@ pub fn main(init: std.process.Init) !void {
     };
 
     var dyn = try std.DynLib.open(path);
-    defer dyn.close();
+    defer {
+        if (dyn.lookup(ShutdownFn, "zynum_blas_shutdown")) |shutdown| shutdown();
+        dyn.close();
+    }
 
     var ni: BlasInt = @intCast(n);
     var inc: BlasInt = 1;
@@ -235,16 +249,31 @@ pub fn main(init: std.process.Init) !void {
                     while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) f(&ni, &alpha, x.ptr, &inc, y.ptr, &inc);
                 },
                 .sdot => {
-                    const f = dyn.lookup(SdotFn, "sdot_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc, y.ptr, &inc);
+                    if (dyn.lookup(CblasSdotFn, "cblas_sdot")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc, y.ptr, inc);
+                    } else if (dyn.lookup(SdotFn, "sdot_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc, y.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 .sasum => {
-                    const f = dyn.lookup(SasumFn, "sasum_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasSasumFn, "cblas_sasum")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(SasumFn, "sasum_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 .snrm2 => {
-                    const f = dyn.lookup(Snrm2Fn, "snrm2_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasSnrm2Fn, "cblas_snrm2")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(Snrm2Fn, "snrm2_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 else => unreachable,
             }
@@ -266,16 +295,31 @@ pub fn main(init: std.process.Init) !void {
                     while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) f(&ni, &alpha, x.ptr, &inc, y.ptr, &inc);
                 },
                 .ddot => {
-                    const f = dyn.lookup(DdotFn, "ddot_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc, y.ptr, &inc);
+                    if (dyn.lookup(CblasDdotFn, "cblas_ddot")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc, y.ptr, inc);
+                    } else if (dyn.lookup(DdotFn, "ddot_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc, y.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 .dasum => {
-                    const f = dyn.lookup(DasumFn, "dasum_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasDasumFn, "cblas_dasum")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(DasumFn, "dasum_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 .dnrm2 => {
-                    const f = dyn.lookup(Dnrm2Fn, "dnrm2_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasDnrm2Fn, "cblas_dnrm2")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(Dnrm2Fn, "dnrm2_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 else => unreachable,
             }
@@ -325,12 +369,22 @@ pub fn main(init: std.process.Init) !void {
                     }
                 },
                 .scasum => {
-                    const f = dyn.lookup(ScasumFn, "scasum_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasScasumFn, "cblas_scasum")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(ScasumFn, "scasum_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 .scnrm2 => {
-                    const f = dyn.lookup(Scnrm2Fn, "scnrm2_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasScnrm2Fn, "cblas_scnrm2")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(Scnrm2Fn, "scnrm2_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 else => unreachable,
             }
@@ -380,12 +434,22 @@ pub fn main(init: std.process.Init) !void {
                     }
                 },
                 .dzasum => {
-                    const f = dyn.lookup(DzasumFn, "dzasum_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasDzasumFn, "cblas_dzasum")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(DzasumFn, "dzasum_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 .dznrm2 => {
-                    const f = dyn.lookup(Dznrm2Fn, "dznrm2_") orelse return error.MissingSymbol;
-                    while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    if (dyn.lookup(CblasDznrm2Fn, "cblas_dznrm2")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(ni, x.ptr, inc);
+                    } else if (dyn.lookup(Dznrm2Fn, "dznrm2_")) |f| {
+                        while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) sink += f(&ni, x.ptr, &inc);
+                    } else {
+                        return error.MissingSymbol;
+                    }
                 },
                 else => unreachable,
             }

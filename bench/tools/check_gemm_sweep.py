@@ -7,6 +7,8 @@ import csv
 import sys
 from collections import defaultdict
 
+CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -32,6 +34,11 @@ def parse_args():
         "--allow-missing-comparators",
         action="store_true",
         help="Skip groups with no requested comparator rows instead of failing.",
+    )
+    parser.add_argument(
+        "--allow-unchecked",
+        action="store_true",
+        help="Allow rows whose GEMM correctness check is absent or not checked.",
     )
     parser.add_argument("--worst", type=int, default=20, help="Number of worst rows to print.")
     return parser.parse_args()
@@ -61,6 +68,12 @@ def main():
         for row in csv.DictReader(f):
             if not row_allowed(args, row):
                 continue
+            if not args.allow_unchecked and row.get("check") not in CHECKED_STATUSES:
+                print(
+                    f"unchecked GEMM row is not eligible for comparison: {row}",
+                    file=sys.stderr,
+                )
+                return 2
             try:
                 row["gflops_value"] = float(row["gflops"])
             except (KeyError, ValueError):
