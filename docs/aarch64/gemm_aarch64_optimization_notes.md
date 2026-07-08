@@ -6,25 +6,31 @@ This document covers AArch64-specific GEMM work in Zynum BLAS.
 
 Current source locations:
 
-- `src/blas/kernels/matrix_matrix/catalog.zig`: shared AArch64 descriptor parameters.
-- `src/blas/kernels/matrix_matrix/tuning.zig`: shape/scalar candidate matching and
+- `src/blas/kernels/shared/matrix_matrix/catalog.zig`: shared AArch64 descriptor parameters.
+- `src/blas/kernels/shared/matrix_matrix/packed_params.zig`: shared fixed-width packed
+  SIMD lane, panel, row-group, K-unroll, and stack-pack parameters.
+- `src/blas/kernels/shared/matrix_matrix/tuning.zig`: shape/scalar candidate matching and
   execution-plan parameter selection.
-- `src/blas/kernels/matrix_matrix/executor.zig`: selected `KernelId` execution bridge.
-- `src/blas/kernels/matrix_matrix/packed_simd.zig`: shared packed-B SIMD skeleton used by
+- `src/blas/kernels/shared/matrix_matrix/executor.zig`: selected `KernelId` execution bridge.
+- `src/blas/kernels/shared/matrix_matrix/packed_simd.zig`: shared packed-B SIMD skeleton used by
   ASIMD after AArch64 supplies lane, row-group, panel, tail, and stack-pack
   parameters.
-- `src/blas/kernels/matrix_matrix/epilogue.zig`: shared scalar/vector alpha/beta
+- `src/blas/kernels/shared/matrix_matrix/epilogue.zig`: shared scalar/vector alpha/beta
   write-back helpers used by portable and packed SIMD kernels.
-- `src/blas/kernels/aarch64/features.zig`: compile-time feature probes.
-- `src/blas/kernels/aarch64/asimd.zig`: thin ASIMD/FMA wrapper that configures
+- `src/blas/kernels/arch/aarch64/features.zig`: compile-time feature probes.
+- `src/blas/kernels/arch/aarch64/matrix_matrix/asimd.zig`: thin ASIMD/FMA wrapper that configures
   the shared packed-B SIMD skeleton.
-- `src/blas/kernels/aarch64/sve2.zig`: SVE2 dispatch placeholder.
-- `src/blas/kernels/aarch64/sme.zig`: SME execution wrapper, feasibility checks,
+- `src/blas/kernels/arch/aarch64/matrix_matrix/sve2.zig`: SVE2 dispatch placeholder.
+- `src/blas/kernels/arch/aarch64/matrix_matrix/sme.zig`: SME execution wrapper, feasibility checks,
   shared f32/f64 pack-workspace prologue, tail-row fallback, and hardware state
   boundaries for plan-selected fast paths.
-- `src/blas/kernels/aarch64/sme_f32_gemm.S`: f32 SME assembly kernels.
-- `src/blas/kernels/aarch64/sme_f64_gemm.S`: f64 SME assembly kernels.
-- `src/blas/kernels/aarch64/amx_gemm.zig`: Apple AMX experiments.
+- `src/blas/kernels/arch/aarch64/matrix_matrix/sme_asm.zig`: f32/f64 SME assembly kernels.
+- `src/blas/kernels/arch/aarch64/asm/builders.zig`: reusable SVE/SME inline assembly
+  fragments and comptime whole-function builders.
+- `src/blas/kernels/arch/aarch64/matrix_matrix/amx_ops.zig`: Apple AMX opcode emitters and operand
+  encoders.
+- `src/blas/kernels/arch/aarch64/matrix_matrix/amx.zig`: Apple AMX GEMM algorithm structure
+  and gate checks.
 
 ## Dispatch Order
 
@@ -91,8 +97,8 @@ exploratory gate to default from one focused win.
   actual `v8`-`v15`/`z8`-`z15` use and narrow the save set when that is safe.
 - Keep large SME loops in assembly files.
 - Use inline assembly only for small state-control snippets.
-- Keep performance shape gates in `src/blas/gemm/dispatch.zig` or
-  `src/blas/kernels/matrix_matrix/tuning.zig`, not in `src/blas/kernels/aarch64/sme.zig`
+- Keep performance shape gates in `src/blas/core/matrix_matrix/planner.zig` or
+  `src/blas/kernels/shared/matrix_matrix/tuning.zig`, not in `src/blas/kernels/arch/aarch64/matrix_matrix/sme.zig`
   or ABI wrappers.
 - Keep SME Zig-side pack helpers parameterized by `T`, panel width, and panel
   count where possible. Instruction files may check tile feasibility, but pack
@@ -102,6 +108,11 @@ exploratory gate to default from one focused win.
   specific: tile feasibility, stack-vs-cache workspace acquisition, and scalar
   tail rows should be parameterized by `T` and tile width. Only the assembly
   call sequence and SME state ownership should remain dtype-specific.
+- For inline assembly generated from Zig strings, put reusable lane suffixes,
+  unroll bodies, reduction epilogues, and streaming-mode boilerplate in
+  `builders.zig`. Callers should select a builder with comptime parameters
+  instead of pasting a second whole-function body for each dtype or conjugation
+  variant.
 
 SME can improve high-throughput real GEMM, but small shapes are sensitive to
 fixed streaming-mode and packing costs.
@@ -118,7 +129,10 @@ Rules:
 - Every AMX state setup must have paired cleanup.
 - AMX wrapper functions should only check ABI, nonzero sizes, alignment, and
   tile feasibility. Shape preference between N8/N16/N32 variants belongs in
-  `src/blas/kernels/matrix_matrix/tuning.zig`.
+  `src/blas/kernels/shared/matrix_matrix/tuning.zig`.
+- AMX opcode emission and operand packing belong in `amx_ops.zig`. GEMM files
+  should call those helpers and keep their local code focused on pack order,
+  tile loops, alpha/beta write-back, and cleanup.
 - Stack/cache workspace budgets for AMX are execution-plan parameters. The AMX
   file may retain hard fixed-stack safety caps, but it should not contain
   tiered performance thresholds.
@@ -175,7 +189,7 @@ parallel work.
 
 Use `ZYNUM_MAXIMUM_THREADS` for explicit thread-cap experiments. When unset, the
 cap is the runtime CPU count. Values above the runtime CPU count are capped to
-that count; GEMM dispatch may choose fewer threads internally.
+that count; GEMM planning may choose fewer threads internally.
 
 Current default planner notes for Apple Silicon:
 
@@ -206,24 +220,32 @@ Accelerate without a fresh-process sweep that proves it.
 Recommended environment for reportable local sweeps:
 
 ```sh
-export ZYNUM_MAXIMUM_THREADS=1
-export VECLIB_MAXIMUM_THREADS=1
-export OPENBLAS_NUM_THREADS=1
+unset ZYNUM_MAXIMUM_THREADS
+export VECLIB_MAXIMUM_THREADS=10
+export OPENBLAS_NUM_THREADS=10
 export OPENBLAS_DYNAMIC=0
 ```
+
+Use `ZYNUM_MAXIMUM_THREADS=1` only for explicit single-thread focused probes or
+thread-cap experiments.
 
 Native Apple M-series target:
 
 ```sh
-zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast
-zig build bench-gemm-sweep -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast -- --reps 30
+zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+zig build bench-gemm-sweep -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast -- --reps 30
 ```
+
+Run benchmark commands only on hosts where the requested SME/SME2 feature set is
+executable. Otherwise, use the target command above as compile coverage and keep
+runtime correctness on a host-supported target.
 
 Focused SME/AMX probe:
 
 ```sh
 ZYNUM_MAXIMUM_THREADS=1 zig build bench-gemm-sweep \
-  -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast -- \
+  -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast -- \
   --kind sgemm \
   --shape sq128:128:128:128 \
   --shape m128_n128_k4096:128:128:4096 \
@@ -238,7 +260,8 @@ python3 bench/tools/run_gemm_sweep_isolated.py \
   --zynum-blas zig-out/lib/libzynum_blas.dylib \
   --csv zig-out/aarch64_gemm_isolated.csv \
   --reps 30 \
-  --process-repeats 2
+  --process-repeats 3 \
+  --check
 ```
 
 Use level 3 isolation for any SME or AMX outlier that might be affected by cache,
@@ -248,6 +271,31 @@ For this local Apple M5 tuning pass, the reportable final sweep should leave
 `ZYNUM_MAXIMUM_THREADS` unset and run the isolated helper against Accelerate and
 OpenBLAS, then plot the CSV with `bench/tools/plot_gemm_sweep.py`.
 
+## 2026-06-30 AArch64 Inline Assembly Organization
+
+This pass reorganized SVE, SME, and AMX inline assembly ownership. It is a
+maintainability and coverage update, not a new throughput claim.
+
+Retained organization:
+
+- `builders.zig` owns reusable SVE/SME whole-function builders for vector
+  copy, scale, real AXPY, real reductions, real dot, complex dot, complex AXPY,
+  SVE rows64 complex GEMV-N, SME streaming byte-copy, SME streaming scale,
+  `asum`, AXPY, dot helpers, and SME2 f32 no-transpose GEMV-N row panels.
+  Builders take comptime parameters such as lane suffix, unroll count,
+  conjugation, row-panel shape, ZA tile shape, and streaming prologue/epilogue
+  text so dtype and variant bodies stay together.
+- The builders are responsible for ISA-legal assembly text. In particular, SVE
+  single-vector load/store `MUL VL` offsets beyond the encodable range must be
+  split through temporary base registers.
+- `amx_ops.zig` owns Apple AMX `.word` opcode emission, state setup/cleanup,
+  memory load/store wrappers, compute wrappers, and operand encoders.
+- `amx.zig` should remain an algorithm file: select the AMX helper,
+  organize packed panels, run the tile loops, and call shared write-back helpers.
+
+Future SVE/SME/AMX variants should first try a new comptime builder parameter or
+small helper in these files before adding another pasted inline-assembly body.
+
 ## 2026-06-23 Apple M5 Tuning Result
 
 Validation commands:
@@ -255,8 +303,8 @@ Validation commands:
 ```sh
 zig fmt --check build.zig build.zig.zon src test bench examples tools
 zig build --global-cache-dir .zig-cache/global test --summary failures
-zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
-zig build --global-cache-dir .zig-cache/global -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+zig build --global-cache-dir .zig-cache/global -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
 ```
 
 Final sweep command:
@@ -312,9 +360,9 @@ After the tuning pass, the AArch64 kernel layer was refactored around shared
 kernel mechanics:
 
 - ASIMD is a thin feature/config wrapper around
-  `src/blas/kernels/matrix_matrix/packed_simd.zig`.
+  `src/blas/kernels/shared/matrix_matrix/packed_simd.zig`.
 - Real-GEMM alpha/beta write-back is centralized in
-  `src/blas/kernels/matrix_matrix/epilogue.zig`, which keeps the `beta=0` no-read path
+  `src/blas/kernels/shared/matrix_matrix/epilogue.zig`, which keeps the `beta=0` no-read path
   explicit.
 - SME direct paths share dtype-parameterized tile feasibility, stack-vs-cache
   workspace prologue, and scalar tail-row handling. SME assembly calls and
@@ -330,7 +378,7 @@ Validation commands:
 
 ```sh
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
 env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/check_gemm_sweep.py
 ```
 
@@ -396,7 +444,7 @@ Validation commands:
 
 ```sh
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
+zig build --global-cache-dir .zig-cache/global test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
 ```
 
 Retained cleanup rules:

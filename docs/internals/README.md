@@ -12,6 +12,7 @@ rules.
 | Public API checks and aliasing model | [`../development_and_usage.md`](../development_and_usage.md) |
 | ABI and generated compatibility files | [`../fortran_compatibility.md`](../fortran_compatibility.md) |
 | Zig 0.16 `std.Io` threading notes | [`../common/zig_0_16_std_io_threading.md`](../common/zig_0_16_std_io_threading.md) |
+| CPU affinity and heterogeneous scheduling | [`../common/cpu_affinity_and_heterogeneous_scheduling.md`](../common/cpu_affinity_and_heterogeneous_scheduling.md) |
 | BLAS Level 1 implementation notes | [`../common/level1_optimization_notes.md`](../common/level1_optimization_notes.md) |
 | BLAS Level 2 implementation notes | [`../common/level2_optimization_notes.md`](../common/level2_optimization_notes.md) |
 | GEMM implementation rules | [`../common/gemm_optimization_notes.md`](../common/gemm_optimization_notes.md) |
@@ -24,13 +25,13 @@ Stable import roots should stay as facades:
 - `src/blas.zig`
 - `src/blas/api.zig`
 - `src/blas/core.zig`
-- `src/blas/core/raw.zig`
-- `src/blas/core/level1.zig`
-- `src/blas/core/level2.zig`
-- `src/blas/core/level3.zig`
+- `src/blas/core/unchecked.zig`
+- `src/blas/core/vector.zig`
+- `src/blas/core/matrix_vector.zig`
+- `src/blas/core/matrix_matrix.zig`
 
 Concrete implementations should live below those facades, grouped by operation
 family or backend responsibility. Preserve facade exports when moving code so
 typed APIs, ABI wrappers, and tests do not learn implementation paths. Keep ABI
-wrappers on `src/blas/core/raw.zig`; public checked operations should continue
+wrappers on `src/blas/core/unchecked.zig`; public checked operations should continue
 to use `src/blas/core.zig` or the public API facade.

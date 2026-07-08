@@ -23,5 +23,5 @@ dispatch details unless they affect observable behavior.
 - `ZYNUM_MAXIMUM_THREADS` is the only Zynum-specific environment variable.
 
 Avoid depending on files under `src/blas/core/`, `src/blas/kernels/`, or
-`src/blas/gemm/` from downstream projects. Those are implementation details
+`src/blas/core/matrix_matrix/` from downstream projects. Those are implementation details
 during the beta line.

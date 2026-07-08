@@ -1,9 +1,9 @@
 # Roadmap
 
 Zynum `0.0.1-beta` establishes the first public foundation for the project:
-full BLAS Level 1-3 coverage, typed Zig vector/matrix views, C/CBLAS/Fortran ABI
-compatibility, generated headers/modules, examples, tests, benchmark tooling, and
-selected architecture-aware GEMM optimization work.
+BLAS Level 1-3 compatibility coverage, typed Zig vector/matrix views,
+C/CBLAS/Fortran ABI compatibility, generated headers/modules, examples, tests,
+benchmark tooling, and selected architecture-aware optimization work.
 
 The long-term goal is a high-performance runtime that can directly replace BLAS,
 LAPACK, FFT, sparse linear algebra, CNN, and Transformer acceleration libraries
@@ -40,9 +40,9 @@ Release goals:
     Apple Silicon and other capable ARM systems.
   - x86_64 baseline/SSE-family, AVX, AVX2/FMA, AVX512/FMA, and current Intel and
     AMD desktop/server CPUs.
-- Make Apple's latest production silicon the primary native performance gate.
-  The target for 0.1 is that Zynum beats Accelerate across the documented BLAS
-  benchmark suite on the latest Apple chips, with `ZYNUM_MAXIMUM_THREADS` unset
+- Make the documented Apple M5 local gate as of 2026-07 the primary native
+  performance gate. The target for 0.1 is that Zynum beats Accelerate across the
+  documented BLAS benchmark suite there, with `ZYNUM_MAXIMUM_THREADS` unset
   unless a single-thread gate is being measured.
 - Treat any performance claim against Accelerate, OpenBLAS, MKL, or another
   comparator as invalid unless it has fresh-process isolation, exact commands,
@@ -83,12 +83,13 @@ Non-goals for 0.1.x:
 - Improve small and medium SGEMM/DGEMM latency without broad shape regressions.
 - Build dedicated complex GEMM paths instead of relying only on repeated real
   transformations where target-specific kernels can do better.
-- Keep worker-pool, non-default GEMM IO, SME, AMX, AVX2, and AVX512 experiments
-  opt-in until native fresh-process evidence justifies a default rule.
+- Keep non-default threading, SME, AMX, AVX2, and AVX512 experiments opt-in
+  until native fresh-process evidence justifies a default rule. All retained
+  parallel paths must use the shared core `std.Io.Threaded` helper lifecycle.
 - Record retained dispatch gates with target features, exact shape predicates,
   runtime environment variables, commands, CSV paths, and rollback criteria.
 - Add better x86_64 validation on real Intel and AMD hardware.
-- Keep shape policy in `src/blas/gemm/dispatch.zig`; keep instruction details
+- Keep shape policy in `src/blas/core/matrix_matrix/planner.zig`; keep instruction details
   under `src/blas/kernels/`.
 
 ## Future Modules

@@ -9,20 +9,26 @@ environment, target, raw data, and isolation level are reproducible.
 ## Rules
 
 1. Run correctness tests for the target before performance tests.
-2. Use the same shapes, repetitions, initialization, warmup, and timing method
+2. Inspect the per-row correctness field before interpreting timing. For Level
+   1/2 reports this is `check_status`; for GEMM sweeps it is `check`.
+   `sampled-ok` and `checked-ok` are valid performance evidence. Rows marked
+   `correctness_failed`, `error`, `missing`, unchecked, or unknown are
+   diagnostics only.
+3. Use the same shapes, repetitions, initialization, warmup, and timing method
    for every library in a comparison.
-3. Pin thread counts and dynamic-threading policy for Zynum and comparator
-   libraries.
-4. Record target tuple, CPU, target features, OS, Zig version, source revision,
+4. For default Zynum runs, leave `ZYNUM_MAXIMUM_THREADS` unset and record the
+   detected max; set it only for explicit cap or single-thread runs. Pin
+   comparator thread counts and dynamic-threading policy.
+5. Record target tuple, CPU, target features, OS, Zig version, source revision,
    command, runtime environment, raw CSV path, summary, and isolation level.
-5. Treat in-process sweeps as smoke checks unless no comparator libraries are
+6. Treat in-process sweeps as smoke checks unless no comparator libraries are
    loaded.
-6. Use fresh-process isolation for reportable comparator data; prefer level 2
+7. Use fresh-process isolation for reportable comparator data; prefer level 2
    and use level 3 for outliers or dispatch-gate evidence.
-7. Re-test outliers in isolation before using them to justify a gate.
-8. Keep optimization gates narrower than the measured evidence. Do not retain a
+8. Re-test outliers in isolation before using them to justify a gate.
+9. Keep optimization gates narrower than the measured evidence. Do not retain a
    default gate from one lucky focused run.
-9. Discard timing data from any run with possible numerical pollution. If a
+10. Discard timing data from any run with possible numerical pollution. If a
    kernel later proves to have missing register preservation, stale scalar
    return state, incorrect hardware-state cleanup, or invalid inline-assembly
    memory ordering, rerun every affected benchmark before using it for either a
@@ -58,6 +64,7 @@ behavior. Record variables that are intentionally unset as `unset`.
 | `MKL_NUM_THREADS` | Intel MKL | Comparator thread count. |
 | `MKL_DYNAMIC` | Intel MKL | Dynamic thread-count policy. |
 | `OMP_NUM_THREADS` | OpenMP-based comparators | Thread count when a comparator uses OpenMP. |
+| `BLIS_NUM_THREADS` | BLIS/AOCL-BLIS | Comparator thread count when a BLIS-family comparator honors it. |
 
 Recommended single-process smoke baseline:
 
@@ -66,15 +73,21 @@ export OPENBLAS_DYNAMIC=0
 export MKL_DYNAMIC=FALSE
 ```
 
-Set thread caps explicitly for every library in a comparison:
+For default reportable Apple Silicon comparisons, leave
+`ZYNUM_MAXIMUM_THREADS` unset and record the detected Zynum max thread count in
+the metadata. Pin comparator library thread settings explicitly so their policy
+is not left to lazy runtime defaults:
 
 ```sh
-export ZYNUM_MAXIMUM_THREADS=6
-export OPENBLAS_NUM_THREADS=6
-export VECLIB_MAXIMUM_THREADS=6
-export MKL_NUM_THREADS=6
-export OMP_NUM_THREADS=6
+unset ZYNUM_MAXIMUM_THREADS
+export OPENBLAS_NUM_THREADS=10
+export VECLIB_MAXIMUM_THREADS=10
+export MKL_NUM_THREADS=10
+export OMP_NUM_THREADS=10
 ```
+
+Set `ZYNUM_MAXIMUM_THREADS` only for explicit cap experiments or single-thread
+verification runs, and label those runs separately from default-thread gates.
 
 ## Quick Benchmark
 
@@ -88,15 +101,30 @@ Pass comparator libraries when defaults are not available:
 zig build bench --release=fast \
   -Dbench-openblas=/path/to/libopenblas.dylib \
   -Dbench-accelerate=/System/Library/Frameworks/Accelerate.framework/Accelerate \
+  -Dbench-mkl=/path/to/libmkl_rt.so \
+  -Dbench-aocl-blis=/path/to/libblis-mt.so \
   -- --size 1024 --reps 10
 ```
 
 ## GEMM Sweep
 
+The build step below is a single-process smoke check. It is useful for validating
+the tool and plotting path, but not for published comparator claims:
+
 ```sh
 zig build bench-gemm-sweep --release=fast -- --reps 30
 python3 bench/tools/plot_gemm_sweep.py zig-out/gemm_sweep.csv zig-out/gemm_sweep.svg
 ```
+
+GEMM sweep CSV rows keep `best_ns` and best-based `gflops` for continuity, but
+also report `median_ns`, `p95_ns`, and `max_ns`. Use the distribution fields when
+deciding whether a gate is robust; do not promote a dispatch rule from a lone
+best-time win. Correctness-checked rows use `check=checked-ok`; older archived
+CSV files may use `sampled-ok`.
+
+When the isolated runner uses `--process-repeats`, the merged CSV adds
+`process_repeats` and combines the per-process timing summaries instead of
+discarding every process except the fastest one.
 
 Use the CSV checker to turn a comparator sweep into a pass/fail gate. The
 strict form requires Zynum to be at least as fast as the fastest requested
@@ -104,6 +132,15 @@ comparator for every selected `(kind, shape)` group:
 
 ```sh
 python3 bench/tools/check_gemm_sweep.py zig-out/gemm_sweep.csv
+```
+
+Pass explicit comparator labels when checking a non-default set such as
+MKL and AOCL-BLIS:
+
+```sh
+python3 bench/tools/check_gemm_sweep.py zig-out/gemm_sweep.csv \
+  --comparator MKL \
+  --comparator AOCL-BLIS
 ```
 
 Use `--ratio 0.98` only when the benchmark note explicitly accepts a 2%
@@ -121,13 +158,18 @@ zig build bench-gemm-sweep --release=fast -- \
 
 ## Level 1/2 Sweep
 
-Use `bench-level12-sweep` for focused Level 1 and Level 2 tuning gates. The
+Use `bench-vector-matrix-sweep` for focused Level 1 and Level 2 tuning gates. The
 benchmark exercises contiguous f64 BLAS ABI paths including copy, scal, axpy,
 dot, asum, nrm2, GEMV, SYMV, and GER:
 
 ```sh
-zig build bench-level12-sweep -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast -- --size 1024 --reps 120
+zig build bench-vector-matrix-sweep -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast -- --size 1024 --reps 120
 ```
+
+Run the SME-targeted AArch64 sweep only on hosts where the requested SME feature
+set is executable. On other Apple Silicon hosts, use the same feature string as
+compile coverage and run benchmark binaries built for the host's
+runtime-supported target.
 
 The `--size` value is the matrix dimension for Level 2 cases. Level 1 cases use
 `size * size` elements so the same sweep stresses comparable memory footprints;
@@ -138,7 +180,7 @@ Use `--case <name>` to isolate a single kernel while tuning noisy paths such as
 `dgemv_t` or `dger`:
 
 ```sh
-zig-out/bin/level12-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib --size 1024 --reps 240 --case dgemv_t
+zig-out/bin/vector-matrix-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib --size 1024 --reps 240 --case dgemv_t
 ```
 
 For reportable comparator data, run one library per process by passing the
@@ -146,10 +188,15 @@ library under test as `--zynum-blas`; the tool label is reused, so record the
 path in the benchmark notes:
 
 ```sh
-zig-out/bin/level12-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib --size 1024 --reps 120
-zig-out/bin/level12-sweep --zynum-blas /System/Library/Frameworks/Accelerate.framework/Accelerate --size 1024 --reps 120
-zig-out/bin/level12-sweep --zynum-blas /opt/homebrew/opt/openblas/lib/libopenblas.dylib --size 1024 --reps 120
+zig-out/bin/vector-matrix-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib --size 1024 --reps 120
+zig-out/bin/vector-matrix-sweep --zynum-blas /System/Library/Frameworks/Accelerate.framework/Accelerate --size 1024 --reps 120
+zig-out/bin/vector-matrix-sweep --zynum-blas /opt/homebrew/opt/openblas/lib/libopenblas.dylib --size 1024 --reps 120
 ```
+
+The command-line benchmark tools can label MKL and AOCL-BLIS separately when the
+libraries export the standard Fortran BLAS symbols. LIBXSMM is not a drop-in
+Fortran BLAS comparator for these tools; use a documented shim or a separate
+LIBXSMM-specific runner before including it in a no-slower-than gate.
 
 Level 1/2 architecture gates must be retained only when the focused sweep shows
 repeatable improvement over the shared Zig vector fallback. Keep rejected ASIMD,
@@ -181,7 +228,8 @@ python3 bench/tools/run_gemm_sweep_isolated.py \
   --zynum-blas zig-out/lib/libzynum_blas.dylib \
   --csv zig-out/gemm_sweep_isolated.csv \
   --reps 30 \
-  --process-repeats 2
+  --process-repeats 3 \
+  --check
 ```
 
 Isolation levels:
@@ -208,6 +256,12 @@ Level 2 DGER work showed that thread placement, helper warm state, and comparato
 worker policy can move 128x128 timings by more than the intended optimization
 margin.
 
+Thread placement experiments must record the platform mechanism. Linux affinity
+mask changes should include the inherited cpuset and the exact helper-pinning
+policy. Apple Silicon experiments should record QoS, `hw.perflevel*` topology,
+and whether Mach affinity tags were probed as supported; do not describe macOS
+results as CPU-pinned unless a public API and trace actually prove that.
+
 A reportable isolated run should include process repeats, the exact CSV path, and
 the per-library command line. Focused reruns should use the same environment as
 the full sweep unless the difference is explicitly part of the experiment.
@@ -230,9 +284,9 @@ On the Apple Silicon development machine used for the current README snapshot,
 build the benchmark artifacts with the measured target first:
 
 ```sh
-zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme2p1 --release=fast --summary failures
-zig build-exe bench/level1_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/level1_probe
-zig build-exe bench/dcopy_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/dcopy_probe
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+zig build-exe bench/level1_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme+sme2+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/level1_probe
+zig build-exe bench/dcopy_probe.zig -O ReleaseFast -target aarch64-macos -mcpu apple_m4+sme+sme2+sme2p1 --global-cache-dir .zig-cache/global -femit-bin=zig-out/perf-report/bin/dcopy_probe
 ```
 
 Run with `ZYNUM_MAXIMUM_THREADS` unset unless the benchmark note explicitly
@@ -266,7 +320,8 @@ env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM
   --gemm-sweep zig-out/bin/gemm-sweep \
   --zynum-blas zig-out/lib/libzynum_blas.dylib \
   --reps 6 \
-  --process-repeats 2 \
+  --process-repeats 3 \
+  --check \
   --isolate-kind \
   --csv zig-out/perf-report/level3_all_types_more_shapes_three_libs.csv \
   --skip-missing

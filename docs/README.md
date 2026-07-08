@@ -34,7 +34,9 @@ only when needed.
 
 | Area | Read |
 | --- | --- |
+| Optimization process | [`common/performance_optimization_process.md`](common/performance_optimization_process.md) |
 | Benchmark methodology | [`common/benchmarking.md`](common/benchmarking.md) |
+| CPU affinity and heterogeneous scheduling | [`common/cpu_affinity_and_heterogeneous_scheduling.md`](common/cpu_affinity_and_heterogeneous_scheduling.md) |
 | BLAS Level 1 | [`common/level1_optimization_notes.md`](common/level1_optimization_notes.md) |
 | BLAS Level 2 | [`common/level2_optimization_notes.md`](common/level2_optimization_notes.md) |
 | GEMM | [`common/gemm_optimization_notes.md`](common/gemm_optimization_notes.md) |
@@ -54,11 +56,13 @@ zig build generate-headers --summary failures
 zig build --summary failures
 ```
 
-Use Debug or ReleaseSafe test builds when changing checked API behavior:
+`zig build test` defaults to ReleaseSafe test modules so checked API behavior is
+covered even though normal build artifacts prefer ReleaseFast. Use explicit test
+optimize modes when a change needs a different contract:
 
 ```sh
-zig build test --summary failures
-zig build --release=safe test --summary failures
+zig build -Dtest-optimize=Debug test --summary failures
+zig build -Dtest-optimize=ReleaseFast test --summary failures
 ```
 
 ## Documentation Rules

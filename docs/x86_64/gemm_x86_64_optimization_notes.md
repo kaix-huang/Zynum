@@ -6,12 +6,19 @@ This document covers x86_64-specific GEMM work in Zynum BLAS.
 
 Current source locations:
 
-- `src/blas/kernels/x86_64/features.zig`: compile-time feature probes.
-- `src/blas/kernels/x86_64/simd.zig`: thin packed-B SGEMM/DGEMM wrapper that
+- `src/blas/kernels/arch/x86_64/features.zig`: compile-time feature probes.
+- `src/blas/kernels/arch/x86_64/matrix_matrix/simd.zig`: thin packed-B SGEMM/DGEMM wrapper that
   selects lane and panel parameters from x86_64 target features.
-- `src/blas/kernels/matrix_matrix/packed_simd.zig`: shared fixed-width packed-B SIMD
+- `src/blas/kernels/arch/x86_64/vector/binary.zig`,
+  `src/blas/kernels/arch/x86_64/vector/unary.zig`, and
+  `src/blas/kernels/arch/x86_64/matrix_vector.zig`: thin Level 1/2 wrappers that
+  select lane widths and call shared fixed-SIMD skeletons.
+- `src/blas/kernels/shared/matrix_matrix/packed_simd.zig`: shared fixed-width packed-B SIMD
   skeleton used by the x86_64 wrapper.
-- `src/blas/kernels/matrix_matrix/epilogue.zig`: shared real-GEMM alpha/beta write-back
+- `src/blas/kernels/shared/vector/fixed_simd.zig` and
+  `src/blas/kernels/shared/matrix_vector/fixed_simd.zig`: shared Level 1/2 SIMD
+  skeletons used by x86_64 and AArch64 wrappers.
+- `src/blas/kernels/shared/matrix_matrix/epilogue.zig`: shared real-GEMM alpha/beta write-back
   helpers.
 
 The wrapper currently selects vector width from target features:
@@ -23,8 +30,8 @@ The wrapper currently selects vector width from target features:
 
 The x86_64 file should stay a configuration and feature-boundary layer. Packed
 panel preparation, the K loop, scalar/vector row tails, and generic fallback for
-tail columns live in the shared `packed_simd.zig` skeleton unless native x86
-evidence justifies a different instruction sequence.
+unsupported shapes live in the shared `packed_simd.zig` skeleton unless native
+x86 evidence justifies a different instruction sequence.
 
 ## Dispatch Rules
 
@@ -72,13 +79,30 @@ the feature tier being enabled by default.
 
 - The current development machine may cross-compile x86_64 but cannot produce
   real AVX2/AVX512 performance numbers.
-- Tail columns still use the generic fallback from the shared packed-SIMD
-  skeleton; packed partial-column handling still needs native measurement before
-  becoming default.
+- Packed-SIMD GEMM has shared partial-column handling enabled by the x86_64
+  wrapper. Native measurement is still required before making any x86
+  throughput claim for a particular feature tier.
 - AVX512 mask-tail paths are not complete.
 - AVX2 and AVX512 probably need separate tile choices.
 - MKL and OpenBLAS threading defaults differ, so comparator benchmarks must pin
   thread counts.
+
+## Level 1/2 Coverage
+
+The x86_64 Level 1 and Level 2 files should stay wrapper-only where possible.
+Current shared skeleton coverage includes:
+
+- Level 1 real copy, swap, scal, axpy, axpby, dot, asum, nrm2, iamax, and rot.
+- Level 1 complex scal, axpy, axpby, and dot.
+- Level 2 real GEMV-N, GEMV-T, beta-handling GEMV wrappers, and GER.
+- Level 2 complex GEMV-N and GEMV-T under conservative work gates.
+- Real GEMV-N packed-row hooks that pack `alpha*x` once and reuse the shared
+  GEMV-N skeleton inside row-split tasks.
+
+Add new x86_64 microkernel coverage by extending the shared skeletons with
+comptime lane, unroll, tail, or packing parameters first. Only add hand-written
+x86 assembly after native measurements show that Zig vector lowering cannot
+cover the required instruction shape.
 
 ## Benchmark Commands
 
@@ -94,18 +118,19 @@ Run `zig build test ...` only on a host that can execute the selected x86_64
 target binaries, or under an explicitly documented runner/emulator. Cross-target
 builds from Apple Silicon are compile coverage only.
 
-Linux benchmark with MKL:
+Linux benchmark with MKL and AOCL-BLIS:
 
 ```sh
 zig build bench-gemm-sweep \
   -Dtarget=x86_64-linux-gnu \
   -Dcpu=x86_64_v4 \
   --release=fast \
-  -Dbench-mkl=/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_rt.so -- \
+  -Dbench-mkl=/opt/intel/oneapi/mkl/latest/lib/intel64/libmkl_rt.so \
+  -Dbench-aocl-blis=/path/to/libblis-mt.so -- \
   --reps 30
 ```
 
-Recommended environment:
+Single-thread focused environment:
 
 ```sh
 export ZYNUM_MAXIMUM_THREADS=1
@@ -114,11 +139,38 @@ export OPENBLAS_DYNAMIC=0
 export MKL_NUM_THREADS=1
 export MKL_DYNAMIC=FALSE
 export OMP_NUM_THREADS=1
+export BLIS_NUM_THREADS=1
 ```
 
 Then sweep thread counts explicitly. Record whether the result came from the
 in-process sweep or the isolated runner; use fresh-process data for comparator
 claims.
+
+For reportable x86 data, prefer the isolated runner so each library gets a fresh
+process:
+
+```sh
+python3 bench/tools/run_gemm_sweep_isolated.py \
+  --gemm-sweep zig-out/bin/gemm-sweep \
+  --zynum-blas zig-out/lib/libzynum_blas.so \
+  --openblas /path/to/libopenblas.so \
+  --mkl /path/to/libmkl_rt.so \
+  --aocl-blis /path/to/libblis-mt.so \
+  --reps 30 \
+  --process-repeats 3 \
+  --isolate-kind \
+  --csv zig-out/perf-report/x86_gemm_isolated.csv \
+  --skip-missing
+
+python3 bench/tools/check_gemm_sweep.py \
+  zig-out/perf-report/x86_gemm_isolated.csv \
+  --comparator OpenBLAS \
+  --comparator MKL \
+  --comparator AOCL-BLIS
+```
+
+Do not include LIBXSMM in this BLAS sweep unless a shim or dedicated runner
+exports the same GEMM semantics and the benchmark record describes that adapter.
 
 ## Optimization Priorities
 
@@ -133,9 +185,10 @@ claims.
 5. Split AVX2/FMA and AVX512/FMA tile choices when native data justifies the
    separate gates.
 6. Benchmark alpha/beta write-back paths separately, but keep shared formulas in
-   `src/blas/kernels/matrix_matrix/epilogue.zig`.
-7. Compare against MKL and OpenBLAS with pinned thread counts and isolated
-   processes.
+   `src/blas/kernels/shared/matrix_matrix/epilogue.zig`.
+7. Compare against MKL, OpenBLAS, and AOCL-BLIS with pinned thread counts and
+   isolated processes. Treat LIBXSMM as a separate comparator integration unless
+   a documented BLAS-compatible shim is used.
 
 ## Acceptance Criteria
 
@@ -147,7 +200,7 @@ A retained x86_64 optimization needs:
 - Pinned Zynum and comparator thread counts, plus dynamic-threading variables.
 - Focused shape data, full sweep data, raw CSV paths, command lines, runtime
   environment, and isolation level.
-- Fresh-process data for any MKL/OpenBLAS comparison.
+- Fresh-process data for any MKL/OpenBLAS/AOCL-BLIS comparison.
 - No broad regression across square, tall/narrow, short/wide, and high-K shapes.
 - A shape/feature gate that is narrower than the measured evidence.
 

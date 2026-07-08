@@ -21,6 +21,7 @@ Outputs:
 - `include/zynum/blas/blas.h`.
 - `include/zynum/blas/cblas.h`.
 - `include/zynum/blas/blas.f90`.
+- `include/zynum/blas/abi_manifest.json`.
 
 Installed files are placed under `zig-out/include/zynum/blas/`.
 
@@ -124,6 +125,14 @@ gfortran -std=f2008 -I build/zynum-blas-mod example.f90 \
 The module uses `bind(C, name="dgemm_")` to bind exact external symbols and
 avoid compiler-dependent Fortran name mangling.
 
+## Invalid Parameters
+
+Classic Fortran BLAS entry points report invalid scalar parameters through
+`xerbla_`, following the BLAS convention. CBLAS entry points intentionally keep a
+silent no-op policy for invalid enum/layout parameters: they leave caller output
+buffers unchanged and return without calling `xerbla_`. This matches the current
+compatibility tests and avoids introducing a project-specific CBLAS error hook.
+
 ## Legacy Fortran
 
 Existing Fortran 77/90/95 code can continue using conventional external BLAS
@@ -183,6 +192,8 @@ explicit output pointer.
    collisions.
 3. Update `tools/generate_compat_headers.zig` source lists and export counts when
    exported ABI functions are added, removed, or moved.
-4. Regenerate headers after ABI changes.
+4. Regenerate headers, the Fortran module, and `abi_manifest.json` after ABI
+   changes.
 5. Add or update compatibility tests.
-6. Run `zig build test`.
+6. Check the generated manifest against built dynamic and static libraries.
+7. Run `zig build test`.
