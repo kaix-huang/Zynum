@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
-const cblas = @import("zynum_blas_cblas_compat");
+const cblas = @import("zynum_blas_cblas_compat").abi;
 const ref = @import("reference.zig");
 
 fn complexF32(re: f32, im: f32) cblas.ComplexF32 {
@@ -43,6 +43,83 @@ fn referenceComplexAxpby(comptime T: type, n: usize, alpha: T, x: []const T, inc
         const iy = ref.vectorIndex(n, incy, i);
         y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), ref.mul(T, beta, y[iy]));
     }
+}
+
+test "cblas level3 invalid enums leave outputs unchanged" {
+    var a = [_]f64{ 1, 2, 3, 4 };
+    var b = [_]f64{ 5, 6, 7, 8 };
+    var c = [_]f64{ 9, 10, 11, 12 };
+    const original_c = c;
+    cblas.cblas_dgemm(999, cblas.CblasNoTrans, cblas.CblasNoTrans, 2, 2, 2, 1, &a, 2, &b, 2, 0, &c, 2);
+    try std.testing.expectEqualSlices(f64, &original_c, &c);
+
+    var tri = [_]f64{ 1, 0, 2, 3 };
+    var trmm_b = [_]f64{ 4, 5, 6, 7 };
+    const original_b = trmm_b;
+    cblas.cblas_dtrmm(cblas.CblasColMajor, cblas.CblasLeft, cblas.CblasUpper, 999, cblas.CblasNonUnit, 2, 2, 1, &tri, 2, &trmm_b, 2);
+    try std.testing.expectEqualSlices(f64, &original_b, &trmm_b);
+}
+
+test "cblas level2 invalid enums leave outputs unchanged" {
+    var matrix = [_]f64{ 1, 2, 3, 4 };
+    var x = [_]f64{ 5, 6 };
+    var y = [_]f64{ 7, 8 };
+    const original_y = y;
+    cblas.cblas_dgemv(cblas.CblasColMajor, 999, 2, 2, 1, &matrix, 2, &x, 1, 0, &y, 1);
+    try std.testing.expectEqualSlices(f64, &original_y, &y);
+
+    var sym_y = [_]f64{ 9, 10 };
+    const original_sym_y = sym_y;
+    cblas.cblas_dsymv(cblas.CblasColMajor, 999, 2, 1, &matrix, 2, &x, 1, 0, &sym_y, 1);
+    try std.testing.expectEqualSlices(f64, &original_sym_y, &sym_y);
+
+    var tri_x = [_]f64{ 11, 12 };
+    const original_tri_x = tri_x;
+    cblas.cblas_dtrmv(cblas.CblasColMajor, cblas.CblasUpper, cblas.CblasNoTrans, 999, 2, &matrix, 2, &tri_x, 1);
+    try std.testing.expectEqualSlices(f64, &original_tri_x, &tri_x);
+
+    var rank_matrix = [_]f64{ 1, 2, 3, 4 };
+    const original_rank_matrix = rank_matrix;
+    cblas.cblas_dger(999, 2, 2, 1, &x, 1, &y, 1, &rank_matrix, 2);
+    try std.testing.expectEqualSlices(f64, &original_rank_matrix, &rank_matrix);
+}
+
+test "cblas row-major direct invalid parameters leave outputs unchanged" {
+    const alpha = complexF64(1, 0);
+    const beta = complexF64(0, 0);
+    var matrix = [_]cblas.ComplexF64{
+        complexF64(1, 1), complexF64(2, -1),
+        complexF64(3, 2), complexF64(-1, 1),
+    };
+    var x = [_]cblas.ComplexF64{ complexF64(1, 0), complexF64(2, 0) };
+    var y = [_]cblas.ComplexF64{ complexF64(7, 0), complexF64(8, 0) };
+    const original_y = y;
+    cblas.cblas_zgemv(cblas.CblasRowMajor, cblas.CblasConjTrans, 2, 2, &alpha, &matrix, 1, &x, 1, &beta, &y, 1);
+    try expectComplexF64SliceApprox(&original_y, &y);
+
+    var tri_x = [_]cblas.ComplexF64{ complexF64(3, 0), complexF64(4, 0) };
+    const original_tri_x = tri_x;
+    cblas.cblas_ztrmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, 999, 2, &matrix, 2, &tri_x, 1);
+    try expectComplexF64SliceApprox(&original_tri_x, &tri_x);
+}
+
+test "cblas symmetric level3 invalid enums leave outputs unchanged" {
+    var a = [_]f64{ 1, 2, 3, 4 };
+    var b = [_]f64{ 5, 6, 7, 8 };
+    var c = [_]f64{ 9, 10, 11, 12 };
+    const original_c = c;
+    cblas.cblas_dsymm(cblas.CblasColMajor, 999, cblas.CblasUpper, 2, 2, 1, &a, 2, &b, 2, 0, &c, 2);
+    try std.testing.expectEqualSlices(f64, &original_c, &c);
+
+    var rank_c = [_]f64{ 13, 14, 15, 16 };
+    const original_rank_c = rank_c;
+    cblas.cblas_dsyrk(cblas.CblasColMajor, cblas.CblasUpper, 999, 2, 2, 1, &a, 2, 0, &rank_c, 2);
+    try std.testing.expectEqualSlices(f64, &original_rank_c, &rank_c);
+
+    var rank2_c = [_]f64{ 17, 18, 19, 20 };
+    const original_rank2_c = rank2_c;
+    cblas.cblas_dsyr2k(cblas.CblasColMajor, 999, cblas.CblasNoTrans, 2, 2, 1, &a, 2, &b, 2, 0, &rank2_c, 2);
+    try std.testing.expectEqualSlices(f64, &original_rank2_c, &rank2_c);
 }
 
 fn expectCblasComplexScalCase(comptime T: type, n: usize, incx: isize, alpha: T, tol: anytype) !void {

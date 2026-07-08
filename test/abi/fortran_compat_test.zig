@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
-const fortran = @import("zynum_blas_fortran_compat");
+const fortran = @import("zynum_blas_fortran_compat").abi;
 const ref = @import("reference.zig");
 
 fn matIndex(lda: fortran.BlasInt, row: usize, col: usize) usize {
@@ -519,6 +519,11 @@ test "sgemm no-trans transpose4 B-pack keeps sign" {
     try expectGemmNoTransCase(f32, allocator, 256, 256, 2048, 259, 2052, 263, 0.001, 0.0);
 }
 
+test "sgemm no-trans single-row wide result matches reference" {
+    const allocator = std.testing.allocator;
+    try expectGemmNoTransCase(f32, allocator, 1, 4096, 256, 1, 256, 1, 1.0, 0.0);
+}
+
 test "dgemm no-trans large panel batch matches reference" {
     const allocator = std.testing.allocator;
     try expectGemmNoTransCase(f64, allocator, 64, 129, 128, 67, 132, 69, 0.001, 0.0);
@@ -597,18 +602,28 @@ test "complex gemm beta zero and alpha zero isolate inactive NaNs" {
 
 test "parallel sgemm and dgemm column split matches reference" {
     const allocator = std.testing.allocator;
-    fortran.setMaxThreads(3);
-    defer fortran.setMaxThreads(0);
+    fortran.runtime.setMaxThreads(3);
+    defer fortran.runtime.setMaxThreads(0);
     try expectGemmNoTransCase(f32, allocator, 96, 97, 96, 96, 96, 96, 0.75, -0.25);
     try expectGemmNoTransCase(f64, allocator, 96, 97, 96, 96, 96, 96, 0.75, -0.25);
 }
 
 test "parallel sgemm and dgemm row split matches reference" {
     const allocator = std.testing.allocator;
-    fortran.setMaxThreads(10);
-    defer fortran.setMaxThreads(0);
+    fortran.runtime.setMaxThreads(10);
+    defer fortran.runtime.setMaxThreads(0);
     try expectGemmNoTransCase(f32, allocator, 512, 16, 1024, 512, 1024, 512, 1, 0);
     try expectGemmNoTransCase(f64, allocator, 512, 16, 1024, 512, 1024, 512, 1, 0);
+}
+
+test "blas shutdown resets shared helper pool state" {
+    const allocator = std.testing.allocator;
+    fortran.runtime.setMaxThreads(4);
+    defer fortran.runtime.setMaxThreads(0);
+    try expectGemmNoTransCase(f32, allocator, 256, 32, 1024, 256, 1024, 256, 1, 0);
+    fortran.zynum_blas_shutdown();
+    try expectGemmNoTransCase(f32, allocator, 256, 32, 1024, 256, 1024, 256, 1, 0);
+    fortran.zynum_blas_shutdown_();
 }
 
 test "dgemm invalid parameter leaves output unchanged" {
@@ -627,6 +642,117 @@ test "dgemm invalid parameter leaves output unchanged" {
     var result_matrix = [_]f64{7};
     fortran.dgemm_(&ta, &tb, &m, &n, &k, &alpha, &left_matrix, &lda, &right_matrix, &ldb, &beta, &result_matrix, &ldc);
     try std.testing.expectEqual(@as(f64, 7), result_matrix[0]);
+}
+
+test "dtrmm invalid parameter leaves output unchanged" {
+    var side = [_]u8{'X'};
+    var upper = [_]u8{'U'};
+    var no_trans = [_]u8{'N'};
+    var non_unit = [_]u8{'N'};
+    var m: fortran.BlasInt = 2;
+    var n: fortran.BlasInt = 2;
+    var lda: fortran.BlasInt = 2;
+    var ldb: fortran.BlasInt = 2;
+    var alpha: f64 = 1;
+    var tri = [_]f64{ 1, 0, 2, 3 };
+    var b = [_]f64{ 4, 5, 6, 7 };
+    const original = b;
+    fortran.dtrmm_(&side, &upper, &no_trans, &non_unit, &m, &n, &alpha, &tri, &lda, &b, &ldb);
+    try std.testing.expectEqualSlices(f64, &original, &b);
+}
+
+test "dgemv invalid parameter leaves output unchanged" {
+    var trans = [_]u8{'X'};
+    var m: fortran.BlasInt = 2;
+    var n: fortran.BlasInt = 2;
+    var lda: fortran.BlasInt = 2;
+    var inc: fortran.BlasInt = 1;
+    var alpha: f64 = 1;
+    var beta: f64 = 0;
+    var matrix = [_]f64{ 1, 2, 3, 4 };
+    var x = [_]f64{ 5, 6 };
+    var y = [_]f64{ 9, 10 };
+    const original = y;
+    fortran.dgemv_(&trans, &m, &n, &alpha, &matrix, &lda, &x, &inc, &beta, &y, &inc);
+    try std.testing.expectEqualSlices(f64, &original, &y);
+}
+
+test "dtbmv invalid parameter leaves vector unchanged" {
+    var upper = [_]u8{'U'};
+    var no_trans = [_]u8{'N'};
+    var diag = [_]u8{'X'};
+    var n: fortran.BlasInt = 2;
+    var k: fortran.BlasInt = 1;
+    var lda: fortran.BlasInt = 2;
+    var inc: fortran.BlasInt = 1;
+    var band = [_]f64{ 0, 1, 2, 3 };
+    var x = [_]f64{ 4, 5 };
+    const original = x;
+    fortran.dtbmv_(&upper, &no_trans, &diag, &n, &k, &band, &lda, &x, &inc);
+    try std.testing.expectEqualSlices(f64, &original, &x);
+}
+
+test "dger invalid parameter leaves matrix unchanged" {
+    var m: fortran.BlasInt = 2;
+    var n: fortran.BlasInt = 2;
+    var incx: fortran.BlasInt = 0;
+    var incy: fortran.BlasInt = 1;
+    var lda: fortran.BlasInt = 2;
+    var alpha: f64 = 1;
+    var x = [_]f64{ 5, 6 };
+    var y = [_]f64{ 7, 8 };
+    var matrix = [_]f64{ 1, 2, 3, 4 };
+    const original = matrix;
+    fortran.dger_(&m, &n, &alpha, &x, &incx, &y, &incy, &matrix, &lda);
+    try std.testing.expectEqualSlices(f64, &original, &matrix);
+}
+
+test "level3 symmetric invalid parameters leave outputs unchanged" {
+    var invalid = [_]u8{'X'};
+    var upper = [_]u8{'U'};
+    var no_trans = [_]u8{'N'};
+    var left = [_]u8{'L'};
+    var m: fortran.BlasInt = 2;
+    var n: fortran.BlasInt = 2;
+    var k: fortran.BlasInt = 2;
+    var lda: fortran.BlasInt = 2;
+    var ldb: fortran.BlasInt = 2;
+    var ldc: fortran.BlasInt = 2;
+    var alpha: f64 = 1;
+    var beta: f64 = 0;
+    var a = [_]f64{ 1, 2, 3, 4 };
+    var b = [_]f64{ 5, 6, 7, 8 };
+
+    var symm_c = [_]f64{ 9, 10, 11, 12 };
+    const original_symm_c = symm_c;
+    fortran.dsymm_(&invalid, &upper, &m, &n, &alpha, &a, &lda, &b, &ldb, &beta, &symm_c, &ldc);
+    try std.testing.expectEqualSlices(f64, &original_symm_c, &symm_c);
+
+    var syrk_c = [_]f64{ 13, 14, 15, 16 };
+    const original_syrk_c = syrk_c;
+    fortran.dsyrk_(&upper, &invalid, &n, &k, &alpha, &a, &lda, &beta, &syrk_c, &ldc);
+    try std.testing.expectEqualSlices(f64, &original_syrk_c, &syrk_c);
+
+    var syr2k_c = [_]f64{ 17, 18, 19, 20 };
+    const original_syr2k_c = syr2k_c;
+    ldb = 1;
+    fortran.dsyr2k_(&upper, &no_trans, &n, &k, &alpha, &a, &lda, &b, &ldb, &beta, &syr2k_c, &ldc);
+    try std.testing.expectEqualSlices(f64, &original_syr2k_c, &syr2k_c);
+
+    var hemm_c = [_]fortran.ComplexF64{
+        complexValue(fortran.ComplexF64, 1, 0), complexValue(fortran.ComplexF64, 2, 0),
+        complexValue(fortran.ComplexF64, 3, 0), complexValue(fortran.ComplexF64, 4, 0),
+    };
+    const original_hemm_c = hemm_c;
+    var z_alpha = complexValue(fortran.ComplexF64, 1, 0);
+    var z_beta = complexValue(fortran.ComplexF64, 0, 0);
+    var za = [_]fortran.ComplexF64{
+        complexValue(fortran.ComplexF64, 1, 0), complexValue(fortran.ComplexF64, 2, 0),
+        complexValue(fortran.ComplexF64, 3, 0), complexValue(fortran.ComplexF64, 4, 0),
+    };
+    var zb = za;
+    fortran.zhemm_(&left, &invalid, &m, &n, &z_alpha, &za, &lda, &zb, &lda, &z_beta, &hemm_c, &ldc);
+    for (original_hemm_c, hemm_c) |want, got| try expectComplexApprox(fortran.ComplexF64, want, got, @as(f64, 1e-12));
 }
 
 test "dgemv and negative increment" {

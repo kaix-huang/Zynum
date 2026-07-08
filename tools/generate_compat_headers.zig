@@ -20,7 +20,7 @@ const abi_sources = struct {
 };
 
 const expected_export_counts = struct {
-    const fortran = 159;
+    const fortran = 161;
     const cblas = 150;
 };
 
@@ -61,11 +61,18 @@ pub fn main(init: std.process.Init) !void {
         "include/zynum/blas/blas.f90",
         try generateFortranModule(allocator, fortran_exports),
     );
+    try writeGeneratedFile(
+        allocator,
+        io,
+        root,
+        "include/zynum/blas/abi_manifest.json",
+        try generateAbiManifest(allocator, fortran_exports, cblas_exports),
+    );
 
     var stdout_buffer: [256]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writerStreaming(io, &stdout_buffer);
     try stdout_writer.interface.print(
-        "Generated {d} Fortran prototypes, {d} Fortran module interfaces, and {d} CBLAS prototypes.\n",
+        "Generated {d} Fortran prototypes, {d} Fortran module interfaces, {d} CBLAS prototypes, and ABI manifest.\n",
         .{ fortran_exports.len, fortran_exports.len, cblas_exports.len },
     );
     try stdout_writer.flush();
@@ -357,6 +364,106 @@ fn generateFortranModule(allocator: std.mem.Allocator, exports: []const Export) 
         \\
     );
     return w.buffered();
+}
+
+fn generateAbiManifest(allocator: std.mem.Allocator, fortran_exports: []const Export, cblas_exports: []const Export) ![]const u8 {
+    var out = std.Io.Writer.Allocating.init(allocator);
+    const w = &out.writer;
+    try w.writeAll(
+        \\{
+        \\  "schema": 1,
+        \\  "generator": "tools/generate_compat_headers.zig",
+        \\  "blas_integer_abi": "LP64",
+        \\  "blas_integer_bits": 32,
+        \\  "fortran": {
+        \\    "source": [
+        \\
+    );
+    for (abi_sources.fortran, 0..) |source, i| {
+        try w.writeAll("      ");
+        try writeJsonString(w, source);
+        try w.writeAll(if (i + 1 == abi_sources.fortran.len) "\n" else ",\n");
+    }
+    try w.print(
+        \\    ],
+        \\    "export_count": {d},
+        \\    "exports": [
+        \\
+    , .{fortran_exports.len});
+    for (fortran_exports, 0..) |exported, i| {
+        try writeManifestExport(w, exported, .fortran);
+        try w.writeAll(if (i + 1 == fortran_exports.len) "\n" else ",\n");
+    }
+    try w.writeAll(
+        \\    ]
+        \\  },
+        \\  "cblas": {
+        \\    "source": [
+        \\
+    );
+    for (abi_sources.cblas, 0..) |source, i| {
+        try w.writeAll("      ");
+        try writeJsonString(w, source);
+        try w.writeAll(if (i + 1 == abi_sources.cblas.len) "\n" else ",\n");
+    }
+    try w.print(
+        \\    ],
+        \\    "export_count": {d},
+        \\    "exports": [
+        \\
+    , .{cblas_exports.len});
+    for (cblas_exports, 0..) |exported, i| {
+        try writeManifestExport(w, exported, .cblas);
+        try w.writeAll(if (i + 1 == cblas_exports.len) "\n" else ",\n");
+    }
+    try w.writeAll(
+        \\    ]
+        \\  }
+        \\}
+        \\
+    );
+    return w.buffered();
+}
+
+const ManifestKind = enum { fortran, cblas };
+
+fn writeManifestExport(w: *std.Io.Writer, exported: Export, kind: ManifestKind) !void {
+    try w.writeAll("      {\"name\": ");
+    try writeJsonString(w, exported.name);
+    switch (kind) {
+        .fortran => {
+            try w.writeAll(", \"procedure_name\": ");
+            try writeJsonString(w, fortranProcedureName(exported.name));
+        },
+        .cblas => {},
+    }
+    try w.writeAll(", \"return_zig\": ");
+    try writeJsonString(w, trim(exported.ret));
+    try w.writeAll(", \"args\": [");
+    for (exported.args, 0..) |arg, i| {
+        if (i != 0) try w.writeAll(", ");
+        try w.writeAll("{\"name\": ");
+        try writeJsonString(w, arg.name);
+        try w.writeAll(", \"zig_type\": ");
+        try writeJsonString(w, trim(arg.type));
+        try w.writeAll("}");
+    }
+    try w.writeAll("]}");
+}
+
+fn writeJsonString(w: *std.Io.Writer, value: []const u8) !void {
+    try w.writeByte('"');
+    for (value) |ch| {
+        switch (ch) {
+            '\\' => try w.writeAll("\\\\"),
+            '"' => try w.writeAll("\\\""),
+            '\n' => try w.writeAll("\\n"),
+            '\r' => try w.writeAll("\\r"),
+            '\t' => try w.writeAll("\\t"),
+            else => try w.writeByte(ch),
+        }
+    }
+    try w.writeByte('"');
 }
 
 fn writeProjectCommonTypes(w: *std.Io.Writer) !void {
@@ -654,6 +761,7 @@ fn writeFortranArgDecl(w: *std.Io.Writer, arg: Arg) !void {
 }
 
 fn fortranProcedureName(name: []const u8) []const u8 {
+    if (std.mem.eql(u8, name, "zynum_blas_shutdown_")) return name;
     return if (std.mem.endsWith(u8, name, "_")) name[0 .. name.len - 1] else name;
 }
 
