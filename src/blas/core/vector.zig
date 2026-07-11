@@ -19,6 +19,7 @@ pub const copyUnit = operations.copyUnit;
 pub const copyUnitReal = operations.copyUnitReal;
 pub const axpyUnitReal = operations.axpyUnitReal;
 pub const dotUnitReal = operations.dotUnitReal;
+pub const dotF32AccF64 = operations.dotF32AccF64;
 
 pub const scal = operations.scal;
 pub const rscal = operations.rscal;

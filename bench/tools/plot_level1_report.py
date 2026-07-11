@@ -19,13 +19,25 @@ COLORS = {
 
 GROUP_TITLES = {
     "copy": "Copy bandwidth (GB/s)",
+    "swap": "Swap bandwidth (GB/s)",
+    "index": "Index reduction bandwidth (GB/s)",
     "real_f32": "Real f32 Level 1 (Gops)",
     "real_f64": "Real f64 Level 1 (Gops)",
+    "mixed_dot": "Mixed-precision dot Level 1 (Gops)",
     "complex_f32": "Complex f32 Level 1 (Gops)",
     "complex_f64": "Complex f64 Level 1 (Gops)",
 }
 
-GROUP_ORDER = ["copy", "real_f32", "real_f64", "complex_f32", "complex_f64"]
+GROUP_ORDER = [
+    "copy",
+    "swap",
+    "index",
+    "real_f32",
+    "real_f64",
+    "mixed_dot",
+    "complex_f32",
+    "complex_f64",
+]
 LIB_ORDER = ["Zynum", "Accelerate", "OpenBLAS", "MKL", "AOCL-BLIS"]
 
 
@@ -35,6 +47,45 @@ def parse_args():
     parser.add_argument("--bars-svg", required=True)
     parser.add_argument("--ratio-svg", required=True)
     return parser.parse_args()
+
+
+def format_byte_size(value):
+    units = (
+        (1024 * 1024 * 1024, "GiB"),
+        (1024 * 1024, "MiB"),
+        (1024, "KiB"),
+    )
+    for factor, suffix in units:
+        if value >= factor and value % factor == 0:
+            return f"{value // factor}{suffix}"
+    return f"{value}B"
+
+
+def copy_case_key(raw):
+    copy_bytes = int(raw.get("copy_bytes") or raw["n"])
+    return f"{raw['op']}:{copy_bytes}"
+
+
+def row_case(raw):
+    if raw["group"] == "copy" and raw.get("copy_bytes"):
+        return copy_case_key(raw)
+    variant = raw.get("variant") or "default"
+    incx = raw.get("incx") or "1"
+    incy = raw.get("incy") or "1"
+    return f"{raw['op']}:{variant}:{incx}:{incy}"
+
+
+def row_label(raw):
+    if raw["group"] == "copy" and raw.get("copy_bytes"):
+        copy_bytes = int(raw.get("copy_bytes") or raw["n"])
+        return f"{raw['op']} {format_byte_size(copy_bytes)}"
+    variant = raw.get("variant") or "default"
+    incx = raw.get("incx") or "1"
+    incy = raw.get("incy") or "1"
+    suffix = "" if variant == "default" else f" {variant}"
+    if incx != "1" or incy != "1":
+        suffix += f" ({incx},{incy})"
+    return f"{raw['op']}{suffix}"
 
 
 def read_rows(path):
@@ -52,10 +103,16 @@ def read_rows(path):
                 {
                     "group": raw["group"],
                     "op": raw["op"],
+                    "variant": raw.get("variant") or "default",
+                    "incx": int(raw.get("incx") or 1),
+                    "incy": int(raw.get("incy") or 1),
+                    "case": row_case(raw),
+                    "label": row_label(raw),
                     "library": raw["library"],
                     "metric": metric,
                     "value": float(value),
                     "n": int(raw["n"]),
+                    "copy_bytes": int(raw["copy_bytes"]) if raw.get("copy_bytes") else None,
                     "seconds": int(raw["seconds"]),
                 }
             )
@@ -141,9 +198,16 @@ def grouped(rows):
 def ops_for_group(rows):
     ops = []
     for row in rows:
-        if row["op"] not in ops:
-            ops.append(row["op"])
+        if row["case"] not in ops:
+            ops.append(row["case"])
     return ops
+
+
+def labels_for_group(rows):
+    labels = {}
+    for row in rows:
+        labels.setdefault(row["case"], row["label"])
+    return labels
 
 
 def libraries_for_group(rows):
@@ -160,12 +224,13 @@ def libraries_for_group(rows):
 def value_map(rows):
     result = {}
     for row in rows:
-        result[(row["op"], row["library"])] = row["value"]
+        result[(row["case"], row["library"])] = row["value"]
     return result
 
 
 def draw_group_panel(svg, rows, group, top, left, width, height):
     ops = ops_for_group(rows)
+    labels = labels_for_group(rows)
     libs = libraries_for_group(rows)
     values = value_map(rows)
     max_value = max((row["value"] for row in rows), default=1.0) * 1.08
@@ -197,7 +262,17 @@ def draw_group_panel(svg, rows, group, top, left, width, height):
             h = top + height - y
             color = COLORS.get(lib, "#6b7280")
             svg.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_width - 2:.1f}" height="{h:.1f}" fill="{color}"/>')
-        svg.append(f'<text x="{cx:.1f}" y="{top + height + 18}" text-anchor="middle" class="op-label">{html.escape(op)}</text>')
+        label = html.escape(labels.get(op, op))
+        label_y = top + height + 18
+        if group == "copy":
+            svg.append(
+                f'<text x="{cx:.1f}" y="{label_y}" text-anchor="start" class="op-label" '
+                f'transform="rotate(45 {cx:.1f} {label_y})">{label}</text>'
+            )
+        else:
+            svg.append(
+                f'<text x="{cx:.1f}" y="{label_y}" text-anchor="middle" class="op-label">{label}</text>'
+            )
 
 
 def plot_bars(rows, output_path):
@@ -211,11 +286,19 @@ def plot_bars(rows, output_path):
     left = 105
     chart_width = width - 155
     svg = svg_header(width, height)
-    n_values = sorted({row["n"] for row in rows})
+    n_values = sorted({row["n"] for row in rows if row["group"] != "copy"})
+    copy_sizes = sorted(
+        {row["copy_bytes"] for row in rows if row["group"] == "copy" and row["copy_bytes"]}
+    )
     seconds_values = sorted({row["seconds"] for row in rows})
     svg.append('<text x="40" y="42" class="title">Zynum Level 1 Performance Coverage</text>')
+    n_part = ",".join(map(str, n_values)) if n_values else "copy-only"
+    if len(copy_sizes) > 8:
+        copy_part = f"{format_byte_size(copy_sizes[0])}..{format_byte_size(copy_sizes[-1])} ({len(copy_sizes)} sizes)"
+    else:
+        copy_part = ",".join(format_byte_size(size) for size in copy_sizes)
     svg.append(
-        f'<text x="40" y="66" class="subtitle">Higher is better. Fresh process per library/op; n={",".join(map(str, n_values))}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
+        f'<text x="40" y="66" class="subtitle">Higher is better. Fresh process per library/op/size; n={n_part}; copy={copy_part}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
     )
     legend_libraries = ordered_libraries(rows)
     legend_x = max(40, width - len(legend_libraries) * 145 - 35)
@@ -228,21 +311,23 @@ def plot_bars(rows, output_path):
 
 
 def ratio_rows(rows):
-    by_op = defaultdict(dict)
-    group_by_op = {}
-    metric_by_op = {}
+    by_case = defaultdict(dict)
+    group_by_case = {}
+    metric_by_case = {}
+    label_by_case = {}
     for row in rows:
-        by_op[row["op"]][row["library"]] = row["value"]
-        group_by_op[row["op"]] = row["group"]
-        metric_by_op[row["op"]] = row["metric"]
+        by_case[row["case"]][row["library"]] = row["value"]
+        group_by_case[row["case"]] = row["group"]
+        metric_by_case[row["case"]] = row["metric"]
+        label_by_case[row["case"]] = row["label"]
     result = []
-    ordered_ops = []
+    ordered_cases = []
     for group in GROUP_ORDER:
         for row in rows:
-            if row["group"] == group and row["op"] not in ordered_ops:
-                ordered_ops.append(row["op"])
-    for op in ordered_ops:
-        values = by_op[op]
+            if row["group"] == group and row["case"] not in ordered_cases:
+                ordered_cases.append(row["case"])
+    for case in ordered_cases:
+        values = by_case[case]
         zynum = values.get("Zynum")
         comparators = [value for lib, value in values.items() if lib != "Zynum"]
         if zynum is None or not comparators:
@@ -250,9 +335,9 @@ def ratio_rows(rows):
         best = max(comparators)
         result.append(
             {
-                "op": op,
-                "group": group_by_op[op],
-                "metric": metric_by_op[op],
+                "op": label_by_case[case],
+                "group": group_by_case[case],
+                "metric": metric_by_case[case],
                 "ratio": zynum / best if best > 0 else 0,
                 "zynum": zynum,
                 "best_comparator": best,

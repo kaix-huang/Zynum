@@ -44,6 +44,15 @@ pub fn vectorConfig(comptime T: type) vector_simd.Config {
     };
 }
 
+pub fn asumVectorConfig(comptime T: type) vector_simd.Config {
+    const R = realType(T);
+    return .{
+        .lane_count = lanes(T),
+        .unroll_vectors = if (R == f64 and features.has_avx512f) 8 else vectorUnrollVectors(),
+        .copy_lane_count = copyLaneCount(),
+    };
+}
+
 pub const byte_config = vector_simd.Config{
     .lane_count = 4,
     .unroll_vectors = vectorUnrollVectors(),

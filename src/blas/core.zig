@@ -94,6 +94,7 @@ pub const swap = vector.swap;
 pub const axpy = vector.axpy;
 pub const axpby = vector.axpby;
 pub const dot = vector.dot;
+pub const dotF32AccF64 = vector.dotF32AccF64;
 pub const asum = vector.asum;
 pub const nrm2 = vector.nrm2;
 pub const iamax = vector.iamax;

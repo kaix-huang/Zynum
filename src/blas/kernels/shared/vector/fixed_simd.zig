@@ -269,7 +269,7 @@ inline fn rotVecBlock(
     const xv = loadVec(T, lanes, x, index);
     const yv = loadVec(T, lanes, y, index);
     storeVec(T, lanes, x, index, @mulAdd(V, xv, c_v, yv * s_v));
-    storeVec(T, lanes, y, index, yv * c_v - xv * s_v);
+    storeVec(T, lanes, y, index, @mulAdd(V, -xv, s_v, yv * c_v));
 }
 
 pub fn copyBytes(comptime cfg: Config, n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
@@ -486,6 +486,57 @@ pub fn nrm2UnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]cons
     return scale * @sqrt(ssq);
 }
 
+pub fn nrm2UnitRealFastF32(comptime cfg: Config, n: usize, x: [*]const f32) ?f32 {
+    comptime checkRealConfig(f32, cfg);
+    if (n < vectorThreshold(cfg)) return null;
+
+    const V = @Vector(cfg.lane_count, f32);
+    var max_v: V = @splat(0);
+    var accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
+    var i: usize = 0;
+    while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        inline for (0..cfg.unroll_vectors) |k| {
+            const ax = @abs(loadVec(f32, cfg.lane_count, x, i + k * cfg.lane_count));
+            max_v = @max(max_v, ax);
+            accs[k] = @mulAdd(V, ax, ax, accs[k]);
+        }
+    }
+    var acc: V = @splat(0);
+    inline for (0..cfg.unroll_vectors) |k| acc += accs[k];
+    while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
+        const ax = @abs(loadVec(f32, cfg.lane_count, x, i));
+        max_v = @max(max_v, ax);
+        acc = @mulAdd(V, ax, ax, acc);
+    }
+    var max_abs = @reduce(.Max, max_v);
+    var ssq = @reduce(.Add, acc);
+    inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
+        if (comptime tail_lanes > 1) {
+            const TailV = @Vector(tail_lanes, f32);
+            var tail_max: TailV = @splat(0);
+            var tail_acc: TailV = @splat(0);
+            while (i + tail_lanes <= n) : (i += tail_lanes) {
+                const ax = @abs(loadVec(f32, tail_lanes, x, i));
+                tail_max = @max(tail_max, ax);
+                tail_acc = @mulAdd(TailV, ax, ax, tail_acc);
+            }
+            max_abs = @max(max_abs, @reduce(.Max, tail_max));
+            ssq += @reduce(.Add, tail_acc);
+        }
+    }
+    while (i < n) : (i += 1) {
+        const ax = @abs(x[i]);
+        max_abs = @max(max_abs, ax);
+        ssq = @mulAdd(f32, ax, ax, ssq);
+    }
+    if (max_abs == 0) return 0;
+    if (!std.math.isFinite(max_abs) or !std.math.isFinite(ssq)) return null;
+
+    const safe_limit = @sqrt(std.math.floatMax(f32) / @as(f32, @floatFromInt(n)));
+    if (max_abs > safe_limit) return null;
+    return @sqrt(ssq);
+}
+
 pub fn iamaxUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T) ?types.BlasInt {
     if (comptime !isReal(T)) return null;
     comptime checkRealConfig(T, cfg);
@@ -551,7 +602,7 @@ pub fn rotUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]T, y:
         const xv = x[i];
         const yv = y[i];
         x[i] = @mulAdd(T, c, xv, s * yv);
-        y[i] = c * yv - s * xv;
+        y[i] = @mulAdd(T, -xv, s, c * yv);
     }
     return true;
 }

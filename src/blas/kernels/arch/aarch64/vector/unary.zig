@@ -44,6 +44,16 @@ inline fn callScalF32Kernel(comptime kernel: anytype, n: usize, alpha: f32, x: [
     @as(Kernel, @ptrCast(&kernel))(n, alpha, x);
 }
 
+inline fn callSmScalF64Kernel(comptime kernel: anytype, n: usize, alpha_bits: u64, x: [*]f64) void {
+    const Kernel = *const fn (usize, [*]f64, u64) callconv(.c) void;
+    @as(Kernel, @ptrCast(&kernel))(n, x, alpha_bits);
+}
+
+inline fn callSmScalF32Kernel(comptime kernel: anytype, n: usize, alpha_bits: u32, x: [*]f32) void {
+    const Kernel = *const fn (usize, [*]f32, u32) callconv(.c) void;
+    @as(Kernel, @ptrCast(&kernel))(n, x, alpha_bits);
+}
+
 inline fn callAsumF64Kernel(comptime kernel: anytype, n: usize, x: [*]const f64) u64 {
     const Kernel = *const fn (usize, [*]const f64) callconv(.c) u64;
     return @as(Kernel, @ptrCast(&kernel))(n, x);
@@ -79,19 +89,21 @@ pub fn scalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
     }
     if (comptime enable_sme_dscal and features.has_sme2) {
         if (T == f32 and n >= 64 * 1024 and features.streamingVectorBytes() == 64) {
+            const alpha_bits: u32 = @bitCast(alpha);
             var sm_state: features.StreamingModeState = undefined;
             sm_state.startSmZa();
             defer sm_state.stopSmZa();
 
-            callScalF32Kernel(smeSscalF32Streaming, n, alpha, x);
+            callSmScalF32Kernel(smeSscalF32Streaming, n, alpha_bits, x);
             return true;
         }
         if (T == f64 and n >= 64 * 1024 and features.streamingVectorBytes() == 64) {
+            const alpha_bits: u64 = @bitCast(alpha);
             var sm_state: features.StreamingModeState = undefined;
             sm_state.startSmZa();
             defer sm_state.stopSmZa();
 
-            callScalF64Kernel(smeDscalF64Streaming, n, alpha, x);
+            callSmScalF64Kernel(smeDscalF64Streaming, n, alpha_bits, x);
             return true;
         }
     }
@@ -162,17 +174,17 @@ noinline fn sveSasumF32Bits(n: usize, x: [*]const f32) callconv(.naked) u32 {
     asm volatile (builders.sveRealAsumAsm("s", 8) ::: .{ .memory = true });
 }
 
-noinline fn smeSscalF32Streaming(n: usize, alpha: f32, x: [*]f32) callconv(.naked) void {
+noinline fn smeSscalF32Streaming(n: usize, x: [*]f32, alpha_bits: u32) callconv(.naked) void {
     _ = n;
-    _ = alpha;
     _ = x;
+    _ = alpha_bits;
     asm volatile (builders.smeScalStreamingAsm("s") ::: .{ .memory = true });
 }
 
-noinline fn smeDscalF64Streaming(n: usize, alpha: f64, x: [*]f64) callconv(.naked) void {
+noinline fn smeDscalF64Streaming(n: usize, x: [*]f64, alpha_bits: u64) callconv(.naked) void {
     _ = n;
-    _ = alpha;
     _ = x;
+    _ = alpha_bits;
     asm volatile (builders.smeScalStreamingAsm("d") ::: .{ .memory = true });
 }
 

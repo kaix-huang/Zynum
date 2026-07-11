@@ -21,11 +21,14 @@ pub fn scalUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
 
 pub fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     if (comptime !enabled) return null;
-    return fixed_simd.asumUnitReal(T, simd_config.vectorConfig(T), n, x);
+    return fixed_simd.asumUnitReal(T, simd_config.asumVectorConfig(T), n, x);
 }
 
 pub fn nrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     if (comptime !enabled) return null;
+    if (comptime T == f32) {
+        if (fixed_simd.nrm2UnitRealFastF32(simd_config.vectorConfig(T), n, x)) |result| return result;
+    }
     return fixed_simd.nrm2UnitReal(T, simd_config.vectorConfig(T), n, x);
 }
 

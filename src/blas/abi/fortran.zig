@@ -46,10 +46,6 @@ pub export fn zynum_blas_shutdown_() callconv(.c) void {
     core.shutdown();
 }
 
-inline fn copyContiguous(comptime T: type, n: BlasInt, x: [*]const T, y: [*]T) void {
-    core.copy(T, n, x, 1, y, 1);
-}
-
 test "xerbla routine names are trimmed" {
     const padded = [_]u8{ 'D', 'G', 'E', 'M', 'M', ' ' };
     const nul_terminated = [_]u8{ 'D', 'G', 'E', 'M', 'M', 0, 'X' };
@@ -307,49 +303,17 @@ pub export fn zswap_(n: *const BlasInt, x: [*]ComplexF64, incx: *const BlasInt, 
     core.swap(ComplexF64, n.*, x, incx.*, y, incy.*);
 }
 
-noinline fn scopySlow(n: BlasInt, x: [*]const f32, incx: BlasInt, y: [*]f32, incy: BlasInt) void {
-    core.copy(f32, n, x, incx, y, incy);
-}
 pub export fn scopy_(n: *const BlasInt, x: [*]const f32, incx: *const BlasInt, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
-    if (n.* <= 0) return;
-    if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(f32, n.*, x, y);
-        return;
-    }
-    scopySlow(n.*, x, incx.*, y, incy.*);
-}
-noinline fn dcopySlow(n: BlasInt, x: [*]const f64, incx: BlasInt, y: [*]f64, incy: BlasInt) void {
-    core.copy(f64, n, x, incx, y, incy);
+    core.copy(f32, n.*, x, incx.*, y, incy.*);
 }
 pub export fn dcopy_(n: *const BlasInt, x: [*]const f64, incx: *const BlasInt, y: [*]f64, incy: *const BlasInt) callconv(.c) void {
-    if (n.* <= 0) return;
-    if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(f64, n.*, x, y);
-        return;
-    }
-    dcopySlow(n.*, x, incx.*, y, incy.*);
-}
-noinline fn ccopySlow(n: BlasInt, x: [*]const ComplexF32, incx: BlasInt, y: [*]ComplexF32, incy: BlasInt) void {
-    core.copy(ComplexF32, n, x, incx, y, incy);
+    core.copy(f64, n.*, x, incx.*, y, incy.*);
 }
 pub export fn ccopy_(n: *const BlasInt, x: [*]const ComplexF32, incx: *const BlasInt, y: [*]ComplexF32, incy: *const BlasInt) callconv(.c) void {
-    if (n.* <= 0) return;
-    if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(ComplexF32, n.*, x, y);
-        return;
-    }
-    ccopySlow(n.*, x, incx.*, y, incy.*);
-}
-noinline fn zcopySlow(n: BlasInt, x: [*]const ComplexF64, incx: BlasInt, y: [*]ComplexF64, incy: BlasInt) void {
-    core.copy(ComplexF64, n, x, incx, y, incy);
+    core.copy(ComplexF32, n.*, x, incx.*, y, incy.*);
 }
 pub export fn zcopy_(n: *const BlasInt, x: [*]const ComplexF64, incx: *const BlasInt, y: [*]ComplexF64, incy: *const BlasInt) callconv(.c) void {
-    if (n.* <= 0) return;
-    if (incx.* == 1 and incy.* == 1) {
-        copyContiguous(ComplexF64, n.*, x, y);
-        return;
-    }
-    zcopySlow(n.*, x, incx.*, y, incy.*);
+    core.copy(ComplexF64, n.*, x, incx.*, y, incy.*);
 }
 
 pub export fn saxpy_(n: *const BlasInt, alpha: *const f32, x: [*]const f32, incx: *const BlasInt, y: [*]f32, incy: *const BlasInt) callconv(.c) void {
@@ -410,19 +374,10 @@ pub export fn zdotc_sub_(n: *const BlasInt, x: [*]const ComplexF64, incx: *const
 
 pub export fn sdsdot_(n: *const BlasInt, sb: *const f32, x: [*]const f32, incx: *const BlasInt, y: [*]const f32, incy: *const BlasInt) callconv(.c) f32 {
     if (n.* <= 0) return sb.*;
-    const sx = core.startIndex(n.*, incx.*);
-    const sy = core.startIndex(n.*, incy.*);
-    var sum: f64 = sb.*;
-    for (0..core.toUsize(n.*)) |i| sum += @as(f64, x[core.ix(sx, i, incx.*)]) * @as(f64, y[core.ix(sy, i, incy.*)]);
-    return @floatCast(sum);
+    return @floatCast(@as(f64, sb.*) + core.dotF32AccF64(n.*, x, incx.*, y, incy.*));
 }
 pub export fn dsdot_(n: *const BlasInt, x: [*]const f32, incx: *const BlasInt, y: [*]const f32, incy: *const BlasInt) callconv(.c) f64 {
-    if (n.* <= 0) return 0;
-    const sx = core.startIndex(n.*, incx.*);
-    const sy = core.startIndex(n.*, incy.*);
-    var sum: f64 = 0;
-    for (0..core.toUsize(n.*)) |i| sum += @as(f64, x[core.ix(sx, i, incx.*)]) * @as(f64, y[core.ix(sy, i, incy.*)]);
-    return sum;
+    return core.dotF32AccF64(n.*, x, incx.*, y, incy.*);
 }
 
 pub export fn snrm2_(n: *const BlasInt, x: [*]const f32, incx: *const BlasInt) callconv(.c) f32 {
@@ -939,4 +894,65 @@ test "level1 core.dot and core.axpy" {
     try std.testing.expectEqual(@as(f64, 6), y[0]);
     try std.testing.expectEqual(@as(f64, 9), y[1]);
     try std.testing.expectEqual(@as(f64, 12), y[2]);
+}
+
+test "sdsdot preserves sb bits when n is nonpositive" {
+    const sb: f32 = @bitCast(@as(u32, 0x80000000));
+    var n: BlasInt = 0;
+    const inc: BlasInt = 1;
+    var x = [_]f32{1};
+    var y = [_]f32{1};
+
+    try std.testing.expectEqual(@as(u32, 0x80000000), @as(u32, @bitCast(sdsdot_(&n, &sb, &x, &inc, &y, &inc))));
+    n = -3;
+    try std.testing.expectEqual(@as(u32, 0x80000000), @as(u32, @bitCast(sdsdot_(&n, &sb, &x, &inc, &y, &inc))));
+}
+
+test "complex dot sub and iamax Fortran exports" {
+    var n: BlasInt = 3;
+    var inc: BlasInt = 2;
+    const x32 = [_]ComplexF32{
+        .{ .re = 1, .im = 2 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = -3, .im = 1 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = 2, .im = -1 },
+    };
+    const y32 = [_]ComplexF32{
+        .{ .re = 4, .im = -1 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = 0.5, .im = 2 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = -2, .im = 3 },
+    };
+    const x64 = [_]ComplexF64{
+        .{ .re = 1, .im = 2 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = -3, .im = 1 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = 2, .im = -1 },
+    };
+    const y64 = [_]ComplexF64{
+        .{ .re = 4, .im = -1 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = 0.5, .im = 2 },
+        .{ .re = 99, .im = 99 },
+        .{ .re = -2, .im = 3 },
+    };
+    var dotu32: ComplexF32 = undefined;
+    var dotc32: ComplexF32 = undefined;
+    var dotu64: ComplexF64 = undefined;
+    var dotc64: ComplexF64 = undefined;
+
+    cdotu_sub_(&n, &x32, &inc, &y32, &inc, &dotu32);
+    cdotc_sub_(&n, &x32, &inc, &y32, &inc, &dotc32);
+    zdotu_sub_(&n, &x64, &inc, &y64, &inc, &dotu64);
+    zdotc_sub_(&n, &x64, &inc, &y64, &inc, &dotc64);
+
+    try std.testing.expectEqual(ComplexF32{ .re = 1.5, .im = 9.5 }, dotu32);
+    try std.testing.expectEqual(ComplexF32{ .re = -4.5, .im = -11.5 }, dotc32);
+    try std.testing.expectEqual(ComplexF64{ .re = 1.5, .im = 9.5 }, dotu64);
+    try std.testing.expectEqual(ComplexF64{ .re = -4.5, .im = -11.5 }, dotc64);
+    try std.testing.expectEqual(@as(BlasInt, 2), icamax_(&n, &x32, &inc));
+    try std.testing.expectEqual(@as(BlasInt, 2), izamax_(&n, &x64, &inc));
 }

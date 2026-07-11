@@ -40,6 +40,21 @@ fn referenceComplexGemmNoTrans(comptime T: type, m: usize, n: usize, k: usize, a
     }
 }
 
+fn referenceComplexGemm(comptime T: type, transa: ref.Trans, transb: ref.Trans, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
+    for (0..n) |j| {
+        for (0..m) |i| {
+            var sum = complexValue(T, 0, 0);
+            for (0..k) |p| {
+                const av = ref.colMatrixValue(T, transa, a, @intCast(lda), i, p);
+                const bv = ref.colMatrixValue(T, transb, b, @intCast(ldb), p, j);
+                sum = complexAdd(T, sum, complexMul(T, av, bv));
+            }
+            const idxc = matIndex(ldc, i, j);
+            c[idxc] = complexAdd(T, complexMul(T, alpha, sum), complexMul(T, beta, c[idxc]));
+        }
+    }
+}
+
 fn expectComplexApprox(comptime T: type, expected: T, actual: T, tol: anytype) !void {
     try std.testing.expectApproxEqAbs(expected.re, actual.re, tol);
     try std.testing.expectApproxEqAbs(expected.im, actual.im, tol);
@@ -200,6 +215,33 @@ fn referenceGemmNoTrans(comptime T: type, m: usize, n: usize, k: usize, alpha: T
     }
 }
 
+fn referenceGemmNoTransTransposedB(comptime T: type, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
+    for (0..n) |j| {
+        for (0..m) |i| {
+            var sum: T = 0;
+            for (0..k) |p| {
+                sum = @mulAdd(T, a[matIndex(lda, i, p)], b[matIndex(ldb, j, p)], sum);
+            }
+            const idxc = matIndex(ldc, i, j);
+            c[idxc] = @mulAdd(T, alpha, sum, if (beta == 0) 0 else beta * c[idxc]);
+        }
+    }
+}
+
+fn referenceGemmTransposedA(comptime T: type, transposed_b: bool, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
+    for (0..n) |j| {
+        for (0..m) |i| {
+            var sum: T = 0;
+            for (0..k) |p| {
+                const bv = if (transposed_b) b[matIndex(ldb, j, p)] else b[matIndex(ldb, p, j)];
+                sum = @mulAdd(T, a[matIndex(lda, p, i)], bv, sum);
+            }
+            const idxc = matIndex(ldc, i, j);
+            c[idxc] = @mulAdd(T, alpha, sum, if (beta == 0) 0 else beta * c[idxc]);
+        }
+    }
+}
+
 fn callGemmNoTrans(comptime T: type, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
     var ta = [_]u8{'N'};
     var tb = [_]u8{'N'};
@@ -220,9 +262,77 @@ fn callGemmNoTrans(comptime T: type, m: usize, n: usize, k: usize, alpha: T, a: 
     }
 }
 
+fn callGemmNoTransTransposedB(comptime T: type, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
+    var ta = [_]u8{'N'};
+    var tb = [_]u8{'T'};
+    var mm: fortran.BlasInt = @intCast(m);
+    var nn: fortran.BlasInt = @intCast(n);
+    var kk: fortran.BlasInt = @intCast(k);
+    var alpha_arg = alpha;
+    var beta_arg = beta;
+    var lda_arg = lda;
+    var ldb_arg = ldb;
+    var ldc_arg = ldc;
+    if (T == f32) {
+        fortran.sgemm_(&ta, &tb, &mm, &nn, &kk, &alpha_arg, a.ptr, &lda_arg, b.ptr, &ldb_arg, &beta_arg, c.ptr, &ldc_arg);
+    } else if (T == f64) {
+        fortran.dgemm_(&ta, &tb, &mm, &nn, &kk, &alpha_arg, a.ptr, &lda_arg, b.ptr, &ldb_arg, &beta_arg, c.ptr, &ldc_arg);
+    } else {
+        @compileError("test helper supports f32 and f64");
+    }
+}
+
+fn callGemmTransposedA(comptime T: type, transposed_b: bool, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
+    var ta = [_]u8{'T'};
+    var tb = [_]u8{if (transposed_b) 'T' else 'N'};
+    var mm: fortran.BlasInt = @intCast(m);
+    var nn: fortran.BlasInt = @intCast(n);
+    var kk: fortran.BlasInt = @intCast(k);
+    var alpha_arg = alpha;
+    var beta_arg = beta;
+    var lda_arg = lda;
+    var ldb_arg = ldb;
+    var ldc_arg = ldc;
+    if (T == f32) {
+        fortran.sgemm_(&ta, &tb, &mm, &nn, &kk, &alpha_arg, a.ptr, &lda_arg, b.ptr, &ldb_arg, &beta_arg, c.ptr, &ldc_arg);
+    } else if (T == f64) {
+        fortran.dgemm_(&ta, &tb, &mm, &nn, &kk, &alpha_arg, a.ptr, &lda_arg, b.ptr, &ldb_arg, &beta_arg, c.ptr, &ldc_arg);
+    } else {
+        @compileError("test helper supports f32 and f64");
+    }
+}
+
 fn callComplexGemmNoTrans(comptime T: type, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
     var ta = [_]u8{'N'};
     var tb = [_]u8{'N'};
+    var mm: fortran.BlasInt = @intCast(m);
+    var nn: fortran.BlasInt = @intCast(n);
+    var kk: fortran.BlasInt = @intCast(k);
+    var alpha_arg = alpha;
+    var beta_arg = beta;
+    var lda_arg = lda;
+    var ldb_arg = ldb;
+    var ldc_arg = ldc;
+    if (T == fortran.ComplexF32) {
+        fortran.cgemm_(&ta, &tb, &mm, &nn, &kk, &alpha_arg, a.ptr, &lda_arg, b.ptr, &ldb_arg, &beta_arg, c.ptr, &ldc_arg);
+    } else if (T == fortran.ComplexF64) {
+        fortran.zgemm_(&ta, &tb, &mm, &nn, &kk, &alpha_arg, a.ptr, &lda_arg, b.ptr, &ldb_arg, &beta_arg, c.ptr, &ldc_arg);
+    } else {
+        @compileError("test helper supports ComplexF32 and ComplexF64");
+    }
+}
+
+fn transChar(trans: ref.Trans) u8 {
+    return switch (trans) {
+        .no_trans => 'N',
+        .trans => 'T',
+        .conj_trans => 'C',
+    };
+}
+
+fn callComplexGemm(comptime T: type, transa: ref.Trans, transb: ref.Trans, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
+    var ta = [_]u8{transChar(transa)};
+    var tb = [_]u8{transChar(transb)};
     var mm: fortran.BlasInt = @intCast(m);
     var nn: fortran.BlasInt = @intCast(n);
     var kk: fortran.BlasInt = @intCast(k);
@@ -275,6 +385,81 @@ fn expectGemmNoTransCase(comptime T: type, allocator: std.mem.Allocator, m: usiz
     }
 }
 
+fn expectGemmNoTransTransposedBCase(comptime T: type, allocator: std.mem.Allocator, m: usize, n: usize, k: usize, lda: fortran.BlasInt, ldb: fortran.BlasInt, ldc: fortran.BlasInt, alpha: T, beta: T) !void {
+    const a_len = @as(usize, @intCast(lda)) * k;
+    const b_len = @as(usize, @intCast(ldb)) * k;
+    const c_len = @as(usize, @intCast(ldc)) * n;
+    const a = try allocator.alloc(T, a_len);
+    defer allocator.free(a);
+    const b = try allocator.alloc(T, b_len);
+    defer allocator.free(b);
+    const c = try allocator.alloc(T, c_len);
+    defer allocator.free(c);
+    const expected = try allocator.alloc(T, c_len);
+    defer allocator.free(expected);
+
+    const sentinel: T = if (T == f32) -777.0 else -999.0;
+    fillPaddedMatrix(T, a, m, k, lda, 13, sentinel);
+    fillPaddedMatrix(T, b, n, k, ldb, 17, sentinel);
+    fillPaddedMatrix(T, c, m, n, ldc, 19, sentinel);
+    @memcpy(expected, c);
+
+    callGemmNoTransTransposedB(T, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    referenceGemmNoTransTransposedB(T, m, n, k, alpha, a, lda, b, ldb, beta, expected, ldc);
+
+    const tol: T = if (T == f32) 1e-3 else 1e-10;
+    for (0..n) |j| {
+        for (0..@as(usize, @intCast(ldc))) |i| {
+            const idxc = matIndex(ldc, i, j);
+            if (i < m) {
+                try std.testing.expectApproxEqAbs(expected[idxc], c[idxc], tol);
+            } else {
+                try std.testing.expectEqual(expected[idxc], c[idxc]);
+            }
+        }
+    }
+}
+
+fn expectGemmTransposedACase(comptime T: type, allocator: std.mem.Allocator, transposed_b: bool, m: usize, n: usize, k: usize, lda: fortran.BlasInt, ldb: fortran.BlasInt, ldc: fortran.BlasInt, alpha: T, beta: T) !void {
+    const a_len = @max(@as(usize, 1), @as(usize, @intCast(lda)) * m);
+    const b_cols = if (transposed_b) k else n;
+    const b_len = @max(@as(usize, 1), @as(usize, @intCast(ldb)) * b_cols);
+    const c_len = @as(usize, @intCast(ldc)) * n;
+    const a = try allocator.alloc(T, a_len);
+    defer allocator.free(a);
+    const b = try allocator.alloc(T, b_len);
+    defer allocator.free(b);
+    const c = try allocator.alloc(T, c_len);
+    defer allocator.free(c);
+    const expected = try allocator.alloc(T, c_len);
+    defer allocator.free(expected);
+
+    const sentinel: T = if (T == f32) -777.0 else -999.0;
+    fillPaddedMatrix(T, a, k, m, lda, 23, sentinel);
+    if (transposed_b) {
+        fillPaddedMatrix(T, b, n, k, ldb, 29, sentinel);
+    } else {
+        fillPaddedMatrix(T, b, k, n, ldb, 29, sentinel);
+    }
+    fillPaddedMatrix(T, c, m, n, ldc, 31, sentinel);
+    @memcpy(expected, c);
+
+    callGemmTransposedA(T, transposed_b, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    referenceGemmTransposedA(T, transposed_b, m, n, k, alpha, a, lda, b, ldb, beta, expected, ldc);
+
+    const tol: T = if (T == f32) 1e-3 else 1e-10;
+    for (0..n) |j| {
+        for (0..@as(usize, @intCast(ldc))) |i| {
+            const idxc = matIndex(ldc, i, j);
+            if (i < m) {
+                try std.testing.expectApproxEqAbs(expected[idxc], c[idxc], tol);
+            } else {
+                try std.testing.expectEqual(expected[idxc], c[idxc]);
+            }
+        }
+    }
+}
+
 fn expectComplexGemmNoTransCase(comptime T: type, allocator: std.mem.Allocator, m: usize, n: usize, k: usize, lda: fortran.BlasInt, ldb: fortran.BlasInt, ldc: fortran.BlasInt, alpha: T, beta: T, tol: anytype) !void {
     const a_len = @as(usize, @intCast(lda)) * k;
     const b_len = @as(usize, @intCast(ldb)) * n;
@@ -296,6 +481,46 @@ fn expectComplexGemmNoTransCase(comptime T: type, allocator: std.mem.Allocator, 
 
     callComplexGemmNoTrans(T, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
     referenceComplexGemmNoTrans(T, m, n, k, alpha, a, lda, b, ldb, beta, expected, ldc);
+
+    for (0..n) |j| {
+        for (0..@as(usize, @intCast(ldc))) |i| {
+            const idxc = matIndex(ldc, i, j);
+            if (i < m) {
+                try expectComplexApprox(T, expected[idxc], c[idxc], tol);
+            } else {
+                try std.testing.expectEqual(expected[idxc], c[idxc]);
+            }
+        }
+    }
+}
+
+fn expectComplexGemmTransCase(comptime T: type, transa: ref.Trans, transb: ref.Trans, m: usize, n: usize, k: usize, alpha: T, beta: T, tol: anytype) !void {
+    const a_rows = if (transa == .no_trans) m else k;
+    const a_cols = if (transa == .no_trans) k else m;
+    const b_rows = if (transb == .no_trans) k else n;
+    const b_cols = if (transb == .no_trans) n else k;
+    const lda: fortran.BlasInt = @intCast(a_rows + 4);
+    const ldb: fortran.BlasInt = @intCast(b_rows + 5);
+    const ldc: fortran.BlasInt = @intCast(m + 6);
+
+    const allocator = std.testing.allocator;
+    const a = try allocator.alloc(T, @as(usize, @intCast(lda)) * a_cols);
+    defer allocator.free(a);
+    const b = try allocator.alloc(T, @as(usize, @intCast(ldb)) * b_cols);
+    defer allocator.free(b);
+    const c = try allocator.alloc(T, @as(usize, @intCast(ldc)) * n);
+    defer allocator.free(c);
+    const expected = try allocator.alloc(T, c.len);
+    defer allocator.free(expected);
+
+    const sentinel = complexValue(T, -77, 33);
+    fillPaddedComplexMatrix(T, a, a_rows, a_cols, lda, 37, sentinel);
+    fillPaddedComplexMatrix(T, b, b_rows, b_cols, ldb, 41, sentinel);
+    fillPaddedComplexMatrix(T, c, m, n, ldc, 43, sentinel);
+    @memcpy(expected, c);
+
+    callComplexGemm(T, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    referenceComplexGemm(T, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, expected, ldc);
 
     for (0..n) |j| {
         for (0..@as(usize, @intCast(ldc))) |i| {
@@ -341,6 +566,7 @@ test "complex scal with complex alpha supports strides" {
     try expectComplexScalCase(fortran.ComplexF32, 9, 1, complexValue(fortran.ComplexF32, -0.75, 0.5), @as(f32, 1e-5));
     try expectComplexScalCase(fortran.ComplexF32, 7, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), @as(f32, 1e-5));
     try expectComplexScalCase(fortran.ComplexF32, 7, -2, complexValue(fortran.ComplexF32, 1.5, 0.375), @as(f32, 1e-5));
+    try expectComplexScalCase(fortran.ComplexF32, 17, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), @as(f32, 1e-5));
     try expectComplexScalCase(fortran.ComplexF64, 9, 1, complexValue(fortran.ComplexF64, -0.75, 0.5), @as(f64, 1e-12));
     try expectComplexScalCase(fortran.ComplexF64, 7, 2, complexValue(fortran.ComplexF64, 0.25, -1.25), @as(f64, 1e-12));
     try expectComplexScalCase(fortran.ComplexF64, 7, -2, complexValue(fortran.ComplexF64, 1.5, 0.375), @as(f64, 1e-12));
@@ -349,19 +575,158 @@ test "complex scal with complex alpha supports strides" {
 test "complex axpy and axpby with complex alpha support strides" {
     try expectComplexAxpyCase(fortran.ComplexF32, 8, 1, 1, complexValue(fortran.ComplexF32, -0.75, 0.5), @as(f32, 1e-5));
     try expectComplexAxpyCase(fortran.ComplexF32, 7, 2, -2, complexValue(fortran.ComplexF32, 0.25, -1.25), @as(f32, 1e-5));
+    try expectComplexAxpyCase(fortran.ComplexF32, 17, 2, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), @as(f32, 1e-5));
     try expectComplexAxpyCase(fortran.ComplexF64, 8, 1, 1, complexValue(fortran.ComplexF64, -0.75, 0.5), @as(f64, 1e-12));
     try expectComplexAxpyCase(fortran.ComplexF64, 7, 2, -2, complexValue(fortran.ComplexF64, 0.25, -1.25), @as(f64, 1e-12));
 
     try expectComplexAxpbyCase(fortran.ComplexF32, 8, 1, 1, complexValue(fortran.ComplexF32, -0.75, 0.5), complexValue(fortran.ComplexF32, 0.25, -0.125), @as(f32, 1e-5));
     try expectComplexAxpbyCase(fortran.ComplexF32, 7, -2, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), complexValue(fortran.ComplexF32, -0.5, 0.75), @as(f32, 1e-5));
+    try expectComplexAxpbyCase(fortran.ComplexF32, 17, 2, 2, complexValue(fortran.ComplexF32, 0.25, -1.25), complexValue(fortran.ComplexF32, -0.5, 0.75), @as(f32, 1e-5));
     try expectComplexAxpbyCase(fortran.ComplexF64, 8, 1, 1, complexValue(fortran.ComplexF64, -0.75, 0.5), complexValue(fortran.ComplexF64, 0.25, -0.125), @as(f64, 1e-12));
     try expectComplexAxpbyCase(fortran.ComplexF64, 7, -2, 2, complexValue(fortran.ComplexF64, 0.25, -1.25), complexValue(fortran.ComplexF64, -0.5, 0.75), @as(f64, 1e-12));
+}
+
+test "stride-two vector updates preserve gap elements" {
+    const n: usize = 17;
+    const storage_len = 2 * n - 1;
+    var nn: fortran.BlasInt = @intCast(n);
+    var inc: fortran.BlasInt = 2;
+
+    var x: [storage_len]f32 = undefined;
+    var y: [storage_len]f32 = undefined;
+    var expected_y: [storage_len]f32 = undefined;
+    for (&x, &y, &expected_y, 0..) |*xv, *yv, *want, i| {
+        xv.* = (@as(f32, @floatFromInt(i)) - 11) / 17;
+        yv.* = (@as(f32, @floatFromInt(i)) + 7) / 19;
+        want.* = yv.*;
+    }
+    var alpha: f32 = 0.25;
+    for (0..n) |i| expected_y[2 * i] = @mulAdd(f32, alpha, x[2 * i], expected_y[2 * i]);
+    fortran.saxpy_(&nn, &alpha, &x, &inc, &y, &inc);
+    for (expected_y, y) |want, got| try std.testing.expectApproxEqAbs(want, got, 1e-6);
+
+    var cx: [storage_len]fortran.ComplexF32 = undefined;
+    var cy: [storage_len]fortran.ComplexF32 = undefined;
+    var expected_x: [storage_len]fortran.ComplexF32 = undefined;
+    var expected_cy: [storage_len]fortran.ComplexF32 = undefined;
+    for (&cx, &cy, &expected_x, &expected_cy, 0..) |*xv, *yv, *want_x, *want_y, i| {
+        xv.* = complexValue(fortran.ComplexF32, @floatFromInt(i), -@as(f64, @floatFromInt(i + 1)));
+        yv.* = complexValue(fortran.ComplexF32, @floatFromInt(i + 3), @floatFromInt(i + 5));
+        want_x.* = xv.*;
+        want_y.* = yv.*;
+    }
+    var c: f32 = 0.8;
+    var s: f32 = 0.6;
+    for (0..n) |i| {
+        const index = 2 * i;
+        const xv = expected_x[index];
+        const yv = expected_cy[index];
+        expected_x[index] = .{
+            .re = c * xv.re + s * yv.re,
+            .im = c * xv.im + s * yv.im,
+        };
+        expected_cy[index] = .{
+            .re = c * yv.re - s * xv.re,
+            .im = c * yv.im - s * xv.im,
+        };
+    }
+    fortran.csrot_(&nn, &cx, &inc, &cy, &inc, &c, &s);
+    for (expected_x, cx) |want, got| try expectComplexApprox(fortran.ComplexF32, want, got, @as(f32, 1e-5));
+    for (expected_cy, cy) |want, got| try expectComplexApprox(fortran.ComplexF32, want, got, @as(f32, 1e-5));
 }
 
 test "sgemm and dgemm no-trans padded alpha beta tile tails" {
     const allocator = std.testing.allocator;
     try expectGemmNoTransCase(f32, allocator, 5, 5, 3, 7, 5, 8, -0.5, 2.0);
     try expectGemmNoTransCase(f64, allocator, 7, 5, 3, 9, 5, 10, -0.5, 2.0);
+}
+
+test "sgemm and dgemm NT packed path handles padding tails alpha beta" {
+    const allocator = std.testing.allocator;
+    try expectGemmNoTransTransposedBCase(f32, allocator, 35, 37, 67, 39, 41, 43, -0.5, 2.0);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 35, 37, 67, 39, 41, 43, -0.5, 2.0);
+    try expectGemmNoTransTransposedBCase(f32, allocator, 37, 35, 71, 41, 39, 43, 1.0, 0.0);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 37, 35, 71, 41, 39, 43, 1.0, 0.0);
+    try expectGemmNoTransTransposedBCase(f32, allocator, 128, 128, 128, 131, 137, 139, 1.0, 0.0);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 128, 128, 128, 131, 137, 139, 1.0, 0.0);
+}
+
+test "sgemm and dgemm NT packed path supports heap packing" {
+    const allocator = std.testing.allocator;
+    try expectGemmNoTransTransposedBCase(f32, allocator, 17, 19, 2049, 23, 29, 31, 0.75, -0.25);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 17, 19, 2049, 23, 29, 31, 0.75, -0.25);
+}
+
+test "sgemm and dgemm NT vector edges reuse GEMV with padded storage" {
+    const allocator = std.testing.allocator;
+    try expectGemmNoTransTransposedBCase(f32, allocator, 1, 257, 131, 3, 263, 5, -0.5, 2.0);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 1, 257, 131, 3, 263, 5, -0.5, 2.0);
+    try expectGemmNoTransTransposedBCase(f32, allocator, 257, 1, 131, 263, 3, 269, -0.5, 2.0);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 257, 1, 131, 263, 3, 269, -0.5, 2.0);
+}
+
+test "parallel sgemm and dgemm NT packed path matches reference" {
+    const allocator = std.testing.allocator;
+    fortran.runtime.setMaxThreads(3);
+    defer fortran.runtime.setMaxThreads(0);
+    try expectGemmNoTransTransposedBCase(f32, allocator, 193, 65, 577, 197, 69, 199, 0.75, -0.25);
+    try expectGemmNoTransTransposedBCase(f64, allocator, 193, 65, 577, 197, 69, 199, 0.75, -0.25);
+}
+
+test "sgemm and dgemm TN TT packed paths handle padding odd tails alpha beta" {
+    const allocator = std.testing.allocator;
+    inline for (.{ f32, f64 }) |T| {
+        try expectGemmTransposedACase(T, allocator, false, 35, 37, 67, 71, 73, 43, -0.5, 2.0);
+        try expectGemmTransposedACase(T, allocator, true, 35, 37, 67, 71, 41, 43, -0.5, 2.0);
+        try expectGemmTransposedACase(T, allocator, false, 37, 35, 71, 73, 79, 43, 0.75, -0.25);
+        try expectGemmTransposedACase(T, allocator, true, 37, 35, 71, 73, 39, 43, 0.75, -0.25);
+    }
+}
+
+test "sgemm and dgemm medium irregular AMX interior keeps padded tails disjoint" {
+    const allocator = std.testing.allocator;
+    inline for (.{ f32, f64 }) |T| {
+        try expectGemmNoTransCase(T, allocator, 127, 129, 65, 131, 69, 137, 1.0, 0.0);
+        try expectGemmNoTransTransposedBCase(T, allocator, 127, 129, 65, 131, 133, 137, 1.0, 0.0);
+        try expectGemmTransposedACase(T, allocator, false, 127, 129, 65, 69, 71, 137, 1.0, 0.0);
+        try expectGemmTransposedACase(T, allocator, true, 127, 129, 65, 69, 133, 137, 1.0, 0.0);
+    }
+}
+
+test "sgemm and dgemm TN TT packed paths support heap A packing" {
+    const allocator = std.testing.allocator;
+    inline for (.{ f32, f64 }) |T| {
+        try expectGemmTransposedACase(T, allocator, false, 17, 19, 2049, 2053, 2057, 23, 0.75, -0.25);
+        try expectGemmTransposedACase(T, allocator, true, 17, 19, 2049, 2053, 23, 23, 0.75, -0.25);
+    }
+}
+
+test "parallel sgemm and dgemm TN TT packed paths match reference" {
+    const allocator = std.testing.allocator;
+    fortran.runtime.setMaxThreads(3);
+    defer fortran.runtime.setMaxThreads(0);
+    inline for (.{ f32, f64 }) |T| {
+        try expectGemmTransposedACase(T, allocator, false, 193, 65, 577, 581, 583, 199, 0.75, -0.25);
+        try expectGemmTransposedACase(T, allocator, true, 193, 65, 577, 581, 69, 199, 0.75, -0.25);
+    }
+}
+
+test "sgemm and dgemm TN TT alpha zero and k zero scale C" {
+    const allocator = std.testing.allocator;
+    inline for (.{ f32, f64 }) |T| {
+        try expectGemmTransposedACase(T, allocator, false, 5, 7, 11, 13, 13, 11, 0.0, -0.25);
+        try expectGemmTransposedACase(T, allocator, true, 5, 7, 11, 13, 9, 11, 0.0, -0.25);
+        try expectGemmTransposedACase(T, allocator, false, 5, 7, 0, 3, 3, 11, 1.0, 2.0);
+        try expectGemmTransposedACase(T, allocator, true, 5, 7, 0, 3, 9, 11, 1.0, 2.0);
+    }
+}
+
+test "small sgemm and dgemm TN TT fall back before updating C" {
+    const allocator = std.testing.allocator;
+    inline for (.{ f32, f64 }) |T| {
+        try expectGemmTransposedACase(T, allocator, false, 5, 7, 3, 5, 5, 11, -0.5, 2.0);
+        try expectGemmTransposedACase(T, allocator, true, 5, 7, 3, 5, 9, 11, -0.5, 2.0);
+    }
 }
 
 test "cgemm and zgemm column major no transpose" {
@@ -494,6 +859,115 @@ test "complex gemm no-trans 3m padded tails match reference" {
         complexValue(fortran.ComplexF64, 0, 0),
         @as(f64, 1e-9),
     );
+}
+
+test "complex gemm non-NN 3m handles all transpose pairs with odd padded storage" {
+    const pairs = [_]struct { transa: ref.Trans, transb: ref.Trans }{
+        .{ .transa = .no_trans, .transb = .trans },
+        .{ .transa = .no_trans, .transb = .conj_trans },
+        .{ .transa = .trans, .transb = .no_trans },
+        .{ .transa = .trans, .transb = .trans },
+        .{ .transa = .trans, .transb = .conj_trans },
+        .{ .transa = .conj_trans, .transb = .no_trans },
+        .{ .transa = .conj_trans, .transb = .trans },
+        .{ .transa = .conj_trans, .transb = .conj_trans },
+    };
+    inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
+        const tol = if (T == fortran.ComplexF32) @as(f32, 4e-2) else @as(f64, 1e-9);
+        for (pairs) |pair| {
+            try expectComplexGemmTransCase(
+                T,
+                pair.transa,
+                pair.transb,
+                33,
+                35,
+                128,
+                complexValue(T, 1, 0),
+                complexValue(T, 0, 0),
+                tol,
+            );
+        }
+    }
+}
+
+test "complex gemm 3m padded 128-row compute preserves 127-row storage and vector tails" {
+    const allocator = std.testing.allocator;
+    const pairs = [_]struct { transa: ref.Trans, transb: ref.Trans }{
+        .{ .transa = .no_trans, .transb = .trans },
+        .{ .transa = .no_trans, .transb = .conj_trans },
+        .{ .transa = .trans, .transb = .no_trans },
+        .{ .transa = .trans, .transb = .trans },
+        .{ .transa = .trans, .transb = .conj_trans },
+        .{ .transa = .conj_trans, .transb = .no_trans },
+        .{ .transa = .conj_trans, .transb = .trans },
+        .{ .transa = .conj_trans, .transb = .conj_trans },
+    };
+    inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
+        const tol = if (T == fortran.ComplexF32) @as(f32, 4e-2) else @as(f64, 1e-9);
+        for ([_]usize{ 31, 32, 33, 129 }) |k| {
+            try expectComplexGemmNoTransCase(
+                T,
+                allocator,
+                127,
+                129,
+                k,
+                131,
+                @intCast(k + 5),
+                137,
+                complexValue(T, 1, 0),
+                complexValue(T, 0, 0),
+                tol,
+            );
+            for (pairs) |pair| {
+                try expectComplexGemmTransCase(
+                    T,
+                    pair.transa,
+                    pair.transb,
+                    127,
+                    129,
+                    k,
+                    complexValue(T, 1, 0),
+                    complexValue(T, 0, 0),
+                    tol,
+                );
+            }
+        }
+    }
+}
+
+test "complex gemm non-NN 3m handles row and column vector edges" {
+    const pairs = [_]struct { transa: ref.Trans, transb: ref.Trans }{
+        .{ .transa = .no_trans, .transb = .trans },
+        .{ .transa = .no_trans, .transb = .conj_trans },
+        .{ .transa = .trans, .transb = .no_trans },
+        .{ .transa = .trans, .transb = .trans },
+        .{ .transa = .trans, .transb = .conj_trans },
+        .{ .transa = .conj_trans, .transb = .no_trans },
+        .{ .transa = .conj_trans, .transb = .trans },
+        .{ .transa = .conj_trans, .transb = .conj_trans },
+    };
+    const shapes = [_]struct { m: usize, n: usize, k: usize }{
+        .{ .m = 1, .n = 1024, .k = 128 },
+        .{ .m = 1024, .n = 1, .k = 128 },
+    };
+    inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
+        const tol = if (T == fortran.ComplexF32) @as(f32, 4e-2) else @as(f64, 1e-9);
+        for (pairs) |pair| {
+            for (shapes) |shape| {
+                try expectComplexGemmTransCase(
+                    T,
+                    pair.transa,
+                    pair.transb,
+                    shape.m,
+                    shape.n,
+                    shape.k,
+                    complexValue(T, 1, 0),
+                    complexValue(T, 0, 0),
+                    tol,
+                );
+            }
+        }
+    }
 }
 
 test "sgemm no-trans direct tile path with tails" {
@@ -836,6 +1310,15 @@ test "level1 double vector fallback smoke" {
     var iamax_input = [_]f64{ -1, 99, 4, 99, -5 };
     try std.testing.expectEqual(@as(fortran.BlasInt, 3), fortran.idamax_(&n, &iamax_input, &inc2));
 
+    var icamax_n: fortran.BlasInt = 4;
+    var icamax_input = [_]fortran.ComplexF32{
+        .{ .re = 1, .im = 1 },
+        .{ .re = -4, .im = 3 },
+        .{ .re = 2, .im = -5 },
+        .{ .re = 0, .im = 6 },
+    };
+    try std.testing.expectEqual(@as(fortran.BlasInt, 2), fortran.icamax_(&icamax_n, &icamax_input, &inc1));
+
     var rot_n: fortran.BlasInt = 2;
     var c: f64 = 0;
     var s: f64 = 1;
@@ -852,6 +1335,13 @@ test "level1 double vector fallback smoke" {
     var two: fortran.BlasInt = 2;
     try std.testing.expectApproxEqAbs(@as(f64, 11), fortran.dsdot_(&two, &left32, &inc2, &right32, &inc2), 1e-12);
 
+    var cancel_n: fortran.BlasInt = 3;
+    var cancellation_x = [_]f32{ 1.0e10, 1, -1.0e10 };
+    var cancellation_y = [_]f32{ 1, 1, 1 };
+    var sb: f32 = 0.25;
+    try std.testing.expectApproxEqAbs(@as(f64, 1), fortran.dsdot_(&cancel_n, &cancellation_x, &inc1, &cancellation_y, &inc1), 1e-12);
+    try std.testing.expectApproxEqAbs(@as(f32, 1.25), fortran.sdsdot_(&cancel_n, &sb, &cancellation_x, &inc1, &cancellation_y, &inc1), 1e-6);
+
     var swap_left = [_]f64{ 1, 2 };
     var swap_right = [_]f64{ 3, 4 };
     fortran.dswap_(&rot_n, &swap_left, &inc1, &swap_right, &inc1);
@@ -859,6 +1349,202 @@ test "level1 double vector fallback smoke" {
     try std.testing.expectEqual(@as(f64, 4), swap_left[1]);
     try std.testing.expectEqual(@as(f64, 1), swap_right[0]);
     try std.testing.expectEqual(@as(f64, 2), swap_right[1]);
+}
+
+test "fortran large unit-stride real Level 1 affine and rotations" {
+    const n: usize = 1024 * 1024;
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(f32, n);
+    defer allocator.free(x);
+    const y = try allocator.alloc(f32, n);
+    defer allocator.free(y);
+
+    for (x, y, 0..) |*xv, *yv, i| {
+        xv.* = (@as(f32, @floatFromInt(i % 251)) - 125) / 251;
+        yv.* = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+    }
+    var nn: fortran.BlasInt = @intCast(n);
+    var inc: fortran.BlasInt = 1;
+
+    var scale: f32 = 0.5;
+    fortran.sscal_(&nn, &scale, x.ptr, &inc);
+    for (x, 0..) |xv, i| {
+        const x0 = (@as(f32, @floatFromInt(i % 251)) - 125) / 251;
+        try std.testing.expectApproxEqAbs(scale * x0, xv, 1e-6);
+    }
+
+    for (x, 0..) |*xv, i| xv.* = (@as(f32, @floatFromInt(i % 251)) - 125) / 251;
+    var axpy_alpha: f32 = 0.125;
+    fortran.saxpy_(&nn, &axpy_alpha, x.ptr, &inc, y.ptr, &inc);
+    for (x, y, 0..) |xv, yv, i| {
+        const y0 = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+        try std.testing.expectApproxEqAbs(axpy_alpha * xv + y0, yv, 1e-6);
+    }
+
+    for (y, 0..) |*yv, i| yv.* = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+    var alpha: f32 = 0.125;
+    var beta: f32 = 0.875;
+    fortran.saxpby_(&nn, &alpha, x.ptr, &inc, &beta, y.ptr, &inc);
+    for (x, y, 0..) |xv, yv, i| {
+        const y0 = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+        try std.testing.expectApproxEqAbs(alpha * xv + beta * y0, yv, 1e-6);
+    }
+
+    for (y, 0..) |*yv, i| yv.* = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+    var c: f32 = 0.8;
+    var s: f32 = 0.6;
+    fortran.srot_(&nn, x.ptr, &inc, y.ptr, &inc, &c, &s);
+    for (x, y, 0..) |xv, yv, i| {
+        const x0 = (@as(f32, @floatFromInt(i % 251)) - 125) / 251;
+        const y0 = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+        try std.testing.expectApproxEqAbs(c * x0 + s * y0, xv, 1e-6);
+        try std.testing.expectApproxEqAbs(c * y0 - s * x0, yv, 1e-6);
+    }
+
+    for (x, y, 0..) |*xv, *yv, i| {
+        xv.* = (@as(f32, @floatFromInt(i % 251)) - 125) / 251;
+        yv.* = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+    }
+    const param = [_]f32{ -1, 0.8, -0.6, 0.6, 0.8 };
+    fortran.srotm_(&nn, x.ptr, &inc, y.ptr, &inc, &param);
+    for (x, y, 0..) |xv, yv, i| {
+        const x0 = (@as(f32, @floatFromInt(i % 251)) - 125) / 251;
+        const y0 = (@as(f32, @floatFromInt(i % 239)) - 119) / 239;
+        try std.testing.expectApproxEqAbs(param[1] * x0 + param[3] * y0, xv, 1e-6);
+        try std.testing.expectApproxEqAbs(param[2] * x0 + param[4] * y0, yv, 1e-6);
+    }
+}
+
+test "fortran SME rotation tails and rotm variants" {
+    const n: usize = 64 * 1024 + 17;
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(f32, n);
+    defer allocator.free(x);
+    const y = try allocator.alloc(f32, n);
+    defer allocator.free(y);
+    var nn: fortran.BlasInt = @intCast(n);
+    var inc: fortran.BlasInt = 1;
+
+    for (x, y, 0..) |*xv, *yv, i| {
+        xv.* = (@as(f32, @floatFromInt(i % 31)) - 15) / 31;
+        yv.* = (@as(f32, @floatFromInt(i % 29)) - 14) / 29;
+    }
+    var c: f32 = 0.8;
+    var s: f32 = 0.6;
+    fortran.srot_(&nn, x.ptr, &inc, y.ptr, &inc, &c, &s);
+    for (x, y, 0..) |xv, yv, i| {
+        const x0 = (@as(f32, @floatFromInt(i % 31)) - 15) / 31;
+        const y0 = (@as(f32, @floatFromInt(i % 29)) - 14) / 29;
+        try std.testing.expectApproxEqAbs(c * x0 + s * y0, xv, 1e-6);
+        try std.testing.expectApproxEqAbs(c * y0 - s * x0, yv, 1e-6);
+    }
+
+    const nan = std.math.nan(f32);
+    const params = [_][5]f32{
+        .{ 0, nan, -0.25, 0.5, nan },
+        .{ 1, 0.75, nan, nan, 0.625 },
+    };
+    for (params) |param| {
+        for (x, y, 0..) |*xv, *yv, i| {
+            xv.* = (@as(f32, @floatFromInt(i % 31)) - 15) / 31;
+            yv.* = (@as(f32, @floatFromInt(i % 29)) - 14) / 29;
+        }
+        fortran.srotm_(&nn, x.ptr, &inc, y.ptr, &inc, &param);
+        for (x, y, 0..) |xv, yv, i| {
+            const x0 = (@as(f32, @floatFromInt(i % 31)) - 15) / 31;
+            const y0 = (@as(f32, @floatFromInt(i % 29)) - 14) / 29;
+            if (param[0] == 0) {
+                try std.testing.expectApproxEqAbs(x0 + param[3] * y0, xv, 1e-6);
+                try std.testing.expectApproxEqAbs(param[2] * x0 + y0, yv, 1e-6);
+            } else {
+                try std.testing.expectApproxEqAbs(param[1] * x0 + y0, xv, 1e-6);
+                try std.testing.expectApproxEqAbs(-x0 + param[4] * y0, yv, 1e-6);
+            }
+        }
+    }
+}
+
+test "fortran large unit-stride swap" {
+    const n: usize = 512 * 1024;
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(f64, n);
+    defer allocator.free(x);
+    const y = try allocator.alloc(f64, n);
+    defer allocator.free(y);
+
+    for (x, y, 0..) |*xv, *yv, i| {
+        xv.* = @floatFromInt(i % 251);
+        yv.* = -@as(f64, @floatFromInt(i % 239));
+    }
+    var nn: fortran.BlasInt = @intCast(n);
+    var inc: fortran.BlasInt = 1;
+    fortran.dswap_(&nn, x.ptr, &inc, y.ptr, &inc);
+    for (x, y, 0..) |xv, yv, i| {
+        try std.testing.expectEqual(-@as(f64, @floatFromInt(i % 239)), xv);
+        try std.testing.expectEqual(@as(f64, @floatFromInt(i % 251)), yv);
+    }
+}
+
+test "fortran exact 8 KiB unit-stride copy" {
+    const n: usize = 1024;
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(f64, n);
+    defer allocator.free(x);
+    const y = try allocator.alloc(f64, n);
+    defer allocator.free(y);
+
+    for (x, 0..) |*value, i| value.* = @as(f64, @floatFromInt(i % 251)) - 73.5;
+    @memset(y, std.math.nan(f64));
+
+    var nn: fortran.BlasInt = @intCast(n);
+    var inc: fortran.BlasInt = 1;
+    fortran.dcopy_(&nn, x.ptr, &inc, y.ptr, &inc);
+    try std.testing.expectEqualSlices(f64, x, y);
+}
+
+test "fortran streaming unit-stride swap tails" {
+    const allocator = std.testing.allocator;
+    const sizes = [_]usize{
+        16 * 1024 + 17, // less than one predicated vgx4 byte group remains
+        16 * 1024 + 127, // one full and one partial vgx4 byte group remain
+    };
+    for (sizes) |n| {
+        const x = try allocator.alloc(f32, n);
+        defer allocator.free(x);
+        const y = try allocator.alloc(f32, n);
+        defer allocator.free(y);
+        for (x, y, 0..) |*xv, *yv, i| {
+            xv.* = @floatFromInt(i % 251);
+            yv.* = -@as(f32, @floatFromInt(i % 239));
+        }
+
+        var nn: fortran.BlasInt = @intCast(n);
+        var inc: fortran.BlasInt = 1;
+        fortran.sswap_(&nn, x.ptr, &inc, y.ptr, &inc);
+        for (x, y, 0..) |xv, yv, i| {
+            try std.testing.expectEqual(-@as(f32, @floatFromInt(i % 239)), xv);
+            try std.testing.expectEqual(@as(f32, @floatFromInt(i % 251)), yv);
+        }
+    }
+}
+
+test "fortran large complex iamax keeps first tie across tasks" {
+    const n: usize = 256 * 1024;
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(fortran.ComplexF32, n);
+    defer allocator.free(x);
+    @memset(x, .{ .re = 0, .im = 0 });
+    const first: usize = 17 * 1024 + 3;
+    const second: usize = 233 * 1024 + 5;
+    x[first] = .{ .re = -9, .im = 8 };
+    x[second] = .{ .re = 10, .im = -7 };
+
+    var nn: fortran.BlasInt = @intCast(n);
+    var inc: fortran.BlasInt = 1;
+    try std.testing.expectEqual(
+        @as(fortran.BlasInt, @intCast(first + 1)),
+        fortran.icamax_(&nn, x.ptr, &inc),
+    );
 }
 
 test "level2 band symmetric hermitian and triangular fallbacks" {
@@ -1543,4 +2229,168 @@ test "fortran packed rank update randomized reference" {
     try runPackedRankCase(f64, allocator, &rng, .lower, 1, -2, false);
     try runPackedRankCase(fortran.ComplexF64, allocator, &rng, .upper, 2, -1, true);
     try runPackedRankCase(fortran.ComplexF64, allocator, &rng, .lower, -1, 2, true);
+}
+
+test "fortran packed rank update unit stride contiguous columns" {
+    const allocator = std.testing.allocator;
+    var rng = ref.Rng.init(0xabc0_1414);
+    try runPackedRankCase(f64, allocator, &rng, .upper, 1, 1, false);
+    try runPackedRankCase(f64, allocator, &rng, .lower, 1, 1, false);
+    try runPackedRankCase(fortran.ComplexF64, allocator, &rng, .upper, 1, 1, true);
+    try runPackedRankCase(fortran.ComplexF64, allocator, &rng, .lower, 1, 1, true);
+}
+
+fn runDenseSyrCase(comptime T: type, uplo: ref.Uplo, comptime rank2: bool, n: usize, incx: isize, incy: isize) !void {
+    const allocator = std.testing.allocator;
+    const lda = n + 6;
+    const x = try allocator.alloc(T, ref.vectorStorageLen(n, incx));
+    defer allocator.free(x);
+    const y = try allocator.alloc(T, ref.vectorStorageLen(n, incy));
+    defer allocator.free(y);
+    const a = try allocator.alloc(T, lda * n);
+    defer allocator.free(a);
+    const expected = try allocator.alloc(T, a.len);
+    defer allocator.free(expected);
+
+    var rng = ref.Rng.init(0x54f2_0311);
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    ref.fillColMajor(T, &rng, a, n, n, lda);
+    @memcpy(expected, a);
+
+    const alpha: T = -0.625;
+    for (0..n) |j| {
+        const row0: usize = if (uplo == .upper) 0 else j;
+        const row1: usize = if (uplo == .upper) j + 1 else n;
+        const xj = ref.vectorGet(T, x, n, incx, j);
+        const yj = ref.vectorGet(T, y, n, incy, j);
+        for (row0..row1) |i| {
+            const xi = ref.vectorGet(T, x, n, incx, i);
+            const yi = ref.vectorGet(T, y, n, incy, i);
+            const update = if (rank2)
+                ref.add(T, ref.mul(T, xi, alpha * yj), ref.mul(T, yi, alpha * xj))
+            else
+                ref.mul(T, xi, alpha * xj);
+            const index = ref.colIndex(lda, i, j);
+            expected[index] = ref.add(T, expected[index], update);
+        }
+    }
+
+    var uu = refUploChar(uplo);
+    var nn: fortran.BlasInt = @intCast(n);
+    var ix: fortran.BlasInt = @intCast(incx);
+    var iy: fortran.BlasInt = @intCast(incy);
+    var lda_arg: fortran.BlasInt = @intCast(lda);
+    var alpha_arg = alpha;
+    if (T == f32 and rank2) {
+        fortran.ssyr2_(&uu, &nn, &alpha_arg, x.ptr, &ix, y.ptr, &iy, a.ptr, &lda_arg);
+    } else if (T == f32) {
+        fortran.ssyr_(&uu, &nn, &alpha_arg, x.ptr, &ix, a.ptr, &lda_arg);
+    } else if (T == f64 and rank2) {
+        fortran.dsyr2_(&uu, &nn, &alpha_arg, x.ptr, &ix, y.ptr, &iy, a.ptr, &lda_arg);
+    } else if (T == f64) {
+        fortran.dsyr_(&uu, &nn, &alpha_arg, x.ptr, &ix, a.ptr, &lda_arg);
+    } else {
+        @compileError("parallel SYR test supports f32 and f64");
+    }
+
+    const tol: T = if (T == f32) 2e-5 else 1e-12;
+    try expectApproxSlice(T, expected, a, tol);
+}
+
+fn runDenseHerCase(comptime T: type, uplo: ref.Uplo, comptime rank2: bool, n: usize, incx: isize, incy: isize) !void {
+    const allocator = std.testing.allocator;
+    const lda = n + 6;
+    const x = try allocator.alloc(T, ref.vectorStorageLen(n, incx));
+    defer allocator.free(x);
+    const y = try allocator.alloc(T, ref.vectorStorageLen(n, incy));
+    defer allocator.free(y);
+    const a = try allocator.alloc(T, lda * n);
+    defer allocator.free(a);
+    const expected = try allocator.alloc(T, a.len);
+    defer allocator.free(expected);
+
+    var rng = ref.Rng.init(0xa12e_2074);
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    ref.fillColMajor(T, &rng, a, n, n, lda);
+    @memcpy(expected, a);
+
+    const real_alpha = if (T == fortran.ComplexF32) @as(f32, -0.625) else @as(f64, -0.625);
+    const alpha = ref.fromParts(T, 0.5, -0.25);
+    for (0..n) |j| {
+        const row0: usize = if (uplo == .upper) 0 else j;
+        const row1: usize = if (uplo == .upper) j + 1 else n;
+        const xj = ref.vectorGet(T, x, n, incx, j);
+        const yj = ref.vectorGet(T, y, n, incy, j);
+        const temp1 = if (rank2)
+            ref.mul(T, alpha, ref.conj(T, yj))
+        else
+            ref.mul(T, ref.fromParts(T, real_alpha, 0), ref.conj(T, xj));
+        const temp2 = if (rank2) ref.mul(T, ref.conj(T, alpha), ref.conj(T, xj)) else ref.zero(T);
+        for (row0..row1) |i| {
+            const xi = ref.vectorGet(T, x, n, incx, i);
+            const yi = ref.vectorGet(T, y, n, incy, i);
+            var update = ref.mul(T, xi, temp1);
+            if (rank2) update = ref.add(T, update, ref.mul(T, yi, temp2));
+            const index = ref.colIndex(lda, i, j);
+            expected[index] = ref.add(T, expected[index], update);
+            if (i == j) expected[index].im = 0;
+        }
+    }
+
+    var uu = refUploChar(uplo);
+    var nn: fortran.BlasInt = @intCast(n);
+    var ix: fortran.BlasInt = @intCast(incx);
+    var iy: fortran.BlasInt = @intCast(incy);
+    var lda_arg: fortran.BlasInt = @intCast(lda);
+    var real_alpha_arg = real_alpha;
+    var alpha_arg = alpha;
+    if (T == fortran.ComplexF32 and rank2) {
+        fortran.cher2_(&uu, &nn, &alpha_arg, x.ptr, &ix, y.ptr, &iy, a.ptr, &lda_arg);
+    } else if (T == fortran.ComplexF32) {
+        fortran.cher_(&uu, &nn, &real_alpha_arg, x.ptr, &ix, a.ptr, &lda_arg);
+    } else if (T == fortran.ComplexF64 and rank2) {
+        fortran.zher2_(&uu, &nn, &alpha_arg, x.ptr, &ix, y.ptr, &iy, a.ptr, &lda_arg);
+    } else if (T == fortran.ComplexF64) {
+        fortran.zher_(&uu, &nn, &real_alpha_arg, x.ptr, &ix, a.ptr, &lda_arg);
+    } else {
+        @compileError("parallel HER test supports ComplexF32 and ComplexF64");
+    }
+
+    const tol = if (T == fortran.ComplexF32) @as(f32, 3e-5) else @as(f64, 1e-12);
+    try expectApproxSlice(T, expected, a, tol);
+}
+
+test "parallel dense rank updates match reference for upper and lower storage" {
+    fortran.runtime.setMaxThreads(4);
+    defer fortran.runtime.setMaxThreads(0);
+
+    inline for (.{ f32, f64 }) |T| {
+        inline for (.{ ref.Uplo.upper, ref.Uplo.lower }) |uplo| {
+            try runDenseSyrCase(T, uplo, false, 513, 1, 1);
+            try runDenseSyrCase(T, uplo, true, 513, 1, 1);
+        }
+    }
+    inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
+        inline for (.{ ref.Uplo.upper, ref.Uplo.lower }) |uplo| {
+            try runDenseHerCase(T, uplo, false, 513, 1, 1);
+            try runDenseHerCase(T, uplo, true, 513, 1, 1);
+        }
+    }
+}
+
+test "dense rank updates preserve negative and non-unit stride fallbacks" {
+    inline for (.{ f32, f64 }) |T| {
+        inline for (.{ ref.Uplo.upper, ref.Uplo.lower }) |uplo| {
+            try runDenseSyrCase(T, uplo, false, 17, -2, 2);
+            try runDenseSyrCase(T, uplo, true, 17, -2, 2);
+        }
+    }
+    inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
+        inline for (.{ ref.Uplo.upper, ref.Uplo.lower }) |uplo| {
+            try runDenseHerCase(T, uplo, false, 17, -2, 2);
+            try runDenseHerCase(T, uplo, true, 17, -2, 2);
+        }
+    }
 }
