@@ -11,6 +11,7 @@ const generic = @import("../shared/matrix_matrix/generic.zig");
 const x86_64_simd = @import("../arch/x86_64/matrix_matrix/simd.zig");
 
 pub const Task = gemm_task.Task;
+pub const BLayout = gemm_task.BLayout;
 pub const Implementation = gemm_task.Implementation;
 pub const ExecutionPlan = gemm_task.ExecutionPlan;
 

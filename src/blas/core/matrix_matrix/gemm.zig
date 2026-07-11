@@ -5,6 +5,7 @@ const std = @import("std");
 
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
+const core_pool = @import("../execution/thread_pool.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const planner = @import("planner.zig");
 
@@ -108,6 +109,39 @@ inline fn storeF64x2(dst: []f64, index: usize, value: F64x2) void {
     @as(*align(1) F64x2, @ptrCast(&dst[index])).* = value;
 }
 
+inline fn loadF64x2(src: []const f64, index: usize) F64x2 {
+    return @as(*align(1) const F64x2, @ptrCast(&src[index])).*;
+}
+
+noinline fn gemmNoTransRealShortWideTailN2048(
+    comptime T: type,
+    m_: BlasInt,
+    aligned_rows: BlasInt,
+    k_: BlasInt,
+    alpha: T,
+    a: [*]const T,
+    lda: BlasInt,
+    b: [*]const T,
+    ldb: BlasInt,
+    beta: T,
+    c: [*]T,
+    ldc: BlasInt,
+) void {
+    planner.noTransReal(T, aligned_rows, 2048, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+
+    var x_tail: [1024]T = undefined;
+    var y_tail: [2048]T = undefined;
+    const m = toUsize(m_);
+    const aligned = toUsize(aligned_rows);
+    const k = toUsize(k_);
+    for (aligned..m) |row| {
+        for (0..k) |p| x_tail[p] = a[matIndex(lda, row, p)];
+        for (0..y_tail.len) |j| y_tail[j] = c[matIndex(ldc, row, j)];
+        matrix_vector_ops.gemv(T, .trans, k_, 2048, alpha, b, ldb, &x_tail, 1, beta, &y_tail, 1);
+        for (0..y_tail.len) |j| c[matIndex(ldc, row, j)] = y_tail[j];
+    }
+}
+
 pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     if (k_ <= 0 or isZero(T, alpha)) {
@@ -119,6 +153,14 @@ pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, 
                 c[idxc] = if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]);
             }
         }
+        return;
+    }
+    if (m_ == 17 and n_ == 2048 and k_ >= 128 and k_ <= 1024) {
+        gemmNoTransRealShortWideTailN2048(T, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        return;
+    }
+    if (m_ == 34 and n_ == 2048 and k_ >= 256 and k_ <= 1024) {
+        gemmNoTransRealShortWideTailN2048(T, m_, 32, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         return;
     }
     if (n_ == 1 and k_ > 0) {
@@ -160,6 +202,27 @@ pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, 
     planner.noTransReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 
+fn tryGemmNoTransTransposedBReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+    if (k_ >= 128 and !isZero(T, alpha)) {
+        if (n_ == 1 and m_ >= 128) {
+            matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b, ldb, beta, c, 1);
+            return true;
+        }
+        if (m_ == 1 and n_ >= 128) {
+            matrix_vector_ops.gemv(T, .no_trans, n_, k_, alpha, b, ldb, a, lda, beta, c, ldc);
+            return true;
+        }
+    }
+    return planner.noTransTransposedBReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+fn tryGemmTransposedAReal(comptime T: type, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+    if (transb == .trans) {
+        return planner.transposedAReal(T, m_, n_, k_, alpha, a, lda, b, ldb, .trans, beta, c, ldc);
+    }
+    return planner.transposedAReal(T, m_, n_, k_, alpha, a, lda, b, ldb, .no_trans, beta, c, ldc);
+}
+
 inline fn loadC32x4(ptr: [*]const ComplexF32, ld: BlasInt, row: usize, col: usize) C32x4 {
     return .{
         .re = .{
@@ -174,6 +237,19 @@ inline fn loadC32x4(ptr: [*]const ComplexF32, ld: BlasInt, row: usize, col: usiz
             ptr[matIndex(ld, row + 2, col)].im,
             ptr[matIndex(ld, row + 3, col)].im,
         },
+    };
+}
+
+inline fn transposeF32x4(v0: F32x4, v1: F32x4, v2: F32x4, v3: F32x4) [4]F32x4 {
+    const t0 = @shuffle(f32, v0, v1, @Vector(4, i32){ 0, ~@as(i32, 0), 2, ~@as(i32, 2) });
+    const t1 = @shuffle(f32, v0, v1, @Vector(4, i32){ 1, ~@as(i32, 1), 3, ~@as(i32, 3) });
+    const t2 = @shuffle(f32, v2, v3, @Vector(4, i32){ 0, ~@as(i32, 0), 2, ~@as(i32, 2) });
+    const t3 = @shuffle(f32, v2, v3, @Vector(4, i32){ 1, ~@as(i32, 1), 3, ~@as(i32, 3) });
+    return .{
+        @shuffle(f32, t0, t2, @Vector(4, i32){ 0, 1, ~@as(i32, 0), ~@as(i32, 1) }),
+        @shuffle(f32, t1, t3, @Vector(4, i32){ 0, 1, ~@as(i32, 0), ~@as(i32, 1) }),
+        @shuffle(f32, t0, t2, @Vector(4, i32){ 2, 3, ~@as(i32, 2), ~@as(i32, 3) }),
+        @shuffle(f32, t1, t3, @Vector(4, i32){ 2, 3, ~@as(i32, 2), ~@as(i32, 3) }),
     };
 }
 
@@ -300,7 +376,96 @@ inline fn useExpandedComplexF64Real(m: usize, n: usize, k: usize) bool {
     return (m == n and n == k and m < 128) or (m > 1 and m <= 32 and n >= 2048 and k <= 512);
 }
 
-fn gemmNoTransComplexF32ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
+inline fn complex3mRowCompute(m: usize, n: usize, k: usize) usize {
+    // The compact 3M path otherwise gives all three real products an odd
+    // 127-row stride.  One zero row makes the representative 127x129 family
+    // a regular 128-row problem while adding less than one percent work.
+    // Keep the experiment exact until its surrounding shape boundaries have
+    // been swept; all other 3M calls retain their original layout.
+    return if (m == 127 and n == 129 and k >= 31 and k <= 129) 128 else m;
+}
+
+noinline fn gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+
+    // The real planner's regular 128x64 AMX tile is much faster than its
+    // 2*m by n fringe path for the small non-NN complex shapes routed here.
+    // Keep the logical real/imaginary rows contiguous and initialize only
+    // the discarded padding rows/columns.
+    const m_valid = 2 * m;
+    const m_compute = 128;
+    const n_compute = 64;
+    const k2 = 2 * k;
+    const a2_len = m_compute * k2;
+    const b2_len = k2 * n_compute;
+    const c2_len = m_compute * n_compute;
+    var workspace_offset: usize = 0;
+    const a2 = takeWorkspace(f32, workspace, &workspace_offset, a2_len);
+    const b2 = takeWorkspace(f32, workspace, &workspace_offset, b2_len);
+    const c2 = takeWorkspace(f32, workspace, &workspace_offset, c2_len);
+    for (0..k2) |p| @memset(a2[p * m_compute + m_valid .. (p + 1) * m_compute], 0);
+    @memset(b2[n * k2 .. n_compute * k2], 0);
+
+    for (0..k) |p| {
+        const p_lo = p * m_compute;
+        const p_hi = (k + p) * m_compute;
+        var i: usize = 0;
+        if (transa == .no_trans) {
+            while (i + 4 <= m) : (i += 4) {
+                const value = loadC32x4(a, lda, i, p);
+                storeF32x4(a2, p_lo + i, value.re);
+                storeF32x4(a2, p_lo + m + i, value.im);
+                storeF32x4(a2, p_hi + i, -value.im);
+                storeF32x4(a2, p_hi + m + i, value.re);
+            }
+        }
+        while (i < m) : (i += 1) {
+            const value = complexOperandValue(ComplexF32, transa, a, lda, i, p);
+            a2[p_lo + i] = value.re;
+            a2[p_lo + m + i] = value.im;
+            a2[p_hi + i] = -value.im;
+            a2[p_hi + m + i] = value.re;
+        }
+    }
+    for (0..n) |j| {
+        const j_base = j * k2;
+        var p: usize = 0;
+        if (transb == .no_trans) {
+            while (p + 4 <= k) : (p += 4) {
+                const value = loadC32x4(b, ldb, p, j);
+                storeF32x4(b2, j_base + p, value.re);
+                storeF32x4(b2, j_base + k + p, value.im);
+            }
+        }
+        while (p < k) : (p += 1) {
+            const value = complexOperandValue(ComplexF32, transb, b, ldb, p, j);
+            b2[j_base + p] = value.re;
+            b2[j_base + k + p] = value.im;
+        }
+    }
+
+    const m_compute_i: BlasInt = @intCast(m_compute);
+    const n_compute_i: BlasInt = @intCast(n_compute);
+    const k2_i: BlasInt = @intCast(k2);
+    const m_compute_ld: BlasInt = @intCast(m_compute);
+    const k2_ld: BlasInt = @intCast(k2);
+    gemmNoTransReal(f32, m_compute_i, n_compute_i, k2_i, 1, a2.ptr, m_compute_ld, b2.ptr, k2_ld, 0, c2.ptr, m_compute_ld);
+
+    for (0..n) |j| {
+        const base = j * m_compute;
+        var i: usize = 0;
+        while (i + 4 <= m) : (i += 4) {
+            storeC32x4(c, ldc, i, j, .{ .re = loadF32x4(c2, base + i), .im = loadF32x4(c2, base + m + i) });
+        }
+        while (i < m) : (i += 1) {
+            c[matIndex(ldc, i, j)] = .{ .re = c2[base + i], .im = c2[base + m + i] };
+        }
+    }
+}
+
+fn gemmComplexF32ViaExpandedRealWorkspace(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -319,15 +484,17 @@ fn gemmNoTransComplexF32ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
         const p_lo = p * m2;
         const p_hi = (k + p) * m2;
         var i: usize = 0;
-        while (i + 4 <= m) : (i += 4) {
-            const value = loadC32x4(a, lda, i, p);
-            storeF32x4(a2, p_lo + i, value.re);
-            storeF32x4(a2, p_lo + m + i, value.im);
-            storeF32x4(a2, p_hi + i, -value.im);
-            storeF32x4(a2, p_hi + m + i, value.re);
+        if (transa == .no_trans) {
+            while (i + 4 <= m) : (i += 4) {
+                const value = loadC32x4(a, lda, i, p);
+                storeF32x4(a2, p_lo + i, value.re);
+                storeF32x4(a2, p_lo + m + i, value.im);
+                storeF32x4(a2, p_hi + i, -value.im);
+                storeF32x4(a2, p_hi + m + i, value.re);
+            }
         }
         while (i < m) : (i += 1) {
-            const value = a[matIndex(lda, i, p)];
+            const value = complexOperandValue(ComplexF32, transa, a, lda, i, p);
             a2[p_lo + i] = value.re;
             a2[p_lo + m + i] = value.im;
             a2[p_hi + i] = -value.im;
@@ -337,13 +504,15 @@ fn gemmNoTransComplexF32ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
     for (0..n) |j| {
         const j_base = j * k2;
         var p: usize = 0;
-        while (p + 4 <= k) : (p += 4) {
-            const value = loadC32x4(b, ldb, p, j);
-            storeF32x4(b2, j_base + p, value.re);
-            storeF32x4(b2, j_base + k + p, value.im);
+        if (transb == .no_trans) {
+            while (p + 4 <= k) : (p += 4) {
+                const value = loadC32x4(b, ldb, p, j);
+                storeF32x4(b2, j_base + p, value.re);
+                storeF32x4(b2, j_base + k + p, value.im);
+            }
         }
         while (p < k) : (p += 1) {
-            const value = b[matIndex(ldb, p, j)];
+            const value = complexOperandValue(ComplexF32, transb, b, ldb, p, j);
             b2[j_base + p] = value.re;
             b2[j_base + k + p] = value.im;
         }
@@ -367,105 +536,247 @@ fn gemmNoTransComplexF32ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
     }
 }
 
-fn tryGemmNoTransComplexF32ViaExpandedReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
+fn tryGemmComplexF32ViaExpandedReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
     if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (!useExpandedComplexF32Real(m, n, k)) return false;
+    if (transa == .no_trans and transb == .no_trans) {
+        if (!useExpandedComplexF32Real(m, n, k)) return false;
+    } else {
+        const work = m *| n *| k;
+        if (!(m <= 64 and n <= 64 and k >= 128 and k <= 256 and work >= 128 * 1024)) return false;
+    }
 
-    const workspace_len = (2 * m) * (2 * k) + (2 * k) * n + (2 * m) * n;
+    const pad_small_non_nn = (transa != .no_trans or transb != .no_trans) and m <= 64 and n <= 64 and (m < 64 or n < 64);
+    const m2 = if (pad_small_non_nn) @as(usize, 128) else 2 * m;
+    const n_compute = if (pad_small_non_nn) @as(usize, 64) else n;
+    const workspace_len = m2 * (2 * k) + (2 * k) * n_compute + m2 * n_compute;
     const workspace = acquireComplexWorkspace(f32, workspace_len) orelse return false;
     defer workspace.deinit();
-    gemmNoTransComplexF32ViaExpandedRealWorkspace(m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
+    if (pad_small_non_nn) {
+        gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
+    } else {
+        gemmComplexF32ViaExpandedRealWorkspace(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
+    }
     return true;
 }
 
-fn gemmNoTransComplexF32ViaRealBuffers(m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, ar: []f32, ai: []f32, am: []f32, br: []f32, bi: []f32, bp: []f32, cr: []f32, ci: []f32, tmp: []f32) void {
-    const m = toUsize(m_);
-    const n = toUsize(n_);
-    const k = toUsize(k_);
+inline fn complexOperandValue(comptime T: type, trans: Order, matrix: [*]const T, ld: BlasInt, row: usize, col: usize) T {
+    const value = switch (trans) {
+        .no_trans => matrix[matIndex(ld, row, col)],
+        .trans, .conj_trans => matrix[matIndex(ld, col, row)],
+    };
+    return if (trans == .conj_trans) .{ .re = value.re, .im = -value.im } else value;
+}
 
-    for (0..k) |p| {
-        var i: usize = 0;
-        while (i + 4 <= m) : (i += 4) {
-            const value = loadC32x4(a, lda, i, p);
-            const idx = i + p * m;
-            storeF32x4(ar, idx, value.re);
-            storeF32x4(ai, idx, value.re + value.im);
-            storeF32x4(am, idx, value.im - value.re);
-        }
-        while (i < m) : (i += 1) {
-            const value = a[matIndex(lda, i, p)];
-            const idx = i + p * m;
-            ar[idx] = value.re;
-            ai[idx] = value.re + value.im;
-            am[idx] = value.im - value.re;
-        }
-    }
-    for (0..n) |j| {
+inline fn materializeComplexF32TransposedB4x4(transb: Order, n: usize, k: usize, b: [*]const ComplexF32, ldb: BlasInt, br: []f32, bi: []f32, bp: []f32) void {
+    var j: usize = 0;
+    while (j + 4 <= n) : (j += 4) {
         var p: usize = 0;
         while (p + 4 <= k) : (p += 4) {
-            const value = loadC32x4(b, ldb, p, j);
-            const idx = p + j * k;
-            storeF32x4(br, idx, value.re);
-            storeF32x4(bi, idx, value.im);
-            storeF32x4(bp, idx, value.re + value.im);
+            const v0 = loadC32x4(b, ldb, j, p + 0);
+            const v1 = loadC32x4(b, ldb, j, p + 1);
+            const v2 = loadC32x4(b, ldb, j, p + 2);
+            const v3 = loadC32x4(b, ldb, j, p + 3);
+            const re = transposeF32x4(v0.re, v1.re, v2.re, v3.re);
+            var im = transposeF32x4(v0.im, v1.im, v2.im, v3.im);
+            if (transb == .conj_trans) {
+                inline for (0..4) |lane| im[lane] = -im[lane];
+            }
+            inline for (0..4) |lane| {
+                const idx = p + (j + lane) * k;
+                storeF32x4(br, idx, re[lane]);
+                storeF32x4(bi, idx, im[lane]);
+                storeF32x4(bp, idx, re[lane] + im[lane]);
+            }
         }
         while (p < k) : (p += 1) {
-            const value = b[matIndex(ldb, p, j)];
+            inline for (0..4) |lane| {
+                const jj = j + lane;
+                const value = complexOperandValue(ComplexF32, transb, b, ldb, p, jj);
+                const idx = p + jj * k;
+                br[idx] = value.re;
+                bi[idx] = value.im;
+                bp[idx] = value.re + value.im;
+            }
+        }
+    }
+    while (j < n) : (j += 1) {
+        for (0..k) |p| {
+            const value = complexOperandValue(ComplexF32, transb, b, ldb, p, j);
             const idx = p + j * k;
             br[idx] = value.re;
             bi[idx] = value.im;
             bp[idx] = value.re + value.im;
         }
     }
+}
 
-    const lda_r: BlasInt = @intCast(m);
+fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, m_compute: usize, ar: []f32, ai: []f32, am: []f32, br: []f32, bi: []f32, bp: []f32, cr: []f32, ci: []f32, tmp: []f32) void {
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+
+    if (m_compute > m) {
+        for (0..k) |p| {
+            const pad_start = p * m_compute + m;
+            const pad_end = (p + 1) * m_compute;
+            @memset(ar[pad_start..pad_end], 0);
+            @memset(ai[pad_start..pad_end], 0);
+            @memset(am[pad_start..pad_end], 0);
+        }
+    }
+
+    if (transa != .no_trans and (m_compute > m or m >= 256 or k >= 512)) {
+        var p: usize = 0;
+        while (p + 4 <= k) : (p += 4) {
+            var i: usize = 0;
+            while (i + 4 <= m) : (i += 4) {
+                const v0 = loadC32x4(a, lda, p, i + 0);
+                const v1 = loadC32x4(a, lda, p, i + 1);
+                const v2 = loadC32x4(a, lda, p, i + 2);
+                const v3 = loadC32x4(a, lda, p, i + 3);
+                const re = transposeF32x4(v0.re, v1.re, v2.re, v3.re);
+                var im = transposeF32x4(v0.im, v1.im, v2.im, v3.im);
+                if (transa == .conj_trans) {
+                    inline for (0..4) |lane| im[lane] = -im[lane];
+                }
+                inline for (0..4) |lane| {
+                    const idx = i + (p + lane) * m_compute;
+                    storeF32x4(ar, idx, re[lane]);
+                    storeF32x4(ai, idx, re[lane] + im[lane]);
+                    storeF32x4(am, idx, im[lane] - re[lane]);
+                }
+            }
+            while (i < m) : (i += 1) {
+                inline for (0..4) |lane| {
+                    const pp = p + lane;
+                    const value = complexOperandValue(ComplexF32, transa, a, lda, i, pp);
+                    const idx = i + pp * m_compute;
+                    ar[idx] = value.re;
+                    ai[idx] = value.re + value.im;
+                    am[idx] = value.im - value.re;
+                }
+            }
+        }
+        while (p < k) : (p += 1) {
+            for (0..m) |i| {
+                const value = complexOperandValue(ComplexF32, transa, a, lda, i, p);
+                const idx = i + p * m_compute;
+                ar[idx] = value.re;
+                ai[idx] = value.re + value.im;
+                am[idx] = value.im - value.re;
+            }
+        }
+    } else {
+        for (0..k) |p| {
+            var i: usize = 0;
+            if (transa == .no_trans) {
+                while (i + 4 <= m) : (i += 4) {
+                    const value = loadC32x4(a, lda, i, p);
+                    const idx = i + p * m_compute;
+                    storeF32x4(ar, idx, value.re);
+                    storeF32x4(ai, idx, value.re + value.im);
+                    storeF32x4(am, idx, value.im - value.re);
+                }
+            }
+            while (i < m) : (i += 1) {
+                const value = complexOperandValue(ComplexF32, transa, a, lda, i, p);
+                const idx = i + p * m_compute;
+                ar[idx] = value.re;
+                ai[idx] = value.re + value.im;
+                am[idx] = value.im - value.re;
+            }
+        }
+    }
+    if (transb != .no_trans and (m_compute > m or n >= 256 or k >= 512)) {
+        materializeComplexF32TransposedB4x4(transb, n, k, b, ldb, br, bi, bp);
+    } else {
+        for (0..n) |j| {
+            var p: usize = 0;
+            if (transb == .no_trans) {
+                while (p + 4 <= k) : (p += 4) {
+                    const value = loadC32x4(b, ldb, p, j);
+                    const idx = p + j * k;
+                    storeF32x4(br, idx, value.re);
+                    storeF32x4(bi, idx, value.im);
+                    storeF32x4(bp, idx, value.re + value.im);
+                }
+            }
+            while (p < k) : (p += 1) {
+                const value = complexOperandValue(ComplexF32, transb, b, ldb, p, j);
+                const idx = p + j * k;
+                br[idx] = value.re;
+                bi[idx] = value.im;
+                bp[idx] = value.re + value.im;
+            }
+        }
+    }
+
+    const m_compute_i: BlasInt = @intCast(m_compute);
+    const lda_r: BlasInt = @intCast(m_compute);
     const ldb_r: BlasInt = @intCast(k);
-    const ldc_r: BlasInt = @intCast(m);
-    gemmNoTransReal(f32, m_, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
-    gemmNoTransReal(f32, m_, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
-    gemmNoTransReal(f32, m_, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+    const ldc_r: BlasInt = @intCast(m_compute);
+    gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
+    gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
+    gemmNoTransReal(f32, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
 
     for (0..n) |j| {
         var i: usize = 0;
         while (i + 4 <= m) : (i += 4) {
-            const src = i + j * m;
+            const src = i + j * m_compute;
             const crv = loadF32x4(cr, src);
             storeC32x4(c, ldc, i, j, .{ .re = crv - loadF32x4(tmp, src), .im = crv + loadF32x4(ci, src) });
         }
         while (i < m) : (i += 1) {
-            const src = i + j * m;
+            const src = i + j * m_compute;
             c[matIndex(ldc, i, j)] = .{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
         }
     }
 }
 
-fn tryGemmNoTransComplexF32ViaReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
+fn tryGemmComplexF32ViaReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
     if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
+    if (m == 1 or n == 1) {
+        // Materialization only amortizes on the edge layouts whose real GEMMs
+        // become contiguous GEMV calls; the other transpose pairs stay direct.
+        const row_edge = m == 1 and transa != .no_trans and transb == .no_trans;
+        const column_edge = n == 1 and transa == .no_trans and transb != .no_trans;
+        if (!row_edge and !column_edge) return false;
+    }
     if (m *| n *| k < 128 * 1024) return false;
 
-    const a_len = m * k;
+    const m_compute = complex3mRowCompute(m, n, k);
+    const a_len = m_compute * k;
     const b_len = k * n;
-    const c_len = m * n;
+    const c_len = m_compute * n;
+    const plane_padding = 64;
 
-    const workspace = acquireComplexWorkspace(f32, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
+    const workspace = acquireComplexWorkspace(f32, 3 * a_len + 3 * b_len + 3 * c_len + 8 * plane_padding) orelse return false;
     defer workspace.deinit();
     var workspace_offset: usize = 0;
     const ar = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
+    workspace_offset += plane_padding;
     const ai = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
+    workspace_offset += plane_padding;
     const am = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
+    workspace_offset += plane_padding;
     const br = takeWorkspace(f32, workspace.data, &workspace_offset, b_len);
+    workspace_offset += plane_padding;
     const bi = takeWorkspace(f32, workspace.data, &workspace_offset, b_len);
+    workspace_offset += plane_padding;
     const bp = takeWorkspace(f32, workspace.data, &workspace_offset, b_len);
+    workspace_offset += plane_padding;
     const cr = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
+    workspace_offset += plane_padding;
     const ci = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
+    workspace_offset += plane_padding;
     const tmp = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
-    gemmNoTransComplexF32ViaRealBuffers(m_, n_, k_, a, lda, b, ldb, c, ldc, ar, ai, am, br, bi, bp, cr, ci, tmp);
+    gemmComplexF32ViaRealBuffers(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
 }
 
@@ -479,6 +790,13 @@ inline fn loadC64x2(ptr: [*]const ComplexF64, ld: BlasInt, row: usize, col: usiz
             ptr[matIndex(ld, row + 0, col)].im,
             ptr[matIndex(ld, row + 1, col)].im,
         },
+    };
+}
+
+inline fn transposeF64x2(v0: F64x2, v1: F64x2) [2]F64x2 {
+    return .{
+        @shuffle(f64, v0, v1, @Vector(2, i32){ 0, ~@as(i32, 0) }),
+        @shuffle(f64, v0, v1, @Vector(2, i32){ 1, ~@as(i32, 1) }),
     };
 }
 
@@ -656,55 +974,204 @@ fn tryGemmNoTransComplexF64ViaExpandedReal(m_: BlasInt, n_: BlasInt, k_: BlasInt
     return true;
 }
 
-fn gemmNoTransComplexF64ViaRealBuffers(m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, ar: []f64, ai: []f64, am: []f64, br: []f64, bi: []f64, bp: []f64, cr: []f64, ci: []f64, tmp: []f64) void {
+const ComplexF64RealGemmTask = struct {
+    m: BlasInt,
+    n: BlasInt,
+    k: BlasInt,
+    a: [*]const f64,
+    lda: BlasInt,
+    b: [*]const f64,
+    ldb: BlasInt,
+    c: [*]f64,
+    ldc: BlasInt,
+};
+
+fn runComplexF64RealGemmTask(raw_tasks: *const anyopaque, index: usize) void {
+    const tasks: [*]const ComplexF64RealGemmTask = @ptrCast(@alignCast(raw_tasks));
+    const task = tasks[index];
+    gemmNoTransReal(f64, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
+}
+
+fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, m_compute: usize, ar: []f64, ai: []f64, am: []f64, br: []f64, bi: []f64, bp: []f64, cr: []f64, ci: []f64, tmp: []f64) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
 
-    for (0..k) |p| {
-        for (0..m) |i| {
-            const value = a[matIndex(lda, i, p)];
-            const idx = i + p * m;
-            ar[idx] = value.re;
-            ai[idx] = value.re + value.im;
-            am[idx] = value.im - value.re;
-        }
-    }
-    for (0..n) |j| {
+    if (m_compute > m) {
         for (0..k) |p| {
-            const value = b[matIndex(ldb, p, j)];
-            const idx = p + j * k;
-            br[idx] = value.re;
-            bi[idx] = value.im;
-            bp[idx] = value.re + value.im;
+            const pad_start = p * m_compute + m;
+            const pad_end = (p + 1) * m_compute;
+            @memset(ar[pad_start..pad_end], 0);
+            @memset(ai[pad_start..pad_end], 0);
+            @memset(am[pad_start..pad_end], 0);
         }
     }
 
-    const lda_r: BlasInt = @intCast(m);
+    if (transa == .no_trans) {
+        for (0..k) |p| {
+            var i: usize = 0;
+            while (i + 2 <= m) : (i += 2) {
+                const value = loadC64x2(a, lda, i, p);
+                const idx = i + p * m_compute;
+                storeF64x2(ar, idx, value.re);
+                storeF64x2(ai, idx, value.re + value.im);
+                storeF64x2(am, idx, value.im - value.re);
+            }
+            while (i < m) : (i += 1) {
+                const value = a[matIndex(lda, i, p)];
+                const idx = i + p * m_compute;
+                ar[idx] = value.re;
+                ai[idx] = value.re + value.im;
+                am[idx] = value.im - value.re;
+            }
+        }
+    } else {
+        var p: usize = 0;
+        while (p + 2 <= k) : (p += 2) {
+            var i: usize = 0;
+            while (i + 2 <= m) : (i += 2) {
+                const v0 = loadC64x2(a, lda, p, i + 0);
+                const v1 = loadC64x2(a, lda, p, i + 1);
+                const re = transposeF64x2(v0.re, v1.re);
+                var im = transposeF64x2(v0.im, v1.im);
+                if (transa == .conj_trans) {
+                    im[0] = -im[0];
+                    im[1] = -im[1];
+                }
+                inline for (0..2) |lane| {
+                    const idx = i + (p + lane) * m_compute;
+                    storeF64x2(ar, idx, re[lane]);
+                    storeF64x2(ai, idx, re[lane] + im[lane]);
+                    storeF64x2(am, idx, im[lane] - re[lane]);
+                }
+            }
+            while (i < m) : (i += 1) {
+                inline for (0..2) |lane| {
+                    const pp = p + lane;
+                    const value = complexOperandValue(ComplexF64, transa, a, lda, i, pp);
+                    const idx = i + pp * m_compute;
+                    ar[idx] = value.re;
+                    ai[idx] = value.re + value.im;
+                    am[idx] = value.im - value.re;
+                }
+            }
+        }
+        while (p < k) : (p += 1) {
+            for (0..m) |i| {
+                const value = complexOperandValue(ComplexF64, transa, a, lda, i, p);
+                const idx = i + p * m_compute;
+                ar[idx] = value.re;
+                ai[idx] = value.re + value.im;
+                am[idx] = value.im - value.re;
+            }
+        }
+    }
+    if (transb == .no_trans) {
+        for (0..n) |j| {
+            var p: usize = 0;
+            while (p + 2 <= k) : (p += 2) {
+                const value = loadC64x2(b, ldb, p, j);
+                const idx = p + j * k;
+                storeF64x2(br, idx, value.re);
+                storeF64x2(bi, idx, value.im);
+                storeF64x2(bp, idx, value.re + value.im);
+            }
+            while (p < k) : (p += 1) {
+                const value = b[matIndex(ldb, p, j)];
+                const idx = p + j * k;
+                br[idx] = value.re;
+                bi[idx] = value.im;
+                bp[idx] = value.re + value.im;
+            }
+        }
+    } else {
+        var j: usize = 0;
+        while (j + 2 <= n) : (j += 2) {
+            var p: usize = 0;
+            while (p + 2 <= k) : (p += 2) {
+                const v0 = loadC64x2(b, ldb, j, p + 0);
+                const v1 = loadC64x2(b, ldb, j, p + 1);
+                const re = transposeF64x2(v0.re, v1.re);
+                var im = transposeF64x2(v0.im, v1.im);
+                if (transb == .conj_trans) {
+                    im[0] = -im[0];
+                    im[1] = -im[1];
+                }
+                inline for (0..2) |lane| {
+                    const idx = p + (j + lane) * k;
+                    storeF64x2(br, idx, re[lane]);
+                    storeF64x2(bi, idx, im[lane]);
+                    storeF64x2(bp, idx, re[lane] + im[lane]);
+                }
+            }
+            while (p < k) : (p += 1) {
+                inline for (0..2) |lane| {
+                    const jj = j + lane;
+                    const value = complexOperandValue(ComplexF64, transb, b, ldb, p, jj);
+                    const idx = p + jj * k;
+                    br[idx] = value.re;
+                    bi[idx] = value.im;
+                    bp[idx] = value.re + value.im;
+                }
+            }
+        }
+        while (j < n) : (j += 1) {
+            for (0..k) |p| {
+                const value = complexOperandValue(ComplexF64, transb, b, ldb, p, j);
+                const idx = p + j * k;
+                br[idx] = value.re;
+                bi[idx] = value.im;
+                bp[idx] = value.re + value.im;
+            }
+        }
+    }
+
+    const m_compute_i: BlasInt = @intCast(m_compute);
+    const lda_r: BlasInt = @intCast(m_compute);
     const ldb_r: BlasInt = @intCast(k);
-    const ldc_r: BlasInt = @intCast(m);
-    gemmNoTransReal(f64, m_, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
-    gemmNoTransReal(f64, m_, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
-    gemmNoTransReal(f64, m_, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+    const ldc_r: BlasInt = @intCast(m_compute);
+    var parallel_real_products = false;
+    if (m == 127 and n == 129 and k == 32) {
+        const real_tasks = [_]ComplexF64RealGemmTask{
+            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
+            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
+            .{ .m = m_compute_i, .n = n_, .k = k_, .a = am.ptr, .lda = lda_r, .b = br.ptr, .ldb = ldb_r, .c = ci.ptr, .ldc = ldc_r },
+        };
+        parallel_real_products = core_pool.runLowLatency(runComplexF64RealGemmTask, @ptrCast(&real_tasks), real_tasks.len);
+    }
+    if (!parallel_real_products) {
+        gemmNoTransReal(f64, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
+        gemmNoTransReal(f64, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
+        gemmNoTransReal(f64, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+    }
 
     for (0..n) |j| {
-        for (0..m) |i| {
-            const src = i + j * m;
+        var i: usize = 0;
+        while (i + 2 <= m) : (i += 2) {
+            const src = i + j * m_compute;
+            const crv = loadF64x2(cr, src);
+            storeC64x2(c, ldc, i, j, .{ .re = crv - loadF64x2(tmp, src), .im = crv + loadF64x2(ci, src) });
+        }
+        while (i < m) : (i += 1) {
+            const src = i + j * m_compute;
             c[matIndex(ldc, i, j)] = .{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
         }
     }
 }
 
-fn tryGemmNoTransComplexF64ViaReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
+fn tryGemmComplexF64ViaReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
     if (!isOne(ComplexF64, alpha) or !isZero(ComplexF64, beta)) return false;
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
+    // f64 only amortizes 3M materialization on the contiguous column-edge form.
+    if ((m == 1 or n == 1) and !(n == 1 and transa == .no_trans and transb != .no_trans)) return false;
     if (m *| n *| k < 128 * 1024) return false;
 
-    const a_len = m * k;
+    const m_compute = complex3mRowCompute(m, n, k);
+    const a_len = m_compute * k;
     const b_len = k * n;
-    const c_len = m * n;
+    const c_len = m_compute * n;
 
     const workspace = acquireComplexWorkspace(f64, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
     defer workspace.deinit();
@@ -718,7 +1185,7 @@ fn tryGemmNoTransComplexF64ViaReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha:
     const cr = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     const ci = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     const tmp = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
-    gemmNoTransComplexF64ViaRealBuffers(m_, n_, k_, a, lda, b, ldb, c, ldc, ar, ai, am, br, bi, bp, cr, ci, tmp);
+    gemmComplexF64ViaRealBuffers(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
 }
 
@@ -727,6 +1194,12 @@ pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: Bla
     if ((T == f32 or T == f64) and transa == .no_trans and transb == .no_trans) {
         gemmNoTransReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         return;
+    }
+    if ((T == f32 or T == f64) and transa == .no_trans and transb == .trans) {
+        if (tryGemmNoTransTransposedBReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+    }
+    if ((T == f32 or T == f64) and transa == .trans and (transb == .no_trans or transb == .trans)) {
+        if (tryGemmTransposedAReal(T, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
     }
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -746,8 +1219,8 @@ pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: Bla
                 gemmNoTransComplexF32(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
                 return;
             }
-            if (tryGemmNoTransComplexF32ViaExpandedReal(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-            if (tryGemmNoTransComplexF32ViaReal(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+            if (tryGemmComplexF32ViaExpandedReal(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+            if (tryGemmComplexF32ViaReal(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
             gemmNoTransComplexF32(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
             return;
         } else if (T == ComplexF64) {
@@ -756,10 +1229,16 @@ pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: Bla
                 return;
             }
             if (tryGemmNoTransComplexF64ViaExpandedReal(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-            if (tryGemmNoTransComplexF64ViaReal(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+            if (tryGemmComplexF64ViaReal(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
             gemmNoTransComplexF64(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
             return;
         }
+    }
+    if (T == ComplexF32) {
+        if (tryGemmComplexF32ViaExpandedReal(transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+        if (tryGemmComplexF32ViaReal(transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+    } else if (T == ComplexF64) {
+        if (tryGemmComplexF64ViaReal(transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
     }
     for (0..n) |j| {
         for (0..m) |i| {

@@ -7,6 +7,7 @@ const runtime = @import("../../runtime.zig");
 const core_pool = @import("../execution/thread_pool.zig");
 const gemm_kernels = @import("../../kernels/dispatch/matrix_matrix.zig");
 const catalog = gemm_kernels.catalog;
+const packing = @import("../../kernels/shared/matrix_matrix/packing.zig");
 const tuning = @import("../../kernels/shared/matrix_matrix/tuning.zig");
 
 const BlasInt = types.BlasInt;
@@ -92,6 +93,8 @@ fn desiredThreadCount(comptime T: type, desc: catalog.Descriptor, requested_thre
     const shape: tuning.Shape = .{ .m = m, .n = n, .k = k };
     const min_dim = tuning.min3(m, n, k);
     const squareish = tuning.isSquareish(shape);
+    if (T == f32 and m == 128 and n == 128 and k >= 2048) return @min(requested_threads, 8);
+    if (T == f64 and allow_direct_kernel and m >= 512 and n >= 512 and k <= 256) return @min(requested_threads, 8);
     if (T == f32 and allow_direct_kernel and m >= 1024 and m < 4096 and n <= 32 and k >= 128 and k <= 512) return 1;
     if (allow_direct_kernel and squareish and T == f32 and work <= 128 * 128 * 128) return 1;
     const vector_edge = (m == 1 or n == 1) and k >= 128 and work >= 128 * 1024;
@@ -124,7 +127,7 @@ fn desiredThreadCount(comptime T: type, desc: catalog.Descriptor, requested_thre
     } else if (tuning.isNarrowN(desc, n) and m >= 512 and k >= desc.bounds.min_k_block * 8) {
         const narrow_cap: usize = if (T == f32 and allow_direct_kernel and n <= desc.tile.n_panel * 2 and k >= 512) 2 else 4;
         threads = @min(threads, narrow_cap);
-    } else if (min_dim >= 256 and squareish and k <= 256) {
+    } else if (min_dim >= 256 and squareish and k <= 256 and !(T == f64 and allow_direct_kernel and m >= 512 and n >= 512)) {
         threads = @min(threads, 4);
     }
 
@@ -152,6 +155,10 @@ fn requestedThreadCountForPlan(m: usize, n: usize, k: usize) usize {
 }
 
 fn forceSingleThreadPlan(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T) bool {
+    if (comptime switch (gemm_kernels.active_backend) {
+        .x86_64_sse2, .x86_64_avx, .x86_64_avx2, .x86_64_avx512f => true,
+        else => false,
+    }) return false;
     return T == f32 and alpha == 1 and beta == 0 and m >= 1024 and m < 4096 and n <= 32 and k >= 128 and k <= 512;
 }
 
@@ -182,9 +189,8 @@ fn rowTaskCount(desc: catalog.Descriptor, desired_threads: usize, column_tasks: 
     return @min(max_rows_by_threads, max_by_rows);
 }
 
-fn selectNoTransReal(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T, requested_threads: usize) Plan {
+fn planForDescriptor(comptime T: type, desc: catalog.Descriptor, m: usize, n: usize, k: usize, alpha: T, beta: T, requested_threads: usize) Plan {
     const shape: tuning.Shape = .{ .m = m, .n = n, .k = k };
-    const desc = tuning.select(T, gemm_kernels.candidates(T), shape, alpha, beta, requested_threads);
     const allow_direct = tuning.directKernelAllowed(T, desc, shape, alpha, beta);
     const thread_count = desiredThreadCount(T, desc, requested_threads, m, n, k, allow_direct);
     const execution = tuning.executionPlan(T, desc, shape, thread_count, runtime.performanceL2Bytes());
@@ -206,6 +212,32 @@ fn selectNoTransReal(comptime T: type, m: usize, n: usize, k: usize, alpha: T, b
     };
 }
 
+fn selectNoTransReal(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T, requested_threads: usize) Plan {
+    const shape: tuning.Shape = .{ .m = m, .n = n, .k = k };
+    const desc = tuning.select(T, gemm_kernels.candidates(T), shape, alpha, beta, requested_threads);
+    return planForDescriptor(T, desc, m, n, k, alpha, beta, requested_threads);
+}
+
+fn selectTransposedBReal(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T, requested_threads: usize) ?Plan {
+    const shape: tuning.Shape = .{ .m = m, .n = n, .k = k };
+    const candidates = gemm_kernels.candidates(T);
+    var best: ?catalog.Descriptor = null;
+    var best_score: i64 = std.math.minInt(i64);
+    var index: usize = 0;
+    while (index < candidates.len) : (index += 1) {
+        const desc = candidates.at(index);
+        const supported = desc.family == .packed_simd or (T == f32 and desc.family == .streaming_matrix);
+        if (!supported) continue;
+        const score = tuning.score(T, desc, shape, alpha, beta, requested_threads);
+        if (best == null or score > best_score) {
+            best = desc;
+            best_score = score;
+        }
+    }
+    const desc = best orelse return null;
+    return planForDescriptor(T, desc, m, n, k, alpha, beta, requested_threads);
+}
+
 fn fallbackNoTrans(comptime T: type, task: gemm_kernels.Task(T)) void {
     if (T == f32) {
         gemm_kernels.noTransRealF32(task);
@@ -216,12 +248,23 @@ fn fallbackNoTrans(comptime T: type, task: gemm_kernels.Task(T)) void {
     }
 }
 
-fn makeTask(comptime T: type, plan: Plan, m: usize, n0: usize, n1: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) gemm_kernels.Task(T) {
+fn makeTask(comptime T: type, plan: Plan, m: usize, n0: usize, n1: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, b_layout: gemm_kernels.BLayout, beta: T, c: [*]T, ldc: BlasInt) gemm_kernels.Task(T) {
     const task_shape: tuning.Shape = .{ .m = m, .n = n1 - n0, .k = k };
     var execution = tuning.executionPlan(T, plan.kernel, task_shape, plan.thread_count, runtime.performanceL2Bytes());
     if (execution.amx == .none and tuning.amxKernelCompatible(T, plan.execution.amx, task_shape)) {
         execution.amx = plan.execution.amx;
         execution.amx_pack = plan.execution.amx_pack;
+    }
+    if (b_layout == .trans) {
+        // The SME kernels consume packed B panels and can therefore handle
+        // op(B) == B^T.  f32 AMX has a layout-specific contiguous packer,
+        // while f64 AMX and the f32 transpose4 pack remain NN-only here.
+        if (T == f64) {
+            execution.amx = .none;
+            execution.amx_pack = .{};
+        }
+        execution.amx_partial_n16 = false;
+        execution.b_pack = .dynamic;
     }
     return .{
         .m = m,
@@ -233,6 +276,7 @@ fn makeTask(comptime T: type, plan: Plan, m: usize, n0: usize, n1: usize, k: usi
         .lda = lda,
         .b = b,
         .ldb = ldb,
+        .b_layout = b_layout,
         .beta = beta,
         .c = c,
         .ldc = ldc,
@@ -249,23 +293,23 @@ fn runSharedTasks(comptime T: type, tasks: []const gemm_kernels.Task(T)) bool {
     @compileError("GEMM planner supports f32 and f64");
 }
 
-fn fallbackWholeTask(comptime T: type, plan: Plan, m: usize, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
-    fallbackNoTrans(T, makeTask(T, plan, m, 0, n, k, alpha, a, lda, b, ldb, beta, c, ldc));
+fn fallbackWholeTask(comptime T: type, plan: Plan, m: usize, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, b_layout: gemm_kernels.BLayout, beta: T, c: [*]T, ldc: BlasInt) void {
+    fallbackNoTrans(T, makeTask(T, plan, m, 0, n, k, alpha, a, lda, b, ldb, b_layout, beta, c, ldc));
 }
 
-fn runPlannedTasks(comptime T: type, plan: Plan, m: usize, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+fn runPlannedTasks(comptime T: type, plan: Plan, m: usize, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, b_layout: gemm_kernels.BLayout, beta: T, c: [*]T, ldc: BlasInt) void {
     const column_task_count = plan.column_tasks;
     const row_task_count = plan.row_tasks;
     const task_count = column_task_count * row_task_count;
     if (task_count <= 1) {
-        fallbackWholeTask(T, plan, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+        fallbackWholeTask(T, plan, m, n, k, alpha, a, lda, b, ldb, b_layout, beta, c, ldc);
         return;
     }
 
     var stack_tasks: [max_stack_tasks]gemm_kernels.Task(T) = undefined;
     const use_stack = task_count <= max_stack_tasks;
     const tasks: []gemm_kernels.Task(T) = if (use_stack) stack_tasks[0..task_count] else std.heap.page_allocator.alloc(gemm_kernels.Task(T), task_count) catch {
-        fallbackWholeTask(T, plan, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+        fallbackWholeTask(T, plan, m, n, k, alpha, a, lda, b, ldb, b_layout, beta, c, ldc);
         return;
     };
     defer if (!use_stack) std.heap.page_allocator.free(tasks);
@@ -277,15 +321,15 @@ fn runPlannedTasks(comptime T: type, plan: Plan, m: usize, n: usize, k: usize, a
         const cols = alignedColumnSplit(n, column_task, column_task_count, plan.column_block);
         // Row-split tasks offset A/C but keep full leading dimensions.
         // Column splits share A and use disjoint C columns.
-        tasks[t] = makeTask(T, plan, rows.m1 - rows.m0, cols.n0, cols.n1, k, alpha, a + matIndex(lda, rows.m0, 0), lda, b, ldb, beta, c + matIndex(ldc, rows.m0, 0), ldc);
+        tasks[t] = makeTask(T, plan, rows.m1 - rows.m0, cols.n0, cols.n1, k, alpha, a + matIndex(lda, rows.m0, 0), lda, b, ldb, b_layout, beta, c + matIndex(ldc, rows.m0, 0), ldc);
     }
 
     if (plan.use_parallel_tasks and runSharedTasks(T, tasks)) return;
-    fallbackWholeTask(T, plan, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    fallbackWholeTask(T, plan, m, n, k, alpha, a, lda, b, ldb, b_layout, beta, c, ldc);
 }
 
-pub fn noTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
-    if (m_ <= 0 or n_ <= 0) return;
+fn noTransRealWithBLayout(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, b_layout: gemm_kernels.BLayout, beta: T, c: [*]T, ldc: BlasInt, require_packed_simd: bool) bool {
+    if (m_ <= 0 or n_ <= 0) return true;
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -294,13 +338,50 @@ pub fn noTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alph
             const idxc = matIndex(ldc, i, j);
             c[idxc] = if (beta == 0) 0 else beta * c[idxc];
         };
-        return;
+        return true;
     }
     if (comptime T == f32) {
-        if (gemm_kernels.tryNoTransRealF32Fast(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+        if (b_layout == .no_trans and gemm_kernels.tryNoTransRealF32Fast(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return true;
     }
 
     const requested_threads = if (forceSingleThreadPlan(T, m, n, k, alpha, beta)) @as(usize, 1) else requestedThreadCountForPlan(m, n, k);
-    const plan = selectNoTransReal(T, m, n, k, alpha, beta, requested_threads);
-    runPlannedTasks(T, plan, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    const plan = if (require_packed_simd)
+        selectTransposedBReal(T, m, n, k, alpha, beta, requested_threads) orelse return false
+    else
+        selectNoTransReal(T, m, n, k, alpha, beta, requested_threads);
+    runPlannedTasks(T, plan, m, n, k, alpha, a, lda, b, ldb, b_layout, beta, c, ldc);
+    return true;
+}
+
+pub fn noTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    _ = noTransRealWithBLayout(T, m_, n_, k_, alpha, a, lda, b, ldb, .no_trans, beta, c, ldc, false);
+}
+
+pub fn noTransTransposedBReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+    return noTransRealWithBLayout(T, m_, n_, k_, alpha, a, lda, b, ldb, .trans, beta, c, ldc, true);
+}
+
+pub fn transposedAReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, b_layout: gemm_kernels.BLayout, beta: T, c: [*]T, ldc: BlasInt) bool {
+    if (m_ <= 0 or n_ <= 0) return true;
+    if (k_ <= 0 or alpha == 0) return false;
+
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+    if (m == 1 or n == 1) return false;
+    if (m <= 33 and n <= 33 and k <= 33) return false;
+    const requested_threads = if (forceSingleThreadPlan(T, m, n, k, alpha, beta)) @as(usize, 1) else requestedThreadCountForPlan(m, n, k);
+    const plan = if (b_layout == .trans)
+        selectTransposedBReal(T, m, n, k, alpha, beta, requested_threads) orelse return false
+    else
+        selectNoTransReal(T, m, n, k, alpha, beta, requested_threads);
+    if (plan.kernel.family == .generic) return false;
+
+    const packed_len = std.math.mul(usize, m, k) catch return false;
+    const a_pack = std.heap.c_allocator.alloc(T, packed_len) catch return false;
+    defer std.heap.c_allocator.free(a_pack);
+
+    packing.packTransposedA(T, m, k, a, lda, a_pack);
+    runPlannedTasks(T, plan, m, n, k, alpha, a_pack.ptr, m_, b, ldb, b_layout, beta, c, ldc);
+    return true;
 }

@@ -377,12 +377,29 @@ fn packBF32_4x4(comptime panel_cols: usize, b_pack: [*]f32, b: [*]const f32, j_s
     }
 }
 
-fn amxSgemmN16Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
+fn packBF32Transposed(comptime panel_cols: usize, b_pack: [*]f32, b: [*]const f32, j_start: usize, k: usize, ldb: usize) void {
+    if (comptime panel_cols == 0 or panel_cols % 4 != 0) @compileError("f32 AMX B panel columns must be a nonzero multiple of 4");
+
+    var p: usize = 0;
+    while (p < k) : (p += 1) {
+        const src = b + p * ldb + j_start;
+        const dst = b_pack + p * panel_cols;
+        inline for (0..(panel_cols / 4)) |block| {
+            storeF32x4(dst + block * 4, loadF32x4(src + block * 4));
+        }
+    }
+}
+
+fn amxSgemmN16LoopForLayout(comptime transposed_b: bool, m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
     amxSet();
     defer amxClr();
     var j: usize = 0;
     while (j < n) : (j += 16) {
-        packBF32_4x4(16, b_pack, b, j, k, ldb);
+        if (comptime transposed_b) {
+            packBF32Transposed(16, b_pack, b, j, k, ldb);
+        } else {
+            packBF32_4x4(16, b_pack, b, j, k, ldb);
+        }
         var i: usize = 0;
         while (i + 64 <= m) : (i += 64) {
             amxSgemmMblocksN16(4, a + i, b_pack, c + i + j * ldc, k, lda, ldc);
@@ -394,12 +411,24 @@ fn amxSgemmN16Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b:
     }
 }
 
-fn amxSgemmN32Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
+fn amxSgemmN16Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
+    amxSgemmN16LoopForLayout(false, m, n, k, a, lda, b, ldb, c, ldc, b_pack);
+}
+
+fn amxSgemmN16TransBLoop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
+    amxSgemmN16LoopForLayout(true, m, n, k, a, lda, b, ldb, c, ldc, b_pack);
+}
+
+fn amxSgemmN32LoopForLayout(comptime transposed_b: bool, m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
     amxSet();
     defer amxClr();
     var j: usize = 0;
     while (j < n) : (j += 32) {
-        packBF32_4x4(32, b_pack, b, j, k, ldb);
+        if (comptime transposed_b) {
+            packBF32Transposed(32, b_pack, b, j, k, ldb);
+        } else {
+            packBF32_4x4(32, b_pack, b, j, k, ldb);
+        }
         var i: usize = 0;
         if ((k & 1) != 0) {
             while (i + 64 <= m) : (i += 64) {
@@ -419,12 +448,28 @@ fn amxSgemmN32Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b:
     }
 }
 
+fn amxSgemmN32Loop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
+    amxSgemmN32LoopForLayout(false, m, n, k, a, lda, b, ldb, c, ldc, b_pack);
+}
+
+fn amxSgemmN32TransBLoop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, b_pack: [*]f32) void {
+    amxSgemmN32LoopForLayout(true, m, n, k, a, lda, b, ldb, c, ldc, b_pack);
+}
+
 fn amxSgemmN16WithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
     return amxGemmWithPack(f32, amxSgemmN16Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
 }
 
 fn amxSgemmN32WithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
     return amxGemmWithPack(f32, amxSgemmN32Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+}
+
+fn amxSgemmN16TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
+    return amxGemmWithPack(f32, amxSgemmN16TransBLoop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+}
+
+fn amxSgemmN32TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
+    return amxGemmWithPack(f32, amxSgemmN32TransBLoop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
 }
 
 pub fn sgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
@@ -459,6 +504,36 @@ pub fn sgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b
 
     const pack_elems = k * 32;
     return if (amxSgemmN32WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+}
+
+pub fn sgemmN16TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
+    if ((m_ & 15) != 0 or (n_ & 15) != 0) return 0;
+
+    const m: usize = @intCast(m_);
+    const n: usize = @intCast(n_);
+    const k: usize = @intCast(k_);
+    const lda: usize = @intCast(lda_);
+    const ldb: usize = @intCast(ldb_);
+    const ldc: usize = @intCast(ldc_);
+
+    const pack_elems = k * 16;
+    return if (amxSgemmN16TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+}
+
+pub fn sgemmN32TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
+    if ((m_ & 31) != 0 or (n_ & 31) != 0) return 0;
+
+    const m: usize = @intCast(m_);
+    const n: usize = @intCast(n_);
+    const k: usize = @intCast(k_);
+    const lda: usize = @intCast(lda_);
+    const ldb: usize = @intCast(ldb_);
+    const ldc: usize = @intCast(ldc_);
+
+    const pack_elems = k * 32;
+    return if (amxSgemmN32TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
 }
 
 pub export fn zynum_blas_amx_sgemm_nn_f32_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
@@ -626,14 +701,7 @@ fn amxDgemmN8Loop(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: 
     defer amxClr();
     var j: usize = 0;
     while (j < n) : (j += 8) {
-        var p: usize = 0;
-        while (p < k) : (p += 1) {
-            const dst = b_pack + p * 8;
-            var col: usize = 0;
-            while (col < 8) : (col += 1) {
-                dst[col] = b[p + (j + col) * ldb];
-            }
-        }
+        packBF64_2x2(8, b_pack, b, j, k, ldb);
         var i: usize = 0;
         while (i < m) : (i += 64) {
             var m_blocks = (m - i) / 8;

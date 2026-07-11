@@ -63,6 +63,8 @@ DEFAULT_SHAPES = [
 
 CSV_FIELDNAMES = [
     "kind",
+    "transa",
+    "transb",
     "shape_index",
     "label",
     "m",
@@ -88,7 +90,16 @@ def default_zynum_blas():
     return "zig-out/lib/libzynum_blas.so"
 
 
-def parse_args():
+def parse_transpose_spec(value):
+    pair = value.upper()
+    if len(pair) != 2 or any(trans not in "NTC" for trans in pair):
+        raise argparse.ArgumentTypeError(
+            f"transpose pair must contain two N/T/C characters, got {value!r}"
+        )
+    return pair
+
+
+def parse_args(argv=None):
     p = argparse.ArgumentParser(
         description="Run gemm-sweep with one BLAS library per fresh OS process and merge the CSV output."
     )
@@ -104,6 +115,14 @@ def parse_args():
     p.add_argument("--openblas", default=DEFAULT_OPENBLAS)
     p.add_argument("--mkl")
     p.add_argument("--aocl-blis")
+    p.add_argument("--atlas")
+    p.add_argument(
+        "--extra-blas",
+        action="append",
+        default=[],
+        metavar="LABEL=PATH",
+        help="Additional drop-in BLAS comparator. May be passed more than once.",
+    )
     p.add_argument("--reps", type=int, default=30)
     p.add_argument(
         "--process-repeats",
@@ -121,6 +140,12 @@ def parse_args():
         "--kind", action="append", choices=["sgemm", "dgemm", "cgemm", "zgemm"]
     )
     p.add_argument(
+        "--trans",
+        action="append",
+        type=parse_transpose_spec,
+        help="GEMM transpose pair. Repeat for multiple combinations; defaults to NN.",
+    )
+    p.add_argument(
         "--isolate-kind",
         action="store_true",
         help="When no --kind filter is supplied, run each GEMM kind in a separate fresh process per library.",
@@ -132,7 +157,7 @@ def parse_args():
     )
     p.add_argument("--shape", action="append", default=[])
     p.add_argument("--skip-missing", action="store_true")
-    args = p.parse_args()
+    args = p.parse_args(argv)
     if args.process_repeats < 1:
         p.error("--process-repeats must be at least 1")
     return args
@@ -150,6 +175,18 @@ def library_path_exists(path):
 
 def library_disabled(path):
     return not path or path == "none"
+
+
+def append_extra_blas(candidates, items):
+    for item in items:
+        if "=" not in item:
+            raise ValueError(f"--extra-blas must be LABEL=PATH, got {item!r}")
+        label, path = item.split("=", 1)
+        label = label.strip()
+        path = path.strip()
+        if not label or not path:
+            raise ValueError(f"--extra-blas must be LABEL=PATH, got {item!r}")
+        candidates.append((label, path))
 
 
 def parse_shape_spec(spec):
@@ -171,6 +208,13 @@ def shape_index_map(shape_specs):
     for index, spec in enumerate(shape_specs):
         result[parse_shape_spec(spec)] = str(index)
     return result
+
+
+def transpose_fields(row):
+    return (
+        (row.get("transa") or "N").upper(),
+        (row.get("transb") or "N").upper(),
+    )
 
 
 def sha256_file(path):
@@ -245,6 +289,9 @@ def existing_libs(args):
         candidates.append(("MKL", args.mkl))
     if args.aocl_blis:
         candidates.append(("AOCL-BLIS", args.aocl_blis))
+    if args.atlas:
+        candidates.append(("ATLAS", args.atlas))
+    append_extra_blas(candidates, args.extra_blas)
     for name, path in candidates:
         if library_disabled(path):
             continue
@@ -259,7 +306,14 @@ def best_rows_csv(inputs, output):
     for csv_path in inputs:
         with open(csv_path, newline="") as inp:
             for row in csv.DictReader(inp):
-                key = (row["kind"], row["label"], row["m"], row["n"], row["k"])
+                key = (
+                    row["kind"],
+                    *transpose_fields(row),
+                    row["label"],
+                    row["m"],
+                    row["n"],
+                    row["k"],
+                )
                 groups.setdefault(key, []).append(row)
     with open(output, "w", newline="") as out:
         writer = csv.DictWriter(out, fieldnames=CSV_FIELDNAMES, extrasaction="ignore")
@@ -300,6 +354,7 @@ def merged_check_status(rows):
 
 def merge_repeat_rows(rows):
     base = max(rows, key=lambda row: float_field(row, "gflops")).copy()
+    base["transa"], base["transb"] = transpose_fields(base)
     best_values = sorted(int_field(row, "best_ns") for row in rows)
     median_values = sorted(int_field(row, "median_ns") for row in rows)
     p95_values = sorted(int_field(row, "p95_ns") for row in rows)
@@ -326,6 +381,8 @@ def run_one_process(args, name, path, out, kind=None, shapes=None):
     kinds = [kind] if kind else (args.kind or [])
     for selected_kind in kinds:
         cmd += ["--kind", selected_kind]
+    for transpose in args.trans or []:
+        cmd += ["--trans", transpose]
     for shape in shapes if shapes is not None else args.shape:
         cmd += ["--shape", shape]
     if args.check:
@@ -338,10 +395,16 @@ def run_one_process(args, name, path, out, kind=None, shapes=None):
     subprocess.run(cmd, check=True, env=env)
 
 
+def isolated_shape_suffix(shape_spec):
+    label = shape_spec.split(":", 1)[0]
+    digest = hashlib.sha256(shape_spec.encode("utf-8")).hexdigest()[:12]
+    return f"_{label}_{digest}"
+
+
 def run_one(args, name, path, tmp_dir, kind=None, shapes=None):
     suffix = f"_{kind}" if kind else ""
     if shapes and len(shapes) == 1:
-        suffix += "_" + shapes[0].split(":", 1)[0]
+        suffix += isolated_shape_suffix(shapes[0])
     out = tmp_dir / f"{name}{suffix}.csv"
 
     if args.process_repeats == 1:
@@ -369,6 +432,7 @@ def merge(rows_by_lib, output_path, shape_indexes):
                         shape_key, row["shape_index"]
                     )
                     row["library"] = name
+                    row["transa"], row["transb"] = transpose_fields(row)
                     row.setdefault("median_ns", row.get("best_ns", ""))
                     row.setdefault("p95_ns", row.get("best_ns", ""))
                     row.setdefault("max_ns", row.get("best_ns", ""))
@@ -407,6 +471,7 @@ def write_metadata(args, libs, shape_specs, output_path):
         "isolate_kind": args.isolate_kind,
         "isolate_shape": args.isolate_shape,
         "kinds": args.kind,
+        "transposes": args.trans or ["NN"],
         "shapes": shape_specs,
         "environment": child_environment_snapshot(env_names),
         "binaries": {

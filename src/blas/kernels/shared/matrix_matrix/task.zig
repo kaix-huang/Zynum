@@ -28,6 +28,11 @@ pub const BPackPath = enum {
     transpose4,
 };
 
+pub const BLayout = enum {
+    no_trans,
+    trans,
+};
+
 pub const SmeF32Panel = enum {
     panels2x2,
     panels2x2_u4,
@@ -59,6 +64,7 @@ pub fn Task(comptime T: type) type {
         lda: BlasInt,
         b: [*]const T,
         ldb: BlasInt,
+        b_layout: BLayout = .no_trans,
         beta: T,
         c: [*]T,
         ldc: BlasInt,

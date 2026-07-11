@@ -10,7 +10,16 @@ from collections import defaultdict
 CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
 
 
-def parse_args():
+def parse_transpose_spec(value):
+    pair = value.upper()
+    if len(pair) != 2 or any(trans not in "NTC" for trans in pair):
+        raise argparse.ArgumentTypeError(
+            f"transpose pair must contain two N/T/C characters, got {value!r}"
+        )
+    return pair
+
+
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Check GEMM sweep CSV rows against the fastest comparator library."
     )
@@ -31,6 +40,18 @@ def parse_args():
     parser.add_argument("--kind", action="append", help="Restrict to one or more GEMM kinds.")
     parser.add_argument("--label", action="append", help="Restrict to one or more shape labels.")
     parser.add_argument(
+        "--trans",
+        action="append",
+        type=parse_transpose_spec,
+        help="Restrict to one or more transpose pairs. Legacy rows are treated as NN.",
+    )
+    parser.add_argument(
+        "--stat",
+        choices=["best", "median", "min"],
+        default="best",
+        help="Timing statistic to compare. min uses max_ns (the minimum observed throughput).",
+    )
+    parser.add_argument(
         "--allow-missing-comparators",
         action="store_true",
         help="Skip groups with no requested comparator rows instead of failing.",
@@ -41,11 +62,22 @@ def parse_args():
         help="Allow rows whose GEMM correctness check is absent or not checked.",
     )
     parser.add_argument("--worst", type=int, default=20, help="Number of worst rows to print.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
+
+
+def transpose_fields(row):
+    return (row.get("transa") or "N").upper(), (row.get("transb") or "N").upper()
 
 
 def group_key(row):
-    return (row["kind"], row["label"], row["m"], row["n"], row["k"])
+    return (
+        row["kind"],
+        *transpose_fields(row),
+        row["label"],
+        row["m"],
+        row["n"],
+        row["k"],
+    )
 
 
 def row_allowed(args, row):
@@ -53,11 +85,37 @@ def row_allowed(args, row):
         return False
     if args.label is not None and row["label"] not in args.label:
         return False
+    if args.trans is not None and "".join(transpose_fields(row)) not in args.trans:
+        return False
     return True
 
 
-def main():
-    args = parse_args()
+def flop_factor(kind):
+    return 8.0 if kind in {"cgemm", "zgemm"} else 2.0
+
+
+def row_gflops(row, stat):
+    if stat == "best":
+        return float(row["gflops"])
+
+    timing_field = "median_ns" if stat == "median" else "max_ns"
+    timing_text = row.get(timing_field) or row.get("best_ns")
+    if not timing_text:
+        return float(row["gflops"])
+    elapsed_ns = int(timing_text)
+    if elapsed_ns <= 0:
+        raise ValueError(f"non-positive {timing_field}")
+    work = (
+        flop_factor(row["kind"])
+        * int(row["m"])
+        * int(row["n"])
+        * int(row["k"])
+    )
+    return work / elapsed_ns
+
+
+def main(argv=None):
+    args = parse_args(argv)
     if args.ratio <= 0:
         print("--ratio must be positive", file=sys.stderr)
         return 2
@@ -75,9 +133,12 @@ def main():
                 )
                 return 2
             try:
-                row["gflops_value"] = float(row["gflops"])
-            except (KeyError, ValueError):
-                print(f"bad gflops value in row: {row}", file=sys.stderr)
+                row["gflops_value"] = row_gflops(row, args.stat)
+            except (KeyError, TypeError, ValueError) as error:
+                print(
+                    f"bad {args.stat} GFLOP/s value in row ({error}): {row}",
+                    file=sys.stderr,
+                )
                 return 2
             groups[group_key(row)][row["library"]] = row
 
@@ -110,23 +171,26 @@ def main():
     failures.sort(key=lambda item: item[0])
     print(
         f"checked={checked} passed={checked - len(failures)} "
-        f"failed={len(failures)} missing={len(missing)} ratio={args.ratio:.6g}"
+        f"failed={len(failures)} missing={len(missing)} ratio={args.ratio:.6g} stat={args.stat}"
     )
     no_checks = checked == 0
     if no_checks:
         print("no matching Zynum/comparator groups were checked", file=sys.stderr)
 
     for ratio, key, zynum, best in failures[: args.worst]:
-        kind, label, m, n, k = key
+        kind, transa, transb, label, m, n, k = key
         print(
-            f"FAIL {ratio:.6f} {kind} {label} m={m} n={n} k={k} "
+            f"FAIL {ratio:.6f} {kind} trans={transa}{transb} {label} m={m} n={n} k={k} "
             f"{args.zynum}={zynum['gflops_value']:.6f} "
             f"best={best['library']}:{best['gflops_value']:.6f}"
         )
 
     for key, label in missing[: args.worst]:
-        kind, shape, m, n, k = key
-        print(f"MISSING {label} {kind} {shape} m={m} n={n} k={k}")
+        kind, transa, transb, shape, m, n, k = key
+        print(
+            f"MISSING {label} {kind} trans={transa}{transb} "
+            f"{shape} m={m} n={n} k={k}"
+        )
 
     if no_checks:
         return 2

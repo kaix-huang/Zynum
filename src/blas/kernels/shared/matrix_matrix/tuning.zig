@@ -61,6 +61,7 @@ pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T,
         .packed_simd => {
             if (shape.m == 1 and shape.k >= 16) result -= 700;
             if (shape.n == 1 and shape.k >= 16) result -= 700;
+            if (shape.m >= 24 and shape.m <= 48 and shape.n >= 24 and shape.n <= 48 and shape.k >= 24 and shape.k <= 48) result += 1000;
             if (work < desc.bounds.min_work / 2) result -= 180;
             result += 250 + @as(i64, @intCast(desc.tile.vector_lanes * desc.tile.register_n));
             if (shape.k >= desc.bounds.min_k_block) result += 120;
@@ -73,6 +74,10 @@ pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T,
             if (!directKernelAllowed(T, desc, shape, alpha, beta)) return std.math.minInt(i64) / 2;
             result += 500;
             if (selectAmx(T, shape) != .none) result += 420;
+            if (shape.m == 16 and shape.n >= 1024 and shape.k >= 128 and shape.k <= 1024) result += 600;
+            if (shape.m == 32 and shape.n >= 1024 and shape.k >= 128 and shape.k <= 1024) result += 400;
+            if (T == f32 and shape.m >= 32 and shape.m <= 256 and shape.n >= 512 and shape.k >= 512) result += 500;
+            if (T == f32 and shape.m == 128 and shape.n == 128 and shape.k >= 768) result += 500;
             if (T == f32 and shape.m >= 512 and shape.n <= desc.tile.n_panel * 4 and shape.k >= 256) result += 380;
             if (T == f32 and shape.m >= 256 and shape.n >= 256 and shape.k >= 512) result += 420;
             if (squareish) result += 180;
@@ -90,13 +95,29 @@ pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T,
     return result;
 }
 
+fn rejectNoTransStreamingLowK(comptime T: type, desc: catalog.Descriptor, shape: Shape) bool {
+    if (desc.family != .streaming_matrix) return false;
+    if (shape.k < desc.bounds.min_k_block or shape.k > 128) return false;
+    if (shape.m < 32 or shape.n < 48 or shape.m >= 256 or shape.n >= 256) return false;
+    // f64 SME's efficient row tails are 4M/2M groups.  A lone 1M (8-row)
+    // remainder falls through to the scalar tail even though it is one
+    // streaming-vector multiple, so only preserve 16-row alignment here.
+    const efficient_m_block = if (T == f64) desc.tile.vector_lanes * 2 else desc.tile.vector_lanes;
+    if (shape.m % efficient_m_block == 0) return false;
+
+    const amx = selectAmx(T, shape);
+    if (amx != .none) return false;
+    if (T == f32 and selectF32AmxPartialN16(shape, amx)) return false;
+    return true;
+}
+
 pub fn select(comptime T: type, candidates: catalog.CandidateList, shape: Shape, alpha: T, beta: T, requested_threads: usize) catalog.Descriptor {
     var best = candidates.at(0);
-    var best_score = score(T, best, shape, alpha, beta, requested_threads);
+    var best_score = if (rejectNoTransStreamingLowK(T, best, shape)) std.math.minInt(i64) / 2 else score(T, best, shape, alpha, beta, requested_threads);
     var index: usize = 1;
     while (index < candidates.len) : (index += 1) {
         const item = candidates.at(index);
-        const item_score = score(T, item, shape, alpha, beta, requested_threads);
+        const item_score = if (rejectNoTransStreamingLowK(T, item, shape)) std.math.minInt(i64) / 2 else score(T, item, shape, alpha, beta, requested_threads);
         if (item_score > best_score) {
             best = item;
             best_score = item_score;
@@ -108,6 +129,17 @@ pub fn select(comptime T: type, candidates: catalog.CandidateList, shape: Shape,
 fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
     if (shape.k == 0) return .none;
     if (T == f32) {
+        // A medium irregular panel still has a large regular 16x16 AMX
+        // interior.  The architecture wrapper computes that interior with
+        // AMX and sends only the last rows/columns through packed ASIMD.
+        // Keep this deliberately narrow until the fringe split has broader
+        // shape coverage.  K31/K32 retain their faster packed specializations;
+        // this targets the ordinary-K 127x129 family and its K129 cliff.
+        const medium_fringe = shape.m >= 96 and shape.m <= 160 and
+            shape.n >= 96 and shape.n <= 160 and
+            shape.k >= 65 and shape.k <= 256 and
+            ((shape.m & 15) != 0 or (shape.n & 15) != 0);
+        if (medium_fringe) return .f32_n16;
         if ((shape.m & 15) != 0 or (shape.n & 15) != 0) return .none;
         if (shape.k > 512) return .none;
 
@@ -135,15 +167,23 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
         return .f32_n16;
     }
     if (T == f64) {
+        // The f64 N8 kernel has the least restrictive AMX tile and is the
+        // safe interior primitive for the same medium irregular family.
+        const medium_fringe = shape.m >= 96 and shape.m <= 160 and
+            shape.n >= 96 and shape.n <= 160 and
+            shape.k >= 65 and shape.k <= 256 and
+            ((shape.m & 7) != 0 or (shape.n & 7) != 0);
+        if (medium_fringe) return .f64_n8;
         if ((shape.m & 7) != 0 or (shape.n & 7) != 0) return .none;
         const short_wide = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
         const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64 and shape.m <= 384;
         const high_k_panel = shape.m >= 128 and shape.m <= 512 and shape.n >= 32 and shape.n <= 128 and shape.k >= 2048;
         const tall_narrow_panel = shape.m >= 512 and shape.n >= 32 and shape.n <= 64 and shape.k >= 512 and shape.k <= 1024;
+        const tall_n16 = shape.m >= 512 and shape.n == 16 and shape.k >= 128 and shape.k <= 1024;
         const low_k_skinny_n32 = shape.m >= 2048 and shape.n >= 32 and shape.n <= 64 and shape.k >= 256 and shape.k <= 512;
         const low_k_large = shape.m >= 256 and shape.n >= 256 and shape.k <= 256;
         const mid_k_large = shape.m >= 256 and shape.n >= 256 and shape.k <= 1024;
-        if (!short_wide and !square and !high_k_panel and !tall_narrow_panel and !low_k_skinny_n32 and !low_k_large and !mid_k_large) return .none;
+        if (!short_wide and !square and !high_k_panel and !tall_narrow_panel and !tall_n16 and !low_k_skinny_n32 and !low_k_large and !mid_k_large) return .none;
         const square_large_n32 = square and shape.m >= 256;
         if (mid_k_large and shape.n <= 256 and (shape.m & 31) == 0 and (shape.n & 15) == 0) return .f64_n16;
         if ((short_wide or (shape.m == 64 or shape.m == 96) or square_large_n32 or high_k_panel or tall_narrow_panel or low_k_skinny_n32 or low_k_large or mid_k_large) and (shape.m & 15) == 0 and (shape.n & 31) == 0) return .f64_n32;

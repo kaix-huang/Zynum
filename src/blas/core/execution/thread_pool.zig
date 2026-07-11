@@ -192,14 +192,16 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
 
     const io = persistent_threaded.io();
     const generation = persistent_generation.fetchAdd(1, .acq_rel) + 1;
+    const lazy_wake_helpers = first_helper == 0 and active_helpers == workers;
     for (0..active_helpers) |worker_id| {
         const target_worker = first_helper + worker_id;
         persistent_worker_generation[target_worker].store(generation, .release);
-        io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
+        if (!lazy_wake_helpers) io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
     }
 
     runtime.configureWorkerThread(null);
     task_fn(tasks, 0);
+    var woke_sleepers = !lazy_wake_helpers;
     while (true) {
         var done = persistent_done_count.load(.acquire);
         const done_target = persistent_done_target.load(.acquire);
@@ -209,6 +211,14 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
             done = persistent_done_count.load(.acquire);
         }
         if (done >= done_target) break;
+        if (!woke_sleepers) {
+            for (0..active_helpers) |worker_id| {
+                io.futexWake(u32, &persistent_worker_generation[worker_id].raw, 1);
+            }
+            woke_sleepers = true;
+            done = persistent_done_count.load(.acquire);
+            if (done >= done_target) break;
+        }
         io.futexWaitUncancelable(u32, &persistent_done_count.raw, done);
     }
     return true;

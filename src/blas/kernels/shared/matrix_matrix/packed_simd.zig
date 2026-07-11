@@ -24,6 +24,7 @@ pub const Config = struct {
     tail_vector_lanes: comptime_int = 0,
     max_stack_pack_bytes: comptime_int = 0,
     pack_tail_columns: bool = false,
+    special_low_k_pack: bool = false,
 };
 
 fn checkConfig(comptime T: type, comptime cfg: Config) void {
@@ -44,6 +45,7 @@ fn withTile(comptime cfg: Config, comptime tile_n: comptime_int) Config {
         .tail_vector_lanes = cfg.tail_vector_lanes,
         .max_stack_pack_bytes = cfg.max_stack_pack_bytes,
         .pack_tail_columns = cfg.pack_tail_columns,
+        .special_low_k_pack = false,
     };
 }
 
@@ -75,6 +77,18 @@ inline fn oldVec(comptime T: type, comptime lane_count: comptime_int, task: gemm
 
 fn preparePanel(comptime T: type, comptime cfg: Config, task: gemm_task.Task(T), j: usize, b_pack: []T) []const T {
     const panel = b_pack[0 .. task.k * cfg.tile_n];
+    if (comptime cfg.special_low_k_pack and T == f32 and cfg.tile_n == 6) {
+        if ((task.k == 31 or task.k == 32) and !packing.isTransposedB(T, task)) {
+            packing.packBPanelF32x6NoTrans(task, j, panel);
+            return panel;
+        }
+    }
+    if (comptime cfg.special_low_k_pack and T == f64 and cfg.tile_n == 8) {
+        if (task.k == 31 and !packing.isTransposedB(T, task)) {
+            packing.packBPanelF64x8NoTrans(task, j, panel);
+            return panel;
+        }
+    }
     packing.packBPanel(T, cfg.tile_n, task, j, panel);
     return panel;
 }
@@ -97,6 +111,30 @@ inline fn writeVectorEpilogue(
 
 inline fn writeScalarEpilogue(comptime T: type, task: gemm_task.Task(T), comptime direct_store: bool, row: usize, col: usize, acc: T) void {
     task.c[matIndex(task.ldc, row, col)] = if (comptime direct_store) acc else epilogue.applyTaskScalar(T, task, acc, row, col);
+}
+
+fn fallbackRealImpl(comptime T: type, comptime direct_store: bool, task: gemm_task.Task(T)) void {
+    if (!packing.isTransposedB(T, task)) {
+        generic.noTransReal(T, task);
+        return;
+    }
+
+    var j = task.n0;
+    while (j < task.n1) : (j += 1) {
+        var i: usize = 0;
+        while (i < task.m) : (i += 1) {
+            var acc: T = 0;
+            for (0..task.k) |p| {
+                acc = @mulAdd(T, task.a[matIndex(task.lda, i, p)], packing.bValue(T, task, p, j), acc);
+            }
+            writeScalarEpilogue(T, task, direct_store, i, j, acc);
+        }
+    }
+}
+
+fn fallbackReal(comptime T: type, task: gemm_task.Task(T)) void {
+    if (task.alpha == 1 and task.beta == 0) return fallbackRealImpl(T, true, task);
+    return fallbackRealImpl(T, false, task);
 }
 
 inline fn accumulatePackedP(
@@ -233,7 +271,7 @@ fn tailColsPacked(comptime T: type, comptime cfg: Config, comptime direct_store:
 fn tailColsGeneric(comptime T: type, task: gemm_task.Task(T), j: usize) void {
     var tail = task;
     tail.n0 = j;
-    generic.noTransReal(T, tail);
+    fallbackReal(T, tail);
 }
 
 fn noTransRealWithPack(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), b_pack: []T) void {
@@ -258,7 +296,7 @@ fn noTransRealWithPackSelected(comptime T: type, comptime cfg: Config, task: gem
 
 fn noTransRealWithHeapPack(comptime T: type, comptime cfg: Config, task: gemm_task.Task(T), pack_elems: usize) void {
     const b_pack = std.heap.c_allocator.alloc(T, pack_elems) catch {
-        generic.noTransReal(T, task);
+        fallbackReal(T, task);
         return;
     };
     defer std.heap.c_allocator.free(b_pack);
