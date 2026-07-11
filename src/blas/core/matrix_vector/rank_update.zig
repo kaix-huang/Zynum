@@ -3,11 +3,15 @@
 
 //! General, symmetric, Hermitian, and packed rank-update BLAS Level 2 kernels.
 
+const std = @import("std");
+const builtin = @import("builtin");
+
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
+const runtime = @import("../../runtime.zig");
 
 const BlasInt = scalar.BlasInt;
 const Uplo = scalar.Uplo;
@@ -426,9 +430,281 @@ pub fn ger(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, 
     }
 }
 
+const DenseRankOperation = enum {
+    syr,
+    her,
+    syr2,
+    her2,
+};
+
+fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) void {
+    for (j0..j1) |j| {
+        const row0: usize = if (uplo == .upper) 0 else j;
+        const row1: usize = if (uplo == .upper) j + 1 else n;
+        const count = row1 - row0;
+        const column = a + matIndex(lda, row0, j);
+
+        switch (operation) {
+            .syr => {
+                const temp = alpha * x[j];
+                if (temp != 0) vector_ops.axpyUnitReal(T, count, temp, x + row0, column);
+            },
+            .her => {
+                const temp = mul(T, alpha, conj(T, x[j]));
+                if (!isZero(T, temp)) vector_ops.axpy(T, @intCast(count), temp, x + row0, 1, column, 1);
+                a[matIndex(lda, j, j)].im = 0;
+            },
+            .syr2 => {
+                const temp1 = alpha * y[j];
+                const temp2 = alpha * x[j];
+                if (temp1 != 0) vector_ops.axpyUnitReal(T, count, temp1, x + row0, column);
+                if (temp2 != 0) vector_ops.axpyUnitReal(T, count, temp2, y + row0, column);
+            },
+            .her2 => {
+                const temp1 = mul(T, alpha, conj(T, y[j]));
+                const temp2 = mul(T, conj(T, alpha), conj(T, x[j]));
+                if (!isZero(T, temp1)) vector_ops.axpy(T, @intCast(count), temp1, x + row0, 1, column, 1);
+                if (!isZero(T, temp2)) vector_ops.axpy(T, @intCast(count), temp2, y + row0, 1, column, 1);
+                a[matIndex(lda, j, j)].im = 0;
+            },
+        }
+    }
+}
+
+fn DenseRankTask(comptime T: type) type {
+    return struct {
+        uplo: Uplo,
+        n: usize,
+        j0: usize,
+        j1: usize,
+        alpha: T,
+        x: [*]const T,
+        y: [*]const T,
+        a: [*]T,
+        lda: BlasInt,
+    };
+}
+
+fn runDenseRankTask(comptime T: type, comptime operation: DenseRankOperation, raw_tasks: *const anyopaque, index: usize) void {
+    const tasks: [*]const DenseRankTask(T) = @ptrCast(@alignCast(raw_tasks));
+    const task = tasks[index];
+    denseRankColumns(T, operation, task.uplo, task.n, task.j0, task.j1, task.alpha, task.x, task.y, task.a, task.lda);
+}
+
+fn runSyrTaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(f32, .syr, raw_tasks, index);
+}
+
+fn runSyrTaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(f64, .syr, raw_tasks, index);
+}
+
+fn runHerTaskC32(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(scalar.ComplexF32, .her, raw_tasks, index);
+}
+
+fn runHerTaskC64(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(scalar.ComplexF64, .her, raw_tasks, index);
+}
+
+fn runSyr2TaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(f32, .syr2, raw_tasks, index);
+}
+
+fn runSyr2TaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(f64, .syr2, raw_tasks, index);
+}
+
+fn runHer2TaskC32(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(scalar.ComplexF32, .her2, raw_tasks, index);
+}
+
+fn runHer2TaskC64(raw_tasks: *const anyopaque, index: usize) void {
+    runDenseRankTask(scalar.ComplexF64, .her2, raw_tasks, index);
+}
+
+fn denseRankTaskBoundary(uplo: Uplo, n: usize, task_count: usize, task_index: usize) usize {
+    if (task_index == 0) return 0;
+    if (task_index >= task_count) return n;
+    const fraction = @as(f64, @floatFromInt(task_index)) / @as(f64, @floatFromInt(task_count));
+    const boundary = if (uplo == .upper)
+        @sqrt(fraction) * @as(f64, @floatFromInt(n))
+    else
+        (1.0 - @sqrt(1.0 - fraction)) * @as(f64, @floatFromInt(n));
+    return @min(n, @as(usize, @intFromFloat(boundary)));
+}
+
+fn capDenseRankTaskCountByWork(task_count: usize, work: usize, min_work_per_task: usize) usize {
+    const by_work = @max(@as(usize, 1), (work +| (min_work_per_task - 1)) / min_work_per_task);
+    return @min(task_count, by_work);
+}
+
+fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
+    if (n *| n < 512 * 512) return false;
+
+    var task_count = core_pool.taskCount(n, 64);
+    if (comptime builtin.cpu.arch == .x86_64) {
+        task_count = capDenseRankTaskCountByWork(task_count, n *| n, 64 * 1024);
+    }
+    if (n <= 1536) task_count = @min(task_count, 8);
+    if (task_count <= 1) return false;
+
+    var tasks: [core_pool.max_tasks]DenseRankTask(T) = undefined;
+    for (0..task_count) |task_index| {
+        tasks[task_index] = .{
+            .uplo = uplo,
+            .n = n,
+            .j0 = denseRankTaskBoundary(uplo, n, task_count, task_index),
+            .j1 = denseRankTaskBoundary(uplo, n, task_count, task_index + 1),
+            .alpha = alpha,
+            .x = x,
+            .y = y,
+            .a = a,
+            .lda = lda,
+        };
+    }
+
+    const runner: core_pool.TaskFn = switch (operation) {
+        .syr => if (T == f32) runSyrTaskF32 else runSyrTaskF64,
+        .her => if (T == scalar.ComplexF32) runHerTaskC32 else runHerTaskC64,
+        .syr2 => if (T == f32) runSyr2TaskF32 else runSyr2TaskF64,
+        .her2 => if (T == scalar.ComplexF32) runHer2TaskC32 else runHer2TaskC64,
+    };
+    return core_pool.run(runner, @ptrCast(&tasks), task_count);
+}
+
+fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) void {
+    for (j0..j1) |j| {
+        const row0: usize = if (uplo == .upper) 0 else j;
+        const count: usize = if (uplo == .upper) j + 1 else n - j;
+        const segment = ap + packedIndex(uplo, n, row0, j);
+
+        switch (operation) {
+            .syr => {
+                const temp = alpha * x[j];
+                if (temp != 0) vector_ops.axpyUnitReal(T, count, temp, x + row0, segment);
+            },
+            .her => {
+                const temp = mul(T, alpha, conj(T, x[j]));
+                if (!isZero(T, temp)) vector_ops.axpy(T, @intCast(count), temp, x + row0, 1, segment, 1);
+                ap[packedIndex(uplo, n, j, j)].im = 0;
+            },
+            .syr2 => {
+                const temp1 = alpha * y[j];
+                const temp2 = alpha * x[j];
+                if (temp1 != 0) vector_ops.axpyUnitReal(T, count, temp1, x + row0, segment);
+                if (temp2 != 0) vector_ops.axpyUnitReal(T, count, temp2, y + row0, segment);
+            },
+            .her2 => {
+                const temp1 = mul(T, alpha, conj(T, y[j]));
+                const temp2 = mul(T, conj(T, alpha), conj(T, x[j]));
+                if (!isZero(T, temp1)) vector_ops.axpy(T, @intCast(count), temp1, x + row0, 1, segment, 1);
+                if (!isZero(T, temp2)) vector_ops.axpy(T, @intCast(count), temp2, y + row0, 1, segment, 1);
+                ap[packedIndex(uplo, n, j, j)].im = 0;
+            },
+        }
+    }
+}
+
+fn PackedRankTask(comptime T: type) type {
+    return struct {
+        uplo: Uplo,
+        n: usize,
+        j0: usize,
+        j1: usize,
+        alpha: T,
+        x: [*]const T,
+        y: [*]const T,
+        ap: [*]T,
+    };
+}
+
+fn runPackedRankTask(comptime T: type, comptime operation: DenseRankOperation, raw_tasks: *const anyopaque, index: usize) void {
+    const tasks: [*]const PackedRankTask(T) = @ptrCast(@alignCast(raw_tasks));
+    const task = tasks[index];
+    packedRankColumns(T, operation, task.uplo, task.n, task.j0, task.j1, task.alpha, task.x, task.y, task.ap);
+}
+
+fn runPackedSyrTaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(f32, .syr, raw_tasks, index);
+}
+
+fn runPackedSyrTaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(f64, .syr, raw_tasks, index);
+}
+
+fn runPackedHerTaskC32(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(scalar.ComplexF32, .her, raw_tasks, index);
+}
+
+fn runPackedHerTaskC64(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(scalar.ComplexF64, .her, raw_tasks, index);
+}
+
+fn runPackedSyr2TaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(f32, .syr2, raw_tasks, index);
+}
+
+fn runPackedSyr2TaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(f64, .syr2, raw_tasks, index);
+}
+
+fn runPackedHer2TaskC32(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(scalar.ComplexF32, .her2, raw_tasks, index);
+}
+
+fn runPackedHer2TaskC64(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedRankTask(scalar.ComplexF64, .her2, raw_tasks, index);
+}
+
+fn packedRankElementCount(n: usize) usize {
+    const next = n +| 1;
+    return if (n % 2 == 0) (n / 2) *| next else n *| (next / 2);
+}
+
+noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) bool {
+    if (n < 512) return false;
+
+    var task_count = core_pool.taskCount(n, 64);
+    if (comptime builtin.cpu.arch == .x86_64) {
+        const by_work = @max(@as(usize, 1), packedRankElementCount(n) / (64 * 1024));
+        task_count = @min(task_count, by_work);
+    }
+    if (n <= 1536) task_count = @min(task_count, 8);
+    if (task_count <= 1) return false;
+
+    var tasks: [core_pool.max_tasks]PackedRankTask(T) = undefined;
+    for (0..task_count) |task_index| {
+        tasks[task_index] = .{
+            .uplo = uplo,
+            .n = n,
+            .j0 = denseRankTaskBoundary(uplo, n, task_count, task_index),
+            .j1 = denseRankTaskBoundary(uplo, n, task_count, task_index + 1),
+            .alpha = alpha,
+            .x = x,
+            .y = y,
+            .ap = ap,
+        };
+    }
+
+    const runner: core_pool.TaskFn = switch (operation) {
+        .syr => if (T == f32) runPackedSyrTaskF32 else runPackedSyrTaskF64,
+        .her => if (T == scalar.ComplexF32) runPackedHerTaskC32 else runPackedHerTaskC64,
+        .syr2 => if (T == f32) runPackedSyr2TaskF32 else runPackedSyr2TaskF64,
+        .her2 => if (T == scalar.ComplexF32) runPackedHer2TaskC32 else runPackedHer2TaskC64,
+    };
+    return core_pool.run(runner, @ptrCast(&tasks), task_count);
+}
+
 pub fn syr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
+    if (comptime isReal(T)) {
+        if (incx_ == 1) {
+            if (parallelDenseRankUpdate(T, .syr, uplo, n, alpha, x, x, a, lda)) return;
+            return denseRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, a, lda);
+        }
+    }
     const sx = startIndex(n_, incx_);
     for (0..n) |j| {
         const xj = vectorGet(T, x, sx, j, incx_);
@@ -445,6 +721,12 @@ pub fn syr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
 pub fn spr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
+    if (comptime isReal(T)) {
+        if (incx_ == 1 and n >= 2048) {
+            if (parallelPackedRankUpdate(T, .syr, uplo, n, alpha, x, x, ap)) return;
+            return packedRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, ap);
+        }
+    }
     const sx = startIndex(n_, incx_);
     for (0..n) |j| {
         const xj = vectorGet(T, x, sx, j, incx_);
@@ -461,6 +743,12 @@ pub fn spr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
 pub fn syr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
+    if (comptime isReal(T)) {
+        if (incx_ == 1 and incy_ == 1) {
+            if (parallelDenseRankUpdate(T, .syr2, uplo, n, alpha, x, y, a, lda)) return;
+            return denseRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, a, lda);
+        }
+    }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
     for (0..n) |j| {
@@ -479,6 +767,12 @@ pub fn syr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
 pub fn spr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
+    if (comptime isReal(T)) {
+        if (incx_ == 1 and incy_ == 1 and n >= 2048) {
+            if (parallelPackedRankUpdate(T, .syr2, uplo, n, alpha, x, y, ap)) return;
+            return packedRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, ap);
+        }
+    }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
     for (0..n) |j| {
@@ -497,6 +791,13 @@ pub fn spr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
 pub fn her(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or alpha == 0) return;
     const n = toUsize(n_);
+    if (comptime isComplex(T)) {
+        if (incx_ == 1) {
+            const complex_alpha = realScalar(T, alpha);
+            if (parallelDenseRankUpdate(T, .her, uplo, n, complex_alpha, x, x, a, lda)) return;
+            return denseRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, a, lda);
+        }
+    }
     const sx = startIndex(n_, incx_);
     for (0..n) |j| {
         const temp = mul(T, realScalar(T, alpha), conj(T, vectorGet(T, x, sx, j, incx_)));
@@ -513,6 +814,13 @@ pub fn her(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
 pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or alpha == 0) return;
     const n = toUsize(n_);
+    if (comptime isComplex(T)) {
+        if (incx_ == 1 and n >= 2048) {
+            const complex_alpha = realScalar(T, alpha);
+            if (parallelPackedRankUpdate(T, .her, uplo, n, complex_alpha, x, x, ap)) return;
+            return packedRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, ap);
+        }
+    }
     const sx = startIndex(n_, incx_);
     for (0..n) |j| {
         const temp = mul(T, realScalar(T, alpha), conj(T, vectorGet(T, x, sx, j, incx_)));
@@ -529,6 +837,12 @@ pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
 pub fn her2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
+    if (comptime isComplex(T)) {
+        if (incx_ == 1 and incy_ == 1) {
+            if (parallelDenseRankUpdate(T, .her2, uplo, n, alpha, x, y, a, lda)) return;
+            return denseRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, a, lda);
+        }
+    }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
     for (0..n) |j| {
@@ -548,6 +862,12 @@ pub fn her2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
 pub fn hpr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
+    if (comptime isComplex(T)) {
+        if (incx_ == 1 and incy_ == 1 and n >= 2048) {
+            if (parallelPackedRankUpdate(T, .her2, uplo, n, alpha, x, y, ap)) return;
+            return packedRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, ap);
+        }
+    }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
     for (0..n) |j| {
@@ -561,5 +881,73 @@ pub fn hpr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
             ap[idxa] = add(T, ap[idxa], upd);
             if (i == j) ap[idxa].im = 0;
         }
+    }
+}
+
+fn packedRankTestValue(comptime T: type, index: usize, phase: usize) T {
+    const re = @as(f64, @floatFromInt((index * 17 + phase * 11) % 37)) / 19.0 - 0.75;
+    if (T == f32 or T == f64) return @floatCast(re);
+    const im = @as(f64, @floatFromInt((index * 13 + phase * 7) % 29)) / 23.0 - 0.5;
+    return .{ .re = @floatCast(re), .im = @floatCast(im) };
+}
+
+fn expectParallelPackedRankMatchesSingle(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo) !void {
+    const n: usize = 512;
+    const packed_len = packedRankElementCount(n);
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(T, n);
+    defer allocator.free(x);
+    const y = try allocator.alloc(T, n);
+    defer allocator.free(y);
+    const expected = try allocator.alloc(T, packed_len);
+    defer allocator.free(expected);
+    const actual = try allocator.alloc(T, packed_len);
+    defer allocator.free(actual);
+
+    for (x, 0..) |*value, i| value.* = packedRankTestValue(T, i, 1);
+    for (y, 0..) |*value, i| value.* = packedRankTestValue(T, i, 2);
+    for (expected, actual, 0..) |*expected_value, *actual_value, i| {
+        const value = packedRankTestValue(T, i, 3);
+        expected_value.* = value;
+        actual_value.* = value;
+    }
+
+    const alpha = if (operation == .her) blk: {
+        const value = packedRankTestValue(T, 5, 4);
+        break :blk realScalar(T, value.re);
+    } else packedRankTestValue(T, 5, 4);
+    packedRankColumns(T, operation, uplo, n, 0, n, alpha, x.ptr, y.ptr, expected.ptr);
+    try std.testing.expect(parallelPackedRankUpdate(T, operation, uplo, n, alpha, x.ptr, y.ptr, actual.ptr));
+    try std.testing.expectEqualSlices(T, expected, actual);
+
+    for (actual, 0..) |*value, i| value.* = packedRankTestValue(T, i, 3);
+    runtime.setMaxThreads(1);
+    switch (operation) {
+        .syr => spr(T, uplo, @intCast(n), alpha, x.ptr, 1, actual.ptr),
+        .her => hpr(T, uplo, @intCast(n), alpha.re, x.ptr, 1, actual.ptr),
+        .syr2 => spr2(T, uplo, @intCast(n), alpha, x.ptr, 1, y.ptr, 1, actual.ptr),
+        .her2 => hpr2(T, uplo, @intCast(n), alpha, x.ptr, 1, y.ptr, 1, actual.ptr),
+    }
+    runtime.setMaxThreads(4);
+    try std.testing.expectEqualSlices(T, expected, actual);
+}
+
+test "packed rank update parallel columns match the single-task body" {
+    runtime.setMaxThreads(4);
+    defer {
+        runtime.setMaxThreads(0);
+        core_pool.shutdown();
+    }
+    if (runtime.maxThreads() <= 1) return error.SkipZigTest;
+
+    inline for (.{ Uplo.upper, Uplo.lower }) |uplo| {
+        try expectParallelPackedRankMatchesSingle(f32, .syr, uplo);
+        try expectParallelPackedRankMatchesSingle(f64, .syr, uplo);
+        try expectParallelPackedRankMatchesSingle(scalar.ComplexF32, .her, uplo);
+        try expectParallelPackedRankMatchesSingle(scalar.ComplexF64, .her, uplo);
+        try expectParallelPackedRankMatchesSingle(f32, .syr2, uplo);
+        try expectParallelPackedRankMatchesSingle(f64, .syr2, uplo);
+        try expectParallelPackedRankMatchesSingle(scalar.ComplexF32, .her2, uplo);
+        try expectParallelPackedRankMatchesSingle(scalar.ComplexF64, .her2, uplo);
     }
 }

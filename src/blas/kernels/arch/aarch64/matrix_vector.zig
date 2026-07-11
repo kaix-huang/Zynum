@@ -427,8 +427,24 @@ fn cgemvTransFcmlaF32M128(
     do_conj: bool,
 ) bool {
     if (comptime !enable_fcmla_cgemv_t_m128 or !features.has_complxnum) return false;
-    if (do_conj or m != 128 or n != 128 or lda < 128) return false;
+    if (m != 128 or n != 128 or lda < 128) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF32);
+    if (do_conj) {
+        var x_conj: [128]scalar.ComplexF32 = undefined;
+        for (&x_conj, 0..) |*value, i| value.* = scalar.conj(scalar.ComplexF32, x[i]);
+        for (y[0..128]) |*value| value.* = scalar.conj(scalar.ComplexF32, value.*);
+        callCgemvTransFcmlaF32M128(
+            matrix_vector_asm.cgemvTransFcmlaF32M128,
+            scalar.conj(scalar.ComplexF32, alpha),
+            scalar.conj(scalar.ComplexF32, beta),
+            a,
+            lda_bytes,
+            &x_conj,
+            y,
+        );
+        for (y[0..128]) |*value| value.* = scalar.conj(scalar.ComplexF32, value.*);
+        return true;
+    }
     callCgemvTransFcmlaF32M128(matrix_vector_asm.cgemvTransFcmlaF32M128, alpha, beta, a, lda_bytes, x, y);
     return true;
 }
@@ -516,9 +532,21 @@ fn zgemvTransFcmlaF64M128(
     do_conj: bool,
 ) bool {
     if (comptime !enable_fcmla_zgemv_t_m128 or !features.has_complxnum) return false;
-    if (do_conj or m != 128 or n != 128 or lda < 128) return false;
+    if (m != 128 or n != 128 or lda < 128) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF64);
-    callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M128, alpha, beta, a, lda_bytes, x, y);
+    if (do_conj) {
+        if (lda >= 256) {
+            callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvConjTransFcmlaF64M128Cols8, alpha, beta, a, lda_bytes, x, y);
+        } else {
+            callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvConjTransFcmlaF64M128, alpha, beta, a, lda_bytes, x, y);
+        }
+        return true;
+    }
+    if (lda >= 256) {
+        callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M128Cols8, alpha, beta, a, lda_bytes, x, y);
+    } else {
+        callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M128, alpha, beta, a, lda_bytes, x, y);
+    }
     return true;
 }
 
@@ -551,7 +579,11 @@ fn zgemvTransFcmlaF64M512N64Task(
 ) bool {
     if (!supportsGemvTransTaskFullUnitComplex(scalar.ComplexF64, m, n, lda, do_conj)) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF64);
-    callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M512N64Task, alpha, scalar.one(scalar.ComplexF64), a, lda_bytes, x, y);
+    if (do_conj) {
+        callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvConjTransFcmlaF64M512N64Task, alpha, scalar.one(scalar.ComplexF64), a, lda_bytes, x, y);
+    } else {
+        callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M512N64Task, alpha, scalar.one(scalar.ComplexF64), a, lda_bytes, x, y);
+    }
     return true;
 }
 
@@ -568,7 +600,11 @@ fn zgemvTransFcmlaF64M512N64TaskBeta(
 ) bool {
     if (!supportsGemvTransTaskFullUnitComplex(scalar.ComplexF64, m, n, lda, do_conj)) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF64);
-    callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M512N64TaskBeta, alpha, beta, a, lda_bytes, x, y);
+    if (do_conj) {
+        callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvConjTransFcmlaF64M512N64TaskBeta, alpha, beta, a, lda_bytes, x, y);
+    } else {
+        callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M512N64TaskBeta, alpha, beta, a, lda_bytes, x, y);
+    }
     return true;
 }
 
@@ -1047,6 +1083,17 @@ pub fn gemvNoTransFullUnitReal(
     y: [*]T,
 ) bool {
     if (T == f32) {
+        // Reuse the retained 512-row SME2 body for tall matrices.  Keeping the
+        // split here preserves the fused beta epilogue and lets the GEMM n=1
+        // reduction use the same fast path without adding a separate GEMM
+        // microkernel.
+        if (m > 1024 and (m & 511) == 0 and n >= 128 and n <= 1024) {
+            var row: usize = 0;
+            while (row < m) : (row += 512) {
+                if (!gemvNoTransSme2F32(512, n, alpha, a + row, lda, x, beta, y + row)) return false;
+            }
+            return true;
+        }
         if (gemvNoTransSme2F32(m, n, alpha, a, lda, x, beta, y)) return true;
         if (gemvNoTransAsimdF32M128(m, n, alpha, a, lda, x, beta, y)) return true;
         if (gemvNoTransAmxF32(m, n, alpha, a, lda, x, beta, y)) return true;
@@ -1054,6 +1101,16 @@ pub fn gemvNoTransFullUnitReal(
         return false;
     }
     if (T == f64) {
+        // The 1024-row SME2 geometry is also the efficient tall-vector tile.
+        // Split inside the fused full wrapper so this does not fall through to
+        // the slower generic row-task path rejected by the Level 3 probes.
+        if (m > 1024 and (m & 1023) == 0 and n >= 128 and n <= 1024) {
+            var row: usize = 0;
+            while (row < m) : (row += 1024) {
+                if (!gemvNoTransSme2F64(1024, n, alpha, a + row, lda, x, beta, y + row)) return false;
+            }
+            return true;
+        }
         if (gemvNoTransSmF64(m, n, alpha, a, lda, x, beta, y)) return true;
         if (gemvNoTransSme2F64(m, n, alpha, a, lda, x, beta, y)) return true;
         if (comptime features.has_asimd)
@@ -1118,7 +1175,7 @@ fn gemvTransSme2F64(
     if (alpha == 0) return false;
     if (comptime !enable_sme2_gemv_t or !features.has_sme2 or !features.has_sme_f64f64) return false;
     if (features.streamingVectorBytes() != 64) return false;
-    if (m < 128 or m > 1024 or n < 8 or n > 1024 or (m & 31) != 0 or (n & 7) != 0) return false;
+    if (m < 128 or m > 1024 or n < 8 or n > 2048 or (m & 31) != 0 or (n & 7) != 0) return false;
 
     const alpha_bits: u64 = @bitCast(alpha);
     const beta_bits: u64 = @bitCast(beta);
@@ -1167,7 +1224,7 @@ fn gemvTransSme2F32(
     if (alpha == 0) return false;
     if (comptime !enable_sme2_gemv_t or !features.has_sme2) return false;
     if (features.streamingVectorBytes() != 64) return false;
-    if (m < 256 or m > 1024 or n < 128 or n > 1024 or (m & 63) != 0 or (n & 15) != 0) return false;
+    if (m < 256 or m > 1024 or n < 128 or n > 2048 or (m & 63) != 0 or (n & 15) != 0) return false;
 
     const alpha_bits: u32 = @bitCast(alpha);
     const beta_bits: u32 = @bitCast(beta);
@@ -1205,12 +1262,39 @@ pub fn gemvTransFullUnitReal(
     y: [*]T,
 ) bool {
     if (T == f32) {
+        // Long unit-stride outputs are independent column panels.  The 2048
+        // column panel amortizes the SM/ZA transition substantially better
+        // than shorter splits and is also the GEMM m=1 fast path.
+        const tail_n = n % 2048;
+        if (m >= 256 and m <= 1024 and (m & 63) == 0 and n > 2048 and (n & 15) == 0 and (tail_n == 0 or tail_n >= 128)) {
+            var col: usize = 0;
+            while (col < n) : (col += 2048) {
+                const panel_n = @min(@as(usize, 2048), n - col);
+                if (panel_n < 128) return false;
+                const panel_a = a + @as(usize, @intCast(lda)) * col;
+                if (!gemvTransSme2F32(m, panel_n, alpha, panel_a, lda, x, beta, y + col)) return false;
+            }
+            return true;
+        }
         if (gemvTransSme2F32(m, n, alpha, a, lda, x, beta, y)) return true;
         if (m == 512 and n == 512) return false;
         if (comptime features.has_asimd) return fixed_simd.gemvTransFullUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, beta, y);
         return false;
     }
     if (T == f64) {
+        // The 2048-column split is the measured transition/amortization sweet
+        // spot for f64 too.  A single 4096-column SM/ZA region was slower, so
+        // keep the larger output as independent panels for the GEMM m=1 path.
+        const tail_n = n % 2048;
+        if (m >= 128 and m <= 1024 and (m & 31) == 0 and n > 2048 and (n & 7) == 0 and (tail_n == 0 or tail_n >= 8)) {
+            var col: usize = 0;
+            while (col < n) : (col += 2048) {
+                const panel_n = @min(@as(usize, 2048), n - col);
+                const panel_a = a + @as(usize, @intCast(lda)) * col;
+                if (!gemvTransSme2F64(m, panel_n, alpha, panel_a, lda, x, beta, y + col)) return false;
+            }
+            return true;
+        }
         if (gemvTransSme2F64(m, n, alpha, a, lda, x, beta, y)) return true;
         if (m == 512 and n == 512) return false;
         if (canUseGemvTransF64(m, n, lda)) {
@@ -1428,7 +1512,8 @@ pub fn gemvTransFullUnitComplex(
 }
 
 pub fn supportsGemvTransFullUnitComplex(comptime T: type, m: usize, n: usize, lda: BlasInt, do_conj: bool) bool {
-    if (do_conj or !features.has_complxnum or m != 128 or n != 128 or lda < 128) return false;
+    _ = do_conj;
+    if (!features.has_complxnum or m != 128 or n != 128 or lda < 128) return false;
     return (T == scalar.ComplexF32 and enable_fcmla_cgemv_t_m128) or (T == scalar.ComplexF64 and enable_fcmla_zgemv_t_m128);
 }
 
@@ -1508,8 +1593,9 @@ pub fn gemvTransTaskFullUnitComplex(
 }
 
 pub fn supportsGemvTransTaskFullUnitComplex(comptime T: type, m: usize, n: usize, lda: BlasInt, do_conj: bool) bool {
+    _ = do_conj;
     if (comptime !enable_fcmla_zgemv_t_m512_n64_task or !features.has_complxnum) return false;
-    return T == scalar.ComplexF64 and !do_conj and m == 512 and n == 64 and lda >= 512;
+    return T == scalar.ComplexF64 and m == 512 and n == 64 and lda >= 512;
 }
 
 pub fn supportsGemvNoTransUnitComplex(comptime T: type) bool {

@@ -681,6 +681,15 @@ fn runHermvTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runHermvTask(scalar.ComplexF64, raw_tasks, index);
 }
 
+fn mergeHermvUpperWorkspacesUnitComplex(comptime T: type, n: usize, task_count: usize, workspace: [*]const T, ends: []const usize, y: [*]T) void {
+    const add_alpha = one(T);
+    for (0..task_count) |task_index| {
+        const end = ends[task_index];
+        if (end == 0) continue;
+        vector_ops.axpy(T, @intCast(end), add_alpha, workspace + task_index * n, 1, y, 1);
+    }
+}
+
 fn upperTriangularTaskBoundary(n: usize, task_count: usize, task_index: usize) usize {
     if (task_index == 0) return 0;
     if (task_index >= task_count) return n;
@@ -702,19 +711,25 @@ fn parallelHermvUnitComplex(comptime T: type, uplo: Uplo, n: usize, n_: BlasInt,
     const min_cols_per_task: usize = 48;
     var task_count = core_pool.taskCount(n, min_cols_per_task);
     if (n <= 512) task_count = @min(task_count, 10);
-    const balance_upper = uplo == .upper and n >= 512;
+    const balance_upper = uplo == .upper and n >= 256;
     if (balance_upper and T == scalar.ComplexF64 and n == 512) task_count = @min(task_count, 8);
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * n;
     if (workspace_len * @sizeOf(T) > 64 * 1024 * 1024) return false;
     const workspace = symvWorkspace(T, workspace_len) orelse return false;
-    @memset(workspace, zero(T));
+    const use_upper_ranged_workspace = uplo == .upper;
+    if (!use_upper_ranged_workspace) @memset(workspace, zero(T));
 
     var tasks: [core_pool.max_tasks]HermvTask(T) = undefined;
+    var upper_ends: [core_pool.max_tasks]usize = undefined;
     for (0..task_count) |task_index| {
         const j0 = if (balance_upper) upperTriangularTaskBoundary(n, task_count, task_index) else task_index * n / task_count;
         const j1 = if (balance_upper) upperTriangularTaskBoundary(n, task_count, task_index + 1) else (task_index + 1) * n / task_count;
+        if (use_upper_ranged_workspace) {
+            upper_ends[task_index] = j1;
+            @memset((workspace.ptr + task_index * n)[0..j1], zero(T));
+        }
         tasks[task_index] = .{
             .uplo = uplo,
             .n = n,
@@ -731,9 +746,13 @@ fn parallelHermvUnitComplex(comptime T: type, uplo: Uplo, n: usize, n_: BlasInt,
     const runner = if (T == scalar.ComplexF32) runHermvTaskC32 else runHermvTaskC64;
     if (!core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
 
-    const add_alpha = one(T);
-    for (0..task_count) |task_index| {
-        vector_ops.axpy(T, n_, add_alpha, workspace.ptr + task_index * n, 1, y, 1);
+    if (use_upper_ranged_workspace) {
+        mergeHermvUpperWorkspacesUnitComplex(T, n, task_count, workspace.ptr, upper_ends[0..task_count], y);
+    } else {
+        const add_alpha = one(T);
+        for (0..task_count) |task_index| {
+            vector_ops.axpy(T, n_, add_alpha, workspace.ptr + task_index * n, 1, y, 1);
+        }
     }
     return true;
 }
@@ -773,6 +792,45 @@ pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);
+    if (incx_ == 1 and incy_ == 1 and n >= 512 and k >= 8) {
+        if (comptime isReal(T)) {
+            scaleUnitReal(T, n, beta, y);
+        } else {
+            vector_ops.scal(T, n_, beta, y, 1);
+        }
+        if (isZero(T, alpha)) return;
+
+        const lda_u = toUsize(lda);
+        for (0..n) |j| {
+            const row0 = if (uplo == .upper) (if (j > k) j - k else 0) else j + 1;
+            const row1 = if (uplo == .upper) j else @min(n, j + k + 1);
+            const len = row1 - row0;
+            const col = if (uplo == .upper)
+                a + j * lda_u + (k + row0 - j)
+            else
+                a + j * lda_u + 1;
+            const xj = mul(T, alpha, x[j]);
+            if (len != 0) {
+                if (!isZero(T, xj)) {
+                    if (comptime isReal(T)) {
+                        vector_ops.axpyUnitReal(T, len, xj, col, y + row0);
+                    } else {
+                        vector_ops.axpy(T, @intCast(len), xj, col, 1, y + row0, 1);
+                    }
+                }
+                const sum = if (comptime isReal(T))
+                    vector_ops.dotUnitReal(T, len, col, x + row0)
+                else
+                    vector_ops.dot(T, @intCast(len), col, 1, x + row0, 1, herm);
+                y[j] = add(T, y[j], mul(T, alpha, sum));
+            }
+
+            var diag_value = a[j * lda_u + (if (uplo == .upper) k else 0)];
+            if (herm and comptime isComplex(T)) diag_value.im = 0;
+            y[j] = add(T, y[j], mul(T, xj, diag_value));
+        }
+        return;
+    }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
     for (0..n) |i| {
@@ -800,8 +858,141 @@ pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
     }
 }
 
-pub fn spmv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
-    if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
+fn packedMvColumnsUnit(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, ap: [*]const T, x: [*]const T, y_delta: [*]T, herm: bool) void {
+    for (j0..j1) |j| {
+        const xj = x[j];
+        const scaled_xj = mul(T, alpha, xj);
+        var mirrored_sum = zero(T);
+        var diag_value: T = undefined;
+
+        if (uplo == .upper) {
+            const column_start = j * (j + 1) / 2;
+            for (0..j) |i| {
+                const value = ap[column_start + i];
+                y_delta[i] = add(T, y_delta[i], mul(T, value, scaled_xj));
+                const mirrored = if (herm) conj(T, value) else value;
+                mirrored_sum = add(T, mirrored_sum, mul(T, mirrored, x[i]));
+            }
+            diag_value = ap[column_start + j];
+        } else {
+            const column_start = j * (2 * n - j + 1) / 2;
+            diag_value = ap[column_start];
+            for (j + 1..n) |i| {
+                const value = ap[column_start + (i - j)];
+                y_delta[i] = add(T, y_delta[i], mul(T, value, scaled_xj));
+                const mirrored = if (herm) conj(T, value) else value;
+                mirrored_sum = add(T, mirrored_sum, mul(T, mirrored, x[i]));
+            }
+        }
+
+        if (herm and comptime isComplex(T)) diag_value.im = 0;
+        const diagonal_sum = add(T, mirrored_sum, mul(T, diag_value, xj));
+        y_delta[j] = add(T, y_delta[j], mul(T, alpha, diagonal_sum));
+    }
+}
+
+fn PackedMvTask(comptime T: type) type {
+    return struct {
+        uplo: Uplo,
+        n: usize,
+        j0: usize,
+        j1: usize,
+        alpha: T,
+        ap: [*]const T,
+        x: [*]const T,
+        y_delta: [*]T,
+        herm: bool,
+    };
+}
+
+fn runPackedMvTask(comptime T: type, raw_tasks: *const anyopaque, index: usize) void {
+    const tasks: [*]const PackedMvTask(T) = @ptrCast(@alignCast(raw_tasks));
+    const task = tasks[index];
+    packedMvColumnsUnit(T, task.uplo, task.n, task.j0, task.j1, task.alpha, task.ap, task.x, task.y_delta, task.herm);
+}
+
+fn runPackedMvTaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedMvTask(f32, raw_tasks, index);
+}
+
+fn runPackedMvTaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedMvTask(f64, raw_tasks, index);
+}
+
+fn runPackedMvTaskC32(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedMvTask(scalar.ComplexF32, raw_tasks, index);
+}
+
+fn runPackedMvTaskC64(raw_tasks: *const anyopaque, index: usize) void {
+    runPackedMvTask(scalar.ComplexF64, raw_tasks, index);
+}
+
+fn mergePackedMvWorkspacesUnit(comptime T: type, n: usize, task_count: usize, beta: T, workspace: [*]const T, y: [*]T) void {
+    if (comptime isReal(T)) {
+        mergeSymvWorkspacesUnitReal(T, n, task_count, beta, workspace, y);
+        return;
+    }
+    for (0..n) |i| {
+        var sum = zero(T);
+        for (0..task_count) |task_index| {
+            sum = add(T, sum, workspace[task_index * n + i]);
+        }
+        y[i] = if (isZero(T, beta)) sum else add(T, mul(T, beta, y[i]), sum);
+    }
+}
+
+noinline fn parallelPackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T, herm: bool) bool {
+    const min_cols_per_task: usize = 64;
+    const task_count = core_pool.taskCount(n, min_cols_per_task);
+    if (task_count <= 1) return false;
+
+    const max_workspace_bytes: usize = 64 * 1024 * 1024;
+    if (n > max_workspace_bytes / @sizeOf(T) / task_count) return false;
+    const workspace_len = task_count * n;
+    const workspace = symvWorkspace(T, workspace_len) orelse return false;
+    @memset(workspace, zero(T));
+
+    var tasks: [core_pool.max_tasks]PackedMvTask(T) = undefined;
+    for (0..task_count) |task_index| {
+        const j0 = if (uplo == .upper)
+            upperTriangularTaskBoundary(n, task_count, task_index)
+        else
+            lowerTriangularTaskBoundary(n, task_count, task_index);
+        const j1 = if (uplo == .upper)
+            upperTriangularTaskBoundary(n, task_count, task_index + 1)
+        else
+            lowerTriangularTaskBoundary(n, task_count, task_index + 1);
+        tasks[task_index] = .{
+            .uplo = uplo,
+            .n = n,
+            .j0 = j0,
+            .j1 = j1,
+            .alpha = alpha,
+            .ap = ap,
+            .x = x,
+            .y_delta = workspace.ptr + task_index * n,
+            .herm = herm,
+        };
+    }
+
+    const runner = if (T == f32)
+        runPackedMvTaskF32
+    else if (T == f64)
+        runPackedMvTaskF64
+    else if (T == scalar.ComplexF32)
+        runPackedMvTaskC32
+    else if (T == scalar.ComplexF64)
+        runPackedMvTaskC64
+    else
+        return false;
+    // A false result means core_pool ran no task, so the caller can use the unchanged serial body.
+    if (!core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
+
+    mergePackedMvWorkspacesUnit(T, n, task_count, beta, workspace.ptr, y);
+    return true;
+}
+
+fn spmvSerial(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
     const n = toUsize(n_);
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
@@ -816,4 +1007,13 @@ pub fn spmv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T,
         const py = ix(sy, i, incy_);
         y[py] = add(T, y[py], mul(T, alpha, sum));
     }
+}
+
+pub fn spmv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
+    const n = toUsize(n_);
+    if (n >= 512 and incx_ == 1 and incy_ == 1 and !isZero(T, alpha)) {
+        if (parallelPackedMvUnit(T, uplo, n, alpha, ap, x, beta, y, herm)) return;
+    }
+    spmvSerial(T, uplo, n_, alpha, ap, x, incx_, beta, y, incy_, herm);
 }

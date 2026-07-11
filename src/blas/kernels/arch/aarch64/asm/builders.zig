@@ -74,6 +74,22 @@ fn scalarReg(comptime lane: []const u8, comptime index: comptime_int) []const u8
     @compileError("unsupported floating-point scalar lane");
 }
 
+fn fmovScalarFromGpr(comptime lane: []const u8, comptime scalar_index: comptime_int, comptime gpr_index: comptime_int) []const u8 {
+    if (std.mem.eql(u8, lane, "s")) {
+        return std.fmt.comptimePrint(
+            \\
+            \\fmov s{d}, w{d}
+        , .{ scalar_index, gpr_index });
+    }
+    if (std.mem.eql(u8, lane, "d")) {
+        return std.fmt.comptimePrint(
+            \\
+            \\fmov d{d}, x{d}
+        , .{ scalar_index, gpr_index });
+    }
+    @compileError("unsupported floating-point scalar lane");
+}
+
 fn gprZero(comptime lane: []const u8) []const u8 {
     if (std.mem.eql(u8, lane, "s")) return "wzr";
     if (std.mem.eql(u8, lane, "d")) return "xzr";
@@ -1513,7 +1529,14 @@ fn zgemvTransFcmlaReduceAddStoreAsm(comptime acc: comptime_int, comptime offset:
     , .{ acc, acc, offset, offset });
 }
 
-fn zgemvTransFcmlaStepAsm(comptime acc0: comptime_int, comptime acc1: comptime_int, comptime acc2: comptime_int, comptime acc3: comptime_int) []const u8 {
+fn zgemvTransFcmlaStepAsm(
+    comptime acc0: comptime_int,
+    comptime acc1: comptime_int,
+    comptime acc2: comptime_int,
+    comptime acc3: comptime_int,
+    comptime do_conj: bool,
+) []const u8 {
+    const imag_rotation = if (do_conj) 270 else 90;
     return std.fmt.comptimePrint(
         \\
         \\ldr q0, [x12], #16
@@ -1525,18 +1548,149 @@ fn zgemvTransFcmlaStepAsm(comptime acc0: comptime_int, comptime acc1: comptime_i
         \\fcmla v{d}.2d, v2.2d, v0.2d, #0
         \\fcmla v{d}.2d, v3.2d, v0.2d, #0
         \\fcmla v{d}.2d, v4.2d, v0.2d, #0
-        \\fcmla v{d}.2d, v1.2d, v0.2d, #90
-        \\fcmla v{d}.2d, v2.2d, v0.2d, #90
-        \\fcmla v{d}.2d, v3.2d, v0.2d, #90
-        \\fcmla v{d}.2d, v4.2d, v0.2d, #90
-    , .{ acc0, acc1, acc2, acc3, acc0, acc1, acc2, acc3 });
+        \\fcmla v{d}.2d, v1.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v2.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v3.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v4.2d, v0.2d, #{d}
+    , .{ acc0, acc1, acc2, acc3, acc0, imag_rotation, acc1, imag_rotation, acc2, imag_rotation, acc3, imag_rotation });
 }
 
-fn zgemvTransFcmlaF64MNColsAsm(comptime row_steps: comptime_int, comptime col_groups: comptime_int) []const u8 {
-    const inner = zgemvTransFcmlaStepAsm(16, 17, 18, 19) ++
-        zgemvTransFcmlaStepAsm(20, 21, 22, 23) ++
-        zgemvTransFcmlaStepAsm(24, 25, 26, 27) ++
-        zgemvTransFcmlaStepAsm(28, 29, 30, 31);
+fn zgemvTransFcmlaStep8Asm(comptime acc_first: comptime_int, comptime do_conj: bool) []const u8 {
+    const imag_rotation = if (do_conj) 270 else 90;
+    return std.fmt.comptimePrint(
+        \\
+        \\ldr q0, [x12], #16
+        \\ldr q1, [x8], #16
+        \\ldr q2, [x9], #16
+        \\ldr q3, [x10], #16
+        \\ldr q4, [x11], #16
+        \\ldr q8, [x16], #16
+        \\ldr q9, [x17], #16
+        \\ldr q10, [x2], #16
+        \\ldr q11, [x3], #16
+        \\fcmla v{d}.2d, v1.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v2.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v3.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v4.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v8.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v9.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v10.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v11.2d, v0.2d, #0
+        \\fcmla v{d}.2d, v1.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v2.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v3.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v4.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v8.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v9.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v10.2d, v0.2d, #{d}
+        \\fcmla v{d}.2d, v11.2d, v0.2d, #{d}
+    , .{
+        acc_first + 0,
+        acc_first + 1,
+        acc_first + 2,
+        acc_first + 3,
+        acc_first + 4,
+        acc_first + 5,
+        acc_first + 6,
+        acc_first + 7,
+        acc_first + 0,
+        imag_rotation,
+        acc_first + 1,
+        imag_rotation,
+        acc_first + 2,
+        imag_rotation,
+        acc_first + 3,
+        imag_rotation,
+        acc_first + 4,
+        imag_rotation,
+        acc_first + 5,
+        imag_rotation,
+        acc_first + 6,
+        imag_rotation,
+        acc_first + 7,
+        imag_rotation,
+    });
+}
+
+fn zgemvTransFcmlaF64M128Cols8BodyAsm(comptime do_conj: bool) []const u8 {
+    const inner = zgemvTransFcmlaStep8Asm(16, do_conj) ++ zgemvTransFcmlaStep8Asm(24, do_conj);
+    const store_tail = zgemvTransFcmlaReduceStoreAsm(16, 0) ++
+        zgemvTransFcmlaReduceStoreAsm(17, 16) ++
+        zgemvTransFcmlaReduceStoreAsm(18, 32) ++
+        zgemvTransFcmlaReduceStoreAsm(19, 48) ++
+        zgemvTransFcmlaReduceStoreAsm(20, 64) ++
+        zgemvTransFcmlaReduceStoreAsm(21, 80) ++
+        zgemvTransFcmlaReduceStoreAsm(22, 96) ++
+        zgemvTransFcmlaReduceStoreAsm(23, 112);
+    return
+    \\
+    \\fmov d6, x0
+    \\fmov d5, x1
+    \\fmov d7, x2
+    \\fmov d4, x3
+    \\mov v6.d[1], v5.d[0]
+    \\mov v7.d[1], v4.d[0]
+    \\
+    \\mov x14, #16
+    \\mov x15, x4
+    \\
+    \\1:
+    \\movi v16.2d, #0
+    \\movi v17.2d, #0
+    \\movi v18.2d, #0
+    \\movi v19.2d, #0
+    \\movi v20.2d, #0
+    \\movi v21.2d, #0
+    \\movi v22.2d, #0
+    \\movi v23.2d, #0
+    \\movi v24.2d, #0
+    \\movi v25.2d, #0
+    \\movi v26.2d, #0
+    \\movi v27.2d, #0
+    \\movi v28.2d, #0
+    \\movi v29.2d, #0
+    \\movi v30.2d, #0
+    \\movi v31.2d, #0
+    \\mov x8, x15
+    \\add x9, x8, x5
+    \\add x10, x9, x5
+    \\add x11, x10, x5
+    \\add x16, x11, x5
+    \\add x17, x16, x5
+    \\add x2, x17, x5
+    \\add x3, x2, x5
+    \\mov x12, x6
+    \\mov x13, #64
+    \\
+    \\2:
+    ++ inner ++
+        \\
+        \\subs x13, x13, #1
+        \\b.ne 2b
+        \\fadd v16.2d, v16.2d, v24.2d
+        \\fadd v17.2d, v17.2d, v25.2d
+        \\fadd v18.2d, v18.2d, v26.2d
+        \\fadd v19.2d, v19.2d, v27.2d
+        \\fadd v20.2d, v20.2d, v28.2d
+        \\fadd v21.2d, v21.2d, v29.2d
+        \\fadd v22.2d, v22.2d, v30.2d
+        \\fadd v23.2d, v23.2d, v31.2d
+    ++ store_tail ++
+        \\
+        \\lsl x16, x5, #3
+        \\add x15, x15, x16
+        \\add x7, x7, #128
+        \\subs x14, x14, #1
+        \\b.ne 1b
+        \\ret
+    ;
+}
+
+fn zgemvTransFcmlaF64MNColsAsm(comptime row_steps: comptime_int, comptime col_groups: comptime_int, comptime do_conj: bool) []const u8 {
+    const inner = zgemvTransFcmlaStepAsm(16, 17, 18, 19, do_conj) ++
+        zgemvTransFcmlaStepAsm(20, 21, 22, 23, do_conj) ++
+        zgemvTransFcmlaStepAsm(24, 25, 26, 27, do_conj) ++
+        zgemvTransFcmlaStepAsm(28, 29, 30, 31, do_conj);
     const store_tail = zgemvTransFcmlaReduceStoreAsm(16, 0) ++
         zgemvTransFcmlaReduceStoreAsm(17, 16) ++
         zgemvTransFcmlaReduceStoreAsm(18, 32) ++
@@ -1615,14 +1769,26 @@ fn zgemvTransFcmlaF64MNColsAsm(comptime row_steps: comptime_int, comptime col_gr
 }
 
 pub fn zgemvTransFcmlaF64M128Asm() []const u8 {
-    return zgemvTransFcmlaF64MNColsAsm(32, 32);
+    return zgemvTransFcmlaF64MNColsAsm(32, 32, false);
+}
+
+pub fn zgemvConjTransFcmlaF64M128Asm() []const u8 {
+    return zgemvTransFcmlaF64MNColsAsm(32, 32, true);
+}
+
+pub fn zgemvTransFcmlaF64M128Cols8Asm() []const u8 {
+    return zgemvTransFcmlaF64M128Cols8BodyAsm(false);
+}
+
+pub fn zgemvConjTransFcmlaF64M128Cols8Asm() []const u8 {
+    return zgemvTransFcmlaF64M128Cols8BodyAsm(true);
 }
 
 pub fn zgemvTransFcmlaF64M256N128TaskAsm() []const u8 {
-    return zgemvTransFcmlaF64MNColsAsm(64, 32);
+    return zgemvTransFcmlaF64MNColsAsm(64, 32, false);
 }
 
-fn zgemvTransFcmlaF64M512N64TaskBodyAsm(comptime with_beta: bool) []const u8 {
+fn zgemvTransFcmlaF64M512N64TaskBodyAsm(comptime with_beta: bool, comptime do_conj: bool) []const u8 {
     const beta_setup =
         if (with_beta)
             \\
@@ -1687,10 +1853,10 @@ fn zgemvTransFcmlaF64M512N64TaskBodyAsm(comptime with_beta: bool) []const u8 {
         \\mov x13, #128
         \\
         \\2:
-    ++ zgemvTransFcmlaStepAsm(16, 17, 18, 19) ++
-        zgemvTransFcmlaStepAsm(20, 21, 22, 23) ++
-        zgemvTransFcmlaStepAsm(24, 25, 26, 27) ++
-        zgemvTransFcmlaStepAsm(28, 29, 30, 31) ++
+    ++ zgemvTransFcmlaStepAsm(16, 17, 18, 19, do_conj) ++
+        zgemvTransFcmlaStepAsm(20, 21, 22, 23, do_conj) ++
+        zgemvTransFcmlaStepAsm(24, 25, 26, 27, do_conj) ++
+        zgemvTransFcmlaStepAsm(28, 29, 30, 31, do_conj) ++
         \\
         \\subs x13, x13, #1
         \\b.ne 2b
@@ -1718,11 +1884,19 @@ fn zgemvTransFcmlaF64M512N64TaskBodyAsm(comptime with_beta: bool) []const u8 {
 }
 
 pub fn zgemvTransFcmlaF64M512N64TaskAsm() []const u8 {
-    return zgemvTransFcmlaF64M512N64TaskBodyAsm(false);
+    return zgemvTransFcmlaF64M512N64TaskBodyAsm(false, false);
 }
 
 pub fn zgemvTransFcmlaF64M512N64TaskBetaAsm() []const u8 {
-    return zgemvTransFcmlaF64M512N64TaskBodyAsm(true);
+    return zgemvTransFcmlaF64M512N64TaskBodyAsm(true, false);
+}
+
+pub fn zgemvConjTransFcmlaF64M512N64TaskAsm() []const u8 {
+    return zgemvTransFcmlaF64M512N64TaskBodyAsm(false, true);
+}
+
+pub fn zgemvConjTransFcmlaF64M512N64TaskBetaAsm() []const u8 {
+    return zgemvTransFcmlaF64M512N64TaskBodyAsm(true, true);
 }
 
 pub fn smeGemmPanel1mAsm(comptime lane: []const u8) []const u8 {
@@ -3302,6 +3476,89 @@ pub fn smeCopyBytesStreamingAsm() []const u8 {
         , .{});
 }
 
+pub fn smeCopy8KiBStreamingAsm() []const u8 {
+    return ptrue("pn8", "b") ++
+        \\
+        \\mov x0, #8
+        \\0:
+    ++ smeVgx4Ld1AtVl("b", 4, "pn8", "x1", 0) ++
+        smeVgx4Ld1AtVl("b", 8, "pn8", "x1", 4) ++
+        smeVgx4Ld1AtVl("b", 16, "pn8", "x1", 8) ++
+        smeVgx4Ld1AtVl("b", 20, "pn8", "x1", 12) ++
+        smeVgx4St1AtVl("b", 4, "pn8", "x2", 0) ++
+        smeVgx4St1AtVl("b", 8, "pn8", "x2", 4) ++
+        smeVgx4St1AtVl("b", 16, "pn8", "x2", 8) ++
+        smeVgx4St1AtVl("b", 20, "pn8", "x2", 12) ++
+        \\
+        \\add x1, x1, #1024
+        \\add x2, x2, #1024
+        \\subs x0, x0, #1
+        \\b.ne 0b
+        \\ret
+    ;
+}
+
+pub fn smeSwapBytesStreamingAsm() []const u8 {
+    return ptrue("pn8", "b") ++ std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 4f
+        \\cntb x6
+        \\lsl x7, x6, #3
+        \\
+        \\0:
+        \\cmp x0, x7
+        \\b.lo 1f
+    , .{}) ++
+        smeVgx4Ld1AtVl("b", 4, "pn8", "x1", 0) ++
+        smeVgx4Ld1AtVl("b", 16, "pn8", "x1", 4) ++
+        smeVgx4Ld1AtVl("b", 20, "pn8", "x2", 0) ++
+        smeVgx4Ld1AtVl("b", 24, "pn8", "x2", 4) ++
+        smeVgx4St1AtVl("b", 20, "pn8", "x1", 0) ++
+        smeVgx4St1AtVl("b", 24, "pn8", "x1", 4) ++
+        smeVgx4St1AtVl("b", 4, "pn8", "x2", 0) ++
+        smeVgx4St1AtVl("b", 16, "pn8", "x2", 4) ++
+        std.fmt.comptimePrint(
+            \\
+            \\addvl x1, x1, #8
+            \\addvl x2, x2, #8
+            \\sub x0, x0, x7
+            \\b 0b
+            \\
+            \\1:
+            \\cbz x0, 4f
+            \\lsl x7, x6, #2
+            \\cmp x0, x7
+            \\b.lo 2f
+            \\sub x8, x0, x7
+            \\ptrue pn9.b
+            \\whilelt pn10.b, xzr, x8, vlx4
+        , .{}) ++
+        smeVgx4Ld1AtVl("b", 4, "pn9", "x1", 0) ++
+        smeVgx4Ld1AtVl("b", 16, "pn10", "x1", 4) ++
+        smeVgx4Ld1AtVl("b", 20, "pn9", "x2", 0) ++
+        smeVgx4Ld1AtVl("b", 24, "pn10", "x2", 4) ++
+        smeVgx4St1AtVl("b", 20, "pn9", "x1", 0) ++
+        smeVgx4St1AtVl("b", 24, "pn10", "x1", 4) ++
+        smeVgx4St1AtVl("b", 4, "pn9", "x2", 0) ++
+        smeVgx4St1AtVl("b", 16, "pn10", "x2", 4) ++
+        std.fmt.comptimePrint(
+            \\
+            \\b 4f
+            \\
+            \\2:
+            \\whilelt pn9.b, xzr, x0, vlx4
+        , .{}) ++
+        smeVgx4Ld1AtVl("b", 4, "pn9", "x1", 0) ++
+        smeVgx4Ld1AtVl("b", 20, "pn9", "x2", 0) ++
+        smeVgx4St1AtVl("b", 20, "pn9", "x1", 0) ++
+        smeVgx4St1AtVl("b", 4, "pn9", "x2", 0) ++
+        std.fmt.comptimePrint(
+            \\
+            \\4:
+            \\ret
+        , .{});
+}
+
 const SmeUnaryZaOp = enum {
     scal,
     asum,
@@ -3384,6 +3641,18 @@ fn smeAxpyZaAccumulate(comptime lane: []const u8, comptime za_row: []const u8) [
     });
 }
 
+fn smeAxpbyZaAccumulate(comptime lane: []const u8, comptime za_row: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\fmla za.{s}[{s}, 0, vgx4], {{ z16.{s} - z19.{s} }}, z1.{s}
+        \\fmla za.{s}[{s}, 0, vgx4], {{ z4.{s} - z7.{s} }}, z0.{s}
+    , .{
+        lane, za_row, lane,   lane,
+        lane, lane,   za_row, lane,
+        lane, lane,
+    });
+}
+
 fn smeAxpyZaMainBlock(comptime lane: []const u8) []const u8 {
     comptime var text: []const u8 = "";
     inline for (0..8) |pair| {
@@ -3394,6 +3663,77 @@ fn smeAxpyZaMainBlock(comptime lane: []const u8) []const u8 {
             smeAxpyZaAccumulate(lane, if (pair % 2 == 0) "w8" else "w11");
     }
     return text;
+}
+
+fn smeAxpbyZaMainBlock(comptime lane: []const u8) []const u8 {
+    comptime var text: []const u8 = "";
+    inline for (0..8) |pair| {
+        const row = pair / 2;
+        if (pair % 2 == 0) text = text ++ smeZaSelectPair(row, 8 + row);
+        text = text ++ smePtrAtVl("x10", "x1", pair * 4) ++ smePtrAtVl("x12", "x2", pair * 4) ++
+            smeVgx4Ld1(lane, 4, "pn8", "x10") ++ smeVgx4Ld1(lane, 16, "pn8", "x12") ++
+            smeAxpbyZaAccumulate(lane, if (pair % 2 == 0) "w8" else "w11");
+    }
+    return text;
+}
+
+fn smeZaFmlaPairScalar(comptime lane: []const u8, comptime scalar_z: comptime_int) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\fmla za.{s}[w8, 0, vgx4], {{ z4.{s} - z7.{s} }}, z{d}.{s}
+        \\fmla za.{s}[w11, 0, vgx4], {{ z16.{s} - z19.{s} }}, z{d}.{s}
+    , .{
+        lane, lane, lane, scalar_z, lane,
+        lane, lane, lane, scalar_z, lane,
+    });
+}
+
+fn smeLinearTransformSourcePass(
+    comptime lane: []const u8,
+    comptime base: []const u8,
+    comptime x_coefficient_z: comptime_int,
+    comptime y_coefficient_z: comptime_int,
+) []const u8 {
+    comptime var text: []const u8 = "";
+    inline for (0..2) |half| {
+        const x_row = 2 * half;
+        const y_row = x_row + 1;
+        text = text ++ smeZaSelectPair(x_row, 8 + x_row) ++
+            smeVgx4Ld1AtVl(lane, 4, "pn8", base, half * 8) ++
+            smeVgx4Ld1AtVl(lane, 16, "pn8", base, half * 8 + 4) ++
+            smeZaFmlaPairScalar(lane, x_coefficient_z) ++
+            smeZaSelectPair(y_row, 8 + y_row) ++
+            smeZaFmlaPairScalar(lane, y_coefficient_z);
+    }
+    return text;
+}
+
+fn smeLinearTransformZaMainBlock(comptime lane: []const u8) []const u8 {
+    // Form b*y and d*y first, then add a*x and c*x.  Apart from matching the
+    // portable mulAdd order, the source-major schedule leaves a full pass
+    // between the two writes to each ZA row.
+    return smeLinearTransformSourcePass(lane, "x2", 1, 3) ++
+        smeLinearTransformSourcePass(lane, "x1", 0, 2);
+}
+
+fn smeLinearTransformZaStoreBlock(comptime lane: []const u8) []const u8 {
+    comptime var text: []const u8 = "";
+    inline for (0..2) |output| {
+        const base = if (output == 0) "x1" else "x2";
+        inline for (0..2) |half| {
+            const row = 2 * half + output;
+            text = text ++ smeZaSelectPair(row, 8 + row) ++ smeZaReadPair(lane) ++
+                smeVgx4St1AtVl(lane, 4, "pn8", base, half * 8) ++
+                smeVgx4St1AtVl(lane, 16, "pn8", base, half * 8 + 4);
+        }
+    }
+    return text;
+}
+
+fn smeLinearTransformBlockElements(comptime lane: []const u8) comptime_int {
+    if (std.mem.eql(u8, lane, "s")) return 256;
+    if (std.mem.eql(u8, lane, "d")) return 128;
+    @compileError("unsupported SME streaming lane");
 }
 
 fn smeAxpyZaStoreBlock(comptime lane: []const u8) []const u8 {
@@ -3474,7 +3814,7 @@ pub fn smeScalStreamingAsm(comptime lane: []const u8) []const u8 {
     return std.fmt.comptimePrint(
         \\
         \\cbz x0, 3f
-    , .{}) ++ ptrue("pn8", lane) ++ std.fmt.comptimePrint(
+    , .{}) ++ fmovScalarFromGpr(lane, 0, 2) ++ ptrue("pn8", lane) ++ std.fmt.comptimePrint(
         \\
         \\mov z0.{s}, {s}
         \\mov x7, #{d}
@@ -3551,7 +3891,7 @@ pub fn smeAxpyStreamingAsm(comptime lane: []const u8) []const u8 {
     return std.fmt.comptimePrint(
         \\
         \\cbz x0, 3f
-    , .{}) ++ ptrue("pn8", lane) ++ std.fmt.comptimePrint(
+    , .{}) ++ fmovScalarFromGpr(lane, 0, 3) ++ ptrue("pn8", lane) ++ std.fmt.comptimePrint(
         \\
         \\mov z0.{s}, {s}
         \\mov x7, #{d}
@@ -3578,6 +3918,131 @@ pub fn smeAxpyStreamingAsm(comptime lane: []const u8) []const u8 {
         \\
         \\fmla z16.{s}, p1/m, z4.{s}, z0.{s}
     , .{ lane, lane, lane }) ++ st1Indexed(lane, 16, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x8
+        \\b 4b
+        \\
+        \\2:
+        \\3:
+        \\ret
+    , .{laneIncMnemonic(lane)});
+}
+
+pub fn smeAxpbyStreamingAsm(comptime lane: []const u8) []const u8 {
+    @setEvalBranchQuota(300000);
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 3f
+    , .{}) ++ fmovScalarFromGpr(lane, 0, 3) ++ fmovScalarFromGpr(lane, 1, 4) ++ ptrue("pn8", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z0.{s}, {s}
+        \\mov z1.{s}, {s}
+        \\mov x7, #{d}
+        \\
+        \\0:
+        \\cmp x0, x7
+        \\b.lo 1f
+        \\zero {{ za }}
+    , .{ lane, scalarReg(lane, 0), lane, scalarReg(lane, 1), smeStreamingBlockElements(lane) }) ++
+        smeAxpbyZaMainBlock(lane) ++ smeAxpyZaStoreBlock(lane) ++ smeStreamingAdvanceX1X2() ++ std.fmt.comptimePrint(
+        \\
+        \\sub x0, x0, x7
+        \\b 0b
+        \\
+        \\1:
+        \\cbz x0, 2f
+        \\mov x8, #0
+        \\mov z0.{s}, {s}
+        \\mov z1.{s}, {s}
+        \\
+        \\4:
+        \\whilelo p1.{s}, x8, x0
+        \\b.none 2f
+    , .{ lane, scalarReg(lane, 0), lane, scalarReg(lane, 1), lane }) ++ ld1Indexed(lane, 4, "p1", "x1", "x8") ++ ld1Indexed(lane, 16, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
+        \\
+        \\fmul z16.{s}, p1/m, z16.{s}, z1.{s}
+        \\fmla z16.{s}, p1/m, z4.{s}, z0.{s}
+    , .{ lane, lane, lane, lane, lane, lane }) ++ st1Indexed(lane, 16, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x8
+        \\b 4b
+        \\
+        \\2:
+        \\3:
+        \\ret
+    , .{laneIncMnemonic(lane)});
+}
+
+/// Apply the real 2x2 transform
+///
+///   x' = a*x + b*y
+///   y' = c*x + d*y
+///
+/// to two unit-stride vectors. The four coefficients arrive as integer bit
+/// patterns in x3-x6 so callers can capture them before entering streaming
+/// mode. Four vgx4 groups produce both outputs in eight ZA rows per block.
+pub fn smeLinearTransformStreamingAsm(comptime lane: []const u8) []const u8 {
+    @setEvalBranchQuota(300000);
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 3f
+    , .{}) ++ fmovScalarFromGpr(lane, 0, 3) ++ fmovScalarFromGpr(lane, 1, 4) ++
+        fmovScalarFromGpr(lane, 2, 5) ++ fmovScalarFromGpr(lane, 3, 6) ++ ptrue("pn8", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z0.{s}, {s}
+        \\mov z1.{s}, {s}
+        \\mov z2.{s}, {s}
+        \\mov z3.{s}, {s}
+        \\mov x7, #{d}
+        \\
+        \\0:
+        \\cmp x0, x7
+        \\b.lo 1f
+        \\zero {{ za }}
+    , .{
+        lane,                                  scalarReg(lane, 0),
+        lane,                                  scalarReg(lane, 1),
+        lane,                                  scalarReg(lane, 2),
+        lane,                                  scalarReg(lane, 3),
+        smeLinearTransformBlockElements(lane),
+    }) ++ smeLinearTransformZaMainBlock(lane) ++ smeLinearTransformZaStoreBlock(lane) ++ std.fmt.comptimePrint(
+        \\
+        \\add x1, x1, #1024
+        \\add x2, x2, #1024
+        \\sub x0, x0, x7
+        \\b 0b
+        \\
+        \\1:
+        \\cbz x0, 2f
+        \\mov x8, #0
+        \\mov z0.{s}, {s}
+        \\mov z1.{s}, {s}
+        \\mov z2.{s}, {s}
+        \\mov z3.{s}, {s}
+        \\
+        \\4:
+        \\whilelo p1.{s}, x8, x0
+        \\b.none 2f
+    , .{
+        lane, scalarReg(lane, 0),
+        lane, scalarReg(lane, 1),
+        lane, scalarReg(lane, 2),
+        lane, scalarReg(lane, 3),
+        lane,
+    }) ++ ld1Indexed(lane, 4, "p1", "x1", "x8") ++ ld1Indexed(lane, 16, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
+        \\
+        \\mov z17.d, z16.d
+        \\mov z18.d, z16.d
+        \\fmul z17.{s}, p1/m, z17.{s}, z1.{s}
+        \\fmla z17.{s}, p1/m, z4.{s}, z0.{s}
+        \\fmul z18.{s}, p1/m, z18.{s}, z3.{s}
+        \\fmla z18.{s}, p1/m, z4.{s}, z2.{s}
+    , .{
+        lane, lane, lane,
+        lane, lane, lane,
+        lane, lane, lane,
+        lane, lane, lane,
+    }) ++ st1Indexed(lane, 17, "p1", "x1", "x8") ++ st1Indexed(lane, 18, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
         \\
         \\{s} x8
         \\b 4b

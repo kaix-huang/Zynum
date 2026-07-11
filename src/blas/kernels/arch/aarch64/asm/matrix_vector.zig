@@ -157,6 +157,42 @@ pub noinline fn zgemvTransFcmlaF64M128(alpha_re_bits: u64, alpha_im_bits: u64, b
     asm volatile (builders.zgemvTransFcmlaF64M128Asm() ::: .{ .memory = true });
 }
 
+pub noinline fn zgemvConjTransFcmlaF64M128(alpha_re_bits: u64, alpha_im_bits: u64, beta_re_bits: u64, beta_im_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {
+    _ = alpha_re_bits;
+    _ = alpha_im_bits;
+    _ = beta_re_bits;
+    _ = beta_im_bits;
+    _ = a;
+    _ = lda_bytes;
+    _ = x;
+    _ = y;
+    asm volatile (builders.zgemvConjTransFcmlaF64M128Asm() ::: .{ .memory = true });
+}
+
+pub noinline fn zgemvTransFcmlaF64M128Cols8(alpha_re_bits: u64, alpha_im_bits: u64, beta_re_bits: u64, beta_im_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {
+    _ = alpha_re_bits;
+    _ = alpha_im_bits;
+    _ = beta_re_bits;
+    _ = beta_im_bits;
+    _ = a;
+    _ = lda_bytes;
+    _ = x;
+    _ = y;
+    asm volatile (builders.zgemvTransFcmlaF64M128Cols8Asm() ::: .{ .memory = true });
+}
+
+pub noinline fn zgemvConjTransFcmlaF64M128Cols8(alpha_re_bits: u64, alpha_im_bits: u64, beta_re_bits: u64, beta_im_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {
+    _ = alpha_re_bits;
+    _ = alpha_im_bits;
+    _ = beta_re_bits;
+    _ = beta_im_bits;
+    _ = a;
+    _ = lda_bytes;
+    _ = x;
+    _ = y;
+    asm volatile (builders.zgemvConjTransFcmlaF64M128Cols8Asm() ::: .{ .memory = true });
+}
+
 pub noinline fn zgemvTransFcmlaF64M256N128Task(alpha_re_bits: u64, alpha_im_bits: u64, beta_re_bits: u64, beta_im_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {
     _ = alpha_re_bits;
     _ = alpha_im_bits;
@@ -191,6 +227,30 @@ pub noinline fn zgemvTransFcmlaF64M512N64TaskBeta(alpha_re_bits: u64, alpha_im_b
     _ = x;
     _ = y;
     asm volatile (builders.zgemvTransFcmlaF64M512N64TaskBetaAsm() ::: .{ .memory = true });
+}
+
+pub noinline fn zgemvConjTransFcmlaF64M512N64Task(alpha_re_bits: u64, alpha_im_bits: u64, beta_re_bits: u64, beta_im_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {
+    _ = alpha_re_bits;
+    _ = alpha_im_bits;
+    _ = beta_re_bits;
+    _ = beta_im_bits;
+    _ = a;
+    _ = lda_bytes;
+    _ = x;
+    _ = y;
+    asm volatile (builders.zgemvConjTransFcmlaF64M512N64TaskAsm() ::: .{ .memory = true });
+}
+
+pub noinline fn zgemvConjTransFcmlaF64M512N64TaskBeta(alpha_re_bits: u64, alpha_im_bits: u64, beta_re_bits: u64, beta_im_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {
+    _ = alpha_re_bits;
+    _ = alpha_im_bits;
+    _ = beta_re_bits;
+    _ = beta_im_bits;
+    _ = a;
+    _ = lda_bytes;
+    _ = x;
+    _ = y;
+    asm volatile (builders.zgemvConjTransFcmlaF64M512N64TaskBetaAsm() ::: .{ .memory = true });
 }
 
 pub noinline fn dgemvNoTransSmF64M128(m: usize, n: usize, alpha_bits: u64, beta_bits: u64, a: [*]const f64, lda_bytes: usize, x: [*]const f64, y: [*]f64) callconv(.naked) void {

@@ -152,7 +152,7 @@ pub fn gemvNoTransTaskUnitComplex(
 ) bool {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.gemvNoTransTaskUnitComplex(T, m, n, alpha, a, lda, x, y_delta),
-        .x86_64 => false,
+        .x86_64 => x86_64.gemvNoTransTaskUnitComplex(T, m, n, alpha, a, lda, x, y_delta),
         else => false,
     };
 }
@@ -160,7 +160,7 @@ pub fn gemvNoTransTaskUnitComplex(
 pub fn supportsGemvNoTransTaskUnitComplex(comptime T: type, m: usize, n: usize, lda: BlasInt) bool {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.supportsGemvNoTransTaskUnitComplex(T, m, n, lda),
-        .x86_64 => false,
+        .x86_64 => x86_64.supportsGemvNoTransTaskUnitComplex(T, m, n, lda),
         else => false,
     };
 }
@@ -204,7 +204,15 @@ pub fn gemvTransTaskUnitComplex(
 ) bool {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.gemvTransTaskUnitComplex(T, m, n, alpha, a, lda, x, y, do_conj),
-        .x86_64 => false,
+        .x86_64 => x86_64.gemvTransTaskUnitComplex(T, m, n, alpha, a, lda, x, y, do_conj),
+        else => false,
+    };
+}
+
+pub fn supportsGemvTransTaskUnitComplex(comptime T: type, m: usize, n: usize, lda: BlasInt, do_conj: bool) bool {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => false,
+        .x86_64 => x86_64.supportsGemvTransTaskUnitComplex(T, m, n, lda, do_conj),
         else => false,
     };
 }

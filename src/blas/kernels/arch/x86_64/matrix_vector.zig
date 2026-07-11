@@ -11,6 +11,30 @@ const BlasInt = types.BlasInt;
 
 pub const enabled: bool = simd_config.enabled;
 
+fn supportsComplexTaskBase(comptime T: type, comptime cfg: fixed_simd.Config, m: usize, n: usize, lda: BlasInt) bool {
+    if (comptime !enabled) return false;
+    if (T != types.ComplexF32 and T != types.ComplexF64) return false;
+    if (m != 512 or lda <= 0 or n == 0) return false;
+    const min_rows = (cfg.lane_count + 1) / 2;
+    const work = m *| n;
+    if (m < min_rows or work < cfg.min_work) return false;
+    if (cfg.max_work != 0 and work > cfg.max_work) return false;
+    return true;
+}
+
+fn supportsComplexNoTransTask(comptime T: type, comptime cfg: fixed_simd.Config, m: usize, n: usize, lda: BlasInt) bool {
+    if (!supportsComplexTaskBase(T, cfg, m, n, lda)) return false;
+    if (T == types.ComplexF32) return n == 64;
+    if (T == types.ComplexF64) return n == 48 or n == 52;
+    return false;
+}
+
+fn supportsComplexTransTask(comptime T: type, comptime cfg: fixed_simd.Config, m: usize, n: usize, lda: BlasInt, do_conj: bool) bool {
+    if (do_conj) return false;
+    if (!supportsComplexTaskBase(T, cfg, m, n, lda)) return false;
+    return n == 64;
+}
+
 pub fn gemvTransUnitReal(
     comptime T: type,
     m: usize,
@@ -80,7 +104,31 @@ pub fn gemvNoTransUnitComplex(
     y: [*]T,
 ) bool {
     if (comptime !enabled) return false;
+    if (m == 512 and n == 512) return false;
     return fixed_simd.gemvNoTransUnitComplex(T, simd_config.matrixComplexConfig(T), m, n, alpha, a, lda, x, y);
+}
+
+pub fn gemvNoTransTaskUnitComplex(
+    comptime T: type,
+    m: usize,
+    n: usize,
+    alpha: T,
+    a: [*]const T,
+    lda: BlasInt,
+    x: [*]const T,
+    y_delta: [*]T,
+) bool {
+    if (T != types.ComplexF32 and T != types.ComplexF64) return false;
+    const cfg = comptime simd_config.matrixComplexConfig(T);
+    if (!supportsComplexNoTransTask(T, cfg, m, n, lda)) return false;
+    @memset(y_delta[0..m], .{ .re = 0, .im = 0 });
+    return fixed_simd.gemvNoTransUnitComplex(T, cfg, m, n, alpha, a, lda, x, y_delta);
+}
+
+pub fn supportsGemvNoTransTaskUnitComplex(comptime T: type, m: usize, n: usize, lda: BlasInt) bool {
+    if (T != types.ComplexF32 and T != types.ComplexF64) return false;
+    const cfg = comptime simd_config.matrixComplexConfig(T);
+    return supportsComplexNoTransTask(T, cfg, m, n, lda);
 }
 
 pub fn gemvTransUnitComplex(
@@ -95,7 +143,31 @@ pub fn gemvTransUnitComplex(
     do_conj: bool,
 ) bool {
     if (comptime !enabled) return false;
+    if (m == 512 and n == 512) return false;
     return fixed_simd.gemvTransUnitComplex(T, simd_config.matrixComplexConfig(T), m, n, alpha, a, lda, x, y, do_conj);
+}
+
+pub fn gemvTransTaskUnitComplex(
+    comptime T: type,
+    m: usize,
+    n: usize,
+    alpha: T,
+    a: [*]const T,
+    lda: BlasInt,
+    x: [*]const T,
+    y: [*]T,
+    do_conj: bool,
+) bool {
+    if (T != types.ComplexF32 and T != types.ComplexF64) return false;
+    const cfg = comptime simd_config.matrixComplexConfig(T);
+    if (!supportsComplexTransTask(T, cfg, m, n, lda, do_conj)) return false;
+    return fixed_simd.gemvTransUnitComplex(T, cfg, m, n, alpha, a, lda, x, y, do_conj);
+}
+
+pub fn supportsGemvTransTaskUnitComplex(comptime T: type, m: usize, n: usize, lda: BlasInt, do_conj: bool) bool {
+    if (T != types.ComplexF32 and T != types.ComplexF64) return false;
+    const cfg = comptime simd_config.matrixComplexConfig(T);
+    return supportsComplexTransTask(T, cfg, m, n, lda, do_conj);
 }
 
 pub fn supportsGemvNoTransUnitComplex(comptime T: type) bool {

@@ -827,6 +827,113 @@ architecture-specific loops. Architecture files should remain feature, lane,
 and gate selection layers unless a native instruction sequence has benchmark
 evidence.
 
+## 2026-07-09 H3C x86 Broad Baseline
+
+This pass intentionally prioritizes broad Level 1/2/3 coverage and obvious
+foundation work over extreme single-shape tuning. The H3C r91 Level 2 baseline
+used MKL, OpenBLAS, AOCL-BLIS, ATLAS, and Upstream BLIS from the remote module
+tree, with `ZYNUM_MAXIMUM_THREADS` unset and comparator thread controls pinned
+by the report wrapper. Login-node smoke for `n=8` verified that all comparator
+paths loaded before SLURM submission.
+
+Evidence:
+
+- Fat-node broad report:
+  `/home/kxhuang/project/zynum-current-codex-20260709-r91/zig-out/perf-report/level2_zynum-l2-r91-broad-cpu_fat_test_297758.csv`.
+  The checker result was `checked=90 passed=13 failed=77 missing=0 ratio=1`.
+- A `c2_test` diagnostic report
+  `/home/kxhuang/project/zynum-current-codex-20260709-r91/zig-out/perf-report/level2_zynum-l2-r91-broad-c2_test_297763.csv`
+  checked as 18 passed and 72 failed. This confirms the broad shape of the
+  problem, but the fat-node report remains the official comparator baseline.
+- Worst fat-node misses are concentrated in GEMV/HEMV and rank-update work:
+  `zgemv_t c64 n=512` ratio 0.077, `cgemv_t c32 n=512` ratio 0.119,
+  `dgemv_t f64 n=1024` ratio 0.191, `zhemv c64 n=512` ratio 0.197,
+  `zgemv_n c64 n=512` ratio 0.213, and `sgemv_n f32 n=1024` ratio 0.228.
+
+Rejected gate experiments from this pass:
+
+- r92 lowered the x86 fixed-SIMD GEMV `max_work` gates from `512*512` to
+  `384*384` for both real and complex matrix-vector paths. It built and smoked
+  correctly, but the fat-node A/B only gave small mixed gains and regressed
+  important controls, including `sgemv_n/t f32 n=512`. The gate change was
+  removed.
+- r93 lowered only the real f64 GEMV gate. Focused fat-node DGEMV improved
+  about 2% at n=512 and about 25% at n=1024, but the broad Level 2 sweep showed
+  unrelated regressions such as `chemv c32 n=1024`, `cgemv_n c32 n=1024`, and
+  `sger f32 n=512`. Because this pass is broad-coverage first, the gate change
+  was also removed.
+
+Mechanism-level conclusion: the H3C Level 2 gap is not solved by a simple
+fixed-SIMD cutoff. The next basic optimization work should target x86 GEMV and
+HEMV kernel coverage, task granularity, and reuse/merge costs across the common
+128/256/512/1024 shapes before returning to narrow gate tuning.
+
+## 2026-07-10 H3C x86 Rectangular Baseline
+
+The Level 2 report controller now accepts repeated `--shape NAME:M:N` values.
+General GEMV and rank-update cases use column-major `m` by `n` storage with
+`lda=m`; complex GEMV includes N, T, and C. SYMV and HEMV remain square-only
+and are intentionally omitted from rectangular reports. The CSV appends
+`shape,m` while retaining the legacy `n` column, and the checker treats old
+CSVs as `sqN,N,N`.
+
+The first reportable H3C rectangular pass used the r95 tree, all five comparator
+libraries, `ZYNUM_MAXIMUM_THREADS` unset, and one fresh worker process per
+library and shape:
+
+- `level2_rect_tall4096x256_fat_297812_0.csv`: all 96 rows were `sampled-ok`;
+  the strict checker passed 0 of 16 case/kind groups. The worst ratios were
+  `dgemv_t` 0.075, `cgemv_c` 0.101, `cgemv_t` 0.108, and `sgemv_n` 0.109.
+- `level2_rect_wide256x4096_fat_297812_1.csv`: all 96 rows were `sampled-ok`;
+  the strict checker passed 2 of 16 groups. Only c64 `zgeru` and `zgerc`
+  passed; the worst ratios were `sgemv_t` 0.089 and `dgemv_t` 0.132.
+
+These results widen the known problem beyond square cutoffs. The next basic x86
+Level 2 work should prioritize real transpose GEMV and tall no-transpose GEMV,
+then complex transpose/conjugate GEMV. Exact-square task gates cannot close
+these rectangular classes.
+
+## 2026-07-10 H3C x86 Rectangular Task Granularity
+
+The cap diagnostic in SLURM job 297817 showed that the default 32-thread task
+count oversplits several real rectangular GEMV paths. The strongest points were
+cap 8 for tall SGEMV-N/DGEMV-N, cap 4 for tall SGEMV-T/DGEMV-T, and cap 16 for
+wide SGEMV-T/DGEMV-T. These cap runs are diagnostic only; the retained default
+policy derives task count from matrix work and remains x86-only.
+
+Retained policy:
+
+- Tall packed SGEMV-N (`m >= 4*n`) uses at least 128 Ki matrix elements of work
+  per task.
+- Wide SGEMV-T/DGEMV-T (`n >= 4*m`) uses at least 64 Ki matrix elements of work
+  per task.
+- Tall DGEMV-N was removed from the candidate after repeated A/B showed a
+  regression; all other architectures and aspect ratios keep the prior policy.
+
+Job 297823 ran five interleaved fresh-worker baseline/candidate pairs on one fat
+node with `ZYNUM_MAXIMUM_THREADS` unset. Median candidate/baseline ratios were
+1.828 for tall SGEMV-N, 1.883 for wide SGEMV-T, and 1.350 for wide DGEMV-T.
+Tall DGEMV-N was 0.769 and therefore rejected. The exact narrowed r104 build was
+then checked by job 297828 against MKL, OpenBLAS, AOCL-BLIS, ATLAS, and Upstream
+BLIS: all 192 rows were `ok` and `sampled-ok`. Its strict comparator gate still
+passed 0 of 32 groups, so this is a basic task-granularity improvement rather
+than closure of the rectangular Level 2 gap. The SLURM job state is `FAILED`
+only because the strict checker intentionally returned nonzero for those gaps.
+
+The next broad complex experiment generalized the x86 fixed-SIMD task leaf from
+the existing `m=512` and fixed-width task gates to every task within its normal
+work bounds, including conjugate transpose. Login smoke covered two rectangular
+shapes with two threads and all 32 rows were `sampled-ok`. Job 297831 then ran
+five interleaved fresh-worker baseline/candidate pairs on two fat nodes for
+tall, wide, square, and tail-bearing shapes. All 680 rows were `sampled-ok`, but
+the policy was rejected: median candidate/baseline ratios included 0.787 for
+wide c32 GEMV-T, 0.782 for square c64 GEMV-C, 0.838 for tail-bearing c32 GEMV-N,
+and 0.867 for tall c64 GEMV-T. The few 1.02-1.10 gains did not justify splitting
+the broad gate during this coverage-first pass, so the original exact task
+widths were restored. Job 297829 is not performance evidence; it failed before
+loading r106 because a login-native build required glibc 2.34. The replacement
+was explicitly built for `x86_64-linux-gnu.2.28` and prechecked with `readelf`.
+
 ## 2026-07-05 f64 Full-Call Dispatch Fix
 
 This pass found a dispatch mismatch in the current refactored worktree: the
@@ -3507,3 +3614,633 @@ Current retained-path diagnostics after the N2G8 revert:
   the earlier rejected OpenBLAS-style ten-task partition and ld2/st2 leaf
   experiments: the remaining gap is still task/body scheduling plus memory
   hierarchy behavior, not a missing high-level algorithm switch.
+
+## 2026-07-10 Apple M5 Complex Conjugate-Transpose GEMV Follow-up
+
+Retained changes:
+
+- Exact M128 complex full-call kernels now accept conjugate transpose. For
+  `c32`, the retained wrapper uses
+  `conj(conj(beta) * conj(y) + conj(alpha) * A^T * conj(x))`; this reuses the
+  existing FCMLA leaf without changing its arithmetic. For `c64`, conjugation
+  is performed directly in the leaf: the normal `#0 + #90` FCMLA pair computes
+  `A * x`, while `#0 + #270` computes `conj(A) * x`. The direct path therefore
+  needs no temporary `x`, no pre/post `y` conjugation, and no sign-mask pass.
+- The c64 M128 leaf keeps the retained four-column/four-accumulator-group body
+  for standalone `lda < 256` calls. M128 tiles whose `lda >= 256` use a separate
+  eight-column/two-accumulator-group body. Eight columns regress standalone
+  128, but they improve the 256 conjugate tiled call by halving repeated `x`
+  loads and outer-loop control at that task shape.
+- The existing two-task M256 transpose tiler now carries `do_conj`; the old
+  nonconjugated M256xN128 shortcut is used only when `do_conj == false`.
+- Exact c64 M512xN64 beta-fused transpose tasks now also have a direct
+  conjugated builder. The eight-task 512 transpose route selects `#270` for
+  conjugate transpose and retains `#90` for ordinary transpose. This reuses the
+  existing task layout and beta fusion instead of routing 512 through generic
+  complex dots.
+
+Fresh-process evidence used the Apple M5 target build, left
+`ZYNUM_MAXIMUM_THREADS` unset (detected max 10), set both comparator thread
+counts to 10, and serialized every performance report. The final five-process
+report is
+`zig-out/perf-report/level2_conj_fcmla_final_repeat5_20260710.csv`; every row is
+`sampled-ok`.
+
+| Case | Shape | Zynum median | Fastest comparator median | Result |
+| --- | ---: | ---: | ---: | --- |
+| `cgemv_c c32` | 128 | 43.69 Gops | 41.94 Gops Accelerate | pass |
+| `cgemv_c c32` | 256 | 104.86 Gops | 99.09 Gops Accelerate | pass |
+| `cgemv_c c32` | 512 | 170.04 Gops | 162.37 Gops Accelerate | pass |
+| `zgemv_c c64` | 128 | 33.12 Gops | 38.36 Gops OpenBLAS | gap |
+| `zgemv_c c64` | 256 | 78.64 Gops | 76.73 Gops OpenBLAS | pass |
+| `zgemv_c c64` | 512 | 117.05 Gops | 118.99 Gops Accelerate | near gap |
+
+The original square screen
+`zig-out/perf-report/level2_current_square_screen_20260710.csv` had 49/60
+strict-best passes and placed `zgemv_c` at roughly 14.98/53.55/101.68 Gops for
+128/256/512. The final repeat-five median checker passes 51/60 groups. The
+largest durable median residuals are the state-sensitive `zgemv_n c64` 512
+route, the OpenBLAS threaded high state for `zgemv_c c64` 128, and c64 GER 512;
+the remaining `sgemv_t` and c64 transpose/conjugate-transpose misses are within
+about three percent in that report.
+
+Rejected diagnostics and boundaries:
+
+- The first c64 reuse wrapper conjugated a stack copy of `x`, conjugated `y`
+  before and after the ordinary leaf, and used conjugated alpha/beta. It closed
+  correctness and improved 128/256, but direct `#270` removed the memory passes
+  and raised 256 from about 73.15 to 77.20 Gops. The wrapper remains only for
+  c32, where it already beats both comparators.
+- Replacing standalone M128 with the eight-column body regressed both
+  `zgemv_t` and `zgemv_c` to about 32.77 Gops. The body is retained only for
+  higher-`lda` tiles; the standalone leaf remains four-column.
+- Two ASIMD FMLA/FMLS alternatives were correct but slower. A four-column
+  `LD2` body reached about 28.08 Gops, and an OpenBLAS-like single-column long
+  dot reached about 20.30 Gops. OpenBLAS' public `_zgemv_` wrapper uses a
+  threaded path once `m*n >= 4096`; its 128 comparator samples are bimodal, so
+  its high band is not evidence that the copied single-column leaf is faster.
+- Splitting c64 128 into two M128xN64 FCMLA tasks reached only about
+  16.3-17.0 Gops. Removing the eager `futexWake`, using a full-beta task, and
+  selecting a later helper did not change the limiting band. All N64 task and
+  thread-pool experiments were removed.
+- A streaming-SVE `LD2D + FMLA/FMLS` M128 full-call leaf passed correctness but
+  reached only about 10.56 Gops. SM transition plus streaming arithmetic and
+  reductions are not competitive for this shape; the path was removed.
+- Extending the M128 eight-column tiler to c64 512 was correct but regressed
+  `zgemv_c` to about 92.52 Gops. Four long column tasks that serially accumulate
+  four row tiles lose to the retained eight M512xN64 task layout, so the 512
+  tiler gate was removed.
+
+Supporting reports:
+
+- `zig-out/perf-report/level2_conj128tile_fixed_repeat3_128_256_20260710.csv`
+- `zig-out/perf-report/level2_direct_conj_fcmla_repeat5_128_256_20260710.csv`
+- `zig-out/perf-report/level2_zgemvt_cols8_repeat5_128_256_20260710.csv`
+- `zig-out/perf-report/level2_zgemvc128_fmla4_repeat5_20260710.csv`
+- `zig-out/perf-report/level2_zgemvc128_fmla1_repeat5_20260710.csv`
+- `zig-out/perf-report/level2_zgemvc128_parallel2_fcmla_repeat5_20260710.csv`
+- `zig-out/perf-report/level2_zgemvc128_sm_ld2_repeat5_20260710.csv`
+- `zig-out/perf-report/level2_zgemvc512_tiled4_repeat5_20260710.csv`
+- `zig-out/perf-report/level2_zgemvc512_task270_repeat5_20260710.csv`
+
+## 2026-07-10 H3C x86 Dense Triangular Broad Baseline
+
+The isolated Level 2 runner now has opt-in dense real TRMV/TRSV coverage.
+`--op triangular` expands s/d TRMV and TRSV across upper/lower storage, N/T,
+unit/non-unit diagonal, and `incx=1`. Every row records these parameters in the
+case key and runs an independent reference check. TRSV uses a safely
+conditioned triangular matrix and constructs its right-hand side from a known
+solution. Existing commands still default to the legacy GEMV/SYMV/HEMV/GER
+set, and legacy CSVs remain checker-compatible.
+
+Job array 297870 ran `n=128/512/2048` on three fat nodes. Each size compared
+Zynum with MKL, OpenBLAS, AOCL-BLIS, ATLAS, Upstream BLIS, and the r110
+baseline, using two fresh worker processes. All 672 rows were `sampled-ok`;
+the strict external median gate passed 0/96 Zynum groups.
+
+Median Zynum/fastest-comparator ratio ranges by size:
+
+| n | STRMV | DTRMV | STRSV | DTRSV |
+| ---: | ---: | ---: | ---: | ---: |
+| 128 | 0.161-0.174 | 0.182-0.197 | 0.276-0.418 | 0.321-0.463 |
+| 512 | 0.020-0.040 | 0.026-0.057 | 0.065-0.088 | 0.065-0.166 |
+| 2048 | 0.008-0.011 | 0.007-0.013 | 0.020-0.058 | 0.028-0.245 |
+
+The reports are `r111_level2_triangular_n{128,512,2048}_297870_*.csv` under
+the r111 H3C worktree. This round changed tooling only; it does not claim a
+triangular core optimization. The scale trend confirms that the current
+element-accessor/scalar implementation is a separate blocked-kernel project.
+Keep the immediate broad optimization order at real GEMV-T, real GEMV-N,
+complex GEMV-T/C, then HEMV; return to TRMV/TRSV after those existing report
+families receive their first x86 leaves.
+
+### Complex Dense Triangular Baseline
+
+Job array 298072 completed the missing c32/c64 dense TRMV/TRSV baseline at
+`n=128/512/2048`. It compared r134 with r128 and all five external H3C
+libraries using two fresh processes per library. All 1008 rows were
+`ok`/`sampled-ok`; none of the 144 Zynum groups beat the fastest external
+median. Ratios use `metric_median`; each external column is the median
+Zynum/fastest-external ratio within that routine family.
+
+| n | Wins vs r128 | Median r134/r128 (range) | CTRMV external | ZTRMV external | CTRSV external | ZTRSV external |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 128 | 14/48 | 0.996 (0.955-1.022) | 0.125 | 0.178 | 0.306 | 0.366 |
+| 512 | 8/48 | 0.991 (0.925-1.010) | 0.020 | 0.024 | 0.130 | 0.164 |
+| 2048 | 25/48 | 1.002 (0.810-1.147) | 0.011 | 0.020 | 0.058 | 0.404 |
+
+The near-1.0 r134/r128 medians confirm this was a baseline, not a triangular
+optimization. The reports and exact commands/environment are
+`logs/h3c-results-20260710/level2-complex-triangular-r134/`
+`r134_level2_complex_triangular_n{128,512,2048}_298072_*.csv{,.meta.json}`.
+
+### Retained Dense Unit-Stride Triangular Path
+
+Dense TRMV/TRSV now use dependency-ordered contiguous column AXPY/DOT bodies
+when `incx=1`; non-unit and negative strides retain the old accessor fallback.
+The path covers s/d/c/z, upper/lower, N/T/C where applicable, and unit/non-unit
+diagonals without introducing task fan-out inside a triangular dependency
+step.
+
+Job array 298096 compared retained r139 with r138 and all five external
+libraries at `n=128/512/2048`, using two fresh processes per library. All 1680
+rows were `ok`/`sampled-ok`, and all 240 Zynum groups beat r138. The family
+columns below are median Zynum/fastest-external ratios.
+
+| n | Wins vs r138 | Median r139/r138 (range) | Real TRMV external | Complex TRMV external | Real TRSV external | Complex TRSV external |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 128 | 80/80 | 3.327 (1.332-6.364) | 0.722 | 0.679 | 0.753 | 0.646 |
+| 512 | 80/80 | 6.317 (1.881-19.988) | 0.364 | 0.187 | 0.557 | 0.578 |
+| 2048 | 80/80 | 8.554 (1.388-24.726) | 0.167 | 0.091 | 0.458 | 0.357 |
+
+The dense unit-stride path is retained, but the strict external gate remains
+0/240: the first broad optimization removes the old scalar/indexing collapse
+without closing the blocked-kernel gap, especially for large TRMV. Reports and
+exact metadata are under
+`logs/h3c-results-20260710/level2-dense-tri-r139/` as
+`r139_level2_dense_triangular_unit_n{128,512,2048}_298096_*.csv{,.meta.json}`.
+
+## 2026-07-10 H3C x86 Real GEMV-T AVX-512 Task-Leaf Rejection
+
+An x86 AVX-512 task leaf was tested for real transposed GEMV.  It accumulated
+eight f32 or four f64 output columns at a time and was called only from the
+existing parallel column-task path.  Job array 297877 compared it with r111 and
+the five external H3C libraries at square 512/1024, tall 4096x256, wide
+256x4096, and odd-tail 1537x257 shapes.  All 616 rows were `sampled-ok`.
+
+The candidate improved only 3/10 targeted SGEMV-T/DGEMV-T groups versus r111
+and passed the fastest external median in only 1/10 groups.  Examples of the
+unstable tradeoff were SGEMV-T tall improving 1.63x while square 1024 regressed
+to 0.70x, and DGEMV-T wide improving 1.36x while tall regressed to 0.79x.
+The implementation also did not address the large DGEMV-T comparator gaps.
+The leaf, its direct architecture import, and its call site were therefore
+removed.  Existing x86 work-based task caps and unrelated complex GEMV paths
+remain unchanged.  The reports are
+`r113_level2_gemv_trans_{sq512,sq1024,tall4096x256,wide256x4096,tail1537x257}_297877_*.csv`
+under the r113 H3C worktree.
+
+## Dense Rank-Update Benchmark Coverage
+
+Dense symmetric and Hermitian rank updates are opt-in in the isolated Level 2
+runner so existing report commands retain the historical case set. Use
+`--op rank-update` to expand SSYR, DSYR, CHER, ZHER, SSYR2, DSYR2, CHER2, and
+ZHER2 across upper and lower storage with `incx=incy=1`. The recommended broad
+H3C shape set has 16 logical groups at each size and 48 groups in total:
+
+```sh
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --shape sq128:128:128 \
+  --shape sq512:512:512 \
+  --shape sq2048:2048:2048 \
+  --op rank-update \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_rank_update.csv
+```
+
+Every worker checks its result against a Python reference before timing. The
+reference updates only the selected triangle, verifies that the opposite
+triangle remains untouched, and requires Hermitian diagonal imaginary parts to
+be zero. CSV rows record `uplo`, `incx`, and `incy`; these fields are part of
+both the fresh-process aggregation key and the checker key. Use the median for
+promotion decisions:
+
+```sh
+python3 bench/tools/check_level2_report.py \
+  zig-out/perf-report/level2_rank_update.csv \
+  --stat median
+```
+
+Job array 297902 ran the recommended 128/512/2048 sizes with two fresh worker
+processes per library, comparing Zynum with MKL, OpenBLAS, AOCL-BLIS, ATLAS,
+and Upstream BLIS. All 288 rows were `sampled-ok`; the strict fastest-external
+median gate passed 0/48 groups. Median Zynum/external ratios by size were:
+
+| n | Median ratio | Range |
+| ---: | ---: | ---: |
+| 128 | 0.5701 | 0.3215-0.7223 |
+| 512 | 0.1460 | 0.0682-0.3417 |
+| 2048 | 0.1065 | 0.0419-0.1332 |
+
+The n=2048 task took about 23 minutes because the final Upstream BLIS worker
+was slow, but it completed inside the allocation and produced the full checked
+matrix. Across all sizes, CHER2 was the weakest family at a 0.0684 median
+ratio, while SSYR was the strongest at 0.2848. The reports are
+`r117_level2_rank_update_n{128,512,2048}_297902_*.csv` in the r117 H3C
+worktree. The declining size trend is consistent with a serial column loop;
+the first implementation pass should partition independent stored columns
+through the existing `std.Io` execution pool before attempting new SIMD leaves.
+
+### Retained Dense Rank-Update Foundation
+
+The retained unit-stride path shares one dense column body across SYR, HER,
+SYR2, and HER2. Real updates reuse the unit-stride AXPY leaf; complex updates
+preserve their conjugation rules and explicitly restore a real Hermitian
+diagonal. Starting at `n=512`, independent stored-column ranges are balanced
+by triangular cumulative work and submitted through the existing persistent
+`std.Io` pool. The x86 task count is capped by at least 64 Ki element-updates
+per task, with at most eight tasks through `n=1536`. A failed helper
+submission executes the same body serially. Non-unit and negative strides and
+all packed formats keep their original paths.
+
+Job array 298011 compared r124 with r117 and all five external libraries at
+`n=128/512/2048`, with two fresh processes per library. All 336 rows were
+`ok`/`sampled-ok`, and all 48 logical groups beat r117. Median speedups versus
+r117 were 1.48x, 1.99x, and 5.65x by increasing size; the n=2048 range was
+4.41-11.18x. The small size remains serial but benefits from the shared
+unit-stride body. The strict fastest-external gate improved from 0/48 to 5/48,
+all at n=128. Median fastest-external ratios were 0.859, 0.281, and 0.498 by
+size. The reports are
+`r124_level2_rank_update_parallel_n{128,512,2048}_298011_*.csv` in the r124
+H3C worktree.
+
+This closes the first broad implementation pass, not the final gate. The
+remaining medium/large gap is in the scalar/AXPY column leaves and memory
+traffic; task-count tuning alone is not the next priority.
+
+## Banded Comparator Benchmark Coverage
+
+Banded Level 2 coverage is opt-in so existing report commands retain the
+historical case set. `--op banded` expands the following compact-storage BLAS
+routines:
+
+- SGBMV and DGBMV with `trans=N/T`;
+- CGBMV and ZGBMV with `trans=N/T/C`;
+- SSBMV and DSBMV with `uplo=U/L`;
+- CHBMV and ZHBMV with `uplo=U/L`.
+
+The default banded sweep has 18 logical groups per profile and 36 groups in
+total. Its two profiles are `n=512, bandwidth=8` and
+`n=2048, bandwidth=64`. Here `bandwidth` is the BLAS half-bandwidth: GBMV uses
+`kl=ku=bandwidth`, while SBMV and HBMV use `k=bandwidth`. Repeat
+`--band-profile NAME:N:BANDWIDTH` for focused or additional profiles:
+
+```sh
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --op banded \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_banded.csv
+```
+
+Each worker constructs the BLAS compact band layout directly and checks every
+output element against an independent Python scalar reference before timing.
+The general-band reference handles N/T/C indexing without expanding through a
+BLAS routine. The symmetric/Hermitian reference reconstructs only the selected
+stored triangle, conjugates the mirrored HBMV entries, and ignores Hermitian
+diagonal imaginary components.
+
+CSV rows record `storage`, `lda`, `k`, `kl`, `ku`, `uplo`, `trans`, `incx`, and
+`incy`. These parameters are included in both the process-repeat aggregation
+key and the checker key. Missing fields in historical CSV files resolve to an
+empty value, preserving legacy square-report compatibility. Every
+library/profile/repeat remains a fresh worker process, and an incorrect or
+missing repeat contaminates the aggregate row instead of allowing a faster
+repeat to hide it.
+
+Use the process median for broad comparator decisions. The checker can also
+isolate a storage family or bandwidth:
+
+```sh
+python3 bench/tools/check_level2_report.py \
+  zig-out/perf-report/level2_banded.csv \
+  --stat median \
+  --storage general-band \
+  --kl 8 \
+  --ku 8
+```
+
+Job array 297957 ran both default profiles with two fresh worker processes per
+library and all five external H3C comparators. All 216 rows were `sampled-ok`;
+Zynum passed 0/36 strict fastest-external median groups. The median ratio was
+0.529 for `n512_bw8` (range 0.446-0.579) and 0.180 for `n2048_bw64` (range
+0.078-0.431). Across both profiles, routine medians ranged from 0.281 for
+CHBMV to 0.480 for ZGBMV. The reports are
+`r122_level2_banded_{n512_bw8,n2048_bw64}_297957_*.csv` in the r122 H3C
+worktree. The widening gap with bandwidth and size makes compact-storage
+loop/vector work a later broad target; it does not justify replacing the
+current rank-update or structured Level 3 work already in progress.
+
+### Retained Unit-Stride Banded Columns
+
+The first banded implementation pass replaces repeated compact-index and
+stride calculations with direct contiguous column segments. GBMV-N and
+SBMV/HBMV use existing unit-stride AXPY leaves; GBMV-T/C and the mirrored
+structured contribution use existing unit-stride DOT leaves. Hermitian DOTs
+conjugate the stored column, and Hermitian diagonal imaginary values remain
+ignored. Non-unit and negative strides keep the scalar accessor path. The
+candidate adds no allocation, workspace, or new task policy.
+
+Job array 298041 compared the ungated r130 candidate with r122 and all five
+external libraries at `n128_bw2`, `n512_bw8`, `n2048_bw64`, and
+`n4096_bw128`. All 504 rows were `ok`/`sampled-ok`. The small profile exposed
+call overhead: only 6/18 groups beat r122 and the median ratio was 0.962. At
+n=512, 17/18 won with a 1.277x median; the only miss was CGEMV-C at 0.963x.
+All 18 groups won at both larger profiles, with 3.85x and 4.50x medians.
+
+The retained gate therefore requires both matrix dimensions to be at least
+512 and general-band width at least 17, or symmetric/Hermitian order at least
+512 and half-bandwidth at least 8. C32 conjugate-transpose GBMV additionally
+requires both dimensions to be at least 1024. The 53 formally selected groups
+all beat r122, with a 2.75x median and 1.034-8.47x range. Two groups beat the
+fastest external library; the selected median external ratio was 0.665.
+Smaller/narrower calls and the n512 CGEMV-C case execute the exact old body.
+Reports are `r130_level2_banded_unit_*_298041_*.csv` in the r130 H3C
+worktree. Wider closure still requires compact-specific fused leaves rather
+than more task tuning.
+
+## Packed And Triangular-Banded Comparator Coverage
+
+The isolated Level 2 runner has three additional opt-in operation families.
+They do not change the default `legacy` operation set or the historical `all`
+expansion:
+
+- `--op packed-mv` covers SSPMV/DSPMV/CHPMV/ZHPMV and all s/d/c/z TPMV/TPSV
+  routines. It expands upper/lower storage, non-unit/unit diagonal, N/T for
+  real triangular routines, N/T/C for complex triangular routines, and unit
+  vector strides. There are 88 logical groups per packed profile.
+- `--op packed-rank` covers SSPR/DSPR/CHPR/ZHPR and
+  SSPR2/DSPR2/CHPR2/ZHPR2 with upper/lower storage and unit vector strides.
+  There are 16 logical groups per packed profile.
+- `--op triangular-banded` covers all s/d/c/z TBMV/TBSV routines with the
+  same triangle, transpose, diagonal, and unit-stride expansion as packed
+  triangular MV/SV. There are 80 logical groups per band profile.
+
+Packed operations default to `n128`, `n512`, and `n2048`. Repeat
+`--packed-profile NAME:N` to replace that set. Triangular-banded operations
+default to `n128_bw8`, `n512_bw8`, and `n2048_bw64`; repeat the existing
+`--band-profile NAME:N:BANDWIDTH` option to replace those profiles. The three
+families can be run separately to keep each broad report manageable:
+
+```sh
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --op packed-mv \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_packed_mv.csv
+
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --op packed-rank \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_packed_rank.csv
+
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --op triangular-banded \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_triangular_banded.csv
+```
+
+The worker constructs packed and triangular-band storage directly. SPMV/HPMV
+references reconstruct the selected triangle and treat Hermitian diagonals as
+real. TPMV/TBMV references decode their compact layouts independently; TPSV
+and TBSV build a right-hand side from a known solution and a safely
+conditioned compact triangular matrix. Packed rank references update every
+stored element and require Hermitian diagonals to become real. All result
+vectors or packed outputs are checked before timing.
+
+CSV rows use the existing `storage`, `lda`, `k`, `uplo`, `trans`, `diag`,
+`incx`, and `incy` fields, which are already part of fresh-process aggregation
+and checker keys. The checker can therefore isolate compact families without a
+format change, for example:
+
+```sh
+python3 bench/tools/check_level2_report.py \
+  zig-out/perf-report/level2_triangular_banded.csv \
+  --stat median \
+  --storage triangular-band \
+  --k 8 \
+  --trans C
+```
+
+### 2026-07-10 H3C x86 Compact Broad Baseline
+
+Job array 298023 split the six compact families by profile so the Python
+reference and slow comparator paths did not serialize one oversized worker.
+It compared Zynum with MKL, OpenBLAS, AOCL-BLIS, ATLAS, and Upstream BLIS,
+using two fresh processes per library. All 3312 rows were
+`ok`/`sampled-ok`; the strict fastest-external median gate passed 0/552
+logical groups.
+
+Median Zynum/fastest-external ratios were:
+
+| Family | n=128 | n=512 | n=2048 |
+| --- | ---: | ---: | ---: |
+| SPMV/HPMV | 0.2202 | 0.0479 | 0.0168 |
+| TPMV | 0.1767 | 0.0300 | 0.0172 |
+| TPSV | 0.2669 | 0.0994 | 0.0521 |
+| packed rank/rank-2 | 0.6565 | 0.2341 | 0.1100 |
+| TBMV | 0.1608 | 0.0187 | 0.0080 |
+| TBSV | 0.2823 | 0.0432 | 0.0152 |
+
+The reports are
+`r128_level2_compact_{packed_structured_mv,tpmv,tpsv,packed_rank,tbmv,tbsv}_*_298023_*.csv`
+in the r128 H3C worktree. Packed rank is the least severe small-size gap, but
+every family worsens materially with scale. The first broad implementation
+pass should use contiguous packed/band column segments and preserve in-place
+triangular dependency order; it should not introduce a second worker pool.
+
+### Serial Compact Column Helper Experiments
+
+The first compact implementation experiment replaced packed SPMV/HPMV and
+packed rank-update scalar indexing with per-column AXPY/DOT helpers. Job array
+298048 compared r132 with r128 and all five external libraries at
+`n=128/512/2048`; every row was `ok`/`sampled-ok`. The structured-MV median
+speedups versus r128 were 0.995x, 0.997x, and 1.005x, while packed rank-update
+medians were 0.999x, 1.000x, and 1.008x. No group beat the fastest external
+library, and the largest profile still had median external ratios of only
+0.021 for SPMV/HPMV and 0.113 for packed rank updates. The serial helpers were
+therefore removed; the separate packed-rank task-parallel experiment is not
+covered by this rejection.
+
+A second source candidate shared contiguous packed/band column helpers across
+TPMV/TPSV/TBMV/TBSV, but job array 298054 did not actually benchmark that
+binary. The remote `triangular.zig` timestamp was 14:02 while the loaded r133
+shared library was built at 13:49; `stbmv_` disassembly still contained the old
+full-`n` scan, and the metadata recorded no revision. The ten completed tasks
+were checked and had 0.998-1.004x medians versus r128, but those values only
+re-measure the old implementation. They cannot promote or reject the source
+candidate. The unfinished `n=2048` TPMV/TPSV tasks were cancelled after about
+25 minutes, and the unmeasured source path was subsequently removed.
+
+The reports are `r132_level2_packed_vectorized_*_298048_*.csv` and
+`r133_level2_compact_triangular_*_298054_*.csv` in their respective H3C
+worktrees. No r132 packed structured-MV or r133 compact-triangular arithmetic
+path is retained. Only r132 supplies valid performance evidence against the
+per-column general-vector-helper approach; 298054 is retained as an experiment
+integrity failure and must not be cited as candidate performance evidence.
+
+### Retained Large Packed Rank Parallelism
+
+Packed SPR/HPR/SPR2/HPR2 now share one unit-stride packed-column body. Stored
+columns are disjoint, so their triangular cumulative work is split across the
+existing persistent `std.Io` pool without a merge workspace. A failed helper
+submission executes the same column body serially. Non-unit and negative
+strides keep the original scalar path.
+
+Job array 298067 compared the first r134 parallel candidate with r128 and all
+five external libraries at `n=128/512/2048`; all rows were
+`ok`/`sampled-ok`. At n=512 only 3/16 groups beat r128 and the median ratio was
+0.923, so medium packed updates remain on the old path. At n=2048 all 16
+groups won, with a 4.54x median and 3.30-6.30x range. The strict external gate
+remained 0/16, but the median fastest-external ratio rose to 0.477
+(0.312-0.678 range). The retained runtime gate is therefore unit stride and
+`n>=2048`.
+
+The initial dispatcher was inlined into the public packed entry points. On x86
+this expanded `ZHPR`'s stack frame from r128's `0x78` to `0x1268`, even when
+the n=128 gate was false, and two n=128 HPR groups fell to 0.43-0.51x. Marking
+the dispatcher `noinline` reduced the r135 frame to `0x98`. A seven-process
+single-thread login diagnostic put upper/lower ZHPR at 1.002/1.008x r128.
+Formal job 298076 then checked all 16 n=128 groups: the median r135/r128 ratio
+was 1.003 with a 0.994-1.020 range, while the two HPR code-layout regressions
+were removed. Reports are `r134_level2_packed_rank_parallel_*_298067_*.csv`
+and `r135_level2_packed_rank_noinline_n128_298076.csv` in the r134/r135 H3C
+worktrees.
+
+### Retained Packed Structured-MV Parallelism
+
+Packed SPMV/HPMV now split triangular cumulative column work through the
+existing low-latency `std.Io` pool for `n>=512`, unit `incx/incy`, and nonzero
+alpha. Each task accumulates into a private output workspace before one merge;
+allocation or submission failure and all other shapes retain the serial path.
+
+Job array 298082 compared r136 with r135 and all five external libraries at
+`n=128/512/2048`, using three fresh processes per library. All 168 rows were
+`ok`/`sampled-ok`. Ratios use `metric_median`; the external columns aggregate
+the real SPMV and complex HPMV families separately.
+
+| n | Wins vs r135 | Median r136/r135 (range) | SPMV external | HPMV external |
+| ---: | ---: | ---: | ---: | ---: |
+| 128 | 4/8 | 1.005 (0.993-1.101) | 0.229 | 0.193 |
+| 512 | 8/8 | 3.525 (3.242-6.107) | 0.148 | 0.247 |
+| 2048 | 8/8 | 14.017 (9.049-32.544) | 0.584 | 0.525 |
+
+The n=128 control stays on the old path; the near-1.0 aggregate is therefore
+not promotion evidence. The unit-stride `n>=512` packed-MV path is retained
+from the complete 16/16 wins at its selected sizes. The external gap remains:
+0/24 groups beat the fastest external median. Reports and exact metadata are
+under `logs/h3c-results-20260710/level2-packed-mv-r136/` as
+`r136_level2_packed_mv_parallel_n{128,512,2048}_298082_*.csv{,.meta.json}`.
+
+### Retained Triangular-Band Window Path
+
+TBMV now visits only the stored triangular-band window instead of scanning the
+full logical triangle. The retained path covers s/d/c/z, upper/lower, N/T/C,
+unit/non-unit diagonal, `incx=1`, `n>=512`, and `k<=n/16`. It is O(nk), uses
+constant workspace, and preserves the original in-place dependency order.
+TBSV and non-unit-stride or wider-band calls retain their previous bodies.
+
+Job array 298135 compared the clean r142 build with clean r141 and MKL,
+OpenBLAS, AOCL-BLIS, ATLAS, and Upstream BLIS. All 840 rows were
+`ok`/`sampled-ok`. Ratios use each fresh-process aggregate's `metric_median`:
+
+| Profile | Wins vs r141 | Median r142/r141 (range) | Wins vs fastest external | Median external ratio (range) |
+| --- | ---: | ---: | ---: | ---: |
+| n128_bw8, gate off | 23/40 | 1.001 (0.936-1.020) | 0/40 | 0.161 (0.099-0.177) |
+| n512_bw8 | 40/40 | 54.069 (31.906-63.664) | 13/40 | 0.933 (0.759-1.286) |
+| n2048_bw64 | 40/40 | 43.731 (19.144-52.923) | 0/40 | 0.328 (0.142-0.597) |
+
+The complete 80/80 selected-shape wins retain the window path as a broad-pass
+complexity correction. It does not close the wider n=2048 external gap; that
+requires fused/vector band leaves rather than restoring full-triangle work.
+Reports are under
+`logs/h3c-results-20260710/level2-tbmv-band-window-r142/` as
+`r142_level2_tbmv_band_window_*_298135_*.csv{,.meta.json}`.
+
+Job 298117 is not performance evidence. Its source tree contained the TBMV
+candidate but inherited an absolute-path Zig cache and loaded an older shared
+library without the new symbols. The roots were rebuilt after deleting
+`.zig-cache` and `zig-out`; only replacement job 298135 is used above.
+
+### Rejected Unit-Helper `noinline` Composition
+
+Job array 298177 checked r143 against r139 to detect indirect Level 2 effects
+from changing Level 1 unit-stride parallel dispatchers to `noinline`. All 264
+candidate/baseline rows were `ok`/`sampled-ok`, but only 58/132 logical groups
+beat r139:
+
+| Profile | Wins | Median r143/r139 | Range |
+| --- | ---: | ---: | ---: |
+| dense triangular n=512 | 35/80 | 0.997 | 0.642-1.169 |
+| rank update n=512 | 6/16 | 0.995 | 0.951-1.087 |
+| banded n512_bw8 | 7/18 | 0.993 | 0.967-1.092 |
+| banded n2048_bw64 | 10/18 | 1.003 | 0.855-1.056 |
+
+The dense-triangular minimum was stable rather than a failed sample: upper
+DTRSV-N fell to 0.642x, and several upper real TRMV/TRSV groups were
+0.68-0.89x. This rejects the composition even though aggregate medians look
+near one. The source restores the ordinary r139 helper declarations and must
+be rebuilt and rechecked before any stride-two candidate is retained. Reports
+are under `logs/h3c-results-20260710/level2-unit-helper-r143/`.
+
+### Rejected Complex T/C TRMV Parallel Layouts
+
+The r145 candidate copied complex dense TRMV input into a private workspace and
+split transpose/conjugate-transpose output rows through the shared low-latency
+pool for unit stride and n>=512. Job 298224 completed all n=128/512/2048
+profiles with 1008 `ok`/`sampled-ok` rows. The selected T/C target was real:
+all 16 groups beat r142 at both n=512 and n=2048, with 1.724x and 6.229x
+medians. The same source layout also moved unrelated solve code. At n=2048,
+ZTRSV lost all 12 controls versus r142 with a 0.938 median; target evidence
+therefore could not promote r145.
+
+r150 moved the candidate into `triangular_complex_parallel.zig` and left only
+one import and narrow dispatch in the main triangular module. Job 298373
+produced another 432 `ok`/`sampled-ok` rows. Selected T/C targets again won
+16/16 versus r142, with 1.979x and 5.828x medians at n=512 and n=2048. The
+module move did not restore controls: n=2048 ZTRSV lost 12/12 with a 0.893
+median and 0.832 minimum, while all solve controls combined won only 5/24 with
+a 0.921 median.
+
+Symbol inspection supplies the mechanism. r142 placed `ctrsv_`/`ztrsv_` at
+0x11a890/0x15c400, while r145 and r150 both placed them at
+0x11d9f0/0x15f560 with identical 287-byte sizes; their four internal TRSV
+instances also kept identical addresses and sizes. Splitting a Zig import file
+did not change the linked layout. Both candidates are rejected and removed
+rather than adding another alignment rule during the broad pass. Reports are
+under `logs/h3c-results-20260710/level2-complex-trmv-{r145,r150}/`.
+
+### Rejected Compact Triangular Foundation Layout
+
+The r153 candidate routed unit-stride x86 TPMV/TPSV through contiguous packed
+column AXPY/DOT leaves for `n>=128` and TBSV through a stored-band solve window
+for `n>=512`. Job array 298387 compared it with r142 and all five external
+libraries at `n=128/512/2048`; all 2520 rows were `ok`/`sampled-ok`. Every one
+of the 320 gate-on groups beat r142. Median speedups were 3.90x/9.15x/8.12x for
+TPMV, 2.34x/5.61x/5.01x for TPSV, and 18.64x/26.23x for TBSV at its two selected
+sizes. The n=128 TBSV gate-off control had a 0.999 median.
+
+This was a useful complexity correction but did not close the external target:
+only 18/320 selected groups beat the fastest external library. Median external
+ratios were 0.709/0.269/0.168 for TPMV, 0.661/0.565/0.516 for TPSV, and
+0.910/0.553 for selected TBSV.
+
+The source layout was not retained. Control job 298388 found only 42/80 dense
+triangular n=512 wins versus r142, with a 1.004 median but a 0.783 minimum;
+STRSV upper/no-trans/non-unit was the stable worst row. Rank-update and banded
+controls had 0.996-1.000 medians but also included a 0.952 minimum. The compact
+arithmetic therefore remains valid follow-up material, but it must be dispatched
+from a layout that preserves existing dense symbols. The restored source was
+rebuilt as the clean r154 baseline before subsequent Level 3 experiments.
