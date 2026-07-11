@@ -293,6 +293,11 @@ used Zig 0.16, `x86_64-linux-gnu.2.28`, `-Dcpu=native`, and
 `ZYNUM_MAXIMUM_THREADS` was unset. MKL, OpenBLAS, AOCL-BLIS, ATLAS, and
 Upstream BLIS were loaded as comparators with pinned 32-thread policies.
 
+This remote run was built from the pre-commit `r162` working snapshot. Its
+submission did not capture a Git commit SHA, so the remote-root label and
+shared-library SHA above are the authoritative provenance. Treat this data as
+a coverage baseline, not as a commit-pinned promotion record.
+
 The final evidence set contains 89 CSV files, 3,443 correctly checked Zynum
 rows, seven chart categories, and three fresh process repeats wherever the
 schema exposes repeat fields. All 89 SLURM array tasks ended `COMPLETED|0:0`.
