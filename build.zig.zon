@@ -19,6 +19,8 @@
         "bench/vector_matrix_sweep.zig",
         "bench/level1_probe.zig",
         "bench/tools/check_gemm_sweep.py",
+        "bench/tools/check_level1_report.py",
+        "bench/tools/check_level2_report.py",
         "bench/tools/plot_gemm_sweep.py",
         "bench/tools/plot_level1_report.py",
         "bench/tools/plot_level2_report.py",

@@ -50,6 +50,34 @@ rollback boundary. Prefer helper predicates such as `isSmallSquareish`,
 `isNarrowN`, `fitsWorkspaceBudget`, or `usesWholePanels` over inline
 coordinates such as `m == 128 and n == 128`.
 
+## Current Cross-Level Lessons
+
+The 2026 Level 1 through Level 3 passes left a few rules that are more useful
+than the individual benchmark coordinates:
+
+- Correctness fixes reset the performance clock. Data collected before a
+  partial-task fallback, stale state cleanup, conjugation fix, or layout
+  correction is not promotion or rollback evidence for the corrected code.
+- Comparator claims need fresh processes even for local experiments. Zynum,
+  Accelerate, OpenBLAS, MKL, and BLIS-family libraries all keep process-local
+  dispatch or worker state, and mixed-library ordering has repeatedly changed
+  small and medium results.
+- Threading is a composition layer. A default route should first identify the
+  right single-thread leaf, materializer, and storage ownership. Only then tune
+  helper count, task shape, wake policy, and merge layout.
+- Exact gates are acceptable when they protect a measured hardware or planner
+  boundary: tile divisibility, odd-K codegen, row-panel tails, compact
+  workspace padding, or a comparator-proven cliff. They should not become a
+  substitute for a missing shape-family implementation.
+- Complex routines often win by reducing the problem to real kernels, but that
+  is not automatically cheaper. The materialization layout, plane spacing,
+  scalar/conjugate handling, repeated packing, and number of real planner calls
+  are part of the optimization, not incidental setup.
+- Rejected experiments should record the mechanism that lost. A slower CSV row
+  without a route check, disassembly, sample, task timing, or nearby repeat is a
+  weak exclusion and should be reopened when the surrounding implementation
+  changes.
+
 ## Per-Level Phase Order
 
 Use the same phase order inside Level 1, Level 2, and Level 3:

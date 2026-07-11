@@ -187,6 +187,94 @@ pub fn build(b: *std.Build) void {
     });
     const run_cblas_tests = b.addRunArtifact(cblas_tests);
 
+    const symm_dense_gemm_tests = b.addTest(.{
+        .name = "zynum-blas-symm-dense-gemm-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/symm_dense_gemm_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_symm_dense_gemm_tests = b.addRunArtifact(symm_dense_gemm_tests);
+
+    const triangular_parallel_tests = b.addTest(.{
+        .name = "zynum-blas-triangular-parallel-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/triangular_parallel_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_triangular_parallel_tests = b.addRunArtifact(triangular_parallel_tests);
+
+    const packed_parallel_tests = b.addTest(.{
+        .name = "zynum-blas-packed-parallel-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/packed_parallel_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_packed_parallel_tests = b.addRunArtifact(packed_parallel_tests);
+
+    const triangular_dense_unit_tests = b.addTest(.{
+        .name = "zynum-blas-triangular-dense-unit-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/triangular_dense_unit_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_triangular_dense_unit_tests = b.addRunArtifact(triangular_dense_unit_tests);
+
+    const triangular_band_window_tests = b.addTest(.{
+        .name = "zynum-blas-triangular-band-window-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/triangular_band_window_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_triangular_band_window_tests = b.addRunArtifact(triangular_band_window_tests);
+
+    const triangular_packed_unit_tests = b.addTest(.{
+        .name = "zynum-blas-triangular-packed-unit-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/triangular_packed_unit_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_triangular_packed_unit_tests = b.addRunArtifact(triangular_packed_unit_tests);
+
+    const triangular_band_solve_tests = b.addTest(.{
+        .name = "zynum-blas-triangular-band-solve-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/triangular_band_solve_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_triangular_band_solve_tests = b.addRunArtifact(triangular_band_solve_tests);
+
+    const vector_stride2_parallel_tests = b.addTest(.{
+        .name = "zynum-blas-vector-stride2-parallel-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/vector_stride2_parallel_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    const run_vector_stride2_parallel_tests = b.addRunArtifact(vector_stride2_parallel_tests);
+
     const header_smoke_mod = b.createModule(.{
         .root_source_file = b.path("test/headers/compat_headers_smoke.zig"),
         .target = target,
@@ -241,6 +329,14 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_blas_module_tests.step);
     test_step.dependOn(&run_fortran_tests.step);
     test_step.dependOn(&run_cblas_tests.step);
+    test_step.dependOn(&run_symm_dense_gemm_tests.step);
+    test_step.dependOn(&run_triangular_parallel_tests.step);
+    test_step.dependOn(&run_packed_parallel_tests.step);
+    test_step.dependOn(&run_triangular_dense_unit_tests.step);
+    test_step.dependOn(&run_triangular_band_window_tests.step);
+    test_step.dependOn(&run_triangular_packed_unit_tests.step);
+    test_step.dependOn(&run_triangular_band_solve_tests.step);
+    test_step.dependOn(&run_vector_stride2_parallel_tests.step);
     test_step.dependOn(&run_header_smoke_tests.step);
     if (host_tool_smoke) {
         test_step.dependOn(&abi_manifest_smoke_test.step);
@@ -350,6 +446,138 @@ pub fn build(b: *std.Build) void {
 
     const vector_matrix_sweep_step = b.step("bench-vector-matrix-sweep", "Sweep representative BLAS Level 1/2 kernels");
     vector_matrix_sweep_step.dependOn(&run_vector_matrix_sweep.step);
+
+    const rank_k_probe = b.addExecutable(.{
+        .name = "rank-k-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/rank_k_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    const install_rank_k_probe = b.addInstallArtifact(rank_k_probe, .{});
+    const build_rank_k_probe_step = b.step("build-rank-k-probe", "Build the opt-in Level 3 rank-k probe");
+    build_rank_k_probe_step.dependOn(&install_rank_k_probe.step);
+
+    const run_rank_k_report = b.addSystemCommand(&.{
+        "python3",
+        "bench/tools/run_rank_k_report.py",
+        "--probe",
+    });
+    run_rank_k_report.addFileArg(rank_k_probe.getEmittedBin());
+    run_rank_k_report.addArg("--zynum");
+    run_rank_k_report.addFileArg(lib.getEmittedBin());
+    addOptionalIsolatedBenchLibrary(run_rank_k_report, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalIsolatedBenchLibrary(run_rank_k_report, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
+    addOptionalIsolatedBenchLibrary(run_rank_k_report, "--mkl", bench_mkl, null);
+    addOptionalIsolatedBenchLibrary(run_rank_k_report, "--aocl-blis", bench_aocl_blis, null);
+    run_rank_k_report.addArg("--csv");
+    run_rank_k_report.addArg("zig-out/rank_k_report.csv");
+    run_rank_k_report.addArg("--skip-missing");
+    if (b.args) |args| run_rank_k_report.addArgs(args);
+
+    const rank_k_report_step = b.step("bench-rank-k-report", "Run the opt-in fresh-process SYRK/HERK comparator report");
+    rank_k_report_step.dependOn(&run_rank_k_report.step);
+
+    const symm_probe = b.addExecutable(.{
+        .name = "symm-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/symm_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    const install_symm_probe = b.addInstallArtifact(symm_probe, .{});
+    const build_symm_probe_step = b.step("build-symm-probe", "Build the opt-in Level 3 SYMM/HEMM probe");
+    build_symm_probe_step.dependOn(&install_symm_probe.step);
+
+    const run_symm_report = b.addSystemCommand(&.{
+        "python3",
+        "bench/tools/run_symm_report.py",
+        "--probe",
+    });
+    run_symm_report.addFileArg(symm_probe.getEmittedBin());
+    run_symm_report.addArg("--zynum");
+    run_symm_report.addFileArg(lib.getEmittedBin());
+    addOptionalIsolatedBenchLibrary(run_symm_report, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalIsolatedBenchLibrary(run_symm_report, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
+    addOptionalIsolatedBenchLibrary(run_symm_report, "--mkl", bench_mkl, null);
+    addOptionalIsolatedBenchLibrary(run_symm_report, "--aocl-blis", bench_aocl_blis, null);
+    run_symm_report.addArg("--csv");
+    run_symm_report.addArg("zig-out/symm_report.csv");
+    run_symm_report.addArg("--skip-missing");
+    if (b.args) |args| run_symm_report.addArgs(args);
+
+    const symm_report_step = b.step("bench-symm-report", "Run the opt-in fresh-process SYMM/HEMM comparator report");
+    symm_report_step.dependOn(&run_symm_report.step);
+
+    const triangular_matrix_probe = b.addExecutable(.{
+        .name = "triangular-matrix-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/triangular_matrix_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    const install_triangular_matrix_probe = b.addInstallArtifact(triangular_matrix_probe, .{});
+    const build_triangular_matrix_probe_step = b.step("build-triangular-matrix-probe", "Build the opt-in Level 3 TRMM/TRSM probe");
+    build_triangular_matrix_probe_step.dependOn(&install_triangular_matrix_probe.step);
+
+    const run_triangular_matrix_report = b.addSystemCommand(&.{
+        "python3",
+        "bench/tools/run_triangular_matrix_report.py",
+        "--probe",
+    });
+    run_triangular_matrix_report.addFileArg(triangular_matrix_probe.getEmittedBin());
+    run_triangular_matrix_report.addArg("--zynum");
+    run_triangular_matrix_report.addFileArg(lib.getEmittedBin());
+    addOptionalIsolatedBenchLibrary(run_triangular_matrix_report, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalIsolatedBenchLibrary(run_triangular_matrix_report, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
+    addOptionalIsolatedBenchLibrary(run_triangular_matrix_report, "--mkl", bench_mkl, null);
+    addOptionalIsolatedBenchLibrary(run_triangular_matrix_report, "--aocl-blis", bench_aocl_blis, null);
+    run_triangular_matrix_report.addArg("--csv");
+    run_triangular_matrix_report.addArg("zig-out/triangular_matrix_report.csv");
+    run_triangular_matrix_report.addArg("--skip-missing");
+    if (b.args) |args| run_triangular_matrix_report.addArgs(args);
+
+    const triangular_matrix_report_step = b.step("bench-triangular-matrix-report", "Run the opt-in fresh-process TRMM/TRSM comparator report");
+    triangular_matrix_report_step.dependOn(&run_triangular_matrix_report.step);
+
+    const rotg_latency_probe = b.addExecutable(.{
+        .name = "rotg-latency-probe",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("bench/rotg_latency_probe.zig"),
+            .target = target,
+            .optimize = optimize,
+            .link_libc = true,
+        }),
+    });
+    const install_rotg_latency_probe = b.addInstallArtifact(rotg_latency_probe, .{});
+    const build_rotg_latency_probe_step = b.step("build-rotg-latency-probe", "Build the opt-in Level 1 ROTG/ROTMG latency probe");
+    build_rotg_latency_probe_step.dependOn(&install_rotg_latency_probe.step);
+
+    const run_rotg_latency_report = b.addSystemCommand(&.{
+        "python3",
+        "bench/tools/run_rotg_latency_report.py",
+        "--probe",
+    });
+    run_rotg_latency_report.addFileArg(rotg_latency_probe.getEmittedBin());
+    run_rotg_latency_report.addArg("--zynum");
+    run_rotg_latency_report.addFileArg(lib.getEmittedBin());
+    addOptionalIsolatedBenchLibrary(run_rotg_latency_report, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+    addOptionalIsolatedBenchLibrary(run_rotg_latency_report, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
+    addOptionalIsolatedBenchLibrary(run_rotg_latency_report, "--mkl", bench_mkl, null);
+    addOptionalIsolatedBenchLibrary(run_rotg_latency_report, "--aocl-blis", bench_aocl_blis, null);
+    run_rotg_latency_report.addArg("--csv");
+    run_rotg_latency_report.addArg("zig-out/perf-report/rotg_latency_report.csv");
+    run_rotg_latency_report.addArg("--skip-missing");
+    if (b.args) |args| run_rotg_latency_report.addArgs(args);
+
+    const rotg_latency_report_step = b.step("bench-rotg-latency-report", "Run the opt-in fresh-process ROTG/ROTMG latency report");
+    rotg_latency_report_step.dependOn(&run_rotg_latency_report.step);
 
     const level1_probe = b.addExecutable(.{
         .name = "level1-probe",

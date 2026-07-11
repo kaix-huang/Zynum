@@ -156,6 +156,163 @@ zig build bench-gemm-sweep --release=fast -- \
   --reps 100
 ```
 
+## Rank-K And Rank-2K Comparator Sweep
+
+The Level 3 rank-k tooling is opt-in and does not change the default benchmark
+or build steps. It covers `ssyrk`, `dsyrk`, `csyrk`, `zsyrk`, `cherk`, `zherk`,
+`ssyr2k`, `dsyr2k`, `csyr2k`, `zsyr2k`, `cher2k`, and `zher2k` through
+dynamically loaded Fortran BLAS symbols. Build the probe, then run the
+controller with explicit comparator paths as needed:
+
+```sh
+zig build build-rank-k-probe --release=fast
+
+python3 bench/tools/run_rank_k_report.py \
+  --probe zig-out/bin/rank-k-probe \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --mkl /path/to/libmkl_rt.so \
+  --openblas /path/to/libopenblas.so \
+  --aocl-blis /path/to/libblis-mt.so \
+  --extra-blas Upstream-BLIS=/path/to/libblis.so \
+  --shape n128_k32:128:32 \
+  --shape n128_k512:128:512 \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/rank_k_broad.csv \
+  --skip-missing
+```
+
+With no routine, transpose, or triangle filters, the runner expands both `U`
+and `L` and every legal transpose: `N/T` for SYRK/SYR2K and `N/C` for
+HERK/HER2K. The four default shapes, 12 routines, two triangles, and two legal
+transpose modes produce 192 logical groups per library for one alpha/beta pair.
+Repeat `--alpha RE[,IM]` and `--beta RE[,IM]` to sweep scalars. Complex alpha
+and beta are valid for CSYRK/ZSYRK/CSYR2K/ZSYR2K. HERK uses real alpha and beta;
+HER2K uses complex alpha and real beta, matching the Fortran ABI. Each CSV row
+records the complete routine, shape, storage, transpose, scalar, `lda`, optional
+rank-2k `ldb`, `ldc`, timing, and correctness parameters.
+
+Every library/case/process repeat runs in a fresh process. The probe checks the
+result against an independent scalar reference before timing. Rank-2k cases
+allocate and initialize A and B independently. The SYR2K reference evaluates
+both symmetric products; the HER2K reference evaluates the alpha and
+conjugate-alpha products separately. Small cases check the full matrix and
+larger cases check deterministic samples. Both modes require the unstored
+triangle to remain bitwise unchanged and require Hermitian diagonal values to
+be real. Any incorrect or failed repeat makes the aggregate row ineligible even
+if another repeat was fast. The process samples use each probe's median timing,
+and the checker compares their median by default:
+
+```sh
+python3 bench/tools/check_rank_k_report.py \
+  zig-out/perf-report/rank_k_broad.csv \
+  --comparator MKL \
+  --comparator OpenBLAS
+```
+
+`zig build bench-rank-k-report --release=fast -- <runner arguments>` builds the
+probe and Zynum shared library and runs the same opt-in controller. Use
+`--stat best` or `--stat min` only for an explicitly documented diagnostic;
+the default `--stat median` is the rank-k promotion gate.
+
+## SYMM/HEMM Comparator Sweep
+
+The opt-in SYMM/HEMM tooling covers `ssymm`, `dsymm`, `csymm`, `zsymm`,
+`chemm`, and `zhemm` through dynamically loaded Fortran BLAS symbols. Its
+default broad set is 72 logical groups: `square128`, `tall512x128`, and
+`wide128x512`, all six routines, both `L/R` sides, and both `U/L` triangles.
+Real routines use real default scalars; complex routines use complex alpha and
+beta. Build and run it with explicit x86 comparators as needed:
+
+```sh
+zig build build-symm-probe --release=fast
+
+python3 bench/tools/run_symm_report.py \
+  --probe zig-out/bin/symm-probe \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --mkl /path/to/libmkl_rt.so \
+  --openblas /path/to/libopenblas.so \
+  --aocl-blis /path/to/libblis-mt.so \
+  --extra-blas Upstream-BLIS=/path/to/libblis.so \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/symm_broad.csv \
+  --skip-missing
+```
+
+Every process first checks all `m*n` output elements against an independent
+scalar reference. The probe puts unrelated values in A's unstored triangle and
+nonzero imaginary values on Hermitian diagonals; the reference reconstructs A
+only from the stored triangle and treats Hermitian diagonals as real. This
+checks the structured-input contract as well as the complete C result. The
+short worker leaves the dynamically loaded BLAS mapped until process exit so a
+threaded BLAS is not explicitly unloaded before its runtime destructors.
+
+The controller uses one fresh process per library, complete case, and process
+repeat. Any bad repeat makes the aggregate ineligible. The checker gates on the
+median of per-process median throughput by default:
+
+```sh
+python3 bench/tools/check_symm_report.py \
+  zig-out/perf-report/symm_broad.csv \
+  --comparator MKL \
+  --comparator OpenBLAS
+```
+
+`zig build bench-symm-report --release=fast -- <runner arguments>` builds the
+probe and shared library before running the controller. Repeat `--shape
+NAME:M:N`, `--alpha RE[,IM]`, or `--beta RE[,IM]` for focused coverage; real
+routines ignore explicitly requested complex scalar values and require at
+least one real value.
+
+## TRMM/TRSM Comparator Sweep
+
+The opt-in triangular matrix tooling covers `strmm`, `dtrmm`, `ctrmm`,
+`ztrmm`, `strsm`, `dtrsm`, `ctrsm`, and `ztrsm` through dynamically loaded
+Fortran BLAS symbols. The default broad set has 480 logical groups over
+`square128`, `tall512x128`, and `wide128x512`; both `L/R` sides, `U/L`
+triangles, and `N/U` diagonal modes; and `N/T` operations plus `C` for complex
+routines. Build the probe and run explicit x86 comparators with:
+
+```sh
+zig build build-triangular-matrix-probe --release=fast
+
+python3 bench/tools/run_triangular_matrix_report.py \
+  --probe zig-out/bin/triangular-matrix-probe \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --mkl /path/to/libmkl_rt.so \
+  --openblas /path/to/libopenblas.so \
+  --aocl-blis /path/to/libblis-mt.so \
+  --atlas /path/to/libatlas.so \
+  --extra-blas Upstream-BLIS=/path/to/libblis.so \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/triangular_matrix_broad.csv \
+  --skip-missing
+```
+
+TRMM and TRSM overwrite B, so the probe restores the same initialized input
+before every timed call. Before timing, it checks every output element against
+an independent scalar reference: TRMM evaluates the triangular product, while
+TRSM performs its own left- or right-side forward/back substitution. Unstored
+A values and stored unit-diagonal values are deliberately unrelated poison and
+must not affect the reference or result. The CSV records the complete family,
+routine, shape, side, triangle, transpose, diagonal, scalar, leading
+dimensions, timing distribution, and correctness fields.
+
+Every library, complete case, and process repeat runs in a fresh process. Any
+bad repeat makes the aggregate ineligible, and the default checker gate uses
+the median of per-process median throughput:
+
+```sh
+python3 bench/tools/check_triangular_matrix_report.py \
+  zig-out/perf-report/triangular_matrix_broad.csv \
+  --comparator MKL \
+  --comparator OpenBLAS
+```
+
+`zig build bench-triangular-matrix-report --release=fast -- <runner
+arguments>` builds the probe and shared library before invoking the same
+controller. Repeat `--routine`, `--shape NAME:M:N`, `--side`, `--uplo`,
+`--trans`, `--diag`, or `--alpha RE[,IM]` for focused coverage.
+
 ## Level 1/2 Sweep
 
 Use `bench-vector-matrix-sweep` for focused Level 1 and Level 2 tuning gates. The
@@ -197,6 +354,54 @@ The command-line benchmark tools can label MKL and AOCL-BLIS separately when the
 libraries export the standard Fortran BLAS symbols. LIBXSMM is not a drop-in
 Fortran BLAS comparator for these tools; use a documented shim or a separate
 LIBXSMM-specific runner before including it in a no-slower-than gate.
+
+Use `run_level2_report.py` for fresh-process rectangular Level 2 coverage. Keep
+`--n` for square sizes and repeat `--shape NAME:M:N` for general matrix shapes:
+
+```sh
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --shape tall4096x256:4096:256 \
+  --shape wide256x4096:256:4096 \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_rectangular.csv
+```
+
+Rectangular shapes cover GEMV N/T, complex GEMV C, and GER/GERU/GERC. SYMV and
+HEMV are square-only and are omitted unless `m == n`. New CSVs record `shape`,
+`m`, and `n`; the checker remains compatible with legacy square CSVs. With
+`--process-repeats N`, every library/shape pair runs in `N` independent worker
+processes. The historical primary metric remains the best repeat, while
+`metric_min`, `metric_median`, `metric_max`, and `metric_samples` retain the
+distribution. Use `check_level2_report.py --stat median` for noisy promotion
+decisions; the default `--stat best` preserves old-report behavior. Any failed,
+missing, or incorrect repeat makes the aggregate row ineligible for a gate.
+
+Dense TRMV/TRSV coverage is opt-in so existing report commands retain the
+historical case set. `--op triangular` expands s/d/c/z TRMV and TRSV across
+upper/lower storage, unit/non-unit diagonal, and `incx=1`. Real routines use
+N/T, while complex routines use N/T/C. This produces 80 logical groups per
+shape; `--op trmv` or `--op trsv` selects one four-type family. Use square
+shapes explicitly for the broad 128/512/2048 sweep:
+
+```sh
+python3 bench/tools/run_level2_report.py \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --shape sq128:128:128 \
+  --shape sq512:512:512 \
+  --shape sq2048:2048:2048 \
+  --op triangular \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/level2_triangular.csv
+```
+
+Each triangular row records `uplo`, `trans`, `diag`, and `incx` and runs its own
+scalar reference check before timing. The complex C reference conjugates every
+selected matrix value; unstored values and stored unit-diagonal values do not
+participate. TRSV uses a safely conditioned real or complex triangular matrix
+and a right-hand side generated from a known solution. The checker includes all
+four triangular parameters in its group key and accepts matching filters such
+as `--uplo U --trans C --diag N --incx 1`.
 
 Level 1/2 architecture gates must be retained only when the focused sweep shows
 repeatable improvement over the shared Zig vector fallback. Keep rejected ASIMD,
@@ -266,6 +471,49 @@ A reportable isolated run should include process repeats, the exact CSV path, an
 the per-library command line. Focused reruns should use the same environment as
 the full sweep unless the difference is explicitly part of the experiment.
 
+## ROTG And ROTMG Scalar Latency
+
+The Level 1 scalar generators use a dedicated latency tool instead of the
+large-vector Gops report. It covers `srotg`, `drotg`, `crotg`, `zrotg`,
+`srotmg`, and `drotmg` over zero inputs, ordinary magnitude ratios, extreme
+exponents, and the principal ROTMG flag branches. Build and run it with:
+
+```sh
+zig build build-rotg-latency-probe --release=fast
+
+python3 bench/tools/run_rotg_latency_report.py \
+  --probe zig-out/bin/rotg-latency-probe \
+  --zynum zig-out/lib/libzynum_blas.so \
+  --mkl /path/to/libmkl_rt.so \
+  --openblas /path/to/libopenblas.so \
+  --aocl-blis /path/to/libblis-mt.so \
+  --extra-blas Upstream-BLIS=/path/to/libblis.so \
+  --process-repeats 3 \
+  --csv zig-out/perf-report/rotg_latency_broad.csv \
+  --skip-missing
+```
+
+Every library, routine, corpus case, and process repeat runs in a fresh process.
+The probe checks every corpus member against an independent scalar reference
+before timing. Each timing sample pairs a full batch with a baseline batch that
+performs the same parameter reset, loop, and output-bit consumption but omits
+the dynamic BLAS call; AB/BA order alternates, and the CSV reports the paired
+difference as `ns/call`. Any incorrect or nonpositive pair makes that repeat
+ineligible, and any bad repeat contaminates the aggregate row.
+
+The checker first rejects bad `status` or `check_status` rows, then compares the
+median of per-process median `ns/call` values. Lower is better:
+
+```sh
+python3 bench/tools/check_rotg_latency_report.py \
+  zig-out/perf-report/rotg_latency_broad.csv \
+  --comparator MKL \
+  --comparator OpenBLAS
+```
+
+`zig build bench-rotg-latency-report --release=fast -- <runner arguments>`
+builds the probe and shared library before invoking the same controller.
+
 ## README Performance Charts
 
 The README performance charts are curated documentation assets. Refresh them
@@ -300,11 +548,30 @@ env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM
   --csv zig-out/perf-report/level1_all_types_three_libs.csv \
   --process-repeats 3 \
   --skip-missing
+```
 
+Level 1 report CSV copy rows use the concrete `scopy`/`dcopy`/`ccopy`/`zcopy`
+operation name. For these rows, `n` is the function element count,
+`copy_bytes` is the measured byte footprint, and `copy_kind` records the
+selected `s/d/c/z` ABI family. The default copy sweep covers small-cache sizes
+and the 4-16 MiB dispatch/cache boundaries; pass `--copy-byte-size <size>` more
+than once to replace the default set, or `--copy-only` for a focused copy
+report.
+
+For a negative-stride vector sweep, pass `--skip-copy-byte-coverage`. This
+disables only the independent byte-size COPY sweep; the signed-stride
+`scopy`/`dcopy`/`ccopy`/`zcopy` ABI cases remain in the Level 1 operation set.
+Without this flag, the report also contains an unrelated unit-stride COPY row
+that must not be merged into the signed-stride evidence.
+
+```sh
 python3 bench/tools/plot_level1_report.py \
   zig-out/perf-report/level1_all_types_three_libs.csv \
   --bars-svg zig-out/perf-report/level1_all_types_three_libs_bars.svg \
   --ratio-svg zig-out/perf-report/level1_all_types_three_libs_ratio.svg
+
+python3 bench/tools/check_level1_report.py \
+  zig-out/perf-report/level1_all_types_three_libs.csv
 
 env OPENBLAS_DYNAMIC=0 OPENBLAS_NUM_THREADS=10 VECLIB_MAXIMUM_THREADS=10 OMP_NUM_THREADS=10 \
   python3 bench/tools/run_level2_report.py \
@@ -331,6 +598,23 @@ python3 bench/tools/plot_gemm_sweep.py \
   zig-out/perf-report/level3_all_types_more_shapes_three_libs_lines.svg
 ```
 
+When `--process-repeats` is greater than one, the Level 1 CSV keeps the best
+repeat in the primary `rate_gops` or `bandwidth_gbps` field for compatibility
+and also records `metric_min`, `metric_median`, `metric_max`, and the ordered
+`metric_samples`. Use the same statistic for Zynum and every comparator. The
+default checker preserves the historical best-repeat gate; use `--stat median`
+to reject a route whose apparent win depends on one lucky process, or
+`--stat min` only for an explicitly documented low-tail stability gate.
+
+Pass explicit comparators when checking an x86 report that used MKL and OpenBLAS:
+
+```sh
+python3 bench/tools/check_level1_report.py \
+  zig-out/perf-report/level1_h3c.csv \
+  --comparator MKL \
+  --comparator OpenBLAS
+```
+
 Then replace the checked-in README image assets:
 
 ```sh
@@ -343,6 +627,41 @@ cp zig-out/perf-report/level3_all_types_more_shapes_three_libs_lines.svg docs/as
 Keep CSV and metadata files under `zig-out/perf-report/` unless a release note
 explicitly links them as external artifacts. The repository should normally track
 only the three curated SVG files under `docs/assets/benchmarks/`.
+
+### Cross-Level H3C Report
+
+After every independent SLURM family has finished, collect its CSV and metadata
+files into one directory and render the synchronized x86 report with the
+canonical comparator set:
+
+```sh
+python3 bench/tools/render_full_benchmark_report.py \
+  --input-dir zig-out/perf-report/full-YYYYMMDD \
+  --output-dir zig-out/perf-report/full-YYYYMMDD-report \
+  --comparator MKL \
+  --comparator OpenBLAS \
+  --comparator AOCL-BLIS \
+  --comparator ATLAS \
+  --comparator Upstream-BLIS \
+  --expected-process-repeats 3
+```
+
+The renderer emits seven SVGs plus `index.html`, `summary.csv`, and
+`summary.json`. It covers vector Level 1, ROTG/ROTMG scalar latency, Level 2,
+GEMM, rank-k/rank-2k, SYMM/HEMM, and TRMM/TRSM. Throughput ratios are Zynum
+divided by the fastest eligible comparator; scalar-latency ratios invert that
+formula so higher is still better. Every SVG shows the 1.0 gate and all
+available library medians in native metric units as an upper all-library line
+chart plus a lower per-case grouped bar chart. Level 1 aggregate rows may carry
+`successful_repeats` without `process_repeats`; GEMM rows may carry
+`process_repeats` with `reps`, and both schemas are validated separately.
+
+The renderer is a final evidence filter, not a replacement for the family
+checkers. It rejects unchecked or incorrect rows, nonpositive metrics, a
+process-repeat mismatch, and rows whose recorded successful repeat count is
+incomplete. A requested comparator that is missing or fails correctness is
+reported explicitly. Retain every per-family checker output so an aggregate
+failure can still be traced to the exact logical case and raw CSV.
 
 ## Default Sweep Shape Classes
 
