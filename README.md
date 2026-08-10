@@ -27,28 +27,14 @@ single C/Fortran-compatible, Zig-native numerical runtime spanning dense linear
 algebra, LAPACK-style decompositions, FFT, sparse kernels, CNN kernels, and
 Transformer workloads across portable and architecture-specific CPU kernels.
 
-## Performance Snapshot
+## Performance Evidence
 
-The charts below compare Zynum, Accelerate, and OpenBLAS in that order. Higher
-is better in every panel. These are local Apple Silicon benchmark snapshots with
-fresh-process comparator isolation, not portable performance guarantees; see
-`docs/common/benchmarking.md` before quoting numbers.
-
-![Level 1 all-type performance](docs/assets/benchmarks/current_level1_all_types_three_libs.svg)
-
-<sub>Level 1 snapshot: real and complex f32/f64 vector routines plus copy paths;
-Accelerate does not export every extension symbol used by the all-type probe.</sub>
-
-![Level 2 all-type performance](docs/assets/benchmarks/current_level2_all_types_three_libs.svg)
-
-<sub>Level 2 snapshot: real f32/f64 GEMV/SYMV/GER and complex f32/f64
-GEMV/HEMV/GERU/GERC at n=128, 256, and 512.</sub>
-
-![Level 3 GEMM performance](docs/assets/benchmarks/current_level3_all_types_more_shapes.svg)
-
-<sub>Level 3 snapshot: SGEMM, DGEMM, CGEMM, and ZGEMM across the default GEMM
-sweep shape set, including square, remainder, skinny, wide, and K-varied
-column-major shapes.</sub>
+No benchmark chart is currently published. A public performance chart requires
+complete public reproduction metadata and raw results, including source
+identity and measurement date, hardware and software details, commands, thread
+policy, comparator versions, and a public CSV or immutable artifact. See the
+[benchmarking guide](docs/common/benchmarking.md) for the measurement and
+correctness requirements.
 
 ## Highlights
 
@@ -357,21 +343,11 @@ internally and are not controlled by environment variables.
 
 ## Tests And Validation
 
-Direct validation requires an environment containing no `GIT_*` name:
-
-```sh
-env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
-  sh <<'ZYNUM_VALIDATION'
-zig fmt --check build.zig build.zig.zon src test bench examples tools
-python3 -B tools/check_build_inventory.py --root .
-python3 -B tools/check_test_inventory.py --structure-only
-zig build test-build-inventory --summary failures
-zig build test-test-inventory --summary failures
-zig build test -Dcpu=baseline --summary failures
-zig build generate-headers --summary failures
-zig build --summary failures
-ZYNUM_VALIDATION
-```
+The canonical local validation sequence is maintained in the
+[Contributor Guide](docs/contributors/README.md#required-checks). It covers
+formatting, every Python tool, build and test inventories, generated headers and
+kernel coverage, baseline correctness modes, and the default build without
+duplicating a command block here.
 
 The test step covers typed Zig APIs, Fortran compatibility wrappers, CBLAS
 compatibility wrappers, generated header smoke tests, and a Fortran module smoke
@@ -467,15 +443,13 @@ bench/tools/*.py              isolated report, plotting, and benchmark-check hel
 examples/*                    Zig, C/CBLAS, and Fortran examples
 tools/*                       project-level maintenance tools
 docs/*                        architecture, usage, compatibility, roadmap, performance notes
-docs/assets/benchmarks/*      curated README chart SVGs only
 ```
 
 Generated benchmark CSVs, raw traces, sampling output, disassembly notes,
 temporary binaries, host-local instructions, and build products are not part
 of the public package. Keep transient reproducible build products under
 `zig-out/`, `.zig-cache/`, or a temporary directory. Keep raw evidence and
-host-local instructions outside the repository. Only curated documentation
-assets under `docs/assets/benchmarks/` should be checked in.
+host-local instructions outside the repository.
 
 ## Stability
 

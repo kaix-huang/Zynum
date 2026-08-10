@@ -7,21 +7,37 @@ journals.
 ## Required Checks
 
 Repository validation fails closed when any inherited environment name starts
-with `GIT_`. Run the required checks in this sanitized subprocess:
+with `GIT_`. If a change intentionally updates generated files, stage those
+expected outputs before running this block. The generator rerun below then
+rejects only additional working-tree drift or new untracked outputs. Run the
+required checks in this sanitized subprocess:
 
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
-  sh <<'ZYNUM_VALIDATION'
+  bash <<'ZYNUM_VALIDATION'
+set -euo pipefail
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py tools/*.py
 python3 -B tools/check_build_inventory.py --root .
-python3 -B tools/check_test_inventory.py --structure-only
+python3 -B tools/check_test_inventory.py --root . --structure-only
 zig build test-build-inventory --summary failures
 zig build test-test-inventory --summary failures
 zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
 zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
 zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
 zig build generate-headers --summary failures
+zig build generate-kernel-coverage --summary failures
+if ! git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json; then
+  echo "The generator produced additional unstaged changes."
+  echo "Review them, then stage the intended generated outputs before retrying."
+  exit 1
+fi
+untracked="$(git ls-files --others --exclude-standard -- include/zynum/blas docs/kernel_coverage.json)"
+if [[ -n "$untracked" ]]; then
+  echo "The generator produced untracked outputs. Review and stage them before retrying."
+  printf '%s\n' "$untracked"
+  exit 1
+fi
 zig build --summary failures
 ZYNUM_VALIDATION
 ```
@@ -36,8 +52,9 @@ well as its test identity and literal reason. Changing `unittest.skipIf` to
 `unittest.skipUnless`, changing the predicate, or substituting unconditional
 `unittest.skip` fails closed.
 
-When ABI exports change, regenerate compatibility files and check that
-`include/zynum/blas/` has no unexpected drift.
+When ABI exports or kernel registrations change, regenerate the corresponding
+files and check that `include/zynum/blas/` and `docs/kernel_coverage.json` have
+no unexpected drift.
 
 ## Change Paths
 

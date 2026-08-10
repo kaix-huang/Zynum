@@ -12,25 +12,10 @@ security issues through `SECURITY.md` rather than a public issue.
 
 Use Zig 0.16.0 or newer in the 0.16 series and Python 3.10 or newer.
 Repository validation rejects inherited environment variables whose names start
-with `GIT_`, so run direct gates in a sanitized subprocess:
-
-```sh
-env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
-  sh <<'ZYNUM_VALIDATION'
-zig fmt --check build.zig build.zig.zon src test bench examples tools
-PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
-python3 -B tools/check_build_inventory.py --root .
-python3 -B tools/check_test_inventory.py --structure-only
-zig build test-build-inventory --summary failures
-zig build test-test-inventory --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
-zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
-zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
-zig build generate-headers --summary failures
-zig build generate-kernel-coverage --summary failures
-zig build --summary failures
-ZYNUM_VALIDATION
-```
+with `GIT_`. Run the canonical sanitized validation sequence from the
+[Contributor Guide](docs/contributors/README.md#required-checks). That is the
+authoritative list for Python tooling, inventories, generated files, baseline
+correctness modes, formatting, and the default build.
 
 Inventory-dependent tests require the exact `-Dcpu=baseline` query. Ordinary
 `zig build` remains host-native and unrestricted by the inventory. For AArch64
@@ -131,7 +116,8 @@ correctness or performance. See `docs/architecture.md`,
 ## Pull Request Checklist
 
 - `zig fmt --check build.zig build.zig.zon src test bench examples tools` passes.
-- `python3 -m py_compile bench/tools/*.py` passes when Python tooling changes.
+- `python3 -m py_compile bench/tools/*.py tools/*.py` passes when Python tooling
+  changes.
 - Debug and ReleaseSafe baseline tests pass when checked API behavior changes.
 - ReleaseFast baseline tests pass when dispatch, kernels, or ReleaseFast-only
   paths change.

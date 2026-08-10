@@ -11,7 +11,8 @@ Release line: `0.0.1-beta`
 - Confirm the intended public remote and branch before any push.
 - Keep `.zig-cache/`, `.zig-global-cache/`, `zig-out/`, Python caches,
   `.DS_Store`, and raw benchmark output out of source control.
-- Track only curated benchmark SVGs under `docs/assets/benchmarks/`.
+- If a qualifying performance chart is published, track only its curated
+  documentation asset, not transient rendering output.
 - Keep host-local instructions, private runbooks, raw profiler captures,
   disassembly, temporary binaries, candidate data, and local maintenance
   records outside the distributable repository.
@@ -139,26 +140,27 @@ Cross-compilation proves build coverage only. Emulation may add functional
 coverage but never native throughput evidence. Label unmeasured targets as
 unmeasured.
 
-## README Performance Charts
+## Public Performance Charts
 
-When kernels, benchmark tools, or performance summaries change, follow
-`common/benchmarking.md#readme-charts`. The published chart set must:
+A performance chart is optional. Before publishing a future chart, follow
+[`common/benchmarking.md`](common/benchmarking.md) and publish all of the
+following with it:
 
-- contain only the curated Level 1, Level 2, and Level 3 README SVGs;
-- state that higher is better;
-- use the documented `Zynum`, `Accelerate`, `OpenBLAS` order;
-- cover the documented real and complex types and shape set; and
-- match README captions and the retained private raw evidence.
+- source commit and measurement date;
+- CPU model, OS, and Zig version;
+- exact benchmark command and Zynum/comparator thread settings;
+- comparator names and versions; and
+- the raw CSV or a link to an immutable public artifact containing it.
 
-Do not commit raw CSV or host metadata unless they are intentional release
-artifacts.
+Private or unavailable evidence cannot support a public chart. Historical
+private evidence is not required for a release.
 
 ## GitHub Settings
 
 - Confirm repository owner, name, description, URL, and topics.
 - Enable private vulnerability reporting when available.
-- Keep security and conduct contact guidance accurate without exposing private
-  contact data.
+- Keep the confidential conduct-report address accurate and route vulnerability
+  reports separately through `SECURITY.md`.
 - Protect the default branch and require CI before merge when appropriate.
 - Enable issue templates and the pull request template.
 - Reconcile an existing remote history; never force-push merely to simplify a

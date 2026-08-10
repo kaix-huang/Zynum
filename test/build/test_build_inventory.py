@@ -12591,7 +12591,7 @@ class BuildInventoryTests(unittest.TestCase):
             "tools/test_inventory.json": "json-data",
             "tools/test_inventory_runner.zig": "zig-source",
         }
-        self.assertEqual(285, len(rows))
+        self.assertEqual(282, len(rows))
         for path, kind in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(kind, rows[path]["kind"])

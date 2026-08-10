@@ -483,9 +483,6 @@ REQUIRED_DERIVED_CANDIDATE_IDS = {
     "derived:docs/kernel_coverage.json",
     "derived:pkgconfig/zynum_blas.pc",
     "derived:tools/abi_baseline_observation.json",
-    "derived:docs/assets/benchmarks/current_level1_all_types_three_libs.svg",
-    "derived:docs/assets/benchmarks/current_level2_all_types_three_libs.svg",
-    "derived:docs/assets/benchmarks/current_level3_all_types_more_shapes.svg",
 }
 REQUIRED_DERIVED_FACT_DIGESTS = {
     "derived:include/zynum/blas/blas.h": "6e9da8d67ac8521c41524651a5acc906447bf24884aabdf4008bff3ca258f1c3",
@@ -495,9 +492,6 @@ REQUIRED_DERIVED_FACT_DIGESTS = {
     "derived:docs/kernel_coverage.json": "3585fdf4912ec58949ba689e2915c8620e6b8d3d941a54ce582137a2405b5fee",
     "derived:pkgconfig/zynum_blas.pc": "252c8c9903eb2c676d02bed6c7db32f8e50e4632702cbec852ddf1131310dc6c",
     "derived:tools/abi_baseline_observation.json": "2f78f017f1b8d531a4465f5ff54278464954a09169478e709ff6fff1e5c2a99a",
-    "derived:docs/assets/benchmarks/current_level1_all_types_three_libs.svg": "91fda3ad65df4cea6bee7e72c8703b78aa59aa8c5fa1f5b9dd05b5b4a688a446",
-    "derived:docs/assets/benchmarks/current_level2_all_types_three_libs.svg": "c1da2890fcb93ebbbcdfa18c451c4a50294ed078d7d31b2e1d1d91556ea0aa47",
-    "derived:docs/assets/benchmarks/current_level3_all_types_more_shapes.svg": "f8a77a09be351d28bac550fd229c5c2270d6159b6a2f03a17aff4ed33409e90f",
 }
 REQUIRED_GAP_FACT_DIGESTS = {
     "gap:process-bounds-deferred": "165ca9d0f5a67a60e33c0687c1752307caf444f89df7ff499cf7418694a22ee0",
@@ -506,8 +500,8 @@ REQUIRED_GAP_FACT_DIGESTS = {
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
     "option_surfaces": "c4047e8167df65133a70d2e096e8e8617dc26e2207210d4d5dc816a810ff811f",
-    "repository_file_classifications": "a3852582e08e104b50a5cb969da73747c0ea2b990ed45ea83de161b2d0f94233",
-    "derived_candidates": "5e4195f0d4b498d4a32c6487de38f310b008d81fd7500130a3a6aa4cc89c68ba",
+    "repository_file_classifications": "1f590bfdc466c53aa8d19f2ce386549158576cd414e38845bc2fb896f37cf228",
+    "derived_candidates": "ce431613bae70ff88c1b6a7b2c7862fc94a4be4f9f24d1f0c5c592a135108ef9",
     "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
 }
 REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {

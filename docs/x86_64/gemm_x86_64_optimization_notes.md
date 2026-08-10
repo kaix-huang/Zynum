@@ -77,8 +77,8 @@ the feature tier being enabled by default.
 
 ## Current Limitations
 
-- The current development machine may cross-compile x86_64 but cannot produce
-  real AVX2/AVX512 performance numbers.
+- Cross-target environments without matching native x86_64 hardware can verify
+  compilation but cannot produce AVX2 or AVX512 performance evidence.
 - Packed-SIMD GEMM has shared partial-column handling enabled by the x86_64
   wrapper. Native measurement is still required before making any x86
   throughput claim for a particular feature tier.
@@ -118,7 +118,7 @@ Inventory-dependent tests accept only exact baseline, so run
 `zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline ...` only on a host
 that can execute those target binaries, or under an explicitly documented
 runner/emulator. Use ordinary `zig build -Dtarget=... -Dcpu=<tier>` for
-feature-tier compile coverage. Cross-target builds from Apple Silicon are
+feature-tier compile coverage. Cross-target builds on non-x86_64 hosts are
 compile coverage only.
 
 Linux benchmark with MKL and AOCL-BLIS:

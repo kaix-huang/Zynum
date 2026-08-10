@@ -46,24 +46,10 @@ useful for kernel work but are not part of the public API contract.
 ## Common Checks
 
 Repository validation rejects inherited environment variables whose names start
-with `GIT_`. Run direct gates in a sanitized subprocess:
-
-```sh
-env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
-  sh <<'ZYNUM_VALIDATION'
-zig fmt --check build.zig build.zig.zon src test bench examples tools
-PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
-python3 -B tools/check_build_inventory.py --root .
-python3 -B tools/check_test_inventory.py --structure-only
-zig build test-build-inventory --summary failures
-zig build test-test-inventory --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
-zig build generate-headers --summary failures
-zig build --summary failures
-ZYNUM_VALIDATION
-```
+with `GIT_`. Use the single canonical sequence in the
+[Contributor Guide](contributors/README.md#required-checks); it includes Python
+tool compilation, inventory gates, all baseline correctness modes, both
+generators and their drift check, formatting, and the default build.
 
 Inventory-dependent test steps require the exact `-Dcpu=baseline` query.
 Ordinary `zig build` remains host-native and unrestricted by the inventory.
@@ -105,8 +91,10 @@ their implementation details into public documentation.
 ## Public Artifact Boundary
 
 Track source, tests, examples, generated compatibility files, benchmark tools,
-documentation, and curated chart SVGs under `docs/assets/`. Do not track build
-outputs, caches, raw reports, profiler captures, temporary probe binaries, or
+and documentation. No README chart assets are currently published. A future
+chart must have the complete public reproducibility package described in the
+[benchmarking guide](common/benchmarking.md). Do not track build outputs,
+caches, private raw reports, profiler captures, temporary probe binaries, or
 host-specific setup notes. Keep durable local records outside the repository.
 
 Zynum `0.0.1-beta` is suitable for public evaluation and integration, but it is

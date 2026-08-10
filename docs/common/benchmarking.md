@@ -369,16 +369,22 @@ Every default performance rule records:
 Do not encode host identities, private paths, or scheduler job numbers in
 dispatch policy.
 
-## README Charts
+## Public README Charts
 
-README charts are curated documentation assets, not raw evidence. Generate them
-only from correctness-checked fresh-process reports. Each chart states that
-higher is better, preserves the documented library order, covers documented
-real and complex types, and names any limited shape set.
+No benchmark chart is currently published in the README. A future chart may be
+published only from correctness-checked fresh-process results and must include a
+public reproducibility package containing:
 
-Keep raw CSV and metadata outside source control. Track only curated SVG assets
-under `docs/assets/benchmarks/`, and keep README captions consistent with the
-measured artifact and method.
+- source commit and measurement date;
+- CPU model, OS, and Zig version;
+- exact benchmark command and Zynum/comparator thread settings;
+- comparator names and versions; and
+- the raw CSV or a link to an immutable public artifact containing it.
+
+The chart and caption must identify the metric, statistic, library order, and
+measured type and shape scope, and state whether higher or lower is better.
+Private or unavailable evidence does not qualify. The public raw artifact may
+be hosted outside source control when its immutable link accompanies the chart.
 
 ## Regression And Rollback
 

@@ -9329,24 +9329,6 @@
       "owner": "documentation-maintainers"
     },
     {
-      "path": "docs/assets/benchmarks/current_level1_all_types_three_libs.svg",
-      "kind": "visual-asset",
-      "class": "curated-documentation-asset",
-      "owner": "documentation-maintainers"
-    },
-    {
-      "path": "docs/assets/benchmarks/current_level2_all_types_three_libs.svg",
-      "kind": "visual-asset",
-      "class": "curated-documentation-asset",
-      "owner": "documentation-maintainers"
-    },
-    {
-      "path": "docs/assets/benchmarks/current_level3_all_types_more_shapes.svg",
-      "kind": "visual-asset",
-      "class": "curated-documentation-asset",
-      "owner": "documentation-maintainers"
-    },
-    {
       "path": "docs/common/benchmarking.md",
       "kind": "documentation",
       "class": "non-generated-source",
@@ -10601,7 +10583,7 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "a3852582e08e104b50a5cb969da73747c0ea2b990ed45ea83de161b2d0f94233",
+  "repository_file_classifications_digest": "1f590bfdc466c53aa8d19f2ce386549158576cd414e38845bc2fb896f37cf228",
   "derived_candidates": [
     {
       "id": "derived:include/zynum/blas/blas.h",
@@ -10779,48 +10761,6 @@
       "authorship": "observed ABI baseline policy source; not a generator output",
       "package_disposition": "included",
       "install_disposition": "not installed"
-    },
-    {
-      "id": "derived:docs/assets/benchmarks/current_level1_all_types_three_libs.svg",
-      "path": "docs/assets/benchmarks/current_level1_all_types_three_libs.svg",
-      "class": "curated-documentation-asset",
-      "owner": "documentation-maintainers",
-      "tracking_status": "tracked",
-      "public_safe_provenance": "Reviewed Zynum comparator benchmark campaign represented as a curated chart.",
-      "claim_scope": "Comparative Level 1 throughput across supported scalar families and three named libraries.",
-      "review_date": "2026-07-18",
-      "freshness_criteria": "Review again when the represented implementation, comparator set, corpus, or published performance claim changes.",
-      "replacement_criteria": "Replace only with a reviewed chart whose provenance and claim scope cover the same or a superseding corpus.",
-      "deterministic_regeneration_claim": false,
-      "raw_inputs_disposition": "retained outside the distributable repository"
-    },
-    {
-      "id": "derived:docs/assets/benchmarks/current_level2_all_types_three_libs.svg",
-      "path": "docs/assets/benchmarks/current_level2_all_types_three_libs.svg",
-      "class": "curated-documentation-asset",
-      "owner": "documentation-maintainers",
-      "tracking_status": "tracked",
-      "public_safe_provenance": "Reviewed Zynum comparator benchmark campaign represented as a curated chart.",
-      "claim_scope": "Comparative Level 2 throughput across supported scalar families and three named libraries.",
-      "review_date": "2026-07-18",
-      "freshness_criteria": "Review again when the represented implementation, comparator set, corpus, or published performance claim changes.",
-      "replacement_criteria": "Replace only with a reviewed chart whose provenance and claim scope cover the same or a superseding corpus.",
-      "deterministic_regeneration_claim": false,
-      "raw_inputs_disposition": "retained outside the distributable repository"
-    },
-    {
-      "id": "derived:docs/assets/benchmarks/current_level3_all_types_more_shapes.svg",
-      "path": "docs/assets/benchmarks/current_level3_all_types_more_shapes.svg",
-      "class": "curated-documentation-asset",
-      "owner": "documentation-maintainers",
-      "tracking_status": "tracked",
-      "public_safe_provenance": "Reviewed Zynum comparator benchmark campaign represented as a curated chart.",
-      "claim_scope": "Comparative Level 3 throughput across the documented expanded shape corpus.",
-      "review_date": "2026-07-18",
-      "freshness_criteria": "Review again when the represented implementation, comparator set, corpus, or published performance claim changes.",
-      "replacement_criteria": "Replace only with a reviewed chart whose provenance and claim scope cover the same or a superseding corpus.",
-      "deterministic_regeneration_claim": false,
-      "raw_inputs_disposition": "retained outside the distributable repository"
     }
   ],
   "current_gaps": [

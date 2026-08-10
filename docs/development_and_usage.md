@@ -9,23 +9,17 @@ not internal source layout or dispatch thresholds.
 
 Use Zig 0.16.0 or newer in the 0.16 series and Python 3.10 or newer. Repository
 validation rejects inherited environment variables whose names start with
-`GIT_`, so run direct gates in a sanitized subprocess:
+`GIT_`. The complete validation sequence is maintained in the
+[Contributor Guide](contributors/README.md#required-checks).
+
+For a quick local build and baseline smoke test:
 
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
-  sh <<'ZYNUM_VALIDATION'
-python3 -B tools/check_build_inventory.py --root .
-python3 -B tools/check_test_inventory.py --structure-only
-zig build test-build-inventory --summary failures
-zig build test-test-inventory --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
-zig build
-zig build generate-headers
-zig fmt --check build.zig build.zig.zon src test bench examples tools
-PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
-ZYNUM_VALIDATION
+  sh <<'ZYNUM_SMOKE'
+zig build test -Dcpu=baseline --summary failures
+zig build --summary failures
+ZYNUM_SMOKE
 ```
 
 Useful target checks:
@@ -390,16 +384,20 @@ the affected representative sweep before production promotion. See
 
 ## Generated Files
 
-Regenerate compatibility files with:
+Regenerate compatibility files and kernel coverage with:
 
 ```sh
 zig build generate-headers
+zig build generate-kernel-coverage
 ```
 
 Generated outputs are:
 
 - `include/zynum/blas/cblas.h`;
 - `include/zynum/blas/blas.h`;
-- `include/zynum/blas/blas.f90`.
+- `include/zynum/blas/blas.f90`; and
+- `docs/kernel_coverage.json`.
 
-If output changes unexpectedly, inspect the ABI export signatures first.
+If compatibility output changes unexpectedly, inspect the ABI export signatures
+first. If kernel coverage changes unexpectedly, inspect the kernel registry and
+catalog descriptors.
