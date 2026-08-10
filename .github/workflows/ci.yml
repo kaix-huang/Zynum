@@ -53,11 +53,6 @@ jobs:
       - name: Check test inventory structure
         run: python3 -B tools/check_test_inventory.py --root . --structure-only
 
-      - name: Run test inventory security suite
-        run: |
-          python3 -B test/build/test_build_inventory.py
-          python3 -B test/build/test_test_inventory.py
-
       - name: Check package paths
         run: python3 tools/check_package_paths.py --archive zig-out/ci/zynum-source.tar.gz
 
@@ -78,9 +73,43 @@ jobs:
             exit 1
           fi
 
+  build-inventory-security:
+    name: Build inventory security
+    needs: source-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Run build inventory security suite
+        run: python3 -B test/build/test_build_inventory.py
+
+  test-inventory-security:
+    name: Test inventory security
+    needs: source-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Run test inventory security suite
+        run: python3 -B test/build/test_test_inventory.py
+
   target-tests:
     name: ${{ matrix.name }}
-    needs: source-checks
+    needs: [source-checks, build-inventory-security, test-inventory-security]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     strategy:
@@ -357,7 +386,7 @@ jobs:
 
   capability-builds:
     name: Capability build / ${{ matrix.name }}
-    needs: source-checks
+    needs: [source-checks, build-inventory-security, test-inventory-security]
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -434,7 +463,7 @@ jobs:
 
   feature-compile:
     name: ${{ matrix.name }}
-    needs: source-checks
+    needs: [source-checks, build-inventory-security, test-inventory-security]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:
@@ -480,3 +509,42 @@ jobs:
 
       - name: Run matrix gate
         run: ${{ matrix.command }}
+
+  ci-gate:
+    name: CI gate
+    needs:
+      - source-checks
+      - build-inventory-security
+      - test-inventory-security
+      - target-tests
+      - capability-builds
+      - feature-compile
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require every CI gate to succeed
+        env:
+          SOURCE_CHECKS_RESULT: ${{ needs.source-checks.result }}
+          BUILD_INVENTORY_SECURITY_RESULT: ${{ needs.build-inventory-security.result }}
+          TEST_INVENTORY_SECURITY_RESULT: ${{ needs.test-inventory-security.result }}
+          TARGET_TESTS_RESULT: ${{ needs.target-tests.result }}
+          CAPABILITY_BUILDS_RESULT: ${{ needs.capability-builds.result }}
+          FEATURE_COMPILE_RESULT: ${{ needs.feature-compile.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          results=(
+            "$SOURCE_CHECKS_RESULT"
+            "$BUILD_INVENTORY_SECURITY_RESULT"
+            "$TEST_INVENTORY_SECURITY_RESULT"
+            "$TARGET_TESTS_RESULT"
+            "$CAPABILITY_BUILDS_RESULT"
+            "$FEATURE_COMPILE_RESULT"
+          )
+          for result in "${results[@]}"; do
+            if [[ "$result" != "success" ]]; then
+              printf 'required CI dependency ended with result: %s\n' "$result" >&2
+              exit 1
+            fi
+          done

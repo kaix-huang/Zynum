@@ -386,7 +386,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "9f254563521301c5056fb1483410bf916ad4062d7f3d0424f84960fa249c9a5e"
+    "0bb599f3a5f0e159b180666890213fb2dd8f5a51ccf939f425d67c00f083f0f0"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -13837,14 +13837,20 @@ def _new_test_inventory_workflow_launch(identifier: str) -> dict[str, Any]:
     identifiers = {
         "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory",
         "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:run-test-inventory-security-suite",
+        "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite",
+        "workflow-launch:.github/workflows/ci.yml:ci-gate:require-every-ci-gate-to-succeed",
+        "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite",
         "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries",
         "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
         "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-python-tooling-inventory-gate",
         "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
+        "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
+        "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",
+        "workflow-launch:.github/workflows/release.yml:build-inventory-security:run-build-inventory-security-suite",
+        "workflow-launch:.github/workflows/release.yml:test-inventory-security:require-current-only-test-inventory-policy",
+        "workflow-launch:.github/workflows/release.yml:test-inventory-security:run-test-inventory-security-suite",
         "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-build-inventory-policy",
         "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-test-inventory-policy",
-        "workflow-launch:.github/workflows/release.yml:artifacts:run-test-inventory-security-suite",
         "workflow-launch:.github/workflows/release.yml:artifacts:provision-fresh-publication-workspace",
         "workflow-launch:.github/workflows/release.yml:artifacts:verify-publication-workspace",
         *REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS,

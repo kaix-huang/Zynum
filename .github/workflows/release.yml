@@ -17,8 +17,58 @@ env:
   ZIG_LOCAL_CACHE_DIR: .zig-cache/local
 
 jobs:
+  build-inventory-security:
+    name: Build inventory security / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Require current-only build inventory policy
+        run: python3 -B tools/check_build_inventory.py --root . --require-current-only
+
+      - name: Require current-only test inventory policy
+        run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
+
+      - name: Run build inventory security suite
+        run: python3 -B test/build/test_build_inventory.py
+
+  test-inventory-security:
+    name: Test inventory security / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Require current-only test inventory policy
+        run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
+
+      - name: Run test inventory security suite
+        run: python3 -B test/build/test_test_inventory.py
+
   artifacts:
     name: ${{ matrix.os }}
+    needs: [build-inventory-security, test-inventory-security]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     strategy:
@@ -77,11 +127,6 @@ jobs:
 
       - name: Require current-only test inventory policy
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
-
-      - name: Run test inventory security suite
-        run: |
-          python3 -B test/build/test_build_inventory.py
-          python3 -B test/build/test_test_inventory.py
 
       - name: Test
         run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures

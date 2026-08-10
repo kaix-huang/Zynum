@@ -1290,14 +1290,20 @@ class BuildInventoryTests(unittest.TestCase):
         workflow_ids = (
             "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory",
             "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure",
-            "workflow-launch:.github/workflows/ci.yml:source-checks:run-test-inventory-security-suite",
+            "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite",
+            "workflow-launch:.github/workflows/ci.yml:ci-gate:require-every-ci-gate-to-succeed",
+            "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite",
             "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries",
             "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
             "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-python-tooling-inventory-gate",
             "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
+            "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
+            "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",
+            "workflow-launch:.github/workflows/release.yml:build-inventory-security:run-build-inventory-security-suite",
+            "workflow-launch:.github/workflows/release.yml:test-inventory-security:require-current-only-test-inventory-policy",
+            "workflow-launch:.github/workflows/release.yml:test-inventory-security:run-test-inventory-security-suite",
             "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-build-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-test-inventory-policy",
-            "workflow-launch:.github/workflows/release.yml:artifacts:run-test-inventory-security-suite",
             "workflow-launch:.github/workflows/release.yml:artifacts:provision-fresh-publication-workspace",
             "workflow-launch:.github/workflows/release.yml:artifacts:verify-publication-workspace",
         )
@@ -2975,7 +2981,11 @@ class BuildInventoryTests(unittest.TestCase):
             "\n      - name: Inventory fixture launch\n        run: python3 -V\n"
         )
         path.write_text(
-            text.replace("\n  target-tests:", insertion + "\n  target-tests:", 1),
+            text.replace(
+                "\n  build-inventory-security:",
+                insertion + "\n  build-inventory-security:",
+                1,
+            ),
             encoding="utf-8",
         )
         self._assert_error_contains(
@@ -2989,7 +2999,11 @@ class BuildInventoryTests(unittest.TestCase):
             "\n      - name: Quoted run key fixture\n        'run': python3 -V\n"
         )
         path.write_text(
-            text.replace("\n  target-tests:", insertion + "\n  target-tests:", 1),
+            text.replace(
+                "\n  build-inventory-security:",
+                insertion + "\n  build-inventory-security:",
+                1,
+            ),
             encoding="utf-8",
         )
         self._assert_error_contains(
@@ -3001,7 +3015,11 @@ class BuildInventoryTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         insertion = "\n      - run: python3 -V\n"
         path.write_text(
-            text.replace("\n  target-tests:", insertion + "\n  target-tests:", 1),
+            text.replace(
+                "\n  build-inventory-security:",
+                insertion + "\n  build-inventory-security:",
+                1,
+            ),
             encoding="utf-8",
         )
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
@@ -3015,7 +3033,11 @@ class BuildInventoryTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         insertion = "\n      - { run: python3 -V }\n"
         path.write_text(
-            text.replace("\n  target-tests:", insertion + "\n  target-tests:", 1),
+            text.replace(
+                "\n  build-inventory-security:",
+                insertion + "\n  build-inventory-security:",
+                1,
+            ),
             encoding="utf-8",
         )
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
@@ -3029,7 +3051,11 @@ class BuildInventoryTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         insertion = "\n      - { run: [python3, -V] }\n"
         path.write_text(
-            text.replace("\n  target-tests:", insertion + "\n  target-tests:", 1),
+            text.replace(
+                "\n  build-inventory-security:",
+                insertion + "\n  build-inventory-security:",
+                1,
+            ),
             encoding="utf-8",
         )
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
@@ -3786,39 +3812,245 @@ class BuildInventoryTests(unittest.TestCase):
         )
         output_ref = "${{ steps.publication_workspace.outputs.path }}"
 
-        def assert_job_timeout(source: str, job: str, expected: int) -> None:
+        def job_block(source: str, job: str) -> str:
             marker = f"  {job}:\n"
-            start = source.index(marker) + len(marker)
-            lines: list[str] = []
-            for line in source[start:].splitlines():
+            start = source.index(marker)
+            end = len(source)
+            for line in source[start + len(marker) :].splitlines(keepends=True):
                 if line.startswith("  ") and not line.startswith("    "):
+                    end = source.index(line, start + len(marker))
                     break
-                lines.append(line)
+            return source[start:end]
+
+        def assert_job_timeout(source: str, job: str, expected: int) -> None:
+            lines = job_block(source, job).splitlines()
             self.assertEqual(
                 [f"    timeout-minutes: {expected}"],
                 [line for line in lines if line.startswith("    timeout-minutes: ")],
             )
 
         assert_job_timeout(ci_source, "source-checks", 120)
+        assert_job_timeout(ci_source, "build-inventory-security", 240)
+        assert_job_timeout(ci_source, "test-inventory-security", 120)
+        assert_job_timeout(ci_source, "ci-gate", 5)
+        assert_job_timeout(release_source, "build-inventory-security", 240)
+        assert_job_timeout(release_source, "test-inventory-security", 120)
         assert_job_timeout(release_source, "artifacts", 180)
-        ci_timeout_mutant = ci_source.replace(
-            "    timeout-minutes: 120\n", "    timeout-minutes: 30\n", 1
-        )
-        release_timeout_mutant = release_source.replace(
-            "    timeout-minutes: 180\n", "    timeout-minutes: 90\n", 1
-        )
-        self.assertNotEqual(ci_source, ci_timeout_mutant)
-        self.assertNotEqual(release_source, release_timeout_mutant)
-        with self.assertRaises(AssertionError):
-            assert_job_timeout(ci_timeout_mutant, "source-checks", 120)
-        with self.assertRaises(AssertionError):
-            assert_job_timeout(release_timeout_mutant, "artifacts", 180)
+
+        def mutate_job(source: str, job: str, before: str, after: str) -> str:
+            original = job_block(source, job)
+            mutated = original.replace(before, after, 1)
+            self.assertNotEqual(original, mutated)
+            return source.replace(original, mutated, 1)
+
+        for source, job, expected, legacy in (
+            (ci_source, "build-inventory-security", 240, 30),
+            (ci_source, "test-inventory-security", 120, 90),
+            (ci_source, "ci-gate", 5, 1),
+            (release_source, "build-inventory-security", 240, 30),
+            (release_source, "test-inventory-security", 120, 90),
+        ):
+            with self.subTest(timeout_mutant=(job, legacy)):
+                mutant = mutate_job(
+                    source,
+                    job,
+                    f"    timeout-minutes: {expected}\n",
+                    f"    timeout-minutes: {legacy}\n",
+                )
+                with self.assertRaises(AssertionError):
+                    assert_job_timeout(mutant, job, expected)
 
         def named_step(source: str, name: str) -> str:
             marker = f"      - name: {name}\n"
             start = source.index(marker)
             end = source.find("\n      - ", start + len(marker))
-            return source[start:] if end < 0 else source[start:end]
+            return (source[start:] if end < 0 else source[start:end]).rstrip()
+
+        build_suite_command = "python3 -B test/build/test_build_inventory.py"
+        test_suite_command = "python3 -B test/build/test_test_inventory.py"
+
+        def assert_security_suite_split(
+            source: str, prerequisite_job: str, *, release: bool
+        ) -> None:
+            prerequisite = job_block(source, prerequisite_job)
+            build_gate = job_block(source, "build-inventory-security")
+            test_gate = job_block(source, "test-inventory-security")
+            build_step = named_step(build_gate, "Run build inventory security suite")
+            test_step = named_step(test_gate, "Run test inventory security suite")
+            self.assertEqual(
+                f"      - name: Run build inventory security suite\n"
+                f"        run: {build_suite_command}",
+                build_step,
+            )
+            self.assertEqual(
+                f"      - name: Run test inventory security suite\n"
+                f"        run: {test_suite_command}",
+                test_step,
+            )
+            self.assertNotIn(test_suite_command, build_gate)
+            self.assertNotIn(build_suite_command, test_gate)
+            self.assertNotIn(build_suite_command, prerequisite)
+            self.assertNotIn(test_suite_command, prerequisite)
+            self.assertEqual(1, source.count(build_suite_command))
+            self.assertEqual(1, source.count(test_suite_command))
+            for gate in (build_gate, test_gate):
+                checkout_steps = [
+                    line
+                    for line in gate.splitlines()
+                    if line.startswith("      - uses: actions/checkout@")
+                ]
+                setup_zig_steps = [
+                    line
+                    for line in gate.splitlines()
+                    if line.startswith("      - uses: mlugg/setup-zig@")
+                ]
+                self.assertEqual(1, len(checkout_steps))
+                self.assertEqual(1, len(setup_zig_steps))
+                self.assertRegex(
+                    checkout_steps[0],
+                    (
+                        r"^      - uses: actions/checkout@[0-9a-f]{40} "
+                        r"# v4\.[0-9]+\.[0-9]+$"
+                    ),
+                )
+                self.assertRegex(
+                    setup_zig_steps[0],
+                    (
+                        r"^      - uses: mlugg/setup-zig@[0-9a-f]{40} "
+                        r"# v[0-9]+\.[0-9]+\.[0-9]+$"
+                    ),
+                )
+            if release:
+                matrix = "        os: [macos-15, ubuntu-24.04]"
+                self.assertEqual(1, build_gate.count(matrix))
+                self.assertEqual(1, test_gate.count(matrix))
+                for gate in (build_gate, test_gate):
+                    self.assertNotIn("actions/upload-artifact@", gate)
+                    self.assertNotIn("actions/download-artifact@", gate)
+                build_policy = named_step(
+                    build_gate, "Require current-only build inventory policy"
+                )
+                build_test_policy = named_step(
+                    build_gate, "Require current-only test inventory policy"
+                )
+                test_policy = named_step(
+                    test_gate, "Require current-only test inventory policy"
+                )
+                self.assertLess(
+                    build_gate.index(build_policy), build_gate.index(build_step)
+                )
+                self.assertLess(
+                    build_gate.index(build_test_policy), build_gate.index(build_step)
+                )
+                self.assertLess(
+                    test_gate.index(test_policy), test_gate.index(test_step)
+                )
+
+        assert_security_suite_split(ci_source, "source-checks", release=False)
+        assert_security_suite_split(release_source, "artifacts", release=True)
+
+        required_ci_gates = (
+            "    needs: [source-checks, build-inventory-security, "
+            "test-inventory-security]"
+        )
+        for job in ("target-tests", "capability-builds", "feature-compile"):
+            with self.subTest(required_ci_gate=job):
+                self.assertEqual(1, job_block(ci_source, job).count(required_ci_gates))
+        for job in ("build-inventory-security", "test-inventory-security"):
+            self.assertEqual(
+                1, job_block(ci_source, job).count("    needs: source-checks")
+            )
+        self.assertEqual(
+            1,
+            job_block(release_source, "artifacts").count(
+                "    needs: [build-inventory-security, test-inventory-security]"
+            ),
+        )
+
+        required_ci_gate_dependencies = (
+            ("source-checks", "SOURCE_CHECKS_RESULT"),
+            ("build-inventory-security", "BUILD_INVENTORY_SECURITY_RESULT"),
+            ("test-inventory-security", "TEST_INVENTORY_SECURITY_RESULT"),
+            ("target-tests", "TARGET_TESTS_RESULT"),
+            ("capability-builds", "CAPABILITY_BUILDS_RESULT"),
+            ("feature-compile", "FEATURE_COMPILE_RESULT"),
+        )
+
+        def assert_aggregate_ci_gate(source: str) -> None:
+            gate = job_block(source, "ci-gate")
+            self.assertEqual(1, gate.count("    if: ${{ always() }}"))
+            for dependency, variable in required_ci_gate_dependencies:
+                self.assertEqual(1, gate.count(f"      - {dependency}"))
+                self.assertEqual(1, gate.count(f"needs.{dependency}.result"))
+                self.assertEqual(2, gate.count(variable))
+                self.assertEqual(1, gate.count(f'            "${variable}"'))
+            self.assertNotIn("uses:", gate)
+            step = named_step(gate, "Require every CI gate to succeed")
+            self.assertIn("        shell: bash", step)
+            self.assertIn("          set -euo pipefail", step)
+            self.assertIn('          for result in "${results[@]}"; do', step)
+            self.assertIn('            if [[ "$result" != "success" ]]; then', step)
+            self.assertIn("              exit 1", step)
+
+        assert_aggregate_ci_gate(ci_source)
+        aggregate_mutants = (
+            mutate_job(
+                ci_source,
+                "ci-gate",
+                "    if: ${{ always() }}\n",
+                "    if: ${{ success() }}\n",
+            ),
+            mutate_job(
+                ci_source,
+                "ci-gate",
+                "      - test-inventory-security\n",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "ci-gate",
+                "          TEST_INVENTORY_SECURITY_RESULT: "
+                "${{ needs.test-inventory-security.result }}\n",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "ci-gate",
+                '            "$TEST_INVENTORY_SECURITY_RESULT"\n',
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "ci-gate",
+                "              exit 1\n",
+                "              exit 0\n",
+            ),
+        )
+        for mutant in aggregate_mutants:
+            self.assertNotEqual(ci_source, mutant)
+            with self.assertRaises(AssertionError):
+                assert_aggregate_ci_gate(mutant)
+
+        for source, prerequisite_job, release in (
+            (ci_source, "source-checks", False),
+            (release_source, "artifacts", True),
+        ):
+            merged_suite = (
+                "        run: |\n"
+                f"          {build_suite_command}\n"
+                f"          {test_suite_command}"
+            )
+            mutant = mutate_job(
+                source,
+                "build-inventory-security",
+                f"        run: {build_suite_command}",
+                merged_suite,
+            )
+            with (
+                self.subTest(serial_suite_mutant=prerequisite_job),
+                self.assertRaises(AssertionError),
+            ):
+                assert_security_suite_split(mutant, prerequisite_job, release=release)
 
         provision = named_step(release_source, "Provision fresh publication workspace")
         source_package = named_step(release_source, "Pack source archive")
