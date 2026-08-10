@@ -4,20 +4,29 @@
 
 import csv
 import html
-import math
 import sys
 from collections import defaultdict
+from pathlib import Path
+
+from report_comparison import parse_positive_finite, positive_finite_axis_ticks
+from report_publication import ReportOutput, publish_outputs
+
+CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
 
 COLORS = {
+    "Zynum": "#2563eb",
     "zynum-blas": "#2563eb",
     "Accelerate": "#dc2626",
     "OpenBLAS": "#16a34a",
     "MKL": "#7c3aed",
+    "AOCL-BLIS": "#ea580c",
 }
 
 DISPLAY_NAMES = {
-    "zynum-blas": "Zynum BLAS",
+    "zynum-blas": "Zynum",
 }
+
+LIB_ORDER = ["Zynum", "zynum-blas", "Accelerate", "OpenBLAS", "MKL", "AOCL-BLIS"]
 
 
 def display_name(value):
@@ -26,30 +35,6 @@ def display_name(value):
 
 def usage():
     print("usage: plot_gemm_sweep.py input.csv output.svg", file=sys.stderr)
-
-
-def nice_ticks(max_value, count=5):
-    if max_value <= 0 or not math.isfinite(max_value):
-        return [0, 1]
-    raw = max_value / count
-    exp = math.floor(math.log10(raw))
-    base = raw / (10**exp)
-    if base <= 1:
-        step = 1
-    elif base <= 2:
-        step = 2
-    elif base <= 5:
-        step = 5
-    else:
-        step = 10
-    step *= 10**exp
-    top = math.ceil(max_value / step) * step
-    ticks = []
-    value = 0
-    while value <= top + step * 0.5:
-        ticks.append(value)
-        value += step
-    return ticks
 
 
 def sx(index, shape_count, left, width):
@@ -68,31 +53,44 @@ def polyline(points):
     return " ".join(f"{x:.1f},{y:.1f}" for x, y in points)
 
 
-def plot_heading(kinds):
+def library_heading(libs):
+    names = [display_name(str(lib)) for lib in libs]
+    if not names:
+        return "GEMM Libraries"
+    if len(names) == 1:
+        return names[0]
+    return " vs ".join(names)
+
+
+def plot_heading(kinds, libs):
     kind_set = set(kinds)
-    library_text = "Zynum BLAS vs Accelerate vs OpenBLAS"
+    library_text = library_heading(libs)
     if kind_set == {"cgemm", "zgemm"}:
         return (
             f"Complex GEMM Performance Sweep: {library_text}",
-            "Best-of-reps GF/s for CGEMM/ZGEMM across square, skinny, wide, and K-varied column-major shapes",
+            "Best-of-reps GF/s for CGEMM/ZGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
         )
     if kind_set == {"sgemm", "dgemm"}:
         return (
             f"Real GEMM Performance Sweep: {library_text}",
-            "Best-of-reps GF/s for SGEMM/DGEMM across square, skinny, wide, and K-varied column-major shapes",
+            "Best-of-reps GF/s for SGEMM/DGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
         )
     kind_text = "/".join(kind.upper() for kind in kinds)
     return (
         f"{kind_text} Performance Sweep: {library_text}",
-        "Best-of-reps GF/s across square, skinny, wide, and K-varied column-major GEMM shapes",
+        "Best-of-reps GF/s across square, remainder, skinny, wide, and K-varied column-major GEMM shapes",
     )
+
+
+def shape_work(shape):
+    return shape["m"] * shape["n"] * shape["k"]
 
 
 def draw_panel(
     kind, rows, labels, libs, panel_top, panel_height, chart_left, chart_width
 ):
     max_value = max((row["gflops"] for row in rows), default=1.0)
-    ticks = nice_ticks(max_value)
+    ticks = positive_finite_axis_ticks(max_value)
     max_tick = ticks[-1] if ticks else max_value
     out = []
     out.append(
@@ -117,7 +115,7 @@ def draw_panel(
 
     by_lib = defaultdict(dict)
     for row in rows:
-        by_lib[row["library"]][row["shape_index"]] = row["gflops"]
+        by_lib[row["library"]][row["plot_index"]] = row["gflops"]
 
     for lib in libs:
         values = by_lib.get(lib, {})
@@ -150,6 +148,10 @@ def main():
     rows = []
     with open(csv_path, newline="") as f:
         for raw in csv.DictReader(f):
+            if raw.get("check") not in CHECKED_STATUSES:
+                raise ValueError(
+                    f"GEMM plots require correctness checks; row has check={raw.get('check')!r}"
+                )
             rows.append(
                 {
                     "kind": raw["kind"],
@@ -159,36 +161,52 @@ def main():
                     "n": int(raw["n"]),
                     "k": int(raw["k"]),
                     "library": raw["library"],
-                    "gflops": float(raw["gflops"]),
+                    "gflops": parse_positive_finite(raw["gflops"], "gflops"),
                 }
             )
 
-    labels_by_index = {}
-    libs = []
+    shapes_by_index = {}
+    seen_libs = []
     for row in rows:
         label = f"{row['label']}\\n{row['m']}x{row['n']}x{row['k']}"
-        old_label = labels_by_index.get(row["shape_index"])
-        if old_label is not None and old_label != label:
+        shape = {
+            "shape_index": row["shape_index"],
+            "label": label,
+            "m": row["m"],
+            "n": row["n"],
+            "k": row["k"],
+        }
+        old_shape = shapes_by_index.get(row["shape_index"])
+        if old_shape is not None and old_shape != shape:
             raise ValueError(
-                f"shape_index {row['shape_index']} maps to both {old_label!r} and {label!r}"
+                f"shape_index {row['shape_index']} maps to both {old_shape!r} and {shape!r}"
             )
-        labels_by_index[row["shape_index"]] = label
-        if row["library"] not in libs:
-            libs.append(row["library"])
-    sorted_indices = sorted(labels_by_index)
-    expected_indices = list(range(len(sorted_indices)))
-    if sorted_indices != expected_indices:
-        raise ValueError(
-            f"shape_index values must be contiguous from 0; got {sorted_indices}"
-        )
-    labels = [labels_by_index[i] for i in sorted_indices]
+        shapes_by_index[row["shape_index"]] = shape
+        if row["library"] not in seen_libs:
+            seen_libs.append(row["library"])
+    libs = [lib for lib in LIB_ORDER if lib in seen_libs]
+    libs.extend(lib for lib in seen_libs if lib not in libs)
+    ordered_shapes = sorted(
+        shapes_by_index.values(),
+        key=lambda shape: (
+            shape_work(shape),
+            max(shape["m"], shape["n"], shape["k"]),
+            shape["shape_index"],
+        ),
+    )
+    plot_index_by_shape_index = {
+        shape["shape_index"]: index for index, shape in enumerate(ordered_shapes)
+    }
+    for row in rows:
+        row["plot_index"] = plot_index_by_shape_index[row["shape_index"]]
+    labels = [shape["label"] for shape in ordered_shapes]
 
     kinds = []
     for row in rows:
         if row["kind"] not in kinds:
             kinds.append(row["kind"])
 
-    width = 1800
+    width = max(1800, 90 * len(labels) + 170)
     panel_height = 260
     panel_gap = 110
     top0 = 110
@@ -218,7 +236,11 @@ def main():
 </style>
 """
     )
-    title, subtitle = plot_heading(kinds)
+    title, subtitle = plot_heading(kinds, libs)
+    subtitle = (
+        "Higher is better. Shapes are ordered by m*n*k so smaller cases stay at the front. "
+        + subtitle
+    )
     svg.append('<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>')
     svg.append(f'<text x="40" y="42" class="title">{html.escape(title)}</text>')
     svg.append(f'<text x="40" y="66" class="subtitle">{html.escape(subtitle)}</text>')
@@ -260,8 +282,8 @@ def main():
         svg.append("</g>")
 
     svg.append("</svg>")
-    with open(svg_path, "w") as f:
-        f.write("\n".join(svg))
+    contents = "\n".join(svg).encode("utf-8")
+    publish_outputs([ReportOutput(Path(svg_path), contents)])
     return 0
 
 

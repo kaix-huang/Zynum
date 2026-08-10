@@ -1,0 +1,7 @@
+ImageBase               0000000180000000
+DLL Name: KERNEL32.dll
+DLL Name: ucrtbase.dll
+Name: zynum_blas.dll
+Ordinal Base 1
+       1 00001000 cblas_sdot
+       2 00001020 _legacy@8

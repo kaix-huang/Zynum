@@ -22,4 +22,5 @@ __pycache__/
 *.svg
 
 # Keep generated/local benchmark outputs ignored, but allow curated README/docs assets.
+logs/
 !docs/assets/**/*.svg

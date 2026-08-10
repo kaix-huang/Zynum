@@ -1,54 +1,74 @@
 # Open Source Release Checklist
 
-This checklist keeps Zynum's GitHub publication and beta release process
-explicit.
+Use this checklist for public repository updates and beta releases. It records
+release invariants and executable gates; implementation details belong in the
+checkers and release tooling.
 
-Target repository: <https://github.com/kaix-huang/Zynum>  
-Current release line: `0.0.1-beta`
+Release line: `0.0.1-beta`
 
 ## Repository Readiness
 
-- Initialize Git only when the working tree is intentional.
-- Push to `https://github.com/kaix-huang/Zynum`.
-- Keep generated build outputs out of source control:
-  - `.zig-cache/`
-  - `.zig-global-cache/`
-  - `zig-out/`
-  - `__pycache__/`
-  - benchmark CSV/SVG artifacts unless they are curated docs assets under
-    `docs/assets/`.
-- Confirm these public-facing files are present:
-  - `README.md`
-  - `docs/README.md`
-  - `CHANGELOG.md`
-  - `CONTRIBUTING.md`
-  - `SECURITY.md`
-  - `CODE_OF_CONDUCT.md`
-  - `LICENSE`
-  - `.github/workflows/ci.yml`
-  - issue templates and pull request template
-- Confirm the package version is `0.0.1-beta`.
-- Confirm the README license badge and `LICENSE` file both say
-  `LGPL-3.0-or-later`.
-- Confirm `README.md`, `CHANGELOG.md`, `LICENSE`, `SECURITY.md`, and the docs
-  point to <https://github.com/kaix-huang/Zynum> where appropriate.
-- Confirm checked-in generated compatibility files are intentional:
-  - `include/zynum/blas/cblas.h`
-  - `include/zynum/blas/blas.h`
-  - `include/zynum/blas/blas.f90`
+- Confirm the intended public remote and branch before any push.
+- Keep `.zig-cache/`, `.zig-global-cache/`, `zig-out/`, Python caches,
+  `.DS_Store`, and raw benchmark output out of source control.
+- Track only curated benchmark SVGs under `docs/assets/benchmarks/`.
+- Keep host-local instructions, private runbooks, raw profiler captures,
+  disassembly, temporary binaries, candidate data, and local maintenance
+  records outside the distributable repository.
+- Confirm the public project files are present: `README.md`, `docs/README.md`,
+  `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
+  `LICENSE`, CI workflow, and issue/PR templates.
+- Confirm package version, release notes, badges, and license all agree.
+- Confirm project links are repository-relative where appropriate.
+- Confirm generated compatibility files are intentional:
+  `include/zynum/blas/cblas.h`, `blas.h`, and `blas.f90`.
 
-## Required Local Validation
+## Required Validation
 
-Run these before the first public push, before tagging, and before release notes:
+Run these before tagging or publishing. Repository checkers reject inherited
+environment variables whose names start with `GIT_`, so use a sanitized
+subprocess:
 
 ```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_RELEASE_VALIDATION'
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-zig build test --summary failures
+python3 -B tools/check_build_inventory.py --root . --require-current-only
+python3 -B tools/check_test_inventory.py --structure-only --require-current-only
+zig build test-build-inventory --summary failures
+zig build test-test-inventory --summary failures
+zig build test -Dcpu=baseline --summary failures
 zig build generate-headers --summary failures
+zig build generate-kernel-coverage --summary failures
 zig build --summary failures
+ZYNUM_RELEASE_VALIDATION
 ```
 
-Smoke-test examples when usage docs change:
+The strict inventory flags require reviewed repository state and reject a
+maintenance transition that has not been finalized. Inventory-dependent tests
+also require an exact `-Dcpu=baseline` query. A pending native row remains a
+documented evidence gap: cross-compilation, emulation, or another target class
+cannot satisfy it. Do not claim a complete native matrix while applicable rows
+remain pending.
+
+The build and test inventory checkers use bounded, fail-closed input admission
+and code-pinned review controls. They do not prove signer identity, remote
+execution, or cryptographic provenance. For schemas, bounds, cleanup behavior,
+and exit statuses, read `tools/check_build_inventory.py`,
+`tools/check_test_inventory.py`, and the runner sources.
+
+Source archive and report publication must run in an isolated workspace without
+an untrusted writer sharing the publisher's effective filesystem credentials.
+Create source archives only from a clean committed checkout; the archive tool
+rejects staged, modified, and untracked repository content and verifies selected
+bytes against the committed tree. Do not reuse or delete an existing checkout
+output directory to manufacture a clean release workspace. If a publication
+tool reports uncertain or recoverable material, stop and inspect it offline; do
+not delete it by pathname alone.
+
+## Example Smoke Tests
+
+Run examples when usage docs, installed headers, or library layout changes:
 
 ```sh
 zig build --build-file examples/zig/build.zig run
@@ -72,103 +92,89 @@ gfortran -std=f2008 -I zig-out/examples/fortran-mod \
 zig-out/examples/fortran-dgemm
 ```
 
-After regenerating headers, a Git checkout should show no generated drift:
+After header generation, inspect drift:
 
 ```sh
 git status --short -- include/zynum/blas
 ```
 
-If any generated file changes, inspect the matching ABI export first, commit the
-updated generated file intentionally, and mention the compatibility impact in the
-release notes. When adding, removing, or moving exported ABI functions, also
-update the ordered source lists and expected export counts in
-`tools/generate_compat_headers.zig`.
+Any generated change must correspond to an intentional ABI source change and be
+described in release notes. Update generator source lists and export
+expectations when moving ABI functions.
 
 ## Compatibility Review
 
-Before release, decide whether each user-visible change is:
+Classify every user-visible change:
 
-- A Zig API change.
-- A BLAS ABI export change.
-- A generated C/Fortran header change.
-- A runtime environment variable behavior change.
-- A benchmark or tool output-format change.
+- Zig API or package layout;
+- BLAS ABI export;
+- generated C/Fortran interface;
+- runtime environment-variable behavior;
+- installed library layout; or
+- benchmark/report format.
 
-For beta releases, Zig API and package layout may still change, but standard
-BLAS ABI symbols should remain stable unless the release explicitly documents a
-breaking compatibility change.
+Before 1.0, Zig APIs and package layout may change, but standard BLAS symbols
+remain stable unless release notes explicitly document a breaking change.
 
-Because Zynum is LGPL-3.0-or-later and installs both shared and static libraries,
-review downstream linking obligations before publishing binary artifacts. Prefer
-shared-library examples for normal application integration, and document
-relinking/object-file expectations when distributing statically linked combined
-works.
+Zynum is LGPL-3.0-or-later and installs shared and static libraries. Review
+downstream linking and relinking obligations before publishing binaries,
+especially statically linked combined works.
 
-## Target And Performance Claims
+## Native Performance Gates
 
-Do not publish broad performance claims without recorded evidence. At minimum,
-record:
+Performance claims require correctness-checked, fresh-process evidence on
+representative AArch64 and x86_64 systems for the advertised capability tier.
+Record:
 
-- Target tuple and `-Dcpu` value.
-- Native CPU model and OS.
-- Zig version.
-- Zynum and comparator runtime environment variables.
-- Correctness command.
-- Focused benchmark command when promoting a shape gate.
-- Full sweep command and CSV path.
-- Fresh-process isolation level when comparing against Accelerate, OpenBLAS, MKL,
-  or another BLAS.
+- source and binary identity;
+- target tuple, `-Dcpu` value, native CPU model, OS, and Zig version;
+- Zynum and comparator thread policy;
+- correctness and forced-path commands;
+- focused commands around dispatch boundaries;
+- representative full-sweep command and raw artifact location;
+- comparator identities and fresh-process isolation; and
+- selected kernel/path evidence plus a rollback condition.
 
-Cross-compilation and CI compile checks prove build coverage, not native
-throughput. Label unmeasured targets as unmeasured.
+Cross-compilation proves build coverage only. Emulation may add functional
+coverage but never native throughput evidence. Label unmeasured targets as
+unmeasured.
 
-## GitHub Setup
+## README Performance Charts
 
-Before making the repository public, configure GitHub project settings:
+When kernels, benchmark tools, or performance summaries change, follow
+`common/benchmarking.md#readme-charts`. The published chart set must:
 
-- Confirm the repository name is `Zynum` under `kaix-huang`.
-- Set the repository description, for example:
-  `Zig-native numerical runtime with full BLAS compatibility and optimized GEMM kernels.`
-- Add repository URL references if GitHub did not infer them automatically.
-- Add topics such as `zig`, `numerical-computing`, `blas`, `linear-algebra`,
-  `cblas`, `fortran`, `gemm`, and `high-performance-computing`.
+- contain only the curated Level 1, Level 2, and Level 3 README SVGs;
+- state that higher is better;
+- use the documented `Zynum`, `Accelerate`, `OpenBLAS` order;
+- cover the documented real and complex types and shape set; and
+- match README captions and the retained private raw evidence.
+
+Do not commit raw CSV or host metadata unless they are intentional release
+artifacts.
+
+## GitHub Settings
+
+- Confirm repository owner, name, description, URL, and topics.
 - Enable private vulnerability reporting when available.
-- Confirm the private security/conduct contact guidance names the maintainer as
-  Kaixiang Huang.
-- Confirm branch protection for `main` if the project accepts contributions.
-- Require the CI workflow before merge once contribution volume justifies it.
+- Keep security and conduct contact guidance accurate without exposing private
+  contact data.
+- Protect the default branch and require CI before merge when appropriate.
 - Enable issue templates and the pull request template.
-
-## Initial Push Commands
-
-Use these only after reviewing `git status` carefully:
-
-```sh
-git init
-git branch -M main
-git add .
-git status --short
-git commit -m "Release Zynum 0.0.1-beta"
-git remote add origin https://github.com/kaix-huang/Zynum.git
-git push -u origin main
-```
-
-If the remote repository already exists with commits, fetch it first and reconcile
-history instead of force-pushing.
+- Reconcile an existing remote history; never force-push merely to simplify a
+  first public release.
 
 ## Release Notes
 
-A `0.0.1-beta` release note should include:
+Release notes should state:
 
-- Full BLAS Level 1-3 support.
-- Typed Zig vector/matrix views and descriptive operations.
-- CBLAS and Fortran BLAS ABI compatibility.
-- Generated `cblas.h`, `blas.h`, and `blas.f90` status.
-- GEMM optimization scope and measured target caveats.
-- Supported Zig version range.
-- Known limitations and experimental runtime switches.
-- License and linking notes for LGPL-3.0-or-later distribution.
-- Benchmark methodology if any performance summary is included.
+- user-visible additions, fixes, and compatibility changes;
+- supported Zig version range;
+- generated C/Fortran interface status;
+- runtime-control or install-layout changes;
+- beta limitations and known issues;
+- LGPL linking considerations; and
+- reproducible methodology for any performance summary.
 
-Keep performance language conservative. Prefer concrete command/data references
-over marketing claims.
+Keep performance language capability-specific and conservative. Prefer links to
+commands and immutable artifacts over broad marketing claims.

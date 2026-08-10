@@ -36,11 +36,17 @@ test "modern typed gemm API" {
     try std.testing.expectApproxEqAbs(@as(f64, 136), c[3], 1e-12);
 }
 
-test "modern checked API rejects invalid shapes and short strides" {
-    if (builtin.mode == .ReleaseFast) return error.SkipZigTest;
-
+test "modern API rejects structural shape errors in all build modes" {
     var short = [_]f64{ 1, 2, 3 };
-    try std.testing.expectError(error.BufferTooSmall, zynum.constVector(f64, &short, .{ .length = 3, .stride = 2 }));
+    try std.testing.expectError(error.InvalidLength, zynum.constVector(f64, &short, .{ .length = -1 }));
+    try std.testing.expectError(error.InvalidStride, zynum.constVector(f64, &short, .{ .length = 3, .stride = 0 }));
+
+    var matrix_data = [_]f64{ 1, 2, 3, 4 };
+    try std.testing.expectError(error.InvalidLeadingDimension, zynum.constMatrix(f64, &matrix_data, .{
+        .row_count = 2,
+        .column_count = 2,
+        .leading_dimension = 1,
+    }));
 
     var a_data = [_]f64{ 1, 2, 3, 4, 5, 6 };
     var b_data = [_]f64{ 1, 2, 3, 4, 5, 6 };
@@ -53,6 +59,23 @@ test "modern checked API rejects invalid shapes and short strides" {
         .right_matrix = right_matrix,
         .result_matrix = result_matrix,
     }));
+
+    var scale_input = [_]f64{ 1, 2, 3 };
+    var scale_result = [_]f64{ 0, 0 };
+    const input_vector = try zynum.constVector(f64, &scale_input, .{});
+    const result_vector = try zynum.vector(f64, &scale_result, .{});
+    try std.testing.expectError(error.DimensionMismatch, zynum.scaleVectorInto(.{
+        .input_vector = input_vector,
+        .result_vector = result_vector,
+        .scale = 2,
+    }));
+}
+
+test "modern checked API rejects short backing storage" {
+    if (builtin.mode == .ReleaseFast) return error.SkipZigTest;
+
+    var short = [_]f64{ 1, 2, 3 };
+    try std.testing.expectError(error.BufferTooSmall, zynum.constVector(f64, &short, .{ .length = 3, .stride = 2 }));
 }
 
 test "modern vector Into operations write out of place" {

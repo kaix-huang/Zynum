@@ -1,0 +1,297 @@
+{
+  "schema_version": 3,
+  "role": "observer_not_abi_authority",
+  "installed_zig_module_abi": false,
+  "artifact_build_configuration": {
+    "configuration_id": "aarch64-macos-releasefast-v1",
+    "command_template": [
+      "zig",
+      "build",
+      "install",
+      "-j1",
+      "-Dtarget=aarch64-macos",
+      "--release=fast",
+      "--prefix",
+      "<temporary-install-prefix>",
+      "--cache-dir",
+      "<isolated-local-cache>",
+      "--global-cache-dir",
+      "<isolated-global-cache>",
+      "--summary",
+      "failures"
+    ],
+    "declared_target": "aarch64-macos",
+    "resolved": {
+      "optimize": "ReleaseFast",
+      "cpu": "apple_m1",
+      "cpu_resolution": "Zig 0.16.0 explicit-target default",
+      "strip_debug_info": false,
+      "minimum_platform": "13.0",
+      "artifact_sdk": "26.4",
+      "zig_version": "0.16.0"
+    },
+    "resolved_build_inputs": {
+      "generated_builtin_zig_sha256": {
+        "dynamic_library": "87a6d1418ffc4acad526edf9f21836a937a0456a868ed521cee9c264d5f30c78",
+        "static_library": "9c61cd4da525518fd5660ac7b84c3750781ad2ef5ad2e93d364b04421bcf9498"
+      },
+      "matched_across_two_independent_cache_roots": true,
+      "installed_artifact_provenance_binding": {
+        "cache_presence_sufficient": false,
+        "dynamic_library": {
+          "binding_chain": [
+            {
+              "from": "installed_dylib",
+              "via": "unique_N_OSO",
+              "to": "cache_object"
+            },
+            {
+              "from": "cache_object",
+              "via": "DWARF_v4_line_directory",
+              "to": "generated_builtin_zig"
+            }
+          ],
+          "expected_sha256_field": "generated_builtin_zig_sha256.dynamic_library",
+          "match_required": true
+        },
+        "static_library": {
+          "binding_chain": [
+            {
+              "from": "installed_archive",
+              "via": "unique_ZCU_member",
+              "to": "ZCU_object"
+            },
+            {
+              "from": "ZCU_object",
+              "via": "DWARF_v4_line_directory",
+              "to": "generated_builtin_zig"
+            }
+          ],
+          "expected_sha256_field": "generated_builtin_zig_sha256.static_library",
+          "match_required": true
+        }
+      },
+      "verification_boundary": {
+        "independent_parser": "tools/abi_artifact_parity.py",
+        "build_and_verify_cli": "tools/verify_abi_artifact_parity.py",
+        "local_receipt_cross_check": true
+      }
+    },
+    "raw_artifacts": {
+      "sha256_retained": true,
+      "cross_cache_raw_byte_equality_claimed": false,
+      "allowed_volatility_classes": [
+        "Mach-O LC_UUID",
+        "N_OSO cache path/object mtime",
+        "derived adhoc signature",
+        "static-object DWARF global-cache path"
+      ]
+    },
+    "fresh_rebuild_parity": {
+      "required_parity_axes": [
+        "artifact_metadata",
+        "archive_structure",
+        "symbol_sets",
+        "source_symbol_accounting",
+        "generated_build_input_provenance"
+      ],
+      "required_artifact_fields": [
+        "format",
+        "architecture",
+        "platform",
+        "minimum_platform",
+        "sdk",
+        "install_name",
+        "dependencies",
+        "rpaths"
+      ],
+      "required_archive_fields": [
+        "members",
+        "index",
+        "normalized_metadata"
+      ],
+      "required_symbol_sets": [
+        {
+          "scope": "external",
+          "definition": "defined",
+          "fields": [
+            "name",
+            "type"
+          ]
+        },
+        {
+          "scope": "external",
+          "definition": "undefined",
+          "fields": [
+            "name",
+            "type"
+          ]
+        },
+        {
+          "scope": "local",
+          "exclude": "STABS",
+          "fields": [
+            "name",
+            "type"
+          ]
+        }
+      ],
+      "required_source_symbol_accounting": [
+        "public",
+        "hidden"
+      ]
+    }
+  },
+  "authority": {
+    "description": "The current source declarations and generated compatibility outputs remain authoritative.",
+    "generated_outputs": [
+      "include/zynum/blas/abi_manifest.json",
+      "include/zynum/blas/blas.h",
+      "include/zynum/blas/cblas.h",
+      "include/zynum/blas/blas.f90",
+      "pkgconfig/zynum_blas.pc"
+    ],
+    "generator": "tools/generate_compat_headers.zig",
+    "sources": [
+      "src/blas/abi/cblas.zig",
+      "src/blas/abi/fortran.zig",
+      "src/**/*.zig"
+    ]
+  },
+  "classification": {
+    "allowed": [
+      "utility_error",
+      "runtime_control",
+      "standard_level1",
+      "standard_level2",
+      "standard_level3",
+      "retained_extension",
+      "architecture_extension",
+      "internal_bridge",
+      "toolchain_owned",
+      "unclassified"
+    ],
+    "unknown_is_failure": true
+  },
+  "platform_matrix": [
+    "aarch64-macos",
+    "x86_64-linux-gnu",
+    "aarch64-linux-gnu",
+    "x86_64-windows-gnu"
+  ],
+  "consumer_matrix": [
+    {
+      "environment": "clean_source_archive",
+      "language": "Zig",
+      "linkage": "source"
+    },
+    {
+      "environment": "binary_install_prefix",
+      "language": "C",
+      "linkage": "shared"
+    },
+    {
+      "environment": "binary_install_prefix",
+      "language": "C",
+      "linkage": "static"
+    },
+    {
+      "environment": "binary_install_prefix",
+      "language": "C++",
+      "linkage": "shared"
+    },
+    {
+      "environment": "binary_install_prefix",
+      "language": "C++",
+      "linkage": "static"
+    },
+    {
+      "environment": "binary_install_prefix",
+      "language": "Fortran",
+      "linkage": "shared"
+    },
+    {
+      "environment": "binary_install_prefix",
+      "language": "Fortran",
+      "linkage": "static"
+    }
+  ],
+  "consumer_execution_policy": {
+    "candidate_build_scripts_executed": false,
+    "compile_and_link_tools": "trusted_toolchain",
+    "runtime": {
+      "darwin": {
+        "backend": "sandbox-exec",
+        "environment": "scrubbed",
+        "fork": "denied",
+        "network": "denied",
+        "file_writes": "denied",
+        "file_data_reads": "default_denied",
+        "read_allowlist": [
+          "system_runtime",
+          "consumer_workspace",
+          "explicit_runtime_dependencies"
+        ]
+      },
+      "windows": "not_observed_without_filesystem_and_network_isolation",
+      "other": "not_observed_without_strict_runtime_containment"
+    }
+  },
+  "artifact_policy": {
+    "required_kinds": [
+      "dynamic",
+      "static"
+    ],
+    "archive_queries_only": true,
+    "max_archive_members": 4096,
+    "unavailable_fields": "not_observed_with_reason",
+    "target_bindings": {
+      "aarch64-macos": {
+        "architectures": [
+          "arm64"
+        ],
+        "dynamic_format": "Mach-O",
+        "static_member_format": "Mach-O",
+        "dynamic_platform": "macOS"
+      },
+      "x86_64-linux-gnu": {
+        "architectures": [
+          "x86_64"
+        ],
+        "dynamic_format": "ELF",
+        "static_member_format": "ELF"
+      },
+      "aarch64-linux-gnu": {
+        "architectures": [
+          "arm64"
+        ],
+        "dynamic_format": "ELF",
+        "static_member_format": "ELF"
+      },
+      "x86_64-windows-gnu": {
+        "architectures": [
+          "x86_64"
+        ],
+        "dynamic_format": "PE/COFF",
+        "static_member_format": "PE/COFF"
+      }
+    }
+  },
+  "source_archive_policy": {
+    "enumeration": "git_tracked_and_untracked_excluding_ignored",
+    "normalized_metadata": true,
+    "extraction_limits": {
+      "max_members": 20000,
+      "max_file_bytes": 67108864,
+      "max_total_bytes": 536870912,
+      "max_compression_ratio": 200,
+      "hard_timeout": true,
+      "links_sparse_and_special_entries": "rejected"
+    }
+  },
+  "determinism": {
+    "include_timestamp": false,
+    "normalize_transient_paths": true,
+    "stable_sorting": true
+  }
+}

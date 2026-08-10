@@ -10,8 +10,9 @@
 ## Validation
 
 - [ ] `zig fmt --check build.zig build.zig.zon src test bench examples tools`
-- [ ] `zig build test --summary failures`
+- [ ] `zig build test -Dcpu=baseline --summary failures`
 - [ ] `zig build generate-headers` when ABI exports changed
+- [ ] `zig build generate-kernel-coverage` when kernel descriptors changed
 - [ ] Examples touched or smoke-tested when docs/examples changed
 - [ ] `git status --short -- include/zynum/blas` shows no generated header drift after regenerating headers
 - [ ] Not run; explain below

@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+const std = @import("std");
 const views = @import("views.zig");
 
 const ByteRange = struct {
@@ -12,9 +13,11 @@ const ByteRange = struct {
     }
 };
 
-fn byteRange(ptr: anytype, len: usize, comptime T: type) ByteRange {
+fn byteRange(ptr: anytype, len: usize, comptime T: type) views.Error!ByteRange {
     const start = @intFromPtr(ptr);
-    return .{ .start = start, .end = start + len * @sizeOf(T) };
+    const byte_len = std.math.mul(usize, len, @sizeOf(T)) catch return error.InvalidLength;
+    const end = std.math.add(usize, start, byte_len) catch return error.InvalidLength;
+    return .{ .start = start, .end = end };
 }
 
 fn rangesOverlap(first: ByteRange, second: ByteRange) bool {
@@ -30,12 +33,12 @@ pub fn vectorsExactlyMatch(first: anytype, second: anytype) bool {
 
 pub fn vectorRange(comptime T: type, vector: anytype) views.Error!ByteRange {
     const len = try views.requiredVectorStorageLength(vector.length, vector.stride);
-    return byteRange(vector.values.ptr, len, T);
+    return try byteRange(vector.values.ptr, len, T);
 }
 
 pub fn matrixRange(comptime T: type, matrix: anytype) views.Error!ByteRange {
     const len = try views.requiredMatrixStorageLength(matrix.row_count, matrix.column_count, matrix.leading_dimension);
-    return byteRange(matrix.values.ptr, len, T);
+    return try byteRange(matrix.values.ptr, len, T);
 }
 
 pub fn vectorsOverlap(comptime T: type, first: anytype, second: anytype) views.Error!bool {

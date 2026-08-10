@@ -16,56 +16,284 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  ZIG_GLOBAL_CACHE_DIR: .zig-cache/global
+  ZIG_LOCAL_CACHE_DIR: .zig-cache/local
+
 jobs:
-  test:
-    name: ${{ matrix.os }} / ${{ matrix.target }}
+  source-checks:
+    name: Source checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .zig-cache
+          key: zig-source-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-source-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Check formatting
+        run: zig fmt --check build.zig build.zig.zon src test bench examples tools
+
+      - name: Check Python tools compile
+        run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py tools/*.py
+
+      - name: Check build inventory
+        run: python3 -B tools/check_build_inventory.py --root .
+
+      - name: Check test inventory structure
+        run: python3 -B tools/check_test_inventory.py --root . --structure-only
+
+      - name: Run test inventory security suite
+        run: |
+          python3 -B test/build/test_build_inventory.py
+          python3 -B test/build/test_test_inventory.py
+
+      - name: Check package paths
+        run: python3 tools/check_package_paths.py --archive zig-out/ci/zynum-source.tar.gz
+
+      - name: Regenerate compatibility headers and kernel coverage
+        run: |
+          zig build generate-headers --summary failures
+          zig build generate-kernel-coverage --summary failures
+
+      - name: Check generated files are up to date
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json
+          status="$(git status --porcelain --untracked-files=all -- include/zynum/blas docs/kernel_coverage.json)"
+          if [[ -n "$status" ]]; then
+            echo "Generated compatibility headers or kernel coverage are out of date."
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
+  target-tests:
+    name: ${{ matrix.name }}
+    needs: source-checks
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-15
-            target: native
-          - os: macos-15
-            target: aarch64-macos-apple-m4
-          - os: ubuntu-24.04
-            target: native
-          - os: ubuntu-24.04
-            target: x86_64-linux-baseline
+          - name: macOS / aarch64 baseline
+            os: macos-15
+            cache_target: macos-aarch64-baseline
+            zig_gate: inventory-certified
+            target_args: -Dtarget=aarch64-macos -Dcpu=baseline
+            host_tool_smoke: true
+            install: true
+            dynlib: zig-out/lib/libzynum_blas.dylib
+            full_smoke: false
+          - name: Linux / x86_64 baseline
+            os: ubuntu-24.04
+            cache_target: linux-x86_64-baseline
+            zig_gate: inventory-certified
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=baseline
+            host_tool_smoke: true
+            install: true
+            dynlib: zig-out/lib/libzynum_blas.so
+            full_smoke: true
+          - name: Linux / ARM64 baseline
+            os: ubuntu-24.04-arm
+            cache_target: linux-arm64-baseline
+            zig_gate: link-only
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=baseline
+            host_tool_smoke: true
+            install: true
+            dynlib: zig-out/lib/libzynum_blas.so
+            full_smoke: false
+          - name: Windows / x86_64 baseline
+            os: windows-2025
+            cache_target: windows-x86_64-baseline
+            zig_gate: link-only
+            target_args: -Dtarget=x86_64-windows-gnu -Dcpu=baseline
+            host_tool_smoke: false
+            install: false
+            dynlib: ""
+            full_smoke: false
     steps:
-      - uses: actions/checkout@v4
-      - uses: mlugg/setup-zig@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.16.0
-      - name: Check formatting
-        run: zig fmt --check build.zig build.zig.zon src test bench examples tools
-      - name: Regenerate compatibility headers
-        run: zig build generate-headers
-      - name: Check generated headers are up to date
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .zig-cache
+          key: zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-
+            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Build Windows Python tooling executable fixtures and libraries
+        if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
+        shell: pwsh
         run: |
-          if [ -n "$(git status --porcelain -- include/zynum/blas)" ]; then
-            echo "Generated compatibility headers are out of date. Run 'zig build generate-headers' and commit the result."
-            git --no-pager diff -- include/zynum/blas
-            git --no-pager status --short -- include/zynum/blas
+          $dynamicLibrary = 'zig-out/bin/zynum_blas.dll'
+          if (Test-Path -LiteralPath $dynamicLibrary) {
+            Write-Error "canonical Windows DLL already exists before the reviewed build: $dynamicLibrary"
             exit 1
-          fi
-      - name: Test native
-        if: matrix.target == 'native'
-        run: zig build test --summary failures
-      - name: Build Apple M4 target
-        if: matrix.target == 'aarch64-macos-apple-m4'
-        run: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4 --release=fast --summary failures
-      - name: Test x86_64 baseline target
-        if: matrix.target == 'x86_64-linux-baseline'
-        run: zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline --summary failures
+          }
+          zig build install-libraries build-rank-k-probe build-rotg-latency-probe build-symm-probe build-triangular-matrix-probe ${{ matrix.target_args }} --release=fast --summary failures
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Check Windows library layout and tooling fixture boundary
+        if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
+        shell: pwsh
+        run: |
+          $dynamicLibrary = 'zig-out/bin/zynum_blas.dll'
+          $importLibrary = 'zig-out/lib/zynum_blas.lib'
+          $staticLibrary = 'zig-out/lib/static/zynum_blas.lib'
+          $libraryPaths = @($dynamicLibrary, $importLibrary, $staticLibrary)
+          foreach ($path in $libraryPaths) {
+            $artifact = Get-Item -LiteralPath $path -ErrorAction Stop
+            if ($artifact.PSIsContainer -or $artifact.Length -eq 0) {
+              Write-Error "expected a nonempty regular library artifact at $path"
+              exit 1
+            }
+          }
+          $resolvedPaths = @($libraryPaths | ForEach-Object { (Resolve-Path -LiteralPath $_).Path })
+          if (@($resolvedPaths | Sort-Object -Unique).Count -ne 3) {
+            Write-Error 'Windows dynamic, import, and static artifacts must have distinct paths'
+            exit 1
+          }
+          $libraryHashes = @($libraryPaths | ForEach-Object { (Get-FileHash -Algorithm SHA256 -LiteralPath $_).Hash })
+          if (@($libraryHashes | Sort-Object -Unique).Count -ne 3) {
+            Write-Error 'Windows dynamic, import, and static artifacts must have distinct contents'
+            exit 1
+          }
+          $installedDlls = @(Get-ChildItem -LiteralPath (Split-Path -Parent $dynamicLibrary) -Filter '*.dll' -File)
+          if ($installedDlls.Count -ne 1 -or $installedDlls[0].Name -cne 'zynum_blas.dll') {
+            Write-Error 'canonical Windows DLL directory must contain exactly zynum_blas.dll and no additional DLLs'
+            exit 1
+          }
+          $hardlinkPaths = @(fsutil hardlink list $dynamicLibrary | Where-Object { $_.Trim().Length -gt 0 })
+          if ($LASTEXITCODE -ne 0 -or $hardlinkPaths.Count -ne 1) {
+            Write-Error "canonical Windows DLL must have exactly one hardlink path, found $($hardlinkPaths.Count)"
+            exit 1
+          }
+          $importMembers = @(zig ar t $importLibrary)
+          if ($LASTEXITCODE -ne 0 -or @($importMembers | Where-Object { $_ -ceq 'zynum_blas.dll' }).Count -eq 0) {
+            Write-Error 'zynum_blas.lib is not the reviewed DLL import library'
+            exit 1
+          }
+          $staticMembers = @(zig ar t $staticLibrary)
+          if ($LASTEXITCODE -ne 0 -or $staticMembers.Count -eq 0 -or @($staticMembers | Where-Object { $_ -like '*.dll' }).Count -ne 0) {
+            Write-Error 'lib/static/zynum_blas.lib is not the reviewed static object archive'
+            exit 1
+          }
+          $unsupportedExecutables = @(
+            'bench-zynum-blas.exe',
+            'gemm-sweep.exe',
+            'vector-matrix-sweep.exe',
+            'level1-probe.exe',
+            'dcopy-probe.exe'
+          )
+          foreach ($name in $unsupportedExecutables) {
+            if (Test-Path -LiteralPath (Join-Path 'zig-out/bin' $name)) {
+              Write-Error "unsupported Windows executable leaked into the default installation: $name"
+              exit 1
+            }
+          }
+
+      - name: Run Windows Python tooling inventory gate
+        if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          $env:PYTHONHOME = $null
+          $env:PYTHONPATH = $null
+          $env:PYTHONINSPECT = $null
+          $env:PYTHONSTARTUP = $null
+          $env:GIT_PAGER = $null
+          $env:PAGER = $null
+          $env:LESS = $null
+          zig build test-python-tooling ${{ matrix.target_args }} --release=fast --summary failures
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Install Fortran compiler on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Test Debug target
+        if: matrix.zig_gate == 'inventory-certified'
+        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+
+      - name: Test ReleaseSafe target
+        if: matrix.zig_gate == 'inventory-certified'
+        run: zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+
+      - name: Test ReleaseFast target
+        if: matrix.zig_gate == 'inventory-certified'
+        run: zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+
+      - name: Link test inventory for Debug target
+        if: matrix.zig_gate == 'link-only'
+        run: zig build test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+
+      - name: Link test inventory for ReleaseSafe target
+        if: matrix.zig_gate == 'link-only'
+        run: zig build --release=safe test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+
+      - name: Link test inventory for ReleaseFast target
+        if: matrix.zig_gate == 'link-only'
+        run: zig build --release=fast test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+
       - name: Build install artifacts
-        if: matrix.target == 'native'
-        run: zig build --summary failures
+        if: matrix.install
+        run: zig build ${{ matrix.target_args }} --release=fast --summary failures
+
+      - name: Check ABI symbols
+        if: matrix.install
+        run: |
+          python3 tools/check_abi_manifest.py \
+            --manifest include/zynum/blas/abi_manifest.json \
+            --dynamic "${{ matrix.dynlib }}" \
+            --static zig-out/lib/libzynum_blas.a
+
+      - name: Check install metadata
+        if: matrix.install
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          pc = Path("zig-out/lib/pkgconfig/zynum_blas.pc")
+          text = pc.read_text()
+          assert "Name: zynum_blas" in text
+          assert "-lzynum_blas" in text
+          assert "Cflags:" in text
+          PY
+          if command -v pkg-config >/dev/null 2>&1; then
+            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --exists zynum_blas
+            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
+          fi
+
       - name: Run Zig example
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: zig build --build-file examples/zig/build.zig run
+
       - name: Run CBLAS example
-        if: matrix.target == 'native'
+        if: matrix.full_smoke
         run: |
           mkdir -p zig-out/examples
           cc -std=c11 examples/cblas/dgemm.c \
@@ -73,17 +301,182 @@ jobs:
             -Wl,-rpath,zig-out/lib \
             -o zig-out/examples/cblas-dgemm
           zig-out/examples/cblas-dgemm
-      - name: Run Fortran example when gfortran is available
-        if: matrix.target == 'native'
+
+      - name: Run Fortran example
+        if: matrix.full_smoke && runner.os == 'Linux'
         run: |
-          if command -v gfortran >/dev/null 2>&1; then
-            mkdir -p zig-out/examples/fortran-mod
-            gfortran -std=f2008 -J zig-out/examples/fortran-mod \
-              -c zig-out/include/zynum/blas/blas.f90 \
-              -o zig-out/examples/zynum_blas_fortran.o
-            gfortran -std=f2008 -I zig-out/examples/fortran-mod \
-              examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
-              -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
-              -o zig-out/examples/fortran-dgemm
-            zig-out/examples/fortran-dgemm
-          fi
+          mkdir -p zig-out/examples/fortran-mod
+          gfortran -std=f2008 -J zig-out/examples/fortran-mod \
+            -c zig-out/include/zynum/blas/blas.f90 \
+            -o zig-out/examples/zynum_blas_fortran.o
+          gfortran -std=f2008 -I zig-out/examples/fortran-mod \
+            examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
+            -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
+            -o zig-out/examples/fortran-dgemm
+          zig-out/examples/fortran-dgemm
+
+      - name: Run benchmark executable smoke tests
+        if: matrix.full_smoke
+        run: |
+          zig build bench -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 2 --reps 1
+          zig build bench-gemm-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --kind dgemm --shape tiny:2:2:2 --reps 1
+          zig build bench-vector-matrix-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 4 --reps 1 --case dcopy
+
+      - name: Run probe smoke tests
+        if: matrix.full_smoke
+        run: |
+          zig-out/bin/level1-probe --lib "${{ matrix.dynlib }}" --op ddot --n 4 --seconds 0
+          zig-out/bin/dcopy-probe --lib "${{ matrix.dynlib }}" --kind d --n 4 --seconds 0
+
+      - name: Run Python benchmark tool smoke tests
+        if: matrix.full_smoke
+        run: |
+          mkdir -p zig-out/ci
+          python3 - <<'PY'
+          from pathlib import Path
+          Path("zig-out/ci/gemm_fixture.csv").write_text(
+              "kind,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,process_repeats,check\n"
+              "dgemm,0,tiny,2,2,2,zynum-blas,1.0,1,1,1,1,1,1,checked-ok\n"
+              "dgemm,0,tiny,2,2,2,OpenBLAS,0.5,2,2,2,2,1,1,checked-ok\n"
+          )
+          Path("zig-out/ci/level1_fixture.csv").write_text(
+              "group,op,library,metric,n,seconds,status,bandwidth_gbps,rate_gops\n"
+              "real_f64,ddot,Zynum,gops,4,1,ok,,1.0\n"
+              "real_f64,ddot,OpenBLAS,gops,4,1,ok,,0.5\n"
+          )
+          Path("zig-out/ci/level2_fixture.csv").write_text(
+              "case,kind,library,n,status,rate_gops\n"
+              "dgemv_n,real_f64,Zynum,4,ok,1.0\n"
+              "dgemv_n,real_f64,OpenBLAS,4,ok,0.5\n"
+          )
+          PY
+          python3 bench/tools/check_gemm_sweep.py zig-out/ci/gemm_fixture.csv --comparator OpenBLAS
+          python3 bench/tools/plot_gemm_sweep.py zig-out/ci/gemm_fixture.csv zig-out/ci/gemm_fixture.svg
+          python3 bench/tools/plot_level1_report.py zig-out/ci/level1_fixture.csv --bars-svg zig-out/ci/level1_bars.svg --ratio-svg zig-out/ci/level1_ratio.svg
+          python3 bench/tools/plot_level2_report.py zig-out/ci/level2_fixture.csv --bars-svg zig-out/ci/level2_bars.svg
+
+  capability-builds:
+    name: Capability build / ${{ matrix.name }}
+    needs: source-checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: AArch64 ASIMD baseline
+            cache_target: aarch64-asimd
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=baseline
+          - name: AArch64 SVE
+            cache_target: aarch64-sve
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=neoverse_v1
+          - name: AArch64 SVE2
+            cache_target: aarch64-sve2
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=neoverse_v2
+          - name: AArch64 SME
+            cache_target: aarch64-sme
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=generic+sme
+          - name: AArch64 SME2 without F64F64
+            cache_target: aarch64-sme2
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=generic+sme+sme2
+          - name: AArch64 SME2 with F64F64
+            cache_target: aarch64-sme2-f64f64
+            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=generic+sme+sme2+sme_f64f64
+          - name: x86_64 SSE2 baseline
+            cache_target: x86_64-sse2
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=x86_64
+          - name: x86_64 AVX
+            cache_target: x86_64-avx
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=x86_64+avx
+          - name: x86_64 AVX2 without FMA
+            cache_target: x86_64-avx2
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=x86_64+avx+avx2
+          - name: x86_64 AVX2 FMA
+            cache_target: x86_64-v3
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3
+          - name: x86_64 AVX-512
+            cache_target: x86_64-v4
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4
+          - name: x86_64 AMX
+            cache_target: x86_64-amx
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=sapphirerapids
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .zig-cache
+          key: zig-capability-${{ runner.os }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-capability-${{ runner.os }}-0.16.0-${{ matrix.cache_target }}-
+            zig-capability-${{ runner.os }}-0.16.0-
+
+      - name: Build target capability
+        run: |
+          zig build \
+            --prefix "zig-out/capability-${{ matrix.cache_target }}" \
+            ${{ matrix.target_args }} \
+            --release=fast --summary failures
+
+      - name: Compile enabled Level 2 width production-artifact probe
+        if: matrix.cache_target == 'x86_64-v4'
+        run: >-
+          zig build build-level2-width-enabled-artifact
+          ${{ matrix.target_args }}
+          -Dlevel2-width-candidates=true
+          --release=fast --summary failures
+
+  feature-compile:
+    name: ${{ matrix.name }}
+    needs: source-checks
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS / host-native correctness
+            os: macos-15
+            cache_target: macos-host-native-correctness
+            command: zig build test-native-feature -Dcpu=native -Dtest-optimize=ReleaseSafe --release=safe --summary failures
+          - name: Linux / host-native correctness
+            os: ubuntu-24.04
+            cache_target: linux-host-native-correctness
+            command: zig build test-native-feature -Dcpu=native -Dtest-optimize=ReleaseSafe --release=safe --summary failures
+          - name: macOS / Apple M4 SME2.1 build-only
+            os: macos-15
+            cache_target: macos-apple-m4-sme2p1
+            command: zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+          - name: Linux / x86_64 v3 build-only
+            os: ubuntu-24.04
+            cache_target: linux-x86_64-v3
+            command: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
+          - name: Linux / x86_64 v4 build-only
+            os: ubuntu-24.04
+            cache_target: linux-x86_64-v4
+            command: zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast --summary failures
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .zig-cache
+          key: zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-
+            zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Run matrix gate
+        run: ${{ matrix.command }}

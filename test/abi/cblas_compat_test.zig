@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
-const cblas = @import("zynum_blas_cblas_compat");
+const cblas = @import("zynum_blas_cblas_compat").abi;
 const ref = @import("reference.zig");
 
 fn complexF32(re: f32, im: f32) cblas.ComplexF32 {
@@ -22,6 +22,183 @@ fn expectComplexF64SliceApprox(expected: []const cblas.ComplexF64, actual: []con
     for (expected, actual) |want, got| try expectComplexF64Approx(want, got);
 }
 
+fn referenceComplexScal(comptime T: type, n: usize, alpha: T, x: []T, incx: isize) void {
+    for (0..n) |i| {
+        const idx = ref.vectorIndex(n, incx, i);
+        x[idx] = ref.mul(T, alpha, x[idx]);
+    }
+}
+
+fn referenceComplexAxpy(comptime T: type, n: usize, alpha: T, x: []const T, incx: isize, y: []T, incy: isize) void {
+    for (0..n) |i| {
+        const ix = ref.vectorIndex(n, incx, i);
+        const iy = ref.vectorIndex(n, incy, i);
+        y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), y[iy]);
+    }
+}
+
+fn referenceComplexAxpby(comptime T: type, n: usize, alpha: T, x: []const T, incx: isize, beta: T, y: []T, incy: isize) void {
+    for (0..n) |i| {
+        const ix = ref.vectorIndex(n, incx, i);
+        const iy = ref.vectorIndex(n, incy, i);
+        y[iy] = ref.add(T, ref.mul(T, alpha, x[ix]), ref.mul(T, beta, y[iy]));
+    }
+}
+
+test "cblas level3 invalid enums leave outputs unchanged" {
+    var a = [_]f64{ 1, 2, 3, 4 };
+    var b = [_]f64{ 5, 6, 7, 8 };
+    var c = [_]f64{ 9, 10, 11, 12 };
+    const original_c = c;
+    cblas.cblas_dgemm(999, cblas.CblasNoTrans, cblas.CblasNoTrans, 2, 2, 2, 1, &a, 2, &b, 2, 0, &c, 2);
+    try std.testing.expectEqualSlices(f64, &original_c, &c);
+
+    var tri = [_]f64{ 1, 0, 2, 3 };
+    var trmm_b = [_]f64{ 4, 5, 6, 7 };
+    const original_b = trmm_b;
+    cblas.cblas_dtrmm(cblas.CblasColMajor, cblas.CblasLeft, cblas.CblasUpper, 999, cblas.CblasNonUnit, 2, 2, 1, &tri, 2, &trmm_b, 2);
+    try std.testing.expectEqualSlices(f64, &original_b, &trmm_b);
+}
+
+test "cblas level2 invalid enums leave outputs unchanged" {
+    var matrix = [_]f64{ 1, 2, 3, 4 };
+    var x = [_]f64{ 5, 6 };
+    var y = [_]f64{ 7, 8 };
+    const original_y = y;
+    cblas.cblas_dgemv(cblas.CblasColMajor, 999, 2, 2, 1, &matrix, 2, &x, 1, 0, &y, 1);
+    try std.testing.expectEqualSlices(f64, &original_y, &y);
+
+    var sym_y = [_]f64{ 9, 10 };
+    const original_sym_y = sym_y;
+    cblas.cblas_dsymv(cblas.CblasColMajor, 999, 2, 1, &matrix, 2, &x, 1, 0, &sym_y, 1);
+    try std.testing.expectEqualSlices(f64, &original_sym_y, &sym_y);
+
+    var tri_x = [_]f64{ 11, 12 };
+    const original_tri_x = tri_x;
+    cblas.cblas_dtrmv(cblas.CblasColMajor, cblas.CblasUpper, cblas.CblasNoTrans, 999, 2, &matrix, 2, &tri_x, 1);
+    try std.testing.expectEqualSlices(f64, &original_tri_x, &tri_x);
+
+    var rank_matrix = [_]f64{ 1, 2, 3, 4 };
+    const original_rank_matrix = rank_matrix;
+    cblas.cblas_dger(999, 2, 2, 1, &x, 1, &y, 1, &rank_matrix, 2);
+    try std.testing.expectEqualSlices(f64, &original_rank_matrix, &rank_matrix);
+}
+
+test "cblas row-major direct invalid parameters leave outputs unchanged" {
+    const alpha = complexF64(1, 0);
+    const beta = complexF64(0, 0);
+    var matrix = [_]cblas.ComplexF64{
+        complexF64(1, 1), complexF64(2, -1),
+        complexF64(3, 2), complexF64(-1, 1),
+    };
+    var x = [_]cblas.ComplexF64{ complexF64(1, 0), complexF64(2, 0) };
+    var y = [_]cblas.ComplexF64{ complexF64(7, 0), complexF64(8, 0) };
+    const original_y = y;
+    cblas.cblas_zgemv(cblas.CblasRowMajor, cblas.CblasConjTrans, 2, 2, &alpha, &matrix, 1, &x, 1, &beta, &y, 1);
+    try expectComplexF64SliceApprox(&original_y, &y);
+
+    var tri_x = [_]cblas.ComplexF64{ complexF64(3, 0), complexF64(4, 0) };
+    const original_tri_x = tri_x;
+    cblas.cblas_ztrmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, 999, 2, &matrix, 2, &tri_x, 1);
+    try expectComplexF64SliceApprox(&original_tri_x, &tri_x);
+}
+
+test "cblas symmetric level3 invalid enums leave outputs unchanged" {
+    var a = [_]f64{ 1, 2, 3, 4 };
+    var b = [_]f64{ 5, 6, 7, 8 };
+    var c = [_]f64{ 9, 10, 11, 12 };
+    const original_c = c;
+    cblas.cblas_dsymm(cblas.CblasColMajor, 999, cblas.CblasUpper, 2, 2, 1, &a, 2, &b, 2, 0, &c, 2);
+    try std.testing.expectEqualSlices(f64, &original_c, &c);
+
+    var rank_c = [_]f64{ 13, 14, 15, 16 };
+    const original_rank_c = rank_c;
+    cblas.cblas_dsyrk(cblas.CblasColMajor, cblas.CblasUpper, 999, 2, 2, 1, &a, 2, 0, &rank_c, 2);
+    try std.testing.expectEqualSlices(f64, &original_rank_c, &rank_c);
+
+    var rank2_c = [_]f64{ 17, 18, 19, 20 };
+    const original_rank2_c = rank2_c;
+    cblas.cblas_dsyr2k(cblas.CblasColMajor, 999, cblas.CblasNoTrans, 2, 2, 1, &a, 2, &b, 2, 0, &rank2_c, 2);
+    try std.testing.expectEqualSlices(f64, &original_rank2_c, &rank2_c);
+}
+
+fn expectCblasComplexScalCase(comptime T: type, n: usize, incx: isize, alpha: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0x5ca1_1234);
+    const len = ref.vectorStorageLen(n, incx);
+    const x = try std.testing.allocator.alloc(T, len);
+    defer std.testing.allocator.free(x);
+    const expected = try std.testing.allocator.alloc(T, len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    @memcpy(expected, x);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_cscal(@intCast(n), &alpha, x.ptr, @intCast(incx));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zscal(@intCast(n), &alpha, x.ptr, @intCast(incx));
+    } else {
+        @compileError("complex scal test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexScal(T, n, alpha, expected, incx);
+
+    for (expected, x) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
+fn expectCblasComplexAxpyCase(comptime T: type, n: usize, incx: isize, incy: isize, alpha: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0xca90_74b5);
+    const x_len = ref.vectorStorageLen(n, incx);
+    const y_len = ref.vectorStorageLen(n, incy);
+    const x = try std.testing.allocator.alloc(T, x_len);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    @memcpy(expected, y);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_caxpy(@intCast(n), &alpha, x.ptr, @intCast(incx), y.ptr, @intCast(incy));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zaxpy(@intCast(n), &alpha, x.ptr, @intCast(incx), y.ptr, @intCast(incy));
+    } else {
+        @compileError("complex axpy test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexAxpy(T, n, alpha, x, incx, expected, incy);
+
+    for (expected, y) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
+fn expectCblasComplexAxpbyCase(comptime T: type, n: usize, incx: isize, incy: isize, alpha: T, beta: T, tol: anytype) !void {
+    var rng = ref.Rng.init(0xcab9_1234);
+    const x_len = ref.vectorStorageLen(n, incx);
+    const y_len = ref.vectorStorageLen(n, incy);
+    const x = try std.testing.allocator.alloc(T, x_len);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, y_len);
+    defer std.testing.allocator.free(expected);
+
+    ref.fillVector(T, &rng, x, n, incx);
+    ref.fillVector(T, &rng, y, n, incy);
+    @memcpy(expected, y);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_caxpby(@intCast(n), &alpha, x.ptr, @intCast(incx), &beta, y.ptr, @intCast(incy));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zaxpby(@intCast(n), &alpha, x.ptr, @intCast(incx), &beta, y.ptr, @intCast(incy));
+    } else {
+        @compileError("complex axpby test supports ComplexF32 and ComplexF64");
+    }
+    referenceComplexAxpby(T, n, alpha, x, incx, beta, expected, incy);
+
+    for (expected, y) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
 fn makeTriangularDiagSafe(a: []cblas.ComplexF64, n: usize, lda: usize) void {
     for (0..n) |i| {
         const step = @as(f64, @floatFromInt(i));
@@ -34,6 +211,15 @@ fn fillRowMajorBand(comptime T: type, rng: *ref.Rng, a: []T, m: usize, n: usize,
     for (0..m) |row| {
         for (0..n) |col| {
             if (ref.gbIndexRowMajor(m, n, kl, ku, lda, row, col)) |idx| a[idx] = rng.scalar(T);
+        }
+    }
+}
+
+fn fillColMajorBand(comptime T: type, rng: *ref.Rng, a: []T, m: usize, n: usize, kl: usize, ku: usize, lda: usize) void {
+    for (0..a.len) |i| a[i] = ref.fromParts(T, 1500 + @as(f64, @floatFromInt(i)), -1500);
+    for (0..n) |col| {
+        for (0..m) |row| {
+            if (ref.gbIndexColMajor(m, n, kl, ku, lda, row, col)) |idx| a[idx] = rng.scalar(T);
         }
     }
 }
@@ -72,11 +258,35 @@ fn fillColMajorTriBand(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: re
     }
 }
 
+fn fillRowMajorTriBand(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: ref.Diag, a: []T, n: usize, k: usize, lda: usize) void {
+    for (0..a.len) |i| a[i] = ref.fromParts(T, -4100 - @as(f64, @floatFromInt(i)), 4100);
+    for (0..n) |row| {
+        for (0..n) |col| {
+            if (ref.triBandIndexRowMajor(uplo, k, lda, row, col)) |idx| {
+                a[idx] = rng.scalar(T);
+                if (row == col and diag == .non_unit) a[idx] = ref.add(T, a[idx], ref.fromParts(T, 2.0 + @as(f64, @floatFromInt(row)), -0.25));
+            }
+        }
+    }
+}
+
 fn fillTriPacked(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: ref.Diag, ap: []T, n: usize) void {
     for (0..ap.len) |i| ap[i] = ref.fromParts(T, 5000 + @as(f64, @floatFromInt(i)), -5000);
     for (0..n) |col| {
         for (0..n) |row| {
             if (ref.triPackedIndex(uplo, n, row, col)) |idx| {
+                ap[idx] = rng.scalar(T);
+                if (row == col and diag == .non_unit) ap[idx] = ref.add(T, ap[idx], ref.fromParts(T, 2.5 + @as(f64, @floatFromInt(row)), 0.5));
+            }
+        }
+    }
+}
+
+fn fillTriPackedRowMajor(comptime T: type, rng: *ref.Rng, uplo: ref.Uplo, diag: ref.Diag, ap: []T, n: usize) void {
+    for (0..ap.len) |i| ap[i] = ref.fromParts(T, 5100 + @as(f64, @floatFromInt(i)), -5100);
+    for (0..n) |row| {
+        for (0..n) |col| {
+            if (ref.triPackedIndexRowMajor(uplo, n, row, col)) |idx| {
                 ap[idx] = rng.scalar(T);
                 if (row == col and diag == .non_unit) ap[idx] = ref.add(T, ap[idx], ref.fromParts(T, 2.5 + @as(f64, @floatFromInt(row)), 0.5));
             }
@@ -105,6 +315,93 @@ fn referenceRowMajorCgemm(m: usize, n: usize, k: usize, alpha: cblas.ComplexF32,
     }
 }
 
+fn cblasTrans(trans: ref.Trans) c_int {
+    return switch (trans) {
+        .no_trans => cblas.CblasNoTrans,
+        .trans => cblas.CblasTrans,
+        .conj_trans => cblas.CblasConjTrans,
+    };
+}
+
+fn expectRowMajorRealGemmCase(comptime T: type, transa: ref.Trans, transb: ref.Trans) !void {
+    const m: usize = 35;
+    const n: usize = 37;
+    const k: usize = 67;
+    const a_rows = if (transa == .no_trans) m else k;
+    const a_cols = if (transa == .no_trans) k else m;
+    const b_rows = if (transb == .no_trans) k else n;
+    const b_cols = if (transb == .no_trans) n else k;
+    const lda = a_cols + 4;
+    const ldb = b_cols + 4;
+    const ldc = n + 5;
+
+    const a = try std.testing.allocator.alloc(T, a_rows * lda);
+    defer std.testing.allocator.free(a);
+    const b = try std.testing.allocator.alloc(T, b_rows * ldb);
+    defer std.testing.allocator.free(b);
+    const c = try std.testing.allocator.alloc(T, m * ldc);
+    defer std.testing.allocator.free(c);
+    const expected = try std.testing.allocator.alloc(T, m * ldc);
+    defer std.testing.allocator.free(expected);
+
+    var rng = ref.Rng.init(0x74a3_119d);
+    ref.fillRowMajor(T, &rng, a, a_rows, a_cols, lda);
+    ref.fillRowMajor(T, &rng, b, b_rows, b_cols, ldb);
+    ref.fillRowMajor(T, &rng, c, m, n, ldc);
+    @memcpy(expected, c);
+
+    const alpha: T = -0.5;
+    const beta: T = 2.0;
+    if (T == f32) {
+        cblas.cblas_sgemm(cblas.CblasRowMajor, cblasTrans(transa), cblasTrans(transb), @intCast(m), @intCast(n), @intCast(k), alpha, a.ptr, @intCast(lda), b.ptr, @intCast(ldb), beta, c.ptr, @intCast(ldc));
+    } else if (T == f64) {
+        cblas.cblas_dgemm(cblas.CblasRowMajor, cblasTrans(transa), cblasTrans(transb), @intCast(m), @intCast(n), @intCast(k), alpha, a.ptr, @intCast(lda), b.ptr, @intCast(ldb), beta, c.ptr, @intCast(ldc));
+    } else {
+        @compileError("real GEMM test supports f32 and f64");
+    }
+    ref.gemmRowMajor(T, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, expected, ldc);
+
+    const tol: T = if (T == f32) 1e-3 else 1e-10;
+    for (expected, c) |want, got| try std.testing.expectApproxEqAbs(want, got, tol);
+}
+
+fn expectRowMajorComplexGemmCase(comptime T: type, transa: ref.Trans, transb: ref.Trans, m: usize, n: usize, k: usize, alpha: T, beta: T, tol: anytype) !void {
+    const a_rows = if (transa == .no_trans) m else k;
+    const a_cols = if (transa == .no_trans) k else m;
+    const b_rows = if (transb == .no_trans) k else n;
+    const b_cols = if (transb == .no_trans) n else k;
+    const lda = a_cols + 4;
+    const ldb = b_cols + 5;
+    const ldc = n + 6;
+
+    const allocator = std.testing.allocator;
+    const a = try allocator.alloc(T, a_rows * lda);
+    defer allocator.free(a);
+    const b = try allocator.alloc(T, b_rows * ldb);
+    defer allocator.free(b);
+    const c = try allocator.alloc(T, m * ldc);
+    defer allocator.free(c);
+    const expected = try allocator.alloc(T, c.len);
+    defer allocator.free(expected);
+
+    var rng = ref.Rng.init(0xc31a_5eed);
+    ref.fillRowMajor(T, &rng, a, a_rows, a_cols, lda);
+    ref.fillRowMajor(T, &rng, b, b_rows, b_cols, ldb);
+    ref.fillRowMajor(T, &rng, c, m, n, ldc);
+    @memcpy(expected, c);
+
+    if (T == cblas.ComplexF32) {
+        cblas.cblas_cgemm(cblas.CblasRowMajor, cblasTrans(transa), cblasTrans(transb), @intCast(m), @intCast(n), @intCast(k), &alpha, a.ptr, @intCast(lda), b.ptr, @intCast(ldb), &beta, c.ptr, @intCast(ldc));
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zgemm(cblas.CblasRowMajor, cblasTrans(transa), cblasTrans(transb), @intCast(m), @intCast(n), @intCast(k), &alpha, a.ptr, @intCast(lda), b.ptr, @intCast(ldb), &beta, c.ptr, @intCast(ldc));
+    } else {
+        @compileError("complex GEMM test supports ComplexF32 and ComplexF64");
+    }
+    ref.gemmRowMajor(T, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, expected, ldc);
+
+    for (expected, c) |want, got| try ref.expectApprox(T, want, got, tol);
+}
+
 test "cblas row-major dgemm wrapper" {
     var left_matrix = [_]f64{
         1, 3, 5,
@@ -121,6 +418,44 @@ test "cblas row-major dgemm wrapper" {
     try std.testing.expectApproxEqAbs(@as(f64, 103), result_matrix[1], 1e-12);
     try std.testing.expectApproxEqAbs(@as(f64, 100), result_matrix[2], 1e-12);
     try std.testing.expectApproxEqAbs(@as(f64, 136), result_matrix[3], 1e-12);
+}
+
+test "cblas row-major real GEMM transpose pairs preserve operand semantics" {
+    inline for (.{ f32, f64 }) |T| {
+        try expectRowMajorRealGemmCase(T, .no_trans, .no_trans);
+        try expectRowMajorRealGemmCase(T, .no_trans, .trans);
+        try expectRowMajorRealGemmCase(T, .trans, .no_trans);
+        try expectRowMajorRealGemmCase(T, .trans, .trans);
+    }
+}
+
+test "cblas row-major complex GEMM non-NN alpha beta cases stay on fallback" {
+    const pairs = [_]struct { transa: ref.Trans, transb: ref.Trans }{
+        .{ .transa = .no_trans, .transb = .trans },
+        .{ .transa = .no_trans, .transb = .conj_trans },
+        .{ .transa = .trans, .transb = .no_trans },
+        .{ .transa = .trans, .transb = .trans },
+        .{ .transa = .trans, .transb = .conj_trans },
+        .{ .transa = .conj_trans, .transb = .no_trans },
+        .{ .transa = .conj_trans, .transb = .trans },
+        .{ .transa = .conj_trans, .transb = .conj_trans },
+    };
+    inline for (.{ cblas.ComplexF32, cblas.ComplexF64 }) |T| {
+        const tol = if (T == cblas.ComplexF32) @as(f32, 4e-2) else @as(f64, 1e-9);
+        for (pairs) |pair| {
+            try expectRowMajorComplexGemmCase(
+                T,
+                pair.transa,
+                pair.transb,
+                17,
+                19,
+                409,
+                ref.fromParts(T, 0.75, -0.25),
+                ref.fromParts(T, -0.5, 0.125),
+                tol,
+            );
+        }
+    }
 }
 
 test "cblas row-major cgemm wrapper" {
@@ -147,6 +482,27 @@ test "cblas row-major cgemm wrapper" {
         try std.testing.expectApproxEqAbs(want.re, got.re, 1e-4);
         try std.testing.expectApproxEqAbs(want.im, got.im, 1e-4);
     }
+}
+
+test "cblas complex scal with complex alpha supports strides" {
+    try expectCblasComplexScalCase(cblas.ComplexF32, 9, 1, complexF32(-0.75, 0.5), @as(f32, 1e-5));
+    try expectCblasComplexScalCase(cblas.ComplexF32, 7, 2, complexF32(0.25, -1.25), @as(f32, 1e-5));
+    try expectCblasComplexScalCase(cblas.ComplexF32, 7, -2, complexF32(1.5, 0.375), @as(f32, 1e-5));
+    try expectCblasComplexScalCase(cblas.ComplexF64, 9, 1, complexF64(-0.75, 0.5), @as(f64, 1e-12));
+    try expectCblasComplexScalCase(cblas.ComplexF64, 7, 2, complexF64(0.25, -1.25), @as(f64, 1e-12));
+    try expectCblasComplexScalCase(cblas.ComplexF64, 7, -2, complexF64(1.5, 0.375), @as(f64, 1e-12));
+}
+
+test "cblas complex axpy and axpby with complex alpha support strides" {
+    try expectCblasComplexAxpyCase(cblas.ComplexF32, 8, 1, 1, complexF32(-0.75, 0.5), @as(f32, 1e-5));
+    try expectCblasComplexAxpyCase(cblas.ComplexF32, 7, 2, -2, complexF32(0.25, -1.25), @as(f32, 1e-5));
+    try expectCblasComplexAxpyCase(cblas.ComplexF64, 8, 1, 1, complexF64(-0.75, 0.5), @as(f64, 1e-12));
+    try expectCblasComplexAxpyCase(cblas.ComplexF64, 7, 2, -2, complexF64(0.25, -1.25), @as(f64, 1e-12));
+
+    try expectCblasComplexAxpbyCase(cblas.ComplexF32, 8, 1, 1, complexF32(-0.75, 0.5), complexF32(0.25, -0.125), @as(f32, 1e-5));
+    try expectCblasComplexAxpbyCase(cblas.ComplexF32, 7, -2, 2, complexF32(0.25, -1.25), complexF32(-0.5, 0.75), @as(f32, 1e-5));
+    try expectCblasComplexAxpbyCase(cblas.ComplexF64, 8, 1, 1, complexF64(-0.75, 0.5), complexF64(0.25, -0.125), @as(f64, 1e-12));
+    try expectCblasComplexAxpbyCase(cblas.ComplexF64, 7, -2, 2, complexF64(0.25, -1.25), complexF64(-0.5, 0.75), @as(f64, 1e-12));
 }
 
 test "cblas amax empty input returns cblas zero index" {
@@ -350,6 +706,87 @@ test "cblas row-major zgbmv conjugate transpose band reference" {
     try expectComplexF64SliceApprox(&expected, &y);
 }
 
+fn expectUnitGbmvCase(comptime T: type, trans: ref.Trans) !void {
+    const m: usize = 31;
+    const n: usize = 27;
+    const kl: usize = 9;
+    const ku: usize = 7;
+    const lda: usize = kl + ku + 4;
+    const lenx = if (trans == .no_trans) n else m;
+    const leny = if (trans == .no_trans) m else n;
+    var rng = ref.Rng.init(@as(u64, 0xbaad_1001) + @intFromEnum(trans));
+    const a = try std.testing.allocator.alloc(T, lda * n);
+    defer std.testing.allocator.free(a);
+    const x = try std.testing.allocator.alloc(T, lenx);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, leny);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, leny);
+    defer std.testing.allocator.free(expected);
+
+    fillColMajorBand(T, &rng, a, m, n, kl, ku, lda);
+    ref.fillVector(T, &rng, x, lenx, 1);
+    ref.fillVector(T, &rng, y, leny, 1);
+    @memcpy(expected, y);
+    const alpha = if (comptime ref.isComplex(T)) ref.fromParts(T, 0.75, -0.375) else @as(T, 0.75);
+    const beta = if (comptime ref.isComplex(T)) ref.fromParts(T, -0.25, 0.125) else @as(T, -0.25);
+    ref.gbmvColMajor(T, trans, m, n, kl, ku, alpha, a, lda, x, 1, beta, expected, 1);
+
+    if (T == f64) {
+        cblas.cblas_dgbmv(cblas.CblasColMajor, cblasTrans(trans), m, n, kl, ku, alpha, a.ptr, lda, x.ptr, 1, beta, y.ptr, 1);
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zgbmv(cblas.CblasColMajor, cblasTrans(trans), m, n, kl, ku, &alpha, a.ptr, lda, x.ptr, 1, &beta, y.ptr, 1);
+    } else {
+        @compileError("unit GBMV test supports f64 and ComplexF64");
+    }
+    for (expected, y) |want, got| try ref.expectApprox(T, want, got, @as(f64, 1e-10));
+}
+
+fn expectUnitSbmvCase(comptime T: type, uplo: ref.Uplo, herm: bool) !void {
+    const n: usize = 29;
+    const k: usize = 7;
+    const lda: usize = k + 3;
+    var rng = ref.Rng.init(@as(u64, 0xbaad_2001) + @intFromEnum(uplo));
+    const a = try std.testing.allocator.alloc(T, lda * n);
+    defer std.testing.allocator.free(a);
+    const x = try std.testing.allocator.alloc(T, n);
+    defer std.testing.allocator.free(x);
+    const y = try std.testing.allocator.alloc(T, n);
+    defer std.testing.allocator.free(y);
+    const expected = try std.testing.allocator.alloc(T, n);
+    defer std.testing.allocator.free(expected);
+
+    fillColMajorSymBand(T, &rng, uplo, a, n, k, lda);
+    ref.fillVector(T, &rng, x, n, 1);
+    ref.fillVector(T, &rng, y, n, 1);
+    @memcpy(expected, y);
+    const alpha = if (comptime ref.isComplex(T)) ref.fromParts(T, 0.625, -0.25) else @as(T, 0.625);
+    const beta = if (comptime ref.isComplex(T)) ref.fromParts(T, -0.375, 0.125) else @as(T, -0.375);
+    ref.sbmvColMajor(T, uplo, n, k, alpha, a, lda, x, 1, beta, expected, 1, herm);
+    const cblas_uplo = if (uplo == .upper) cblas.CblasUpper else cblas.CblasLower;
+
+    if (T == f64) {
+        cblas.cblas_dsbmv(cblas.CblasColMajor, cblas_uplo, n, k, alpha, a.ptr, lda, x.ptr, 1, beta, y.ptr, 1);
+    } else if (T == cblas.ComplexF64) {
+        cblas.cblas_zhbmv(cblas.CblasColMajor, cblas_uplo, n, k, &alpha, a.ptr, lda, x.ptr, 1, &beta, y.ptr, 1);
+    } else {
+        @compileError("unit SBMV/HBMV test supports f64 and ComplexF64");
+    }
+    for (expected, y) |want, got| try ref.expectApprox(T, want, got, @as(f64, 1e-10));
+}
+
+test "cblas unit-stride banded column paths" {
+    try expectUnitGbmvCase(f64, .no_trans);
+    try expectUnitGbmvCase(f64, .trans);
+    try expectUnitGbmvCase(cblas.ComplexF64, .no_trans);
+    try expectUnitGbmvCase(cblas.ComplexF64, .trans);
+    try expectUnitGbmvCase(cblas.ComplexF64, .conj_trans);
+    try expectUnitSbmvCase(f64, .upper, false);
+    try expectUnitSbmvCase(f64, .lower, false);
+    try expectUnitSbmvCase(cblas.ComplexF64, .upper, true);
+    try expectUnitSbmvCase(cblas.ComplexF64, .lower, true);
+}
+
 test "cblas row-major zgemm conjugate transpose padded reference" {
     const T = cblas.ComplexF64;
     const m = 2;
@@ -461,6 +898,42 @@ test "cblas col-major complex packed banded level2 reference" {
     ref.tpsvColMajor(T, .upper, .conj_trans, .unit, n, &tp, &tp_solve, 1);
     cblas.cblas_ztbsv(cblas.CblasColMajor, cblas.CblasLower, cblas.CblasConjTrans, cblas.CblasNonUnit, n, k, &tb, lda, &expected_tb, -2);
     cblas.cblas_ztpsv(cblas.CblasColMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, n, &tp, &expected_tp, 1);
+    try expectComplexF64SliceApprox(&tb_solve, &expected_tb);
+    try expectComplexF64SliceApprox(&tp_solve, &expected_tp);
+}
+
+test "cblas row-major complex banded packed triangular conjugate transpose reference" {
+    const T = cblas.ComplexF64;
+    const n = 5;
+    const k = 2;
+    const lda = k + 1;
+    var rng = ref.Rng.init(0x5eed_0302);
+
+    var tb: [n * lda]T = undefined;
+    var tp: [n * (n + 1) / 2]T = undefined;
+    var tx: [ref.vectorStorageLen(n, 2)]T = undefined;
+    var tpx: [ref.vectorStorageLen(n, -1)]T = undefined;
+    var work: [n]T = undefined;
+    fillRowMajorTriBand(T, &rng, .upper, .non_unit, &tb, n, k, lda);
+    fillTriPackedRowMajor(T, &rng, .lower, .unit, &tp, n);
+    ref.fillVector(T, &rng, &tx, n, 2);
+    ref.fillVector(T, &rng, &tpx, n, -1);
+
+    var expected_tb = tx;
+    var expected_tp = tpx;
+    ref.tbmvRowMajor(T, .upper, .conj_trans, .non_unit, n, k, &tb, lda, &expected_tb, 2, &work);
+    ref.tpmvRowMajor(T, .lower, .conj_trans, .unit, n, &tp, &expected_tp, -1, &work);
+    cblas.cblas_ztbmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasNonUnit, n, k, &tb, lda, &tx, 2);
+    cblas.cblas_ztpmv(cblas.CblasRowMajor, cblas.CblasLower, cblas.CblasConjTrans, cblas.CblasUnit, n, &tp, &tpx, -1);
+    try expectComplexF64SliceApprox(&expected_tb, &tx);
+    try expectComplexF64SliceApprox(&expected_tp, &tpx);
+
+    var tb_solve = expected_tb;
+    var tp_solve = expected_tp;
+    ref.tbsvRowMajor(T, .upper, .conj_trans, .non_unit, n, k, &tb, lda, &tb_solve, 2);
+    ref.tpsvRowMajor(T, .lower, .conj_trans, .unit, n, &tp, &tp_solve, -1);
+    cblas.cblas_ztbsv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasNonUnit, n, k, &tb, lda, &expected_tb, 2);
+    cblas.cblas_ztpsv(cblas.CblasRowMajor, cblas.CblasLower, cblas.CblasConjTrans, cblas.CblasUnit, n, &tp, &expected_tp, -1);
     try expectComplexF64SliceApprox(&tb_solve, &expected_tb);
     try expectComplexF64SliceApprox(&tp_solve, &expected_tp);
 }

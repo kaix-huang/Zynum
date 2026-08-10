@@ -6,21 +6,21 @@ Do not open a public issue, discussion, or pull request for vulnerabilities
 involving memory safety, ABI misuse, unexpected code execution, unsafe build
 tooling, or supply-chain behavior.
 
-Report vulnerabilities privately through GitHub's private vulnerability
-reporting flow when available. The project maintainer is Kaixiang Huang:
+Use GitHub's private vulnerability reporting flow so the report and any
+follow-up remain visible only to the reporter and repository maintainers:
 
-1. Open <https://github.com/kaix-huang/Zynum> on GitHub.
-2. Select **Security**.
-3. Select **Report a vulnerability** or **Advisories** → **Report a vulnerability**.
-4. Include reproduction steps, affected versions, impact, and any suggested fix.
+Open <https://github.com/kaix-huang/Zynum/security/advisories/new> and submit
+the report there. Include affected versions, impact, reproduction steps or a
+proof of concept, and any suggested mitigation.
 
-Do not disclose vulnerability details in public issues, discussions, or pull
-requests before maintainers have had time to coordinate a fix.
+Maintainers will investigate in the private report, keep the reporter informed
+of material progress, and coordinate a fix and disclosure date when the report
+is confirmed. Please do not disclose details publicly before that coordinated
+date. Security fixes should include a regression test when practical, and
+reporters may request public credit or anonymity.
 
 ## Supported versions
 
 | Version | Supported |
 | --- | --- |
 | 0.0.1-beta / main | Yes |
-
-Security fixes should include a regression test when practical.

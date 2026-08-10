@@ -1,0 +1,180 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+name: Release Artifacts
+
+permissions:
+  contents: read
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+env:
+  ZIG_GLOBAL_CACHE_DIR: .zig-cache/global
+  ZIG_LOCAL_CACHE_DIR: .zig-cache/local
+
+jobs:
+  artifacts:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            artifact: zynum-blas-macos
+            dynlib: zig-out/lib/libzynum_blas.dylib
+            target_args: -Dtarget=aarch64-macos -Dcpu=baseline
+          - os: ubuntu-24.04
+            artifact: zynum-blas-linux
+            dynlib: zig-out/lib/libzynum_blas.so
+            target_args: -Dtarget=x86_64-linux-gnu -Dcpu=baseline
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
+        with:
+          version: 0.16.0
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .zig-cache
+          key: zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          restore-keys: |
+            zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+
+      - name: Install Fortran compiler on Ubuntu
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Regenerate compatibility files
+        run: |
+          zig build generate-headers --summary failures
+          zig build generate-kernel-coverage --summary failures
+
+      - name: Check generated files are up to date
+        shell: bash
+        run: |
+          set -euo pipefail
+          git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json
+          status="$(git status --porcelain --untracked-files=all -- include/zynum/blas docs/kernel_coverage.json)"
+          if [[ -n "$status" ]]; then
+            echo "Generated compatibility headers or kernel coverage are out of date."
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
+      - name: Require current-only build inventory policy
+        run: python3 -B tools/check_build_inventory.py --root . --require-current-only
+
+      - name: Require current-only test inventory policy
+        run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
+
+      - name: Run test inventory security suite
+        run: |
+          python3 -B test/build/test_build_inventory.py
+          python3 -B test/build/test_test_inventory.py
+
+      - name: Test
+        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
+
+      - name: Build install tree
+        run: zig build ${{ matrix.target_args }} --release=fast --summary failures
+
+      - name: Check ABI manifest
+        run: |
+          python3 tools/check_abi_manifest.py \
+            --manifest include/zynum/blas/abi_manifest.json \
+            --dynamic "${{ matrix.dynlib }}" \
+            --static zig-out/lib/libzynum_blas.a
+
+      - name: Require clean committed checkout before archiving
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rev-parse --verify 'HEAD^{commit}' >/dev/null
+          git --no-pager diff --exit-code
+          git --no-pager diff --cached --exit-code
+          status="$(git status --porcelain --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            echo "Release archives require a clean committed checkout."
+            printf '%s\n' "$status"
+            exit 1
+          fi
+
+      - name: Provision fresh publication workspace
+        id: publication_workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(mktemp -d "${RUNNER_TEMP}/zynum-publication.XXXXXXXX")"
+          if find "$workspace" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+            echo "fresh publication workspace is not empty" >&2
+            exit 1
+          fi
+          printf 'path=%s\n' "$workspace" >> "$GITHUB_OUTPUT"
+
+      - name: Pack source archive
+        run: |
+          python3 tools/check_package_paths.py \
+            --archive "${{ steps.publication_workspace.outputs.path }}/zynum-source-${{ matrix.artifact }}.tar.gz"
+
+      - name: Pack artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="${{ steps.publication_workspace.outputs.path }}"
+          binary_archive="$workspace/${{ matrix.artifact }}.tar.gz"
+          tar -czf "$binary_archive" \
+            -C zig-out lib include \
+            -C "$GITHUB_WORKSPACE" LICENSE COPYING COPYING.LESSER
+          licenses=(LICENSE COPYING COPYING.LESSER)
+          members="$(tar -tzf "$binary_archive")"
+          for license in "${licenses[@]}"; do
+            count="$(printf '%s\n' "$members" | grep -Fxc "$license" || true)"
+            test "$count" -eq 1
+            tar -xOzf "$binary_archive" "$license" \
+              | cmp - "$GITHUB_WORKSPACE/$license"
+          done
+          (
+            cd "$workspace"
+            shasum -a 256 "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+            shasum -a 256 "zynum-source-${{ matrix.artifact }}.tar.gz" > "zynum-source-${{ matrix.artifact }}.tar.gz.sha256"
+          )
+
+      - name: Verify publication workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="${{ steps.publication_workspace.outputs.path }}"
+          arena="$workspace/.zynum-cleanup-v2-$(id -u)"
+          test -d "$arena" && test ! -L "$arena"
+          if find "$arena" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+            echo "publication cleanup arena retained material" >&2
+            exit 1
+          fi
+          for artifact in \
+            "${{ matrix.artifact }}.tar.gz" \
+            "${{ matrix.artifact }}.tar.gz.sha256" \
+            "zynum-source-${{ matrix.artifact }}.tar.gz" \
+            "zynum-source-${{ matrix.artifact }}.tar.gz.sha256"; do
+            test -f "$workspace/$artifact" && test ! -L "$workspace/$artifact"
+          done
+          test "$(find "$workspace" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')" -eq 5
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ steps.publication_workspace.outputs.path }}/${{ matrix.artifact }}.tar.gz
+            ${{ steps.publication_workspace.outputs.path }}/${{ matrix.artifact }}.tar.gz.sha256
+            ${{ steps.publication_workspace.outputs.path }}/zynum-source-${{ matrix.artifact }}.tar.gz
+            ${{ steps.publication_workspace.outputs.path }}/zynum-source-${{ matrix.artifact }}.tar.gz.sha256

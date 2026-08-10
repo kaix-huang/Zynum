@@ -1,0 +1,21 @@
+Load command 2
+          cmd LC_LOAD_DYLINKER
+      cmdsize 32
+         name /usr/lib/dyld (offset 12)
+Load command 3
+          cmd LC_ID_DYLIB
+      cmdsize 64
+         name @rpath/libzynum_blas.1.dylib (offset 24)
+   time stamp 0 Thu Jan  1 00:00:00 1970
+      current version 1.2.0
+compatibility version 1.0.0
+Load command 4
+      cmd LC_BUILD_VERSION
+  cmdsize 32
+ platform 1
+    minos 13.0
+      sdk 15.0
+Load command 5
+          cmd LC_RPATH
+      cmdsize 32
+         path @loader_path (offset 12)

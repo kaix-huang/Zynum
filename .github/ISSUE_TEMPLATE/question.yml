@@ -1,0 +1,47 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+name: Support Question
+description: Ask for help with using, building, configuring, or integrating Zynum.
+title: "[Support]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for support questions. Report reproducible incorrect behavior with the bug form and proposals with the feature form. For a suspected vulnerability, do not post details here; follow `SECURITY.md`.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do, what happened, and what result did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: Relevant code or commands
+      description: Provide a minimal example and complete output when applicable. Remove secrets and private information.
+      render: sh
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Provide the versions and platform details relevant to the question.
+      value: |
+        - Zynum version or commit:
+        - Zig version:
+        - OS:
+        - CPU:
+        - Target:
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I checked the documentation and existing issues for an answer.
+          required: true
+        - label: This report does not contain a suspected security vulnerability.
+          required: true

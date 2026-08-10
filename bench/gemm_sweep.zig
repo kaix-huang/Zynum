@@ -43,11 +43,23 @@ const Shape = struct {
     k: usize,
 };
 
+const TransposePair = struct {
+    a: u8,
+    b: u8,
+};
+
 const max_custom_shapes = 64;
-const pool_env_name = "ZYNUM_BLAS_GEMM_POOL";
-const io_env_name = "ZYNUM_BLAS_GEMM_IO";
+const max_custom_transposes = 9;
+
+const default_transposes = [_]TransposePair{
+    .{ .a = 'N', .b = 'N' },
+};
 
 const default_shapes = [_]Shape{
+    .{ .label = "m1_n1_k1", .m = 1, .n = 1, .k = 1 },
+    .{ .label = "m8_n8_k8", .m = 8, .n = 8, .k = 8 },
+    .{ .label = "m31_n31_k31", .m = 31, .n = 31, .k = 31 },
+    .{ .label = "m33_n33_k33", .m = 33, .n = 33, .k = 33 },
     .{ .label = "sq64", .m = 64, .n = 64, .k = 64 },
     .{ .label = "sq96", .m = 96, .n = 96, .k = 96 },
     .{ .label = "sq128", .m = 128, .n = 128, .k = 128 },
@@ -57,13 +69,21 @@ const default_shapes = [_]Shape{
     .{ .label = "sq512", .m = 512, .n = 512, .k = 512 },
     .{ .label = "sq768", .m = 768, .n = 768, .k = 768 },
     .{ .label = "sq1024", .m = 1024, .n = 1024, .k = 1024 },
+    .{ .label = "m63_n65_k17", .m = 63, .n = 65, .k = 17 },
+    .{ .label = "m65_n63_k33", .m = 65, .n = 63, .k = 33 },
+    .{ .label = "m127_n129_k31", .m = 127, .n = 129, .k = 31 },
+    .{ .label = "m129_n127_k33", .m = 129, .n = 127, .k = 33 },
+    .{ .label = "m1_n4096_k256", .m = 1, .n = 4096, .k = 256 },
+    .{ .label = "m4096_n1_k256", .m = 4096, .n = 1, .k = 256 },
     .{ .label = "m1024_n64_k1024", .m = 1024, .n = 64, .k = 1024 },
     .{ .label = "m2048_n64_k512", .m = 2048, .n = 64, .k = 512 },
     .{ .label = "m4096_n32_k256", .m = 4096, .n = 32, .k = 256 },
+    .{ .label = "m2048_n17_k257", .m = 2048, .n = 17, .k = 257 },
     .{ .label = "m512_n64_k2048", .m = 512, .n = 64, .k = 2048 },
     .{ .label = "m64_n1024_k1024", .m = 64, .n = 1024, .k = 1024 },
     .{ .label = "m64_n2048_k512", .m = 64, .n = 2048, .k = 512 },
     .{ .label = "m32_n4096_k256", .m = 32, .n = 4096, .k = 256 },
+    .{ .label = "m17_n2048_k257", .m = 17, .n = 2048, .k = 257 },
     .{ .label = "m64_n512_k2048", .m = 64, .n = 512, .k = 2048 },
     .{ .label = "m1024_n1024_k64", .m = 1024, .n = 1024, .k = 64 },
     .{ .label = "m1024_n1024_k128", .m = 1024, .n = 1024, .k = 128 },
@@ -76,50 +96,24 @@ const default_shapes = [_]Shape{
     .{ .label = "m256_n512_k768", .m = 256, .n = 512, .k = 768 },
     .{ .label = "m768_n512_k256", .m = 768, .n = 512, .k = 256 },
     .{ .label = "m512_n768_k256", .m = 512, .n = 768, .k = 256 },
+    .{ .label = "m384_n640_k96", .m = 384, .n = 640, .k = 96 },
+    .{ .label = "m640_n384_k96", .m = 640, .n = 384, .k = 96 },
 };
 
 fn usage() void {
-    std.debug.print("usage: gemm-sweep --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--reps n] [--csv path] [--kind sgemm|dgemm|cgemm|zgemm] [--shape label:m:n:k]\n", .{});
+    std.debug.print("usage: gemm-sweep --zynum-blas path [--accelerate path] [--openblas path] [--mkl path] [--aocl-blis path] [--reps n] [--csv path] [--check] [--kind sgemm|dgemm|cgemm|zgemm] [--trans NN|NT|TN|TT|<complex N/T/C pair>] [--shape label:m:n:k]\n", .{});
 }
 
-fn zynumBlasPoolWorkersRequested() bool {
-    const raw = std.c.getenv(pool_env_name) orelse return false;
-    const value = std.mem.span(raw);
-    return std.mem.eql(u8, value, "1") or
-        std.ascii.eqlIgnoreCase(value, "true") or
-        std.ascii.eqlIgnoreCase(value, "on");
-}
-
-fn zynumBlasIoWorkersRequested() bool {
-    const raw = std.c.getenv(io_env_name) orelse return false;
-    const value = std.mem.span(raw);
-    return std.mem.eql(u8, value, "1") or
-        std.ascii.eqlIgnoreCase(value, "true") or
-        std.ascii.eqlIgnoreCase(value, "on") or
-        std.ascii.eqlIgnoreCase(value, "concurrent") or
-        std.ascii.eqlIgnoreCase(value, "group-concurrent") or
-        std.ascii.eqlIgnoreCase(value, "group_concurrent") or
-        std.ascii.eqlIgnoreCase(value, "async") or
-        std.ascii.eqlIgnoreCase(value, "group-async") or
-        std.ascii.eqlIgnoreCase(value, "group_async") or
-        std.ascii.eqlIgnoreCase(value, "future") or
-        std.ascii.eqlIgnoreCase(value, "future-concurrent") or
-        std.ascii.eqlIgnoreCase(value, "future_concurrent") or
-        std.ascii.eqlIgnoreCase(value, "await") or
-        std.ascii.eqlIgnoreCase(value, "future-async") or
-        std.ascii.eqlIgnoreCase(value, "future_async") or
-        std.ascii.eqlIgnoreCase(value, "async-await") or
-        std.ascii.eqlIgnoreCase(value, "async_await") or
-        std.ascii.eqlIgnoreCase(value, "pool") or
-        std.ascii.eqlIgnoreCase(value, "persistent") or
-        std.ascii.eqlIgnoreCase(value, "persistent-pool") or
-        std.ascii.eqlIgnoreCase(value, "persistent_pool") or
-        std.ascii.eqlIgnoreCase(value, "worker-pool") or
-        std.ascii.eqlIgnoreCase(value, "worker_pool");
-}
-
-fn zynumBlasStatefulWorkersRequested() bool {
-    return zynumBlasPoolWorkersRequested() or zynumBlasIoWorkersRequested();
+fn parseTransposePair(spec: []const u8) !TransposePair {
+    if (spec.len != 2) return error.BadTranspose;
+    const pair = TransposePair{
+        .a = std.ascii.toUpper(spec[0]),
+        .b = std.ascii.toUpper(spec[1]),
+    };
+    for ([_]u8{ pair.a, pair.b }) |trans| {
+        if (trans != 'N' and trans != 'T' and trans != 'C') return error.BadTranspose;
+    }
+    return pair;
 }
 
 fn parseShape(spec: []const u8) !Shape {
@@ -187,6 +181,110 @@ fn one(comptime T: type) T {
     return if (T == ComplexF32 or T == ComplexF64) .{ .re = 1, .im = 0 } else 1;
 }
 
+fn add(comptime T: type, a: T, b: T) T {
+    return if (T == ComplexF32 or T == ComplexF64)
+        .{ .re = a.re + b.re, .im = a.im + b.im }
+    else
+        a + b;
+}
+
+fn mul(comptime T: type, a: T, b: T) T {
+    return if (T == ComplexF32 or T == ComplexF64)
+        .{ .re = a.re * b.re - a.im * b.im, .im = a.re * b.im + a.im * b.re }
+    else
+        a * b;
+}
+
+fn conjugate(comptime T: type, value: T) T {
+    return if (T == ComplexF32 or T == ComplexF64)
+        .{ .re = value.re, .im = -value.im }
+    else
+        value;
+}
+
+fn supportsTransposePair(comptime T: type, pair: TransposePair) bool {
+    if (T == ComplexF32 or T == ComplexF64) return true;
+    return pair.a != 'C' and pair.b != 'C';
+}
+
+fn storedLeadingDimension(logical_rows: usize, logical_cols: usize, trans: u8) usize {
+    return @max(@as(usize, 1), if (trans == 'N') logical_rows else logical_cols);
+}
+
+fn storedColumnCount(logical_rows: usize, logical_cols: usize, trans: u8) usize {
+    return if (trans == 'N') logical_cols else logical_rows;
+}
+
+fn opElement(comptime T: type, matrix: []const T, leading_dimension: usize, trans: u8, row: usize, col: usize) T {
+    const value = if (trans == 'N')
+        matrix[row + col * leading_dimension]
+    else
+        matrix[col + row * leading_dimension];
+    return if (trans == 'C') conjugate(T, value) else value;
+}
+
+fn absDiff(comptime T: type, a: T, b: T) f64 {
+    if (T == ComplexF32 or T == ComplexF64) {
+        const dr = @as(f64, @floatCast(a.re)) - @as(f64, @floatCast(b.re));
+        const di = @as(f64, @floatCast(a.im)) - @as(f64, @floatCast(b.im));
+        return @sqrt(dr * dr + di * di);
+    }
+    return @abs(@as(f64, @floatCast(a)) - @as(f64, @floatCast(b)));
+}
+
+fn sampleIndex(index: usize, len: usize) ?usize {
+    if (len == 0) return null;
+    return switch (index) {
+        0 => 0,
+        1 => len / 4,
+        2 => len / 2,
+        3 => (len - 1) - (len - 1) / 4,
+        4 => len - 1,
+        else => null,
+    };
+}
+
+fn checkGemmElement(comptime T: type, a: []const T, b: []const T, c: []const T, shape: Shape, pair: TransposePair, lda: usize, ldb: usize, ldc: usize, row: usize, col: usize) !void {
+    const tolerance: f64 = if (T == f32 or T == ComplexF32) 1e-3 else 1e-9;
+    var expected = zero(T);
+    for (0..shape.k) |p| {
+        expected = add(T, expected, mul(T, opElement(T, a, lda, pair.a, row, p), opElement(T, b, ldb, pair.b, p, col)));
+    }
+    const actual = c[row + col * ldc];
+    if (absDiff(T, expected, actual) > tolerance * @as(f64, @floatFromInt(@max(@as(usize, 1), shape.k)))) {
+        return error.GemmCheckFailed;
+    }
+}
+
+fn checkGemmSamples(comptime T: type, a: []const T, b: []const T, c: []const T, shape: Shape, pair: TransposePair, lda: usize, ldb: usize, ldc: usize) !void {
+    if (shape.m *| shape.n <= 4096) {
+        for (0..shape.n) |col| {
+            for (0..shape.m) |row| try checkGemmElement(T, a, b, c, shape, pair, lda, ldb, ldc, row, col);
+        }
+        return;
+    }
+
+    var checked: [25]struct { row: usize, col: usize } = undefined;
+    var checked_count: usize = 0;
+    for (0..5) |row_slot| {
+        const row = sampleIndex(row_slot, shape.m) orelse continue;
+        for (0..5) |col_slot| {
+            const col = sampleIndex(col_slot, shape.n) orelse continue;
+            var duplicate = false;
+            for (checked[0..checked_count]) |item| {
+                if (item.row == row and item.col == col) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (duplicate) continue;
+            checked[checked_count] = .{ .row = row, .col = col };
+            checked_count += 1;
+            try checkGemmElement(T, a, b, c, shape, pair, lda, ldb, ldc, row, col);
+        }
+    }
+}
+
 fn nowNs(io: std.Io) i96 {
     return std.Io.Clock.awake.now(io).nanoseconds;
 }
@@ -199,37 +297,71 @@ fn gflops(elapsed_ns: i96, flop_factor: f64, m: usize, n: usize, k: usize) f64 {
 
 const BenchResult = struct {
     best_ns: i96,
+    median_ns: i96,
+    p95_ns: i96,
+    max_ns: i96,
+    check: []const u8,
 };
 
-fn benchGemm(comptime T: type, gemm: GemmFn(T), allocator: std.mem.Allocator, io: std.Io, shape: Shape, reps: usize) !BenchResult {
+fn sortTimings(values: []i96) void {
+    var i: usize = 1;
+    while (i < values.len) : (i += 1) {
+        const value = values[i];
+        var j = i;
+        while (j > 0 and values[j - 1] > value) : (j -= 1) {
+            values[j] = values[j - 1];
+        }
+        values[j] = value;
+    }
+}
+
+fn benchGemm(comptime T: type, gemm: GemmFn(T), allocator: std.mem.Allocator, io: std.Io, shape: Shape, pair: TransposePair, reps: usize, check: bool) !BenchResult {
     const m_i: BlasInt = @intCast(shape.m);
     const n_i: BlasInt = @intCast(shape.n);
     const k_i: BlasInt = @intCast(shape.k);
-    const a = try allocator.alloc(T, shape.m * shape.k);
+    const lda = storedLeadingDimension(shape.m, shape.k, pair.a);
+    const ldb = storedLeadingDimension(shape.k, shape.n, pair.b);
+    const ldc = @max(@as(usize, 1), shape.m);
+    const lda_i: BlasInt = @intCast(lda);
+    const ldb_i: BlasInt = @intCast(ldb);
+    const ldc_i: BlasInt = @intCast(ldc);
+    const a = try allocator.alloc(T, lda * storedColumnCount(shape.m, shape.k, pair.a));
     defer allocator.free(a);
-    const b = try allocator.alloc(T, shape.k * shape.n);
+    const b = try allocator.alloc(T, ldb * storedColumnCount(shape.k, shape.n, pair.b));
     defer allocator.free(b);
-    const c = try allocator.alloc(T, shape.m * shape.n);
+    const c = try allocator.alloc(T, ldc * shape.n);
     defer allocator.free(c);
     fill(T, a);
     fill(T, b);
     @memset(c, zero(T));
 
-    var ta = [_]u8{'N'};
-    var tb = [_]u8{'N'};
+    var ta = [_]u8{pair.a};
+    var tb = [_]u8{pair.b};
     var alpha: T = one(T);
     var beta: T = zero(T);
-    gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &m_i, b.ptr, &k_i, &beta, c.ptr, &m_i);
+    gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
+    if (check) try checkGemmSamples(T, a, b, c, shape, pair, lda, ldb, ldc);
 
-    var best: i96 = std.math.maxInt(i96);
-    for (0..reps) |_| {
+    if (reps == 0) return error.InvalidRepetitions;
+    const timings = try allocator.alloc(i96, reps);
+    defer allocator.free(timings);
+
+    for (0..reps) |rep| {
         @memset(c, zero(T));
         const start = nowNs(io);
-        gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &m_i, b.ptr, &k_i, &beta, c.ptr, &m_i);
+        gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
         const end = nowNs(io);
-        if (end > start) best = @min(best, end - start);
+        timings[rep] = if (end >= start) @max(@as(i96, 1), end - start) else 1;
     }
-    return .{ .best_ns = best };
+    sortTimings(timings);
+    const p95_index = @min(timings.len - 1, ((timings.len * 95) + 99) / 100 - 1);
+    return .{
+        .best_ns = timings[0],
+        .median_ns = timings[timings.len / 2],
+        .p95_ns = timings[p95_index],
+        .max_ns = timings[timings.len - 1],
+        .check = if (check) "checked-ok" else "unchecked",
+    };
 }
 
 fn csvEscape(writer: *std.Io.Writer, value: []const u8) !void {
@@ -245,15 +377,24 @@ fn flopFactorForKind(kind: []const u8) f64 {
     return if (std.mem.eql(u8, kind, "cgemm") or std.mem.eql(u8, kind, "zgemm")) 8.0 else 2.0;
 }
 
-fn writeCsvRow(writer: *std.Io.Writer, kind: []const u8, shape_index: usize, shape: Shape, lib_name: []const u8, result: BenchResult, reps: usize) !void {
+fn writeCsvRow(writer: *std.Io.Writer, kind: []const u8, pair: TransposePair, shape_index: usize, shape: Shape, lib_name: []const u8, result: BenchResult, reps: usize) !void {
     try writer.writeAll(kind);
-    try writer.writeByte(',');
+    try writer.print(",{c},{c},", .{ pair.a, pair.b });
     try writer.print("{d},", .{shape_index});
     try csvEscape(writer, shape.label);
     try writer.print(",{d},{d},{d},", .{ shape.m, shape.n, shape.k });
     try csvEscape(writer, lib_name);
     const measured_gflops = gflops(result.best_ns, flopFactorForKind(kind), shape.m, shape.n, shape.k);
-    try writer.print(",{d:.6},{d},{d}\n", .{ measured_gflops, result.best_ns, reps });
+    try writer.print(",{d:.6},{d},{d},{d},{d},{d},", .{
+        measured_gflops,
+        result.best_ns,
+        result.median_ns,
+        result.p95_ns,
+        result.max_ns,
+        reps,
+    });
+    try csvEscape(writer, result.check);
+    try writer.writeByte('\n');
 }
 
 pub fn main(init: std.process.Init) !void {
@@ -262,15 +403,19 @@ pub fn main(init: std.process.Init) !void {
     var accel_path: ?[]const u8 = null;
     var openblas_path: ?[]const u8 = null;
     var mkl_path: ?[]const u8 = null;
+    var aocl_blis_path: ?[]const u8 = null;
     var csv_path: ?[]const u8 = null;
     var reps: usize = 5;
     var custom_shapes: [max_custom_shapes]Shape = undefined;
     var custom_shape_count: usize = 0;
+    var custom_transposes: [max_custom_transposes]TransposePair = undefined;
+    var custom_transpose_count: usize = 0;
     var kind_filter_set = false;
     var run_sgemm = true;
     var run_dgemm = true;
     var run_cgemm = true;
     var run_zgemm = true;
+    var check = false;
 
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
     defer args.deinit();
@@ -284,10 +429,14 @@ pub fn main(init: std.process.Init) !void {
             openblas_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--mkl")) {
             mkl_path = args.next() orelse return error.MissingValue;
+        } else if (std.mem.eql(u8, arg, "--aocl-blis") or std.mem.eql(u8, arg, "--aocl")) {
+            aocl_blis_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--csv")) {
             csv_path = args.next() orelse return error.MissingValue;
         } else if (std.mem.eql(u8, arg, "--reps")) {
             reps = try std.fmt.parseInt(usize, args.next() orelse return error.MissingValue, 10);
+        } else if (std.mem.eql(u8, arg, "--check")) {
+            check = true;
         } else if (std.mem.eql(u8, arg, "--kind")) {
             const kind = args.next() orelse return error.MissingValue;
             if (!kind_filter_set) {
@@ -313,6 +462,10 @@ pub fn main(init: std.process.Init) !void {
             if (custom_shape_count == custom_shapes.len) return error.TooManyShapes;
             custom_shapes[custom_shape_count] = try parseShape(args.next() orelse return error.MissingValue);
             custom_shape_count += 1;
+        } else if (std.mem.eql(u8, arg, "--trans")) {
+            if (custom_transpose_count == custom_transposes.len) return error.TooManyTransposes;
+            custom_transposes[custom_transpose_count] = try parseTransposePair(args.next() orelse return error.MissingValue);
+            custom_transpose_count += 1;
         } else {
             usage();
             return error.BadArgument;
@@ -324,7 +477,7 @@ pub fn main(init: std.process.Init) !void {
     }
     if (!run_sgemm and !run_dgemm and !run_cgemm and !run_zgemm) return error.BadKind;
 
-    var libs: [4]LibSpec = undefined;
+    var libs: [5]LibSpec = undefined;
     var lib_count: usize = 0;
     libs[lib_count] = .{ .name = "zynum-blas", .path = zynum_blas_path.? };
     lib_count += 1;
@@ -340,52 +493,87 @@ pub fn main(init: std.process.Init) !void {
         libs[lib_count] = .{ .name = "MKL", .path = path };
         lib_count += 1;
     }
-
-    const zynum_blas_stateful_workers = zynumBlasStatefulWorkersRequested();
-    if (zynum_blas_stateful_workers and lib_count > 1) {
-        std.debug.print(
-            "warning: ZYNUM_BLAS_GEMM_POOL or ZYNUM_BLAS_GEMM_IO is enabled; mixed-library sweeps share one process and can let Zynum BLAS workers/std.Io state perturb later comparator libraries. Use fresh processes for reportable comparator numbers.\n",
-            .{},
-        );
+    if (aocl_blis_path) |path| {
+        libs[lib_count] = .{ .name = "AOCL-BLIS", .path = path };
+        lib_count += 1;
     }
 
     var csv_file = try std.Io.Dir.cwd().createFile(init.io, csv_path.?, .{ .truncate = true });
     defer csv_file.close(init.io);
     var buf: [8192]u8 = undefined;
     var writer = csv_file.writer(init.io, &buf);
-    try writer.interface.writeAll("kind,shape_index,label,m,n,k,library,gflops,best_ns,reps\n");
+    try writer.interface.writeAll("kind,transa,transb,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,check\n");
 
     const shapes: []const Shape = if (custom_shape_count == 0) default_shapes[0..] else custom_shapes[0..custom_shape_count];
+    const transposes: []const TransposePair = if (custom_transpose_count == 0) default_transposes[0..] else custom_transposes[0..custom_transpose_count];
+    var has_valid_pair = false;
+    for (transposes) |pair| {
+        if (((run_sgemm or run_dgemm) and supportsTransposePair(f32, pair)) or run_cgemm or run_zgemm) {
+            has_valid_pair = true;
+            break;
+        }
+    }
+    if (!has_valid_pair) return error.BadTranspose;
+
+    // Keep benchmark libraries loaded until process exit. Zynum and comparator
+    // BLAS implementations may own process-lifetime worker threads after use.
     for (libs[0..lib_count]) |spec| {
-        var lib = try loadLib(spec.name, spec.path);
+        const lib = try loadLib(spec.name, spec.path);
         std.debug.print("[lib {s}] {d} shapes\n", .{ lib.name, shapes.len });
         for (shapes, 0..) |shape, shape_index| {
-            std.debug.print("[{d}/{d}] {s} m={d} n={d} k={d}\n", .{ shape_index + 1, shapes.len, shape.label, shape.m, shape.n, shape.k });
-            if (run_sgemm) {
-                const sg = try benchGemm(f32, lib.sgemm, allocator, init.io, shape, reps);
-                try writeCsvRow(&writer.interface, "sgemm", shape_index, shape, lib.name, sg, reps);
-            }
+            for (transposes) |pair| {
+                std.debug.print("[{d}/{d}] {s} trans={c}{c} m={d} n={d} k={d}\n", .{ shape_index + 1, shapes.len, shape.label, pair.a, pair.b, shape.m, shape.n, shape.k });
+                if (run_sgemm and supportsTransposePair(f32, pair)) {
+                    const sg = try benchGemm(f32, lib.sgemm, allocator, init.io, shape, pair, reps, check);
+                    try writeCsvRow(&writer.interface, "sgemm", pair, shape_index, shape, lib.name, sg, reps);
+                }
 
-            if (run_dgemm) {
-                const dg = try benchGemm(f64, lib.dgemm, allocator, init.io, shape, reps);
-                try writeCsvRow(&writer.interface, "dgemm", shape_index, shape, lib.name, dg, reps);
-            }
+                if (run_dgemm and supportsTransposePair(f64, pair)) {
+                    const dg = try benchGemm(f64, lib.dgemm, allocator, init.io, shape, pair, reps, check);
+                    try writeCsvRow(&writer.interface, "dgemm", pair, shape_index, shape, lib.name, dg, reps);
+                }
 
-            if (run_cgemm) {
-                const cg = try benchGemm(ComplexF32, lib.cgemm, allocator, init.io, shape, reps);
-                try writeCsvRow(&writer.interface, "cgemm", shape_index, shape, lib.name, cg, reps);
-            }
+                if (run_cgemm) {
+                    const cg = try benchGemm(ComplexF32, lib.cgemm, allocator, init.io, shape, pair, reps, check);
+                    try writeCsvRow(&writer.interface, "cgemm", pair, shape_index, shape, lib.name, cg, reps);
+                }
 
-            if (run_zgemm) {
-                const zg = try benchGemm(ComplexF64, lib.zgemm, allocator, init.io, shape, reps);
-                try writeCsvRow(&writer.interface, "zgemm", shape_index, shape, lib.name, zg, reps);
+                if (run_zgemm) {
+                    const zg = try benchGemm(ComplexF64, lib.zgemm, allocator, init.io, shape, pair, reps, check);
+                    try writeCsvRow(&writer.interface, "zgemm", pair, shape_index, shape, lib.name, zg, reps);
+                }
             }
-        }
-        if (zynum_blas_stateful_workers and std.mem.eql(u8, lib.name, "zynum-blas")) {
-            std.debug.print("[lib Zynum BLAS] keeping dylib loaded because stateful GEMM workers may outlive the benchmark loop\n", .{});
-        } else {
-            lib.dyn.close();
         }
     }
     try writer.interface.flush();
+}
+
+test "transpose pair parsing and real restrictions" {
+    try std.testing.expectEqual(TransposePair{ .a = 'N', .b = 'C' }, try parseTransposePair("nc"));
+    try std.testing.expectError(error.BadTranspose, parseTransposePair("NX"));
+    try std.testing.expect(supportsTransposePair(ComplexF32, .{ .a = 'C', .b = 'T' }));
+    try std.testing.expect(!supportsTransposePair(f32, .{ .a = 'C', .b = 'N' }));
+}
+
+test "column-major storage dimensions follow BLAS transpose semantics" {
+    try std.testing.expectEqual(@as(usize, 2), storedLeadingDimension(2, 3, 'N'));
+    try std.testing.expectEqual(@as(usize, 3), storedColumnCount(2, 3, 'N'));
+    try std.testing.expectEqual(@as(usize, 3), storedLeadingDimension(2, 3, 'T'));
+    try std.testing.expectEqual(@as(usize, 2), storedColumnCount(2, 3, 'T'));
+}
+
+test "opElement handles transpose and conjugate transpose" {
+    const real = [_]f32{ 1, 2, 3, 4, 5, 6 };
+    try std.testing.expectEqual(@as(f32, 6), opElement(f32, &real, 2, 'N', 1, 2));
+    try std.testing.expectEqual(@as(f32, 6), opElement(f32, &real, 3, 'T', 1, 2));
+
+    const complex = [_]ComplexF32{
+        .{ .re = 1, .im = 2 },
+        .{ .re = 3, .im = 4 },
+        .{ .re = 5, .im = 6 },
+        .{ .re = 7, .im = 8 },
+        .{ .re = 9, .im = 10 },
+        .{ .re = 11, .im = 12 },
+    };
+    try std.testing.expectEqual(ComplexF32{ .re = 11, .im = -12 }, opElement(ComplexF32, &complex, 3, 'C', 1, 2));
 }

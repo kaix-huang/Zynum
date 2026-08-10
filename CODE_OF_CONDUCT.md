@@ -1,4 +1,4 @@
-# Code Of Conduct
+# Code of Conduct
 
 Zynum contributors are expected to keep technical discussion respectful,
 focused, and evidence-based.
@@ -11,7 +11,12 @@ Maintainers may moderate issues, discussions, pull requests, or other project
 spaces to protect the quality and safety of the community. Enforcement actions
 may include warnings, temporary restrictions, or removal from project spaces.
 
-Report conduct concerns privately to the project maintainer, Kaixiang Huang, via
-project-maintainer channels on <https://github.com/kaix-huang/Zynum>. Security
-vulnerabilities should follow `SECURITY.md` and should not be disclosed in public
-issues or discussions.
+Report conduct concerns privately through the repository's
+[security advisory form](https://github.com/kaix-huang/Zynum/security/advisories/new).
+Include the relevant URLs or context, the behavior involved, and any immediate
+safety concern. Reports will be handled confidentially and shared only with
+people needed to investigate and respond, except where disclosure is required
+by law or necessary to address an immediate safety risk.
+
+Security vulnerabilities are not conduct reports. Follow [SECURITY.md](SECURITY.md)
+and do not disclose vulnerability details in public issues or pull requests.

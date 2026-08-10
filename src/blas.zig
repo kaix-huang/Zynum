@@ -51,3 +51,13 @@ pub const matrixVectorMultiplyWithWorkspace = api.matrixVectorMultiplyWithWorksp
 pub const matrixMultiplyWorkspaceLength = api.matrixMultiplyWorkspaceLength;
 pub const matrixMultiply = api.matrixMultiply;
 pub const matrixMultiplyWithWorkspace = api.matrixMultiplyWithWorkspace;
+
+test {
+    _ = @import("blas/kernels/coverage.zig");
+    _ = @import("blas/kernels/shared/vector/catalog.zig");
+    _ = @import("blas/kernels/shared/vector/coverage.zig");
+    _ = @import("blas/kernels/shared/vector/tuning.zig");
+    _ = @import("blas/kernels/shared/matrix_vector/catalog.zig");
+    _ = @import("blas/kernels/shared/matrix_vector/coverage.zig");
+    _ = @import("blas/kernels/shared/matrix_vector/tuning.zig");
+}

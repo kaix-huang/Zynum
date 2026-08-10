@@ -25,7 +25,7 @@ body:
         - zynum-blas implementation
         - BLAS compatibility headers or ABI
         - Future LAPACK, FFT, sparse, CNN, or Transformer module
-        - ARM, x86, GPU, or NPU backend
+        - CPU kernel, target feature, or platform support
         - Build, packaging, or CI
         - Documentation
         - Other
