@@ -106,6 +106,60 @@ class BuildInventoryTests(unittest.TestCase):
         self.assertTrue(errors, "the mutation unexpectedly validated")
         self.assertIn(expected, "\n".join(errors))
 
+    def _as_curated_svg_asset(self, inventory: dict[str, Any]) -> dict[str, Any]:
+        # The public tree intentionally has no benchmark charts without reviewed
+        # source data. Replace a required fixture with an empty synthetic SVG so
+        # the test covers the SVG policy without asserting benchmark results.
+        source_candidate_id = "derived:pkgconfig/zynum_blas.pc"
+        candidates = {item["id"]: item for item in inventory["derived_candidates"]}
+        self.assertIn(source_candidate_id, candidates)
+        candidate = candidates[source_candidate_id]
+        source_path = candidate["path"]
+        source_file = self.root / source_path
+        self.assertTrue(source_file.is_file())
+        source_file.unlink()
+
+        fixture_path = "docs/assets/benchmarks/schema-validation.svg"
+        fixture_file = self.root / fixture_path
+        fixture_file.parent.mkdir(parents=True, exist_ok=True)
+        fixture_file.write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg"/>\n', encoding="utf-8"
+        )
+
+        candidate.clear()
+        candidate.update(
+            {
+                "id": f"derived:{fixture_path}",
+                "path": fixture_path,
+                "class": "curated-documentation-asset",
+                "owner": "documentation-maintainers",
+                "tracking_status": "tracked",
+                "public_safe_provenance": "empty synthetic SVG test fixture",
+                "claim_scope": "schema validation only; no benchmark results",
+                "review_date": "2026-08-10",
+                "freshness_criteria": "replace when the curated-asset schema changes",
+                "replacement_criteria": "retain only while this schema test requires it",
+                "deterministic_regeneration_claim": False,
+                "raw_inputs_disposition": "no benchmark inputs; generated in the test fixture",
+            }
+        )
+
+        classifications = {
+            item["path"]: item for item in inventory["repository_file_classifications"]
+        }
+        self.assertIn(source_path, classifications)
+        classification = classifications[source_path]
+        classification.clear()
+        classification.update(
+            {
+                "path": fixture_path,
+                "kind": "visual-asset",
+                "class": candidate["class"],
+                "owner": candidate["owner"],
+            }
+        )
+        return candidate
+
     def test_positive_validation_and_cli(self) -> None:
         self.assertEqual([], CHECKER.validate(self.root, self.inventory_path))
         stdout = io.StringIO()
@@ -7396,12 +7450,8 @@ class BuildInventoryTests(unittest.TestCase):
 
     def test_missing_svg_provenance_fails(self) -> None:
         inventory = self._inventory()
-        chart = next(
-            item
-            for item in inventory["derived_candidates"]
-            if item["path"].endswith(".svg")
-        )
-        del chart["claim_scope"]
+        candidate = self._as_curated_svg_asset(inventory)
+        del candidate["claim_scope"]
         self._write_inventory(inventory)
         self._assert_error_contains("missing curated provenance field claim_scope")
 
@@ -7423,12 +7473,8 @@ class BuildInventoryTests(unittest.TestCase):
 
     def test_curated_review_date_must_be_an_iso_calendar_date(self) -> None:
         inventory = self._inventory()
-        chart = next(
-            item
-            for item in inventory["derived_candidates"]
-            if item["path"].endswith(".svg")
-        )
-        chart["review_date"] = "2026-02-31"
+        candidate = self._as_curated_svg_asset(inventory)
+        candidate["review_date"] = "2026-02-31"
         self._write_inventory(inventory)
         self._assert_error_contains("review_date must be an ISO calendar date")
 
