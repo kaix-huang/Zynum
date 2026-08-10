@@ -368,6 +368,10 @@ SNAPSHOT_GENERATOR_PATHS = frozenset(
         "tools/generate_kernel_coverage.zig",
     }
 )
+DEPENDABOT_CONFIG_PATH = ".github/dependabot.yml"
+REVIEWED_DEPENDABOT_CONFIG_SHA256 = (
+    "8cc45e0a71d5c86f69270791a53e239d2e72b59d46bad459cb57bfefdc5a2255"
+)
 SOURCE_REFRESH_MAX_BYTES = SNAPSHOT_MAX_CACHED_FILE_BYTES
 SOURCE_REFRESH_MAX_JSON_DEPTH = 128
 SOURCE_REFRESH_MAX_JSON_NODES = 262_144
@@ -502,7 +506,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
     "option_surfaces": "c4047e8167df65133a70d2e096e8e8617dc26e2207210d4d5dc816a810ff811f",
-    "repository_file_classifications": "7b8b68321e841249ea9c541296ee36353b08faa6726b75fdf4dc752f14159001",
+    "repository_file_classifications": "a3852582e08e104b50a5cb969da73747c0ea2b990ed45ea83de161b2d0f94233",
     "derived_candidates": "5e4195f0d4b498d4a32c6487de38f310b008d81fd7500130a3a6aa4cc89c68ba",
     "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
 }
@@ -885,6 +889,7 @@ def _requires_cached_bytes(path: str, inventory_path: str | None) -> bool:
             pure.parent == PurePosixPath(".github/workflows")
             and pure.suffix.lower() in {".yml", ".yaml"}
         )
+        or path == DEPENDABOT_CONFIG_PATH
         or path in SNAPSHOT_GENERATOR_PATHS
         or path
         in {inventory_path, "tools/build_inventory.json", "tools/test_inventory.json"}
@@ -12666,6 +12671,16 @@ def _validate(
             f"unclassified={sorted(observed_paths - classified_paths)}",
             errors,
         )
+    if DEPENDABOT_CONFIG_PATH in observed_paths:
+        dependabot_bytes = _frozen_regular_bytes(
+            context, DEPENDABOT_CONFIG_PATH, "Dependabot configuration"
+        )
+        _require(
+            hashlib.sha256(dependabot_bytes).hexdigest()
+            == REVIEWED_DEPENDABOT_CONFIG_SHA256,
+            "reviewed Dependabot configuration changed",
+            errors,
+        )
     enforced_classifications = (
         classified_by_path
         if repository_complete
@@ -13251,6 +13266,12 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         }
     classifications.update(
         {
+            ".github/dependabot.yml": {
+                "path": ".github/dependabot.yml",
+                "kind": "configuration-metadata",
+                "class": "non-generated-source",
+                "owner": "workflow-maintainers",
+            },
             ".github/ISSUE_TEMPLATE/config.yml": {
                 "path": ".github/ISSUE_TEMPLATE/config.yml",
                 "kind": "configuration-metadata",
