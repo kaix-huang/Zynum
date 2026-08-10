@@ -118,9 +118,13 @@ correctness or performance. See `docs/architecture.md`,
 - `zig fmt --check build.zig build.zig.zon src test bench examples tools` passes.
 - `python3 -m py_compile bench/tools/*.py tools/*.py` passes when Python tooling
   changes.
-- Debug and ReleaseSafe baseline tests pass when checked API behavior changes.
+- Debug baseline tests pass when checked API behavior changes:
+  `zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures`.
+- ReleaseSafe baseline tests pass when checked API behavior changes:
+  `zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures`.
 - ReleaseFast baseline tests pass when dispatch, kernels, or ReleaseFast-only
-  paths change.
+  paths change:
+  `zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures`.
 - `zig build generate-headers --summary failures` has been run after ABI export
   changes.
 - `zig build generate-kernel-coverage --summary failures` has been run after a
