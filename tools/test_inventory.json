@@ -8341,88 +8341,93 @@
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:8",
-          "name": "TestInventoryTests.test_predicate_x86_and_mode_row_mutations_fail",
+          "name": "TestInventoryTests.test_predicate_ast_digest_is_version_stable",
           "ordinal": 8
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:9",
-          "name": "TestInventoryTests.test_python_root_commands_are_directly_executable",
+          "name": "TestInventoryTests.test_predicate_x86_and_mode_row_mutations_fail",
           "ordinal": 9
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:10",
-          "name": "TestInventoryTests.test_evidence_slot_ids_are_unique_and_row_bound",
+          "name": "TestInventoryTests.test_python_root_commands_are_directly_executable",
           "ordinal": 10
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:11",
-          "name": "TestInventoryTests.test_enumeration_class_set_foreign_key_and_state_mutations_fail",
+          "name": "TestInventoryTests.test_evidence_slot_ids_are_unique_and_row_bound",
           "ordinal": 11
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:12",
-          "name": "TestInventoryTests.test_expected_set_identity_name_and_order_mutations_fail",
+          "name": "TestInventoryTests.test_enumeration_class_set_foreign_key_and_state_mutations_fail",
           "ordinal": 12
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:13",
-          "name": "TestInventoryTests.test_pending_gap_closure_and_default_cli_fail_closed",
+          "name": "TestInventoryTests.test_expected_set_identity_name_and_order_mutations_fail",
           "ordinal": 13
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:14",
-          "name": "TestInventoryTests.test_explicit_test_optimize_and_mode_mismatch_fail",
+          "name": "TestInventoryTests.test_pending_gap_closure_and_default_cli_fail_closed",
           "ordinal": 14
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:15",
-          "name": "TestInventoryTests.test_contributor_commands_pair_test_and_artifact_optimize_modes",
+          "name": "TestInventoryTests.test_explicit_test_optimize_and_mode_mismatch_fail",
           "ordinal": 15
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:16",
-          "name": "TestInventoryTests.test_runner_protocol_and_isolated_object_mutations_fail",
+          "name": "TestInventoryTests.test_contributor_commands_pair_test_and_artifact_optimize_modes",
           "ordinal": 16
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:17",
-          "name": "TestInventoryTests.test_reviewed_native_projection_rejects_coherent_forgery",
+          "name": "TestInventoryTests.test_runner_protocol_and_isolated_object_mutations_fail",
           "ordinal": 17
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:18",
-          "name": "TestInventoryTests.test_reviewed_native_projection_blocks_refresh_and_direct_publication",
+          "name": "TestInventoryTests.test_reviewed_native_projection_rejects_coherent_forgery",
           "ordinal": 18
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:19",
-          "name": "TestInventoryTests.test_reviewed_native_projection_two_slot_migration",
+          "name": "TestInventoryTests.test_reviewed_native_projection_blocks_refresh_and_direct_publication",
           "ordinal": 19
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:20",
-          "name": "TestInventoryTests.test_refresh_rebases_stale_python_source_facts",
+          "name": "TestInventoryTests.test_reviewed_native_projection_two_slot_migration",
           "ordinal": 20
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:21",
-          "name": "TestInventoryTests.test_refresh_rejects_forged_existing_native_binding_without_publication",
+          "name": "TestInventoryTests.test_refresh_rebases_stale_python_source_facts",
           "ordinal": 21
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:22",
-          "name": "TestInventoryTests.test_factory_missing_duplicate_and_wrong_mapping_fail",
+          "name": "TestInventoryTests.test_refresh_rejects_forged_existing_native_binding_without_publication",
           "ordinal": 22
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:23",
-          "name": "TestInventoryTests.test_factory_optional_projection_and_fail_closure_mutations_fail",
+          "name": "TestInventoryTests.test_factory_missing_duplicate_and_wrong_mapping_fail",
           "ordinal": 23
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:24",
-          "name": "TestInventoryTests.test_privacy_matrix_row_contract_and_digest_mutations_fail",
+          "name": "TestInventoryTests.test_factory_optional_projection_and_fail_closure_mutations_fail",
           "ordinal": 24
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:25",
+          "name": "TestInventoryTests.test_privacy_matrix_row_contract_and_digest_mutations_fail",
+          "ordinal": 25
         }
       ],
       "root_ids": [
@@ -8609,7 +8614,7 @@
           "reason": "Accelerate is unavailable",
           "predicate_id": "python-skip-predicate:accelerate-unavailable",
           "skip_kind": "unittest.skipUnless",
-          "predicate_ast_sha256": "7ae7c35b74f62c212fa4ce69f95fcdedce63e0a9f4ac9ffb5be280f25dc28591"
+          "predicate_ast_sha256": "7db4bcf8bef7d89e9fe37c689c8f3a6d522cd4f32e2cc4a5a35b3013a57b1479"
         },
         {
           "test": "bench/tools/test_level1_report.py::Level1RunnerTests.test_stage_drift_before_publication_returns_two_and_preserves_outputs",
@@ -8714,7 +8719,7 @@
           "reason": "rank-k probe and Zynum shared library have not been built",
           "predicate_id": "python-skip-predicate:rank-k-artifacts-unavailable",
           "skip_kind": "unittest.skipUnless",
-          "predicate_ast_sha256": "ec77c098cd1b0a2c727ca16c214baa5f94d2b3794e3283e18dcca71438c3ba62"
+          "predicate_ast_sha256": "9c5a795bb6b9b408dc6989c6f7648c45fd6cef1a23fd834264ab2cb0a174e70e"
         },
         {
           "test": "bench/tools/test_rank_k_report.py::RankKRunnerTests.test_stage_drift_and_cleanup_failure_preserve_existing_outputs",
@@ -8805,7 +8810,7 @@
           "reason": "filesystem permits case-distinct names",
           "predicate_id": "python-skip-predicate:case-distinct-names",
           "skip_kind": "self.skipTest-if",
-          "predicate_ast_sha256": "7147aeb18c987d42a3b91b0f41e7dc0fa5bbe1b1221d3026130767b7e3dd7469"
+          "predicate_ast_sha256": "571abac73b8f84ec91cdfae5ff80c6047a97a757ca22d779369482258343ba67"
         },
         {
           "test": "bench/tools/test_report_publication.py::ReportPublicationTests.test_case_distinct_names_publish_on_case_sensitive_filesystem",
@@ -8819,7 +8824,7 @@
           "reason": "filesystem aliases case-distinct names",
           "predicate_id": "python-skip-predicate:case-aliasing-filesystem",
           "skip_kind": "self.skipTest-if",
-          "predicate_ast_sha256": "107c538046baa29d09685864d2b392fb65f73f36bec21ccaccf1735dcbc33f7f"
+          "predicate_ast_sha256": "b68aa26809c517630acb54d79fa5a46e4cfbb048fd703c498a8f5228fcdb0b69"
         },
         {
           "test": "bench/tools/test_report_publication.py::ReportPublicationTests.test_changed_created_parent_is_preserved_and_reported",
@@ -9078,7 +9083,7 @@
           "reason": "filesystem does not apply setgid directory inheritance",
           "predicate_id": "python-skip-predicate:no-setgid-inheritance",
           "skip_kind": "self.skipTest-if",
-          "predicate_ast_sha256": "ac6bc960fe185f8c52c8b367c18382d38f3e6557a05e002ddf1d70320845c167"
+          "predicate_ast_sha256": "25a61701139091a44f2496b4bf51ec893b886618d42fdca04b637bb3f0174917"
         },
         {
           "test": "bench/tools/test_report_publication.py::ReportPublicationTests.test_setgid_parent_rollback_preserves_original_uid_gid",
@@ -9148,7 +9153,7 @@
           "reason": "filesystem permits normalization-distinct names",
           "predicate_id": "python-skip-predicate:normalization-distinct-names",
           "skip_kind": "self.skipTest-if",
-          "predicate_ast_sha256": "a72938bc906e50175d7b21b5d9bd3cf4137c56547cc9205991e525e6c473461c"
+          "predicate_ast_sha256": "b85a4f3d06b5696b07a8519be4e641b0004de13bf798f00d52a5aa37ba0f4012"
         },
         {
           "test": "bench/tools/test_report_publication.py::ReportPublicationTests.test_unidentifiable_created_sidecar_closes_fd_and_is_preserved",
@@ -9190,7 +9195,7 @@
           "reason": "ROTG latency probe and Zynum shared library have not been built",
           "predicate_id": "python-skip-predicate:rotg-latency-artifacts-unavailable",
           "skip_kind": "unittest.skipUnless",
-          "predicate_ast_sha256": "9a8a8d2a4a432d4c8c1454ee7ddf6b03f750aa3e13d1eb4193973ef85e43c472"
+          "predicate_ast_sha256": "0528009144f89189929391cf810b02fb1286dd1a057daf5be6f276e3c44711e1"
         },
         {
           "test": "bench/tools/test_rotg_latency_report.py::RotgLatencyRunnerTests.test_non_default_accelerate_requests_fail_closed_as_files",
@@ -9225,7 +9230,7 @@
           "reason": "SYMM probe and Zynum shared library have not been built",
           "predicate_id": "python-skip-predicate:symm-artifacts-unavailable",
           "skip_kind": "unittest.skipUnless",
-          "predicate_ast_sha256": "c9a7b31c44f807306ee68787c5e0fef03b7201f1f7c172094b5b5f2e0c0424b2"
+          "predicate_ast_sha256": "36810485020e7b5f68dc738e3f48d0be9a35045838d5ee05160be90f2a91f4f2"
         },
         {
           "test": "bench/tools/test_symm_report.py::SymmRunnerTests.test_stage_drift_and_bare_soname_capture_preserve_existing_outputs",
@@ -9239,7 +9244,7 @@
           "reason": "triangular matrix probe and an integration BLAS are not available",
           "predicate_id": "python-skip-predicate:triangular-matrix-artifacts-unavailable",
           "skip_kind": "unittest.skipUnless",
-          "predicate_ast_sha256": "1c031317b061a551be1819ab903453ec7a8cd1a6be45ad3dfce5c3629ddf8375"
+          "predicate_ast_sha256": "b238b284b4f18337c82c42cc05309dd82aece3dd39df78527fe4064079252567"
         },
         {
           "test": "bench/tools/test_triangular_matrix_report.py::TriangularMatrixRunnerTests.test_stage_drift_and_bare_soname_capture_preserve_existing_outputs",
@@ -9250,7 +9255,7 @@
         }
       ],
       "count": 116,
-      "digest": "e7d899d755bc721bd0b7e7996d1a19163ebf2bef45b2f92732241ad5c6e9c419"
+      "digest": "ef7baae91b3c579ac730ba3e6213d8f5ea1858529254570ad102b428e36e3745"
     }
   ],
   "expected_test_sets": [
@@ -14581,7 +14586,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "root_id": "python-root:test-inventory-direct",
       "tests": [
         {
@@ -14626,92 +14631,97 @@
         },
         {
           "id": "test:python-root-test-inventory-direct:8",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_predicate_x86_and_mode_row_mutations_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_predicate_ast_digest_is_version_stable",
           "ordinal": 8
         },
         {
           "id": "test:python-root-test-inventory-direct:9",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_python_root_commands_are_directly_executable",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_predicate_x86_and_mode_row_mutations_fail",
           "ordinal": 9
         },
         {
           "id": "test:python-root-test-inventory-direct:10",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_evidence_slot_ids_are_unique_and_row_bound",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_python_root_commands_are_directly_executable",
           "ordinal": 10
         },
         {
           "id": "test:python-root-test-inventory-direct:11",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_enumeration_class_set_foreign_key_and_state_mutations_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_evidence_slot_ids_are_unique_and_row_bound",
           "ordinal": 11
         },
         {
           "id": "test:python-root-test-inventory-direct:12",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_expected_set_identity_name_and_order_mutations_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_enumeration_class_set_foreign_key_and_state_mutations_fail",
           "ordinal": 12
         },
         {
           "id": "test:python-root-test-inventory-direct:13",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_pending_gap_closure_and_default_cli_fail_closed",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_expected_set_identity_name_and_order_mutations_fail",
           "ordinal": 13
         },
         {
           "id": "test:python-root-test-inventory-direct:14",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_explicit_test_optimize_and_mode_mismatch_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_pending_gap_closure_and_default_cli_fail_closed",
           "ordinal": 14
         },
         {
           "id": "test:python-root-test-inventory-direct:15",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_contributor_commands_pair_test_and_artifact_optimize_modes",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_explicit_test_optimize_and_mode_mismatch_fail",
           "ordinal": 15
         },
         {
           "id": "test:python-root-test-inventory-direct:16",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_runner_protocol_and_isolated_object_mutations_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_contributor_commands_pair_test_and_artifact_optimize_modes",
           "ordinal": 16
         },
         {
           "id": "test:python-root-test-inventory-direct:17",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_reviewed_native_projection_rejects_coherent_forgery",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_runner_protocol_and_isolated_object_mutations_fail",
           "ordinal": 17
         },
         {
           "id": "test:python-root-test-inventory-direct:18",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_reviewed_native_projection_blocks_refresh_and_direct_publication",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_reviewed_native_projection_rejects_coherent_forgery",
           "ordinal": 18
         },
         {
           "id": "test:python-root-test-inventory-direct:19",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_reviewed_native_projection_two_slot_migration",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_reviewed_native_projection_blocks_refresh_and_direct_publication",
           "ordinal": 19
         },
         {
           "id": "test:python-root-test-inventory-direct:20",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_refresh_rebases_stale_python_source_facts",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_reviewed_native_projection_two_slot_migration",
           "ordinal": 20
         },
         {
           "id": "test:python-root-test-inventory-direct:21",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_refresh_rejects_forged_existing_native_binding_without_publication",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_refresh_rebases_stale_python_source_facts",
           "ordinal": 21
         },
         {
           "id": "test:python-root-test-inventory-direct:22",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_factory_missing_duplicate_and_wrong_mapping_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_refresh_rejects_forged_existing_native_binding_without_publication",
           "ordinal": 22
         },
         {
           "id": "test:python-root-test-inventory-direct:23",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_factory_optional_projection_and_fail_closure_mutations_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_factory_missing_duplicate_and_wrong_mapping_fail",
           "ordinal": 23
         },
         {
           "id": "test:python-root-test-inventory-direct:24",
-          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_privacy_matrix_row_contract_and_digest_mutations_fail",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_factory_optional_projection_and_fail_closure_mutations_fail",
           "ordinal": 24
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:25",
+          "name": "test/build/test_test_inventory.py::TestInventoryTests.test_privacy_matrix_row_contract_and_digest_mutations_fail",
+          "ordinal": 25
         }
       ],
-      "count": 25,
-      "digest": "d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "count": 26,
+      "digest": "4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "enumeration_source": "static"
     },
     {
@@ -21468,7 +21478,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21483,7 +21493,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21498,7 +21508,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22638,7 +22648,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22653,7 +22663,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22668,7 +22678,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23808,7 +23818,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23823,7 +23833,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23838,7 +23848,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -24978,7 +24988,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -24993,7 +25003,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -25008,7 +25018,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:d50883abdbf52ec1c4c081f0b3f13824cabe5426345843a3d4e2be6226d37eea",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:4199101d47448dbfbb9c3128c48b01018427c3f8ceab0f58004ddc4aaac73c0d",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -26489,11 +26499,11 @@
     },
     "python_test_modules": {
       "count": 19,
-      "digest": "c218daeb4900d5bb5e21241f2ce4b2d3769460a67cbe13c34fed637cb41c89a1"
+      "digest": "ad51c537482e7f0db322a529294dc70fa97fe6e01585170a0d7670ed5892ddff"
     },
     "expected_test_sets": {
       "count": 42,
-      "digest": "518e08b8d711309f22a9140de1e3b6f9699b9bf3a0d1abf3ee8c113b329d0552"
+      "digest": "511844c7014a9bd352229fc045a0fb3d52d54207ce94f59d18d0ea8b1c236e75"
     },
     "native_observation_bindings": {
       "count": 123,
@@ -26501,7 +26511,7 @@
     },
     "test_mode_rows": {
       "count": 312,
-      "digest": "6bc3a6465801c1dab106a98aaa11a1620e845b526d0fe9d865fa6f9c9e8e9c1c"
+      "digest": "db532ded9a72b1be183634e42eeb8d114e5b277b2299ae0203816684718793da"
     },
     "workflow_mode_bindings": {
       "count": 4,

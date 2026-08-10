@@ -936,7 +936,7 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "e2e0e96288f73f6ec4a8edb63142b079a8e6f1df9f5ff8dbd33be334e860743d"
+    "a3d5e31a6c1b6cc0845f06cc15f54b0a8c3cf2b1cf2e5e926ee6aa94852700d4"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
@@ -1029,7 +1029,7 @@ PYTHON_INVENTORY_PLATFORM_REASONS = {
 PYTHON_SKIP_PREDICATE_SOURCE_BINDINGS = {
     "python-skip-predicate:accelerate-unavailable": (
         "unittest.skipUnless",
-        "7ae7c35b74f62c212fa4ce69f95fcdedce63e0a9f4ac9ffb5be280f25dc28591",
+        "7db4bcf8bef7d89e9fe37c689c8f3a6d522cd4f32e2cc4a5a35b3013a57b1479",
     ),
     "python-skip-predicate:drop-in-blas-unavailable": (
         "unittest.skipUnless",
@@ -1041,19 +1041,19 @@ PYTHON_SKIP_PREDICATE_SOURCE_BINDINGS = {
     ),
     "python-skip-predicate:rank-k-artifacts-unavailable": (
         "unittest.skipUnless",
-        "ec77c098cd1b0a2c727ca16c214baa5f94d2b3794e3283e18dcca71438c3ba62",
+        "9c5a795bb6b9b408dc6989c6f7648c45fd6cef1a23fd834264ab2cb0a174e70e",
     ),
     "python-skip-predicate:rotg-latency-artifacts-unavailable": (
         "unittest.skipUnless",
-        "9a8a8d2a4a432d4c8c1454ee7ddf6b03f750aa3e13d1eb4193973ef85e43c472",
+        "0528009144f89189929391cf810b02fb1286dd1a057daf5be6f276e3c44711e1",
     ),
     "python-skip-predicate:symm-artifacts-unavailable": (
         "unittest.skipUnless",
-        "c9a7b31c44f807306ee68787c5e0fef03b7201f1f7c172094b5b5f2e0c0424b2",
+        "36810485020e7b5f68dc738e3f48d0be9a35045838d5ee05160be90f2a91f4f2",
     ),
     "python-skip-predicate:triangular-matrix-artifacts-unavailable": (
         "unittest.skipUnless",
-        "1c031317b061a551be1819ab903453ec7a8cd1a6be45ad3dfce5c3629ddf8375",
+        "b238b284b4f18337c82c42cc05309dd82aece3dd39df78527fe4064079252567",
     ),
     "python-skip-predicate:no-alternate-supplementary-group": (
         "self.skipTest-if",
@@ -1061,7 +1061,7 @@ PYTHON_SKIP_PREDICATE_SOURCE_BINDINGS = {
     ),
     "python-skip-predicate:no-setgid-inheritance": (
         "self.skipTest-if",
-        "ac6bc960fe185f8c52c8b367c18382d38f3e6557a05e002ddf1d70320845c167",
+        "25a61701139091a44f2496b4bf51ec893b886618d42fdca04b637bb3f0174917",
     ),
     "python-skip-predicate:not-darwin": (
         "unittest.skipUnless",
@@ -1073,15 +1073,15 @@ PYTHON_SKIP_PREDICATE_SOURCE_BINDINGS = {
     ),
     "python-skip-predicate:case-distinct-names": (
         "self.skipTest-if",
-        "7147aeb18c987d42a3b91b0f41e7dc0fa5bbe1b1221d3026130767b7e3dd7469",
+        "571abac73b8f84ec91cdfae5ff80c6047a97a757ca22d779369482258343ba67",
     ),
     "python-skip-predicate:normalization-distinct-names": (
         "self.skipTest-if",
-        "a72938bc906e50175d7b21b5d9bd3cf4137c56547cc9205991e525e6c473461c",
+        "b85a4f3d06b5696b07a8519be4e641b0004de13bf798f00d52a5aa37ba0f4012",
     ),
     "python-skip-predicate:case-aliasing-filesystem": (
         "self.skipTest-if",
-        "107c538046baa29d09685864d2b392fb65f73f36bec21ccaccf1735dcbc33f7f",
+        "b68aa26809c517630acb54d79fa5a46e4cfbb048fd703c498a8f5228fcdb0b69",
     ),
     "python-skip-predicate:artifact-snapshot-platform-unavailable": (
         PYTHON_INVENTORY_PLATFORM_SKIP_KIND,
@@ -4831,7 +4831,15 @@ def _unittest_runtime_id(inventory_name: str) -> str:
 
 
 def _predicate_ast_sha256(predicate: ast.expr) -> str:
-    canonical = ast.dump(predicate, annotate_fields=True, include_attributes=False)
+    if "show_empty" in inspect.signature(ast.dump).parameters:
+        canonical = ast.dump(
+            predicate,
+            annotate_fields=True,
+            include_attributes=False,
+            show_empty=True,
+        )
+    else:
+        canonical = ast.dump(predicate, annotate_fields=True, include_attributes=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 

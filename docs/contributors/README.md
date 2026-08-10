@@ -30,7 +30,8 @@ The canonical Python tooling gate reports and rejects unexpected skips, expected
 failures, and unexpected successes. An allowed skip is bound to exact
 `skip_kind`, reviewed `predicate_id`, and `predicate_ast_sha256`, the lowercase
 SHA-256 of canonical
-`ast.dump(predicate_expr, annotate_fields=True, include_attributes=False)`, as
+`ast.dump(predicate_expr, annotate_fields=True, include_attributes=False,
+show_empty=True)` (or the equivalent default on Python 3.12 and earlier), as
 well as its test identity and literal reason. Changing `unittest.skipIf` to
 `unittest.skipUnless`, changing the predicate, or substituting unconditional
 `unittest.skip` fails closed.
