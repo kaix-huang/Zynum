@@ -3958,7 +3958,7 @@ class BuildInventoryTests(unittest.TestCase):
                     checkout_steps[0],
                     (
                         r"^      - uses: actions/checkout@[0-9a-f]{40} "
-                        r"# v4\.[0-9]+\.[0-9]+$"
+                        r"# v5\.[0-9]+\.[0-9]+$"
                     ),
                 )
                 self.assertRegex(
@@ -4111,7 +4111,7 @@ class BuildInventoryTests(unittest.TestCase):
         ]
         self.assertRegex(
             upload_marker,
-            r"^      - uses: actions/upload-artifact@[0-9a-f]{40} # v4\.[0-9]+\.[0-9]+\n$",
+            r"^      - uses: actions/upload-artifact@[0-9a-f]{40} # v6\.[0-9]+\.[0-9]+\n$",
         )
         upload = release_source[upload_start:]
 
@@ -4245,7 +4245,7 @@ class BuildInventoryTests(unittest.TestCase):
         ]
         self.assertRegex(
             checkout_line,
-            r"^      - uses: actions/checkout@[0-9a-f]{40} # v4\.[0-9]+\.[0-9]+\n$",
+            r"^      - uses: actions/checkout@[0-9a-f]{40} # v5\.[0-9]+\.[0-9]+\n$",
         )
         checkout_mutant = (
             release_source[:provision_start].replace(
@@ -6934,7 +6934,7 @@ class BuildInventoryTests(unittest.TestCase):
         path = self.root / ".github/workflows/ci.yml"
         text = path.read_text(encoding="utf-8")
         checkout = (
-            "      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n"
+            "      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n"
             "        with:\n"
             "          persist-credentials: false\n"
         )
@@ -6944,7 +6944,7 @@ class BuildInventoryTests(unittest.TestCase):
             "          version: 0.16.0\n"
         )
         cache = (
-            "      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0\n"
+            "      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0\n"
             "        with:\n"
             "          path: .zig-cache\n"
             "          key: zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}\n"
