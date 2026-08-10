@@ -5,8 +5,8 @@
 from __future__ import annotations
 
 import ast
-import copy
 import contextlib
+import copy
 import ctypes
 import dataclasses
 import errno
@@ -17,8 +17,8 @@ import json
 import os
 import re
 import shlex
-import signal
 import shutil
+import signal
 import stat
 import subprocess
 import sys
@@ -814,6 +814,21 @@ class TestInventoryTests(unittest.TestCase):
             encoding="utf-8",
         )
         self.assertIn("dynamic unittest discovery", self._errors())
+
+    def test_predicate_ast_digest_is_version_stable(self) -> None:
+        empty_call = ast.parse("probe()", mode="eval").body
+        mutated_call = ast.parse("probe(flag=True)", mode="eval").body
+        full_field_dump = (
+            "Call(func=Name(id='probe', ctx=Load()), args=[], keywords=[])"
+        )
+        self.assertEqual(
+            hashlib.sha256(full_field_dump.encode("utf-8")).hexdigest(),
+            CHECKER._predicate_ast_sha256(empty_call),
+        )
+        self.assertNotEqual(
+            CHECKER._predicate_ast_sha256(empty_call),
+            CHECKER._predicate_ast_sha256(mutated_call),
+        )
 
     def test_predicate_x86_and_mode_row_mutations_fail(self) -> None:
         platform_predicate_id = (
