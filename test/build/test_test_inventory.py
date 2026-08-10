@@ -7405,6 +7405,14 @@ class TestInventoryTests(unittest.TestCase):
             CHECKER._native_observation_binding(vector_row, vector_set_id)
         )
         vector_inventory["native_observation_bindings"].sort(key=lambda row: row["id"])
+        CHECKER._refresh_native_gaps(vector_inventory)
+        self.assertFalse(
+            any(
+                vector_row_id in gap["subject_ids"]
+                for gap in vector_inventory["known_gaps"]
+                if gap["kind"] == "native-test-enumeration-required"
+            )
+        )
         vector_inventory["strict_summary"] = CHECKER._section_summary(vector_inventory)
         self._write(vector_inventory)
         vector_bytes = self.inventory_path.read_bytes()

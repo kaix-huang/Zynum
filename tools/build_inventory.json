@@ -7525,7 +7525,7 @@
         "ordinal": 1
       },
       "call": "subprocess.Popen",
-      "call_semantics_digest": "61248591f1877f0d04df61f2892ba8448b709eba324bf43c16ed996ad1d7b616"
+      "call_semantics_digest": "3cc0e8cffc0353badd6ca578fa60ec29d2251d37c26ece618ce5c7fdb61d2c76"
     },
     {
       "detail_status": "process-lifecycle-out-of-scope",
@@ -7560,7 +7560,7 @@
         "ordinal": 1
       },
       "call": "subprocess.run",
-      "call_semantics_digest": "edb7ec371ee209dc1c4a836ce1bfdaf280558b0bf73ecdb2ee3b3427c6f04f55"
+      "call_semantics_digest": "bf9c05fe2f3b8b096549e108019bb2df730c72ef311e1aa1b88fd44dd8ba824c"
     },
     {
       "id": "python-launch:tools/check_abi_manifest.py:run_nm:subprocess.run:1",
