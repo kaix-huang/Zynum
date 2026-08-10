@@ -16,13 +16,24 @@ from __future__ import annotations
 import argparse
 import csv
 import html
+import io
 import json
-import math
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from statistics import median
 from typing import Callable, Mapping, TypedDict
+
+from report_comparison import (
+    best_higher_row,
+    best_lower_row,
+    metric_samples,
+    parse_positive_finite,
+    positive_finite_axis_ticks,
+    positive_finite_median,
+    positive_finite_ratio,
+    validate_optional_metric_evidence,
+)
+from report_publication import ReportOutput, publish_outputs
 
 
 CATEGORY_ORDER = (
@@ -57,6 +68,25 @@ ACCEPTED_CHECKS = {
     "correctness-ok",
     "correctness-passed",
 }
+
+PERFORMANCE_EVIDENCE_FIELDS = (
+    "seconds",
+    "time_ns",
+    "rate_gops",
+    "bandwidth_gbps",
+    "gflops",
+    "median_gflops",
+    "best_ns",
+    "median_ns",
+    "p95_ns",
+    "max_ns",
+    "best_ns_per_call",
+    "median_ns_per_call",
+    "p95_ns_per_call",
+    "max_ns_per_call",
+    "median_full_ns_per_call",
+    "median_harness_ns_per_call",
+)
 
 SUMMARY_FIELDS = (
     "category",
@@ -93,6 +123,7 @@ LIBRARY_COLORS = {
 
 CsvRow = Mapping[str, str | None]
 CaseData = tuple[str, str, str, float]
+EvidenceCardinality = tuple[int | None, int | None, int | None]
 
 
 class RawCase(TypedDict):
@@ -287,7 +318,118 @@ def normalized_library(value: str) -> str:
     return name
 
 
-def checked_row(row: CsvRow, expected_process_repeats: int | None = None) -> None:
+def canonical_positive_integer(value: str | None, field: str) -> int:
+    candidate = "" if value is None else str(value)
+    if not candidate.isascii() or not candidate.isdigit() or candidate.startswith("0"):
+        raise InvalidRow(f"{field} must be a canonical positive integer")
+    return int(candidate)
+
+
+def optional_positive_integer(row: CsvRow, field: str) -> int | None:
+    value = row.get(field)
+    if value in (None, ""):
+        return None
+    return canonical_positive_integer(value, field)
+
+
+def validate_evidence_cardinality(
+    row: CsvRow,
+    expected_process_repeats: int | None,
+    *,
+    require_paired_repeats: bool,
+    require_complete_cardinality: bool,
+) -> EvidenceCardinality:
+    """Validate declared repeat/sample counts and return their cardinality.
+
+    Level 1 keeps its historical paired-repeat contract with optional samples.
+    Other report schemas treat only a completely absent triplet as legacy.
+    """
+
+    process_value = row.get("process_repeats")
+    successful_value = row.get("successful_repeats")
+    has_process = process_value not in (None, "")
+    has_successful = successful_value not in (None, "")
+    has_samples = row.get("metric_samples") not in (None, "")
+    if (
+        require_complete_cardinality
+        and any((has_process, has_successful, has_samples))
+        and not all((has_process, has_successful, has_samples))
+    ):
+        missing = [
+            field
+            for field, present in (
+                ("process_repeats", has_process),
+                ("successful_repeats", has_successful),
+                ("metric_samples", has_samples),
+            )
+            if not present
+        ]
+        raise InvalidRow(
+            "process_repeats, successful_repeats, and metric_samples must all "
+            f"be present when cardinality evidence is declared; missing "
+            f"{', '.join(missing)}"
+        )
+    if require_paired_repeats and has_process != has_successful:
+        raise InvalidRow(
+            "process_repeats and successful_repeats must either both be present "
+            "or both be absent/empty for a legacy row"
+        )
+    process_repeats = optional_positive_integer(row, "process_repeats")
+    successful_repeats = optional_positive_integer(row, "successful_repeats")
+    sample_count = None
+    if has_samples:
+        try:
+            sample_count = len(metric_samples(row))
+        except ValueError as exc:
+            raise InvalidRow(str(exc)) from exc
+    if (
+        process_repeats is not None
+        and successful_repeats is not None
+        and successful_repeats != process_repeats
+    ):
+        raise InvalidRow(
+            f"successful_repeats={successful_repeats}, "
+            f"process_repeats={process_repeats}"
+        )
+    if expected_process_repeats is not None:
+        declared_repeats = (
+            process_repeats if process_repeats is not None else successful_repeats
+        )
+        if declared_repeats is None:
+            raise InvalidRow("missing repeat count")
+        if declared_repeats != expected_process_repeats:
+            raise InvalidRow(
+                f"repeat count={declared_repeats}, expected={expected_process_repeats}"
+            )
+    sample_repeats = (
+        successful_repeats if successful_repeats is not None else process_repeats
+    )
+    if (
+        sample_count is not None
+        and sample_repeats is not None
+        and sample_count != sample_repeats
+    ):
+        raise InvalidRow(
+            f"metric_samples count={sample_count}, declared repeats={sample_repeats}"
+        )
+    return process_repeats, successful_repeats, sample_count
+
+
+def cardinality_text(cardinality: EvidenceCardinality) -> str:
+    process_repeats, successful_repeats, sample_count = cardinality
+    return (
+        f"process_repeats={process_repeats}, "
+        f"successful_repeats={successful_repeats}, "
+        f"metric_samples={sample_count}"
+    )
+
+
+def checked_row(
+    row: CsvRow,
+    expected_process_repeats: int | None = None,
+    *,
+    category: str | None = None,
+) -> EvidenceCardinality:
     status = text(row, "status")
     if status and status.lower() != "ok":
         raise InvalidRow(f"status={status}")
@@ -298,57 +440,32 @@ def checked_row(row: CsvRow, expected_process_repeats: int | None = None) -> Non
     for value in checks:
         if value.lower() not in ACCEPTED_CHECKS:
             raise InvalidRow(f"correctness={value}")
-    process_repeats_text = text(row, "process_repeats")
-    successful_repeats_text = text(row, "successful_repeats")
-    if not process_repeats_text:
-        if expected_process_repeats is not None:
-            if not successful_repeats_text:
-                raise InvalidRow("missing repeat count")
-            try:
-                successful_repeats = int(successful_repeats_text)
-            except ValueError as exc:
-                raise InvalidRow("invalid successful_repeats") from exc
-            if successful_repeats != expected_process_repeats:
-                raise InvalidRow(
-                    f"successful_repeats={successful_repeats}, "
-                    f"expected={expected_process_repeats}"
-                )
-        return
-    if process_repeats_text:
-        try:
-            process_repeats = int(process_repeats_text)
-        except ValueError as exc:
-            raise InvalidRow("invalid process_repeats") from exc
-        if process_repeats <= 0:
-            raise InvalidRow("non-positive process_repeats")
-        if (
-            expected_process_repeats is not None
-            and process_repeats != expected_process_repeats
-        ):
-            raise InvalidRow(
-                f"process_repeats={process_repeats}, expected={expected_process_repeats}"
-            )
-        if successful_repeats_text:
-            try:
-                successful_repeats = int(successful_repeats_text)
-            except ValueError as exc:
-                raise InvalidRow("invalid successful_repeats") from exc
-            if successful_repeats != process_repeats:
-                raise InvalidRow(
-                    f"successful_repeats={successful_repeats}, process_repeats={process_repeats}"
-                )
+    return validate_evidence_cardinality(
+        row,
+        expected_process_repeats,
+        require_paired_repeats=category == "level1",
+        require_complete_cardinality=category != "level1",
+    )
 
 
 def positive_float(value: str | None, field: str) -> float:
     if value is None:
         raise InvalidRow(f"missing {field}")
     try:
-        result = float(value)
-    except (TypeError, ValueError) as exc:
-        raise InvalidRow(f"invalid {field}") from exc
-    if not math.isfinite(result) or result <= 0:
-        raise InvalidRow(f"non-positive {field}")
-    return result
+        return parse_positive_finite(value, field)
+    except ValueError as exc:
+        raise InvalidRow(str(exc)) from exc
+
+
+def validate_performance_evidence(row: CsvRow) -> None:
+    try:
+        validate_optional_metric_evidence(row)
+        for field in PERFORMANCE_EVIDENCE_FIELDS:
+            value = row.get(field)
+            if value not in (None, ""):
+                parse_positive_finite(value, field)
+    except ValueError as exc:
+        raise InvalidRow(str(exc)) from exc
 
 
 def median_metric(row: CsvRow, fallback_field: str) -> float:
@@ -399,8 +516,13 @@ def level1_case(row: CsvRow) -> CaseData:
     copy_bytes = text(row, "copy_bytes")
     if copy_bytes:
         label += f" bytes={copy_bytes}"
-    return joined_key("level1", fields), label, metric, median_metric(
-        row, "bandwidth_gbps" if metric == "bandwidth_gbps" else "rate_gops"
+    return (
+        joined_key("level1", fields),
+        label,
+        metric,
+        median_metric(
+            row, "bandwidth_gbps" if metric == "bandwidth_gbps" else "rate_gops"
+        ),
     )
 
 
@@ -498,7 +620,6 @@ def rank_k_case(row: CsvRow) -> CaseData:
             "ldb",
             "ldc",
             "reps",
-            "process_repeats",
             "metric",
         )
     ]
@@ -535,7 +656,6 @@ def symm_case(row: CsvRow) -> CaseData:
             "ldb",
             "ldc",
             "reps",
-            "process_repeats",
             "metric",
         )
     ]
@@ -572,7 +692,6 @@ def triangular_case(row: CsvRow) -> CaseData:
             "lda",
             "ldb",
             "reps",
-            "process_repeats",
             "metric",
         )
     ]
@@ -616,6 +735,10 @@ def read_inputs(
     csv_files = sorted(path for path in input_dir.rglob("*.csv") if path.is_file())
     recognized: list[str] = []
     ignored: list[str] = []
+    semantic_slots: dict[tuple[str, str, str], tuple[str, int]] = {}
+    case_cardinalities: dict[
+        tuple[str, str], tuple[EvidenceCardinality, str, str, int]
+    ] = {}
 
     for path in csv_files:
         relative = path.relative_to(input_dir).as_posix()
@@ -636,16 +759,54 @@ def read_inputs(
             for row in reader:
                 row_stats[category]["seen"] += 1
                 try:
-                    checked_row(row, expected_process_repeats)
+                    cardinality = checked_row(
+                        row, expected_process_repeats, category=category
+                    )
+                    validate_performance_evidence(row)
                     library = normalized_library(text(row, "library"))
                     if not library:
                         raise InvalidRow("missing library")
                     case_id, label, metric, value = reader_fn(row)
+                    value = parse_positive_finite(value, f"{category} derived metric")
                 except (InvalidRow, KeyError, TypeError, ValueError) as exc:
                     row_stats[category]["rejected"] += 1
                     reason = str(exc) or exc.__class__.__name__
                     row_stats[category]["reasons"][reason] += 1
-                    continue
+                    raise ValueError(
+                        f"{relative}:{reader.line_num}: invalid {category} evidence: "
+                        f"{reason}"
+                    ) from exc
+                slot = (category, case_id, library)
+                previous = semantic_slots.get(slot)
+                if previous is not None:
+                    previous_path, previous_line = previous
+                    raise ValueError(
+                        f"{relative}:{reader.line_num}: duplicate semantic slot "
+                        f"category={category} case_id={case_id!r} library={library!r}; "
+                        f"first seen at {previous_path}:{previous_line}"
+                    )
+                semantic_slots[slot] = (relative, reader.line_num)
+                if category != "level1":
+                    cardinality_key = (category, case_id)
+                    previous_cardinality = case_cardinalities.get(cardinality_key)
+                    if previous_cardinality is None:
+                        case_cardinalities[cardinality_key] = (
+                            cardinality,
+                            library,
+                            relative,
+                            reader.line_num,
+                        )
+                    elif cardinality != previous_cardinality[0]:
+                        expected, expected_library, expected_path, expected_line = (
+                            previous_cardinality
+                        )
+                        raise ValueError(
+                            f"{relative}:{reader.line_num}: inconsistent evidence "
+                            f"cardinality for category={category} case_id={case_id!r}: "
+                            f"{library} has {cardinality_text(cardinality)}; "
+                            f"{expected_library} has {cardinality_text(expected)} "
+                            f"at {expected_path}:{expected_line}"
+                        )
                 row_stats[category]["accepted"] += 1
                 case = groups[category].setdefault(
                     case_id,
@@ -678,10 +839,17 @@ def aggregate_category(
     results: list[BenchmarkResult] = []
     for case_id in sorted(groups):
         raw = groups[case_id]
-        values = {
-            library: median(samples)
-            for library, samples in raw["libraries"].items()
-        }
+        try:
+            values = {
+                library: positive_finite_median(
+                    samples, f"{category} {case_id} {library} median"
+                )
+                for library, samples in raw["libraries"].items()
+            }
+        except ValueError as exc:
+            raise ValueError(
+                f"invalid aggregate for {category} {case_id}: {exc}"
+            ) from exc
         zynum = values.get("Zynum")
         comparators = {name: value for name, value in values.items() if name != "Zynum"}
         missing_comparators = []
@@ -699,16 +867,25 @@ def aggregate_category(
         ratio = None
         lower_is_better = category == "scalar-latency"
         if comparators:
-            selector = min if lower_is_better else max
-            best_name, best_value = selector(
-                comparators.items(), key=lambda item: (item[1], item[0])
+            comparator_rows = [
+                {"library": name, "value": value} for name, value in comparators.items()
+            ]
+            best = (
+                best_lower_row(comparator_rows, "value")
+                if lower_is_better
+                else best_higher_row(comparator_rows, "value")
             )
+            best_name = str(best["library"])
+            best_value = float(best["value"])
         if zynum is None:
             status = "missing-zynum"
         elif best_value is None:
             status = "missing-comparator"
         else:
-            ratio = best_value / zynum if lower_is_better else zynum / best_value
+            ratio = positive_finite_ratio(
+                best_value if lower_is_better else zynum,
+                zynum if lower_is_better else best_value,
+            )
             status = "passed" if ratio >= 1.0 else "failed"
         results.append(
             {
@@ -771,9 +948,7 @@ def ratio_tick(exponent: int) -> str:
     return f"{value:.1e}x"
 
 
-def render_svg(
-    category: str, results: list[BenchmarkResult], output_path: Path
-) -> None:
+def render_svg(category: str, results: list[BenchmarkResult]) -> bytes:
     width = 1500
     label_right = 510
     chart_left = 540
@@ -793,31 +968,9 @@ def render_svg(
         "source_files": [],
         "libraries": {},
     }
+
     def format_value(value: float) -> str:
         return f"{value:.4g}"
-
-    def tick_values(max_value: float) -> list[float]:
-        if max_value <= 0 or not math.isfinite(max_value):
-            return [0.0, 1.0]
-        raw = max_value / 5.0
-        exponent = math.floor(math.log10(raw))
-        base = raw / (10.0**exponent)
-        if base <= 1:
-            step_base = 1.0
-        elif base <= 2:
-            step_base = 2.0
-        elif base <= 5:
-            step_base = 5.0
-        else:
-            step_base = 10.0
-        step = step_base * 10.0**exponent
-        top = math.ceil(max_value / step) * step
-        values: list[float] = []
-        value = 0.0
-        while value <= top + step * 0.5:
-            values.append(value)
-            value += step
-        return values
 
     metric_units = {
         "bandwidth_gbps": "GB/s",
@@ -850,7 +1003,9 @@ def render_svg(
     status = category_status(results)
     panel_gap = 36
     base_top = 124
-    panel_layout: list[tuple[str, list[BenchmarkResult], float, list[float], int, int, int, int]] = []
+    panel_layout: list[
+        tuple[str, list[BenchmarkResult], float, list[float], int, int, int, int]
+    ] = []
     cursor = base_top
     for metric, metric_rows in metric_groups:
         values = [
@@ -860,14 +1015,23 @@ def render_svg(
             if value > 0
         ]
         max_value = max(values, default=1.0)
-        ticks = tick_values(max_value)
+        ticks = positive_finite_axis_ticks(max_value)
         max_tick = ticks[-1]
         line_top = cursor + 34
         line_bottom = line_top + 140
         bar_top = line_bottom + 58
         panel_bottom = bar_top + row_height * len(metric_rows) + 32
         panel_layout.append(
-            (metric, metric_rows, max_tick, ticks, line_top, line_bottom, bar_top, panel_bottom)
+            (
+                metric,
+                metric_rows,
+                max_tick,
+                ticks,
+                line_top,
+                line_bottom,
+                bar_top,
+                panel_bottom,
+            )
         )
         cursor = panel_bottom + panel_gap
     height = max(300, cursor)
@@ -907,13 +1071,24 @@ def render_svg(
     legend_x = 40
     for library in libraries:
         color = LIBRARY_COLORS.get(library, "#6b7280")
-        svg.append(f'<rect x="{legend_x}" y="99" width="12" height="9" fill="{color}"/>')
+        svg.append(
+            f'<rect x="{legend_x}" y="99" width="12" height="9" fill="{color}"/>'
+        )
         svg.append(
             f'<text x="{legend_x + 18}" y="108" class="legend">{html.escape(library)}</text>'
         )
         legend_x += 38 + 7 * len(library)
 
-    for metric, metric_rows, max_tick, ticks, line_top, line_bottom, bar_top, panel_bottom in panel_layout:
+    for (
+        metric,
+        metric_rows,
+        max_tick,
+        ticks,
+        line_top,
+        line_bottom,
+        bar_top,
+        panel_bottom,
+    ) in panel_layout:
         unit = metric_units.get(metric, metric or "value")
         lower_better = metric == "ns_per_call"
         direction = "lower is better" if lower_better else "higher is better"
@@ -953,7 +1128,9 @@ def render_svg(
                         segments.append(segment)
                         segment = []
                     continue
-                point_x = chart_left + chart_width * index / max(1, len(metric_rows) - 1)
+                point_x = chart_left + chart_width * index / max(
+                    1, len(metric_rows) - 1
+                )
                 segment.append((point_x, value_y(value)))
             if segment:
                 segments.append(segment)
@@ -1013,12 +1190,16 @@ def render_svg(
                 summary_color = "#6b7280"
             else:
                 summary = f"Zynum {format_value(zynum_value)} | {comparator} {format_value(comparator_value)} | {result['ratio']:.3f}x"
-                summary_color = "#15803d" if result["ratio"] is not None and result["ratio"] >= 1.0 else "#dc2626"
+                summary_color = (
+                    "#15803d"
+                    if result["ratio"] is not None and result["ratio"] >= 1.0
+                    else "#dc2626"
+                )
             svg.append(
                 f'<text x="{value_x}" y="{y + 4}" class="value" fill="{summary_color}">{html.escape(summary)}</text>'
             )
     svg.append("</svg>\n")
-    output_path.write_text("\n".join(svg), encoding="utf-8")
+    return "\n".join(svg).encode("utf-8")
 
 
 def csv_value(value: float | str | None) -> str:
@@ -1029,48 +1210,45 @@ def csv_value(value: float | str | None) -> str:
     return str(value)
 
 
-def write_summary_csv(categories: list[CategoryReport], output_path: Path) -> None:
-    with output_path.open("w", newline="", encoding="utf-8") as file_handle:
-        writer = csv.DictWriter(file_handle, fieldnames=SUMMARY_FIELDS)
-        writer.writeheader()
-        for category in categories:
-            if not category["results"]:
-                writer.writerow(
-                    {
-                        "category": category["id"],
-                        "case": "missing",
-                        "status": "missing",
-                    }
-                )
-                continue
-            for result in category["results"]:
-                writer.writerow(
-                    {
-                        "category": category["id"],
-                        "case_id": result["case_id"],
-                        "case": result["case"],
-                        "metric": result["metric"],
-                        "zynum_value": csv_value(result["zynum_value"]),
-                        "fastest_comparator": result["fastest_comparator"] or "",
-                        "comparator_value": csv_value(result["comparator_value"]),
-                        "ratio": csv_value(result["ratio"]),
-                        "status": result["status"],
-                        "missing_comparators": ";".join(
-                            result["missing_comparators"]
-                        ),
-                        "library_values": json.dumps(
-                            result["libraries"], sort_keys=True
-                        ),
-                        "source_files": ";".join(result["source_files"]),
-                    }
-                )
+def render_summary_csv(categories: list[CategoryReport]) -> bytes:
+    file_handle = io.StringIO(newline="")
+    writer = csv.DictWriter(file_handle, fieldnames=SUMMARY_FIELDS)
+    writer.writeheader()
+    for category in categories:
+        if not category["results"]:
+            writer.writerow(
+                {
+                    "category": category["id"],
+                    "case": "missing",
+                    "status": "missing",
+                }
+            )
+            continue
+        for result in category["results"]:
+            writer.writerow(
+                {
+                    "category": category["id"],
+                    "case_id": result["case_id"],
+                    "case": result["case"],
+                    "metric": result["metric"],
+                    "zynum_value": csv_value(result["zynum_value"]),
+                    "fastest_comparator": result["fastest_comparator"] or "",
+                    "comparator_value": csv_value(result["comparator_value"]),
+                    "ratio": csv_value(result["ratio"]),
+                    "status": result["status"],
+                    "missing_comparators": ";".join(result["missing_comparators"]),
+                    "library_values": json.dumps(result["libraries"], sort_keys=True),
+                    "source_files": ";".join(result["source_files"]),
+                }
+            )
+    return file_handle.getvalue().encode("utf-8")
 
 
 def html_number(value: float | None) -> str:
     return "" if value is None else f"{value:.6g}"
 
 
-def render_index(report: FullReport, output_path: Path) -> None:
+def render_index(report: FullReport) -> bytes:
     sections: list[str] = []
     for category in report["categories"]:
         counts = category["cases"]
@@ -1098,19 +1276,19 @@ def render_index(report: FullReport, output_path: Path) -> None:
                 f"<td>{html.escape(result['fastest_comparator'] or '')}</td>"
                 f"<td>{html_number(result['ratio'])}</td>"
                 f"<td>{html.escape(library_values)}</td>"
-                f"<td class=\"{html.escape(result['status'])}\">{html.escape(result['status'])}</td>"
+                f'<td class="{html.escape(result["status"])}">{html.escape(result["status"])}</td>'
                 "</tr>"
             )
         sections.append(
             f"""
 <section>
-  <h2>{html.escape(category['title'])}</h2>
-  <p class="meta">status={category['status']} | cases={counts['total']} | passed={counts['passed']} | failed={counts['failed']} | missing={counts['missing']} | comparator-incomplete={counts['comparator_incomplete']} | accepted rows={category['rows']['accepted']} | rejected rows={category['rows']['rejected']}</p>
-  <p><a href="{category['svg']}">Open full-size SVG</a></p>
-  <a href="{category['svg']}"><img src="{category['svg']}" alt="{html.escape(category['title'])} real performance chart"></a>
+  <h2>{html.escape(category["title"])}</h2>
+  <p class="meta">status={category["status"]} | cases={counts["total"]} | passed={counts["passed"]} | failed={counts["failed"]} | missing={counts["missing"]} | comparator-incomplete={counts["comparator_incomplete"]} | accepted rows={category["rows"]["accepted"]} | rejected rows={category["rows"]["rejected"]}</p>
+  <p><a href="{category["svg"]}">Open full-size SVG</a></p>
+  <a href="{category["svg"]}"><img src="{category["svg"]}" alt="{html.escape(category["title"])} real performance chart"></a>
   <details>
-    <summary>Case table ({counts['total']})</summary>
-    <table><thead><tr><th>Case</th><th>Metric</th><th>Zynum</th><th>Fastest comparator</th><th>Ratio</th><th>All library medians</th><th>Status</th></tr></thead><tbody>{''.join(rows)}</tbody></table>
+    <summary>Case table ({counts["total"]})</summary>
+    <table><thead><tr><th>Case</th><th>Metric</th><th>Zynum</th><th>Fastest comparator</th><th>Ratio</th><th>All library medians</th><th>Status</th></tr></thead><tbody>{"".join(rows)}</tbody></table>
   </details>
 </section>
 """
@@ -1141,13 +1319,13 @@ def render_index(report: FullReport, output_path: Path) -> None:
   <h1>Zynum Full Benchmark Report</h1>
   <p>Charts show real metric values in native units. Throughput ratio = Zynum / fastest comparator; latency ratio = fastest comparator latency / Zynum latency. The 1.0 strict gate is supplementary. Only correctness-checked rows are included.</p>
   <p><a href="summary.csv">summary.csv</a> | <a href="summary.json">summary.json</a></p>
-  <p class="meta">CSV files scanned={report['files']['scanned']}; recognized={report['files']['recognized']}; ignored={report['files']['ignored_count']}</p>
+  <p class="meta">CSV files scanned={report["files"]["scanned"]}; recognized={report["files"]["recognized"]}; ignored={report["files"]["ignored_count"]}</p>
 </header>
-{''.join(sections)}
+{"".join(sections)}
 </body>
 </html>
 """
-    output_path.write_text(document, encoding="utf-8")
+    return document.encode("utf-8")
 
 
 def render_report(
@@ -1162,7 +1340,6 @@ def render_report(
         raise ValueError(f"input directory does not exist: {input_dir}")
     if expected_process_repeats is not None and expected_process_repeats <= 0:
         raise ValueError("expected process repeats must be positive")
-    output_dir.mkdir(parents=True, exist_ok=True)
     requested_comparators = (
         [normalized_library(name) for name in comparators] if comparators else None
     )
@@ -1190,7 +1367,6 @@ def render_report(
             "cases": counts,
             "results": results,
         }
-        render_svg(category, results, output_dir / SVG_NAMES[category])
         categories.append(category_report)
 
     report: FullReport = {
@@ -1212,11 +1388,24 @@ def render_report(
         },
         "categories": categories,
     }
-    write_summary_csv(categories, output_dir / "summary.csv")
-    (output_dir / "summary.json").write_text(
-        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    outputs = [
+        ReportOutput(
+            output_dir / category["svg"],
+            render_svg(category["id"], category["results"]),
+        )
+        for category in categories
+    ]
+    outputs.extend(
+        [
+            ReportOutput(output_dir / "summary.csv", render_summary_csv(categories)),
+            ReportOutput(
+                output_dir / "summary.json",
+                (json.dumps(report, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+            ),
+            ReportOutput(output_dir / "index.html", render_index(report)),
+        ]
     )
-    render_index(report, output_dir / "index.html")
+    publish_outputs(outputs)
     return report
 
 

@@ -114,9 +114,12 @@ zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary fai
 zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v4 --release=fast --summary failures
 ```
 
-Run `zig build test ...` only on a host that can execute the selected x86_64
-target binaries, or under an explicitly documented runner/emulator. Cross-target
-builds from Apple Silicon are compile coverage only.
+Inventory-dependent tests accept only exact baseline, so run
+`zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline ...` only on a host
+that can execute those target binaries, or under an explicitly documented
+runner/emulator. Use ordinary `zig build -Dtarget=... -Dcpu=<tier>` for
+feature-tier compile coverage. Cross-target builds from Apple Silicon are
+compile coverage only.
 
 Linux benchmark with MKL and AOCL-BLIS:
 

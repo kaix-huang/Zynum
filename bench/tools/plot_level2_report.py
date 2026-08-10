@@ -5,8 +5,10 @@
 import argparse
 import csv
 import html
-import math
 from pathlib import Path
+
+from report_comparison import parse_positive_finite, positive_finite_axis_ticks
+from report_publication import ReportOutput, publish_outputs
 
 LIB_ORDER = ["Zynum", "Accelerate", "OpenBLAS", "MKL", "AOCL-BLIS"]
 COLORS = {
@@ -38,35 +40,11 @@ CASE_ORDER = [
 ]
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Plot Level 2 report CSV.")
     parser.add_argument("csv")
     parser.add_argument("--bars-svg", required=True)
-    return parser.parse_args()
-
-
-def nice_ticks(max_value, count=5):
-    if max_value <= 0 or not math.isfinite(max_value):
-        return [0, 1]
-    raw = max_value / count
-    exp = math.floor(math.log10(raw))
-    base = raw / (10**exp)
-    if base <= 1:
-        step = 1
-    elif base <= 2:
-        step = 2
-    elif base <= 5:
-        step = 5
-    else:
-        step = 10
-    step *= 10**exp
-    top = math.ceil(max_value / step) * step
-    ticks = []
-    value = 0
-    while value <= top + step * 0.5:
-        ticks.append(value)
-        value += step
-    return ticks
+    return parser.parse_args(argv)
 
 
 def sy(value, top, height, max_value):
@@ -87,7 +65,7 @@ def read_rows(path):
                     "kind": raw["kind"],
                     "library": raw["library"],
                     "n": int(raw["n"]),
-                    "rate_gops": float(raw["rate_gops"]),
+                    "rate_gops": parse_positive_finite(raw["rate_gops"], "rate_gops"),
                 }
             )
     return rows
@@ -103,7 +81,7 @@ def libraries_for(rows):
     return libs
 
 
-def plot(rows, output_path):
+def render_svg(rows):
     sizes = sorted({row["n"] for row in rows})
     libs = libraries_for(rows)
     values = {(row["n"], row["case"], row["library"]): row for row in rows}
@@ -114,7 +92,9 @@ def plot(rows, output_path):
     panel_gap = 102
     top0 = 118
     bottom = 110
-    height = top0 + len(sizes) * panel_height + max(0, len(sizes) - 1) * panel_gap + bottom
+    height = (
+        top0 + len(sizes) * panel_height + max(0, len(sizes) - 1) * panel_gap + bottom
+    )
     chart_width = width - left - right
 
     svg = [
@@ -149,8 +129,8 @@ def plot(rows, output_path):
     for panel_index, n in enumerate(sizes):
         top = top0 + panel_index * (panel_height + panel_gap)
         panel_rows = [row for row in rows if row["n"] == n]
-        max_value = max((row["rate_gops"] for row in panel_rows), default=1.0) * 1.12
-        ticks = nice_ticks(max_value)
+        max_value = max((row["rate_gops"] for row in panel_rows), default=1.0)
+        ticks = positive_finite_axis_ticks(max_value, padding=1.12)
         max_value = ticks[-1]
         svg.append(f'<text x="{left}" y="{top - 23}" class="panel">n={n}</text>')
         for tick in ticks:
@@ -193,12 +173,13 @@ def plot(rows, output_path):
             )
 
     svg.append("</svg>\n")
-    Path(output_path).write_text("\n".join(svg))
+    return "\n".join(svg).encode("utf-8")
 
 
-def main():
-    args = parse_args()
-    plot(read_rows(args.csv), args.bars_svg)
+def main(argv=None):
+    args = parse_args(argv)
+    contents = render_svg(read_rows(args.csv))
+    publish_outputs([ReportOutput(Path(args.bars_svg), contents)])
 
 
 if __name__ == "__main__":

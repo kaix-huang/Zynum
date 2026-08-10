@@ -196,4 +196,4 @@ explicit output pointer.
    changes.
 5. Add or update compatibility tests.
 6. Check the generated manifest against built dynamic and static libraries.
-7. Run `zig build test`.
+7. Run `zig build test -Dcpu=baseline`.

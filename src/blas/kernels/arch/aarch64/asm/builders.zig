@@ -51,6 +51,7 @@ fn laneLoadSuffix(comptime lane: []const u8) []const u8 {
 }
 
 fn laneCountMnemonic(comptime lane: []const u8) []const u8 {
+    if (std.mem.eql(u8, lane, "b")) return "cntb";
     if (std.mem.eql(u8, lane, "s")) return "cntw";
     if (std.mem.eql(u8, lane, "d")) return "cntd";
     @compileError("unsupported SVE element count lane");
@@ -2747,6 +2748,30 @@ fn dupZeroSeq(comptime lane: []const u8, comptime first_z: comptime_int, comptim
     return text;
 }
 
+fn preserveLowV8V15Prologue(comptime needed: bool) []const u8 {
+    if (!needed) return "";
+    return
+    \\
+    \\sub sp, sp, #64
+    \\stp d8, d9, [sp, #0]
+    \\stp d10, d11, [sp, #16]
+    \\stp d12, d13, [sp, #32]
+    \\stp d14, d15, [sp, #48]
+    ;
+}
+
+fn preserveLowV8V15Epilogue(comptime needed: bool) []const u8 {
+    if (!needed) return "";
+    return
+    \\
+    \\ldp d8, d9, [sp, #0]
+    \\ldp d10, d11, [sp, #16]
+    \\ldp d12, d13, [sp, #32]
+    \\ldp d14, d15, [sp, #48]
+    \\add sp, sp, #64
+    ;
+}
+
 fn faddSeq(
     comptime lane: []const u8,
     comptime acc_first: comptime_int,
@@ -3098,12 +3123,332 @@ pub fn sveScalAsm(comptime lane: []const u8, comptime unroll: comptime_int) []co
     , .{laneIncMnemonic(lane)});
 }
 
+pub fn sveCopyAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ laneCountMnemonic(lane), lane }) ++ ld1(lane, 0, "p1", "x1", 0) ++ st1(lane, 0, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\addvl x2, x2, #1
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveSwapAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ laneCountMnemonic(lane), lane }) ++ ld1(lane, 0, "p1", "x1", 0) ++ ld1(lane, 1, "p1", "x2", 0) ++
+        st1(lane, 1, "p1", "x1", 0) ++ st1(lane, 0, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\addvl x2, x2, #1
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveAxpyAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z4.{s}, {s}
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ lane, scalarReg(lane, 0), laneCountMnemonic(lane), lane }) ++ ld1(lane, 0, "p1", "x1", 0) ++ ld1(lane, 1, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\fmla z1.{s}, p1/m, z0.{s}, z4.{s}
+    , .{ lane, lane, lane }) ++ st1(lane, 1, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\addvl x2, x2, #1
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveAxpbyAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z4.{s}, {s}
+        \\mov z5.{s}, {s}
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ lane, scalarReg(lane, 0), lane, scalarReg(lane, 1), laneCountMnemonic(lane), lane }) ++ ld1(lane, 0, "p1", "x1", 0) ++ ld1(lane, 1, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\fmul z1.{s}, p1/m, z1.{s}, z5.{s}
+        \\fmla z1.{s}, p1/m, z0.{s}, z4.{s}
+    , .{ lane, lane, lane, lane, lane, lane }) ++ st1(lane, 1, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\addvl x2, x2, #1
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveLinearTransformAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z4.{s}, {s}
+        \\mov z5.{s}, {s}
+        \\mov z6.{s}, {s}
+        \\mov z7.{s}, {s}
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{
+        lane,                    scalarReg(lane, 0), lane, scalarReg(lane, 1),
+        lane,                    scalarReg(lane, 2), lane, scalarReg(lane, 3),
+        laneCountMnemonic(lane), lane,
+    }) ++ ld1(lane, 0, "p1", "x1", 0) ++ ld1(lane, 1, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z16.d, z0.d
+        \\mov z17.d, z0.d
+        \\fmul z16.{s}, p1/m, z16.{s}, z4.{s}
+        \\fmla z16.{s}, p1/m, z1.{s}, z5.{s}
+        \\fmul z17.{s}, p1/m, z17.{s}, z6.{s}
+        \\fmla z17.{s}, p1/m, z1.{s}, z7.{s}
+    , .{ lane, lane, lane, lane, lane, lane, lane, lane, lane, lane, lane, lane }) ++ st1(lane, 16, "p1", "x1", 0) ++ st1(lane, 17, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\addvl x2, x2, #1
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveComplexScalAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z0.{s}, {s}
+        \\mov z1.{s}, {s}
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ lane, scalarReg(lane, 0), lane, scalarReg(lane, 1), laneCountMnemonic(lane), lane }) ++ complexLd2(lane, 4, 5, "p1", "x1", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z6.d, z4.d
+        \\mov z7.d, z5.d
+        \\fmul z6.{s}, p1/m, z6.{s}, z0.{s}
+        \\fmls z6.{s}, p1/m, z5.{s}, z1.{s}
+        \\fmul z7.{s}, p1/m, z7.{s}, z0.{s}
+        \\fmla z7.{s}, p1/m, z4.{s}, z1.{s}
+    , .{ lane, lane, lane, lane, lane, lane, lane, lane, lane, lane, lane, lane }) ++ complexSt2(lane, 6, 7, "p1", "x1", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #2
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveComplexAxpbyAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\cbz x0, 2f
+    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z0.{s}, {s}
+        \\mov z1.{s}, {s}
+        \\mov z2.{s}, {s}
+        \\mov z3.{s}, {s}
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{
+        lane,                    scalarReg(lane, 0), lane, scalarReg(lane, 1),
+        lane,                    scalarReg(lane, 2), lane, scalarReg(lane, 3),
+        laneCountMnemonic(lane), lane,
+    }) ++ complexLd2(lane, 4, 5, "p1", "x1", 0) ++ complexLd2(lane, 16, 17, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\mov z6.d, z4.d
+        \\mov z7.d, z5.d
+        \\mov z18.d, z16.d
+        \\mov z19.d, z17.d
+        \\fmul z6.{s}, p1/m, z6.{s}, z0.{s}
+        \\fmls z6.{s}, p1/m, z5.{s}, z1.{s}
+        \\fmul z7.{s}, p1/m, z7.{s}, z0.{s}
+        \\fmla z7.{s}, p1/m, z4.{s}, z1.{s}
+        \\fmul z18.{s}, p1/m, z18.{s}, z2.{s}
+        \\fmls z18.{s}, p1/m, z17.{s}, z3.{s}
+        \\fmul z19.{s}, p1/m, z19.{s}, z2.{s}
+        \\fmla z19.{s}, p1/m, z16.{s}, z3.{s}
+        \\fadd z6.{s}, z6.{s}, z18.{s}
+        \\fadd z7.{s}, z7.{s}, z19.{s}
+    , .{
+        lane, lane, lane, lane, lane, lane, lane, lane,
+        lane, lane, lane, lane, lane, lane, lane, lane,
+        lane, lane, lane, lane, lane, lane, lane, lane,
+        lane, lane, lane, lane, lane, lane,
+    }) ++ complexSt2(lane, 6, 7, "p1", "x2", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #2
+        \\addvl x2, x2, #2
+        \\b 0b
+        \\2:
+        \\ret
+    , .{});
+}
+
+pub fn sveMaxAbsAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\fmov {s}, {s}
+        \\cbz x0, 2f
+    , .{ scalarReg(lane, 2), gprZero(lane) }) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ laneCountMnemonic(lane), lane }) ++ ld1(lane, 0, "p1", "x1", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\fabs z0.{s}, p1/m, z0.{s}
+        \\fmaxnmv {s}, p1, z0.{s}
+        \\fmaxnm {s}, {s}, {s}
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\b 0b
+        \\2:
+        \\fmov {s}, {s}
+        \\ret
+    , .{
+        lane,               lane,               scalarReg(lane, 0), lane,
+        scalarReg(lane, 2), scalarReg(lane, 2), scalarReg(lane, 0), returnGpr(lane),
+        scalarReg(lane, 2),
+    });
+}
+
+pub fn sveComplexMaxAbs1Asm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\fmov {s}, {s}
+        \\cbz x0, 2f
+    , .{ scalarReg(lane, 2), gprZero(lane) }) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ laneCountMnemonic(lane), lane }) ++ complexLd2(lane, 4, 5, "p1", "x1", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\fabs z4.{s}, p1/m, z4.{s}
+        \\fabs z5.{s}, p1/m, z5.{s}
+        \\fadd z4.{s}, z4.{s}, z5.{s}
+        \\fmaxnmv {s}, p1, z4.{s}
+        \\fmaxnm {s}, {s}, {s}
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #2
+        \\b 0b
+        \\2:
+        \\fmov {s}, {s}
+        \\ret
+    , .{
+        lane,               lane, lane,               lane,               lane,               lane,            lane,
+        scalarReg(lane, 0), lane, scalarReg(lane, 2), scalarReg(lane, 2), scalarReg(lane, 0), returnGpr(lane), scalarReg(lane, 2),
+    });
+}
+
+pub fn sveScaledSumSquaresAsm(comptime lane: []const u8) []const u8 {
+    return std.fmt.comptimePrint(
+        \\
+        \\mov z4.{s}, {s}
+        \\dup z0.{s}, #0
+        \\cbz x0, 2f
+    , .{ lane, scalarReg(lane, 0), lane }) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+        \\
+        \\{s} x6
+        \\0:
+        \\whilelo p1.{s}, xzr, x0
+        \\b.none 2f
+    , .{ laneCountMnemonic(lane), lane }) ++ ld1(lane, 1, "p1", "x1", 0) ++ std.fmt.comptimePrint(
+        \\
+        \\fdiv z1.{s}, p1/m, z1.{s}, z4.{s}
+        \\fmla z0.{s}, p1/m, z1.{s}, z1.{s}
+        \\cmp x0, x6
+        \\b.ls 2f
+        \\sub x0, x0, x6
+        \\addvl x1, x1, #1
+        \\b 0b
+        \\2:
+        \\faddv {s}, p0, z0.{s}
+        \\fmov {s}, {s}
+        \\ret
+    , .{
+        lane,                lane, lane,            lane,                lane, lane,
+        scalarReg(lane, 16), lane, returnGpr(lane), scalarReg(lane, 16),
+    });
+}
+
 pub fn sveRealDotAsm(comptime lane: []const u8, comptime unroll: comptime_int) []const u8 {
     @setEvalBranchQuota(100000);
     return std.fmt.comptimePrint(
         \\
         \\cbz x0, 13f
-    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+    , .{}) ++ preserveLowV8V15Prologue(unroll > 8) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
         \\
         \\{s} x6
         \\lsl x7, x6, #{d}
@@ -3112,13 +3457,13 @@ pub fn sveRealDotAsm(comptime lane: []const u8, comptime unroll: comptime_int) [
         \\10:
         \\cmp x0, x7
         \\b.lo 11f
-    , .{}) ++ ld1Seq(lane, 4, unroll, "p0", "x1", 0) ++ ld1Seq(lane, 16, unroll, "p0", "x2", 0) ++ blk: {
+    , .{}) ++ ld1Seq(lane, 16, unroll, "p0", "x1", 0) ++ ld1Seq(lane, 24, unroll, "p0", "x2", 0) ++ blk: {
         comptime var text: []const u8 = "";
         inline for (0..unroll) |i| {
             text = text ++ std.fmt.comptimePrint(
                 \\
                 \\fmla z{d}.{s}, p0/m, z{d}.{s}, z{d}.{s}
-            , .{ i, lane, 4 + i, lane, 16 + i, lane });
+            , .{ i, lane, 16 + i, lane, 24 + i, lane });
         }
         break :blk text;
     } ++ addvlAdvance("x1", unroll) ++ addvlAdvance("x2", unroll) ++ std.fmt.comptimePrint(
@@ -3133,9 +3478,9 @@ pub fn sveRealDotAsm(comptime lane: []const u8, comptime unroll: comptime_int) [
         \\14:
         \\whilelo p1.{s}, x8, x0
         \\b.none 12f
-    , .{lane}) ++ ld1Indexed(lane, 4, "p1", "x1", "x8") ++ ld1Indexed(lane, 16, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
+    , .{lane}) ++ ld1Indexed(lane, 16, "p1", "x1", "x8") ++ ld1Indexed(lane, 24, "p1", "x2", "x8") ++ std.fmt.comptimePrint(
         \\
-        \\fmla z0.{s}, p1/m, z4.{s}, z16.{s}
+        \\fmla z0.{s}, p1/m, z16.{s}, z24.{s}
         \\{s} x8
         \\b 14b
         \\
@@ -3143,13 +3488,52 @@ pub fn sveRealDotAsm(comptime lane: []const u8, comptime unroll: comptime_int) [
     , .{ lane, lane, lane, laneIncMnemonic(lane) }) ++ reduceAccumulators(lane, 0, unroll) ++ std.fmt.comptimePrint(
         \\
         \\faddv {s}, p0, z0.{s}
+    , .{ scalarReg(lane, 16), lane }) ++ preserveLowV8V15Epilogue(unroll > 8) ++ std.fmt.comptimePrint(
+        \\
         \\fmov {s}, {s}
         \\ret
         \\
         \\13:
         \\mov {s}, {s}
         \\ret
-    , .{ scalarReg(lane, 16), lane, returnGpr(lane), scalarReg(lane, 16), returnGpr(lane), gprZero(lane) });
+    , .{ returnGpr(lane), scalarReg(lane, 16), returnGpr(lane), gprZero(lane) });
+}
+
+pub fn sveDotF32AccF64Asm() []const u8 {
+    return
+    \\
+    \\cbz x0, 2f
+    \\ptrue p1.d
+    \\dup z24.d, #0
+    \\dup z25.d, #0
+    \\mov x8, #0
+    \\0:
+    \\whilelo p0.s, x8, x0
+    \\b.none 1f
+    \\ld1w { z0.s }, p0/z, [x1, x8, lsl #2]
+    \\ld1w { z1.s }, p0/z, [x2, x8, lsl #2]
+    \\mov z16.d, z0.d
+    \\mov z17.d, z1.d
+    \\lsr z18.d, z0.d, #32
+    \\lsr z19.d, z1.d, #32
+    \\fcvt z16.d, p1/m, z16.s
+    \\fcvt z17.d, p1/m, z17.s
+    \\fcvt z18.d, p1/m, z18.s
+    \\fcvt z19.d, p1/m, z19.s
+    \\fmla z24.d, p1/m, z16.d, z17.d
+    \\fmla z25.d, p1/m, z18.d, z19.d
+    \\incw x8
+    \\b 0b
+    \\1:
+    \\faddv d0, p1, z24.d
+    \\faddv d1, p1, z25.d
+    \\fadd d0, d0, d1
+    \\fmov x0, d0
+    \\ret
+    \\2:
+    \\mov x0, xzr
+    \\ret
+    ;
 }
 
 pub fn sveRealAsumAsm(comptime lane: []const u8, comptime unroll: comptime_int) []const u8 {
@@ -3157,7 +3541,7 @@ pub fn sveRealAsumAsm(comptime lane: []const u8, comptime unroll: comptime_int) 
     return std.fmt.comptimePrint(
         \\
         \\cbz x0, 13f
-    , .{}) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
+    , .{}) ++ preserveLowV8V15Prologue(unroll > 8) ++ ptrue("p0", lane) ++ std.fmt.comptimePrint(
         \\
         \\{s} x6
         \\lsl x7, x6, #{d}
@@ -3198,13 +3582,15 @@ pub fn sveRealAsumAsm(comptime lane: []const u8, comptime unroll: comptime_int) 
     , .{ lane, lane, lane, lane, lane, laneIncMnemonic(lane) }) ++ reduceAccumulators(lane, 0, unroll) ++ std.fmt.comptimePrint(
         \\
         \\faddv {s}, p0, z0.{s}
+    , .{ scalarReg(lane, 16), lane }) ++ preserveLowV8V15Epilogue(unroll > 8) ++ std.fmt.comptimePrint(
+        \\
         \\fmov {s}, {s}
         \\ret
         \\
         \\13:
         \\mov {s}, {s}
         \\ret
-    , .{ scalarReg(lane, 16), lane, returnGpr(lane), scalarReg(lane, 16), returnGpr(lane), gprZero(lane) });
+    , .{ returnGpr(lane), scalarReg(lane, 16), returnGpr(lane), gprZero(lane) });
 }
 
 pub fn sveComplexDotAsm(comptime lane: []const u8, comptime conj_x: bool) []const u8 {
@@ -3216,7 +3602,7 @@ pub fn sveComplexDotAsm(comptime lane: []const u8, comptime conj_x: bool) []cons
         \\
         \\{s} x6
         \\lsl x7, x6, #2
-    , .{laneCountMnemonic(lane)}) ++ dupZeroSeq(lane, 0, 4) ++ dupZeroSeq(lane, 8, 4) ++ std.fmt.comptimePrint(
+    , .{laneCountMnemonic(lane)}) ++ dupZeroSeq(lane, 0, 4) ++ dupZeroSeq(lane, 24, 4) ++ std.fmt.comptimePrint(
         \\
         \\10:
         \\cmp x0, x7
@@ -3225,7 +3611,7 @@ pub fn sveComplexDotAsm(comptime lane: []const u8, comptime conj_x: bool) []cons
         comptime var text: []const u8 = "";
         inline for (0..4) |i| {
             text = text ++ complexLd2(lane, 4, 5, "p0", "x1", i * 2) ++ complexLd2(lane, 16, 17, "p0", "x2", i * 2) ++
-                complexFmla(lane, "p0", i, 8 + i, 4, 5, 16, 17, conj_x);
+                complexFmla(lane, "p0", i, 24 + i, 4, 5, 16, 17, conj_x);
         }
         break :blk text;
     } ++ std.fmt.comptimePrint(
@@ -3242,7 +3628,7 @@ pub fn sveComplexDotAsm(comptime lane: []const u8, comptime conj_x: bool) []cons
         \\whilelo p1.{s}, xzr, x0
         \\b.none 12f
     , .{lane}) ++ complexLd2(lane, 4, 5, "p1", "x1", 0) ++ complexLd2(lane, 16, 17, "p1", "x2", 0) ++
-        complexFmla(lane, "p1", 0, 8, 4, 5, 16, 17, conj_x) ++ std.fmt.comptimePrint(
+        complexFmla(lane, "p1", 0, 24, 4, 5, 16, 17, conj_x) ++ std.fmt.comptimePrint(
         \\
         \\cmp x0, x6
         \\b.ls 12f
@@ -3252,10 +3638,10 @@ pub fn sveComplexDotAsm(comptime lane: []const u8, comptime conj_x: bool) []cons
         \\b 14b
         \\
         \\12:
-    , .{}) ++ reduceAccumulators(lane, 0, 4) ++ reduceAccumulators(lane, 8, 4) ++ std.fmt.comptimePrint(
+    , .{}) ++ reduceAccumulators(lane, 0, 4) ++ reduceAccumulators(lane, 24, 4) ++ std.fmt.comptimePrint(
         \\
         \\faddv {s}, p0, z0.{s}
-        \\faddv {s}, p0, z8.{s}
+        \\faddv {s}, p0, z24.{s}
         \\str {s}, [x3]
         \\str {s}, [x3, #{d}]
         \\ret

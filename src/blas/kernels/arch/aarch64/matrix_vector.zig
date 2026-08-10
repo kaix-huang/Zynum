@@ -20,6 +20,10 @@ const enable_sm_gemv_n = false;
 const enable_sme2_gemv_n = true;
 const enable_sme2_gemv_t = true;
 const enable_sme2_zgemv_n_rows = false;
+const build_sme2_zgemv_n_rows =
+    enable_sme2_zgemv_n_rows and
+    features.has_sme2 and
+    features.has_sme_f64f64;
 const enable_fcmla_cgemv_t_m128 = true;
 const enable_fcmla_cgemv_n_m128 = true;
 const enable_fcmla_cgemv_n_m512_n64_task = true;
@@ -577,6 +581,7 @@ fn zgemvTransFcmlaF64M512N64Task(
     y: [*]scalar.ComplexF64,
     do_conj: bool,
 ) bool {
+    if (comptime !enable_fcmla_zgemv_t_m512_n64_task or !features.has_complxnum) return false;
     if (!supportsGemvTransTaskFullUnitComplex(scalar.ComplexF64, m, n, lda, do_conj)) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF64);
     if (do_conj) {
@@ -598,6 +603,7 @@ fn zgemvTransFcmlaF64M512N64TaskBeta(
     y: [*]scalar.ComplexF64,
     do_conj: bool,
 ) bool {
+    if (comptime !enable_fcmla_zgemv_t_m512_n64_task or !features.has_complxnum) return false;
     if (!supportsGemvTransTaskFullUnitComplex(scalar.ComplexF64, m, n, lda, do_conj)) return false;
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF64);
     if (do_conj) {
@@ -1364,9 +1370,8 @@ pub fn gemvNoTransUnitReal(
 }
 
 fn canUseGemvNoTransSme2C64Rows(row_count: usize, n: usize, lda: BlasInt) bool {
-    if (comptime !enable_sme2_zgemv_n_rows) return false;
+    if (comptime !build_sme2_zgemv_n_rows) return false;
     if ((row_count != 64 and row_count != 128) or n != 512 or lda != 512) return false;
-    if (comptime !features.has_sme2 or !features.has_sme_f64f64) return false;
     return features.streamingVectorBytes() == 64;
 }
 
@@ -1384,6 +1389,7 @@ fn gemvNoTransFcmlaC64Rows(
     x: [*]const scalar.ComplexF64,
     y: [*]scalar.ComplexF64,
 ) bool {
+    if (comptime !enable_fcmla_zgemv_n_m64_n512_rows or !features.has_complxnum) return false;
     if (!canUseGemvNoTransFcmlaC64Rows(row_count, n, lda)) return false;
 
     const alpha_re_bits: u64 = @bitCast(alpha.re);
@@ -1402,6 +1408,7 @@ fn gemvNoTransSme2C64Rows(
     x: [*]const scalar.ComplexF64,
     y: [*]scalar.ComplexF64,
 ) bool {
+    if (comptime !build_sme2_zgemv_n_rows) return false;
     if (!canUseGemvNoTransSme2C64Rows(row_count, n, lda)) return false;
 
     const alpha_re_bits: u64 = @bitCast(alpha.re);
@@ -1421,6 +1428,7 @@ noinline fn gemvNoTransSme2C64RowsBits(
     x: [*]const scalar.ComplexF64,
     y: [*]scalar.ComplexF64,
 ) void {
+    if (comptime !build_sme2_zgemv_n_rows) return;
     var sm_state: features.StreamingModeState = undefined;
     sm_state.startSmZa();
     defer sm_state.stopSmZa();
@@ -1661,4 +1669,72 @@ pub fn gerUnitReal(
     }
     if ((T == f32 or T == f64) and comptime features.has_asimd) return fixed_simd.gerUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, x, y, a, lda);
     return false;
+}
+
+pub fn gerUnitComplex(
+    comptime T: type,
+    m: usize,
+    n: usize,
+    alpha: T,
+    x: [*]const T,
+    y: [*]const T,
+    a: [*]T,
+    lda: BlasInt,
+    conjugate_y: bool,
+) bool {
+    if (comptime !features.has_asimd) return false;
+    return fixed_simd.gerUnitComplex(T, simd_config.matrixComplexConfig(T), m, n, alpha, x, y, a, lda, conjugate_y);
+}
+
+pub fn triangularAxpyUnit(
+    comptime T: type,
+    n: usize,
+    alpha: T,
+    a: [*]const T,
+    x: [*]T,
+) bool {
+    if (comptime !features.has_asimd) return false;
+    return fixed_simd.triangularAxpyUnit(T, simd_config.matrixBodyConfig(T), n, alpha, a, x);
+}
+
+pub fn triangularDotUnit(
+    comptime T: type,
+    n: usize,
+    a: [*]const T,
+    x: [*]const T,
+    conjugate_a: bool,
+    result: *T,
+) bool {
+    if (comptime !features.has_asimd) return false;
+    return fixed_simd.triangularDotUnit(T, simd_config.matrixBodyConfig(T), n, a, x, conjugate_a, result);
+}
+
+pub fn symmetricColumnsUnit(
+    comptime T: type,
+    upper: bool,
+    hermitian: bool,
+    n: usize,
+    j0: usize,
+    j1: usize,
+    alpha: T,
+    a: [*]const T,
+    lda: BlasInt,
+    x: [*]const T,
+    y_delta: [*]T,
+) bool {
+    if (comptime !features.has_asimd) return false;
+    return fixed_simd.symmetricColumnsUnit(
+        T,
+        simd_config.matrixBodyConfig(T),
+        upper,
+        hermitian,
+        n,
+        j0,
+        j1,
+        alpha,
+        a,
+        lda,
+        x,
+        y_delta,
+    );
 }

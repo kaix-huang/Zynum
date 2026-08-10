@@ -50,10 +50,10 @@ rollback boundary. Prefer helper predicates such as `isSmallSquareish`,
 `isNarrowN`, `fitsWorkspaceBudget`, or `usesWholePanels` over inline
 coordinates such as `m == 128 and n == 128`.
 
-## Current Cross-Level Lessons
+## Cross-Level Principles
 
-The 2026 Level 1 through Level 3 passes left a few rules that are more useful
-than the individual benchmark coordinates:
+The following principles apply across Level 1 through Level 3 and are more
+durable than individual benchmark coordinates:
 
 - Correctness fixes reset the performance clock. Data collected before a
   partial-task fallback, stale state cleanup, conjugation fix, or layout
@@ -211,6 +211,29 @@ A default optimization needs an evidence chain:
 Promote a rule only when the default predicate is narrower than the evidence.
 Reject, narrow, or keep opt-in when data is noisy, isolated to one point,
 contaminated by worker/cache state, or missing correctness coverage.
+
+Lifecycle is an evidence state, not a synonym for source presence:
+
+1. Register a new executable body as `experimental` with a total fallback.
+2. Prove target compilation and forced-path correctness. Cross-build and
+   emulated execution remain separate from native evidence.
+3. Run same-source, same-ISA candidate/control probes, then adjacent boundaries
+   and the affected full sweep. Record the selected stable ID and route, not
+   merely the public BLAS symbol.
+4. Promote only the measured operation/type/shape predicate to `production`;
+   nearby unproven cells remain experimental even when they share source.
+5. Mark a body `rejected` when a repeatable mechanism and reopen condition are
+   recorded. Keep its descriptor and evidence visible rather than silently
+   deleting the failed experiment.
+6. Delete a compatibility alias or obsolete body only after callers, forced
+   tests, docs, benchmark tooling, and generated coverage no longer reference
+   it.
+
+Every reportable run should preserve source revision, compiler version, target
+tuple and capability set, maximum-thread policy, comparator names and hashes,
+Zynum library hashes, registry IDs or selected routes, raw samples, correctness
+status, and isolation level. A report without enough identity to distinguish
+two executable tiers may diagnose a result but cannot promote dispatch.
 
 ## Documentation Targets
 

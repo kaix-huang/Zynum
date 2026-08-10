@@ -2,12 +2,21 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const builtin = @import("builtin");
+const root = @import("root");
 
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
 const runtime = @import("../../runtime.zig");
+const isolated_structured = @import("../../kernels/isolated/x86_64_structured_bridge.zig");
+const structured_tuning = @import("../../kernels/tuning/structured.zig");
+
+const use_isolated_structured = if (@hasDecl(root, "zynum_structured_object_candidates"))
+    root.zynum_structured_object_candidates
+else
+    false;
 
 pub const BlasInt = scalar.BlasInt;
 pub const Order = scalar.Order;
@@ -194,6 +203,10 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
+    if (comptime use_isolated_structured and builtin.cpu.arch == .x86_64) {
+        if (side == .right and structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n) and
+            isolated_structured.tryTrmmRight(T, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+    }
     if (side == .left) {
         runLeft(T, .multiply, uplo, trans_, diag, m, n, alpha, a, lda, b, ldb);
     } else {
@@ -221,6 +234,10 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
+    if (comptime use_isolated_structured and builtin.cpu.arch == .x86_64) {
+        if (side == .right and structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n) and
+            isolated_structured.tryTrsmRight(T, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+    }
     if (side == .left) {
         runLeft(T, .solve, uplo, trans_, diag, m, n, alpha, a, lda, b, ldb);
     } else {

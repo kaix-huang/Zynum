@@ -1,0 +1,11 @@
+# Copyright (C) 2026 Zynum contributors
+# SPDX-License-Identifier: LGPL-3.0-or-later
+
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/kaix-huang/Zynum/security/advisories/new
+    about: Report suspected vulnerabilities privately; do not open a public issue.
+  - name: Support guide
+    url: https://github.com/kaix-huang/Zynum/blob/main/SUPPORT.md
+    about: Review how to route support questions, bugs, feature requests, and security reports.

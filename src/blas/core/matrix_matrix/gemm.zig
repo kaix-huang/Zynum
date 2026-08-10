@@ -7,6 +7,7 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const core_pool = @import("../execution/thread_pool.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
+const gemm_catalog = @import("../../kernels/shared/matrix_matrix/catalog.zig");
 const planner = @import("planner.zig");
 
 pub const BlasInt = scalar.BlasInt;
@@ -38,6 +39,28 @@ const C64x2 = struct {
 };
 
 const max_cached_complex_workspace_bytes = 64 * 1024 * 1024;
+
+const ComplexExecutionPolicy = enum {
+    tuned,
+    forced,
+};
+
+pub const ComplexExecutionOptions = struct {
+    /// Lets tests and higher-level planners exercise allocation failure without
+    /// installing a process-global failing allocator.  A denied workspace is
+    /// observed before any output element is written.
+    workspace_available: bool = true,
+};
+
+pub const ComplexExecutionResult = struct {
+    requested: gemm_catalog.ComplexKernelId,
+    executed: ?gemm_catalog.ComplexKernelId,
+    fallback_count: usize,
+
+    pub fn usedRequested(self: ComplexExecutionResult) bool {
+        return self.executed == self.requested;
+    }
+};
 
 threadlocal var complex_f32_workspace_ptr: ?[*]f32 = null;
 threadlocal var complex_f32_workspace_len: usize = 0;
@@ -359,8 +382,8 @@ inline fn useExpandedComplexF32Real(m: usize, n: usize, k: usize) bool {
     // Expanded-real maps one CGEMM to one larger SGEMM.  It avoids the
     // 3M path's three real GEMM planner calls and three B-pack passes, but
     // pays for bigger A/B/C workspaces and a final AoS scatter.  Keep the
-    // extra gate under roughly the M5 P-core L2 and only for shapes that
-    // beat 3M in complete sweeps.
+    // extra gate within the intended private-cache working-set budget and
+    // only for shapes that beat 3M in complete sweeps.
     const min_work = 128 * 1024;
     if (m *| n *| k < min_work) return false;
     const expanded_real_elems = 4 *| m *| k + 2 *| k *| n + 2 *| m *| n;
@@ -383,6 +406,39 @@ inline fn complex3mRowCompute(m: usize, n: usize, k: usize) usize {
     // Keep the experiment exact until its surrounding shape boundaries have
     // been swept; all other 3M calls retain their original layout.
     return if (m == 127 and n == 129 and k >= 31 and k <= 129) 128 else m;
+}
+
+fn expandedComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, alpha: ComplexF32, beta: ComplexF32) bool {
+    if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
+    if (policy == .forced) return true;
+    if (transa == .no_trans and transb == .no_trans) return useExpandedComplexF32Real(m, n, k);
+
+    const work = m *| n *| k;
+    return m <= 64 and n <= 64 and k >= 128 and k <= 256 and work >= 128 * 1024;
+}
+
+fn expandedComplexF64Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, alpha: ComplexF64, beta: ComplexF64) bool {
+    if (transa != .no_trans or transb != .no_trans) return false;
+    if (!isOne(ComplexF64, alpha) or !isZero(ComplexF64, beta)) return false;
+    return policy == .forced or useExpandedComplexF64Real(m, n, k);
+}
+
+fn threeMComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, alpha: ComplexF32, beta: ComplexF32) bool {
+    if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
+    if (policy == .forced) return true;
+    if (m == 1 or n == 1) {
+        const row_edge = m == 1 and transa != .no_trans and transb == .no_trans;
+        const column_edge = n == 1 and transa == .no_trans and transb != .no_trans;
+        if (!row_edge and !column_edge) return false;
+    }
+    return m *| n *| k >= 128 * 1024;
+}
+
+fn threeMComplexF64Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, alpha: ComplexF64, beta: ComplexF64) bool {
+    if (!isOne(ComplexF64, alpha) or !isZero(ComplexF64, beta)) return false;
+    if (policy == .forced) return true;
+    if ((m == 1 or n == 1) and !(n == 1 and transa == .no_trans and transb != .no_trans)) return false;
+    return m *| n *| k >= 128 * 1024;
 }
 
 noinline fn gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
@@ -536,17 +592,12 @@ fn gemmComplexF32ViaExpandedRealWorkspace(transa: Order, transb: Order, m_: Blas
     }
 }
 
-fn tryGemmComplexF32ViaExpandedReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
-    if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
+fn tryGemmComplexF32ViaExpandedReal(policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (transa == .no_trans and transb == .no_trans) {
-        if (!useExpandedComplexF32Real(m, n, k)) return false;
-    } else {
-        const work = m *| n *| k;
-        if (!(m <= 64 and n <= 64 and k >= 128 and k <= 256 and work >= 128 * 1024)) return false;
-    }
+    if (!expandedComplexF32Feasible(policy, transa, transb, m, n, k, alpha, beta)) return false;
+    if (!workspace_available) return false;
 
     const pad_small_non_nn = (transa != .no_trans or transb != .no_trans) and m <= 64 and n <= 64 and (m < 64 or n < 64);
     const m2 = if (pad_small_non_nn) @as(usize, 128) else 2 * m;
@@ -736,19 +787,12 @@ fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     }
 }
 
-fn tryGemmComplexF32ViaReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
-    if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
+fn tryGemmComplexF32ViaReal(policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (m == 1 or n == 1) {
-        // Materialization only amortizes on the edge layouts whose real GEMMs
-        // become contiguous GEMV calls; the other transpose pairs stay direct.
-        const row_edge = m == 1 and transa != .no_trans and transb == .no_trans;
-        const column_edge = n == 1 and transa == .no_trans and transb != .no_trans;
-        if (!row_edge and !column_edge) return false;
-    }
-    if (m *| n *| k < 128 * 1024) return false;
+    if (!threeMComplexF32Feasible(policy, transa, transb, m, n, k, alpha, beta)) return false;
+    if (!workspace_available) return false;
 
     const m_compute = complex3mRowCompute(m, n, k);
     const a_len = m_compute * k;
@@ -960,12 +1004,12 @@ fn gemmNoTransComplexF64ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
     }
 }
 
-fn tryGemmNoTransComplexF64ViaExpandedReal(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
-    if (!isOne(ComplexF64, alpha) or !isZero(ComplexF64, beta)) return false;
+fn tryGemmNoTransComplexF64ViaExpandedReal(policy: ComplexExecutionPolicy, workspace_available: bool, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (!useExpandedComplexF64Real(m, n, k)) return false;
+    if (!expandedComplexF64Feasible(policy, .no_trans, .no_trans, m, n, k, alpha, beta)) return false;
+    if (!workspace_available) return false;
 
     const workspace_len = (2 * m) * (2 * k) + (2 * k) * n + (2 * m) * n;
     const workspace = acquireComplexWorkspace(f64, workspace_len) orelse return false;
@@ -1159,14 +1203,12 @@ fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     }
 }
 
-fn tryGemmComplexF64ViaReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
-    if (!isOne(ComplexF64, alpha) or !isZero(ComplexF64, beta)) return false;
+fn tryGemmComplexF64ViaReal(policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
-    // f64 only amortizes 3M materialization on the contiguous column-edge form.
-    if ((m == 1 or n == 1) and !(n == 1 and transa == .no_trans and transb != .no_trans)) return false;
-    if (m *| n *| k < 128 * 1024) return false;
+    if (!threeMComplexF64Feasible(policy, transa, transb, m, n, k, alpha, beta)) return false;
+    if (!workspace_available) return false;
 
     const m_compute = complex3mRowCompute(m, n, k);
     const a_len = m_compute * k;
@@ -1187,6 +1229,164 @@ fn tryGemmComplexF64ViaReal(transa: Order, transb: Order, m_: BlasInt, n_: BlasI
     const tmp = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     gemmComplexF64ViaRealBuffers(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
+}
+
+fn gemmComplexPortable(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+    for (0..n) |j| {
+        for (0..m) |i| {
+            var sum = zero(T);
+            for (0..k) |p| sum = add(T, sum, mul(T, matrixValue(T, transa, a, lda, i, p), matrixValue(T, transb, b, ldb, p, j)));
+            const idxc = matIndex(ldc, i, j);
+            c[idxc] = add(T, mul(T, alpha, sum), if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]));
+        }
+    }
+}
+
+fn gemmComplexVectorEdge(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+    if (n_ == 1) {
+        matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
+        return true;
+    }
+    if (m_ == 1) {
+        matrix_vector_ops.gemv(T, .trans, k_, n_, alpha, b, ldb, a, lda, beta, c, ldc);
+        return true;
+    }
+    return false;
+}
+
+fn preferredComplexKernel(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, beta: T) gemm_catalog.ComplexKernelId {
+    if (T != ComplexF32 and T != ComplexF64) @compileError("complex GEMM selection requires a complex scalar type");
+    const portable: gemm_catalog.ComplexKernelId = if (T == ComplexF32) .portable_c32 else .portable_c64;
+    if (m_ <= 0 or n_ <= 0 or k_ <= 0 or isZero(T, alpha)) return portable;
+
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+    const no_trans = transa == .no_trans and transb == .no_trans;
+    if (no_trans and (m == 1 or n == 1) and k >= 128) {
+        return if (T == ComplexF32) .vector_edge_c32 else .vector_edge_c64;
+    }
+    if (T == ComplexF32) {
+        if (expandedComplexF32Feasible(.tuned, transa, transb, m, n, k, alpha, beta)) return .expanded_real_c32;
+        if (threeMComplexF32Feasible(.tuned, transa, transb, m, n, k, alpha, beta)) return .three_m_c32;
+        return if (no_trans) .compact_c32 else .portable_c32;
+    }
+    if (expandedComplexF64Feasible(.tuned, transa, transb, m, n, k, alpha, beta)) return .expanded_real_c64;
+    if (threeMComplexF64Feasible(.tuned, transa, transb, m, n, k, alpha, beta)) return .three_m_c64;
+    return if (no_trans) .compact_c64 else .portable_c64;
+}
+
+/// Returns the allocation-free, deterministic default complex GEMM choice.
+/// Runtime workspace acquisition can still cause a whole-operation fallback.
+pub fn selectComplexKernel(comptime T: type, transa: Order, transb: Order, m: BlasInt, n: BlasInt, k: BlasInt, alpha: T, beta: T) gemm_catalog.ComplexKernelId {
+    return preferredComplexKernel(T, transa, transb, m, n, k, alpha, beta);
+}
+
+pub const ComplexExecutorRoute = enum {
+    portable,
+    compact,
+    vector_edge,
+    three_m,
+    expanded_real,
+};
+
+/// Single typed authority used by both production execution and the registry
+/// completeness snapshot. Adding a stable complex kernel ID without an actual
+/// route makes this exhaustive switch fail to compile.
+pub fn complexExecutorRoute(kernel: gemm_catalog.ComplexKernelId) ComplexExecutorRoute {
+    return switch (kernel) {
+        .portable_c32, .portable_c64 => .portable,
+        .compact_c32, .compact_c64 => .compact,
+        .vector_edge_c32, .vector_edge_c64 => .vector_edge,
+        .three_m_c32, .three_m_c64 => .three_m,
+        .expanded_real_c32, .expanded_real_c64 => .expanded_real,
+    };
+}
+
+pub fn complexExecutorRouteMatchesDescriptor(kernel: gemm_catalog.ComplexKernelId, route: ComplexExecutorRoute) bool {
+    const descriptor = gemm_catalog.complexDescriptorForKernel(kernel) orelse return false;
+    const expected_scalar: gemm_catalog.ScalarKind = switch (kernel) {
+        .portable_c32, .compact_c32, .vector_edge_c32, .three_m_c32, .expanded_real_c32 => .complex_f32,
+        .portable_c64, .compact_c64, .vector_edge_c64, .three_m_c64, .expanded_real_c64 => .complex_f64,
+    };
+    const expected_route: ComplexExecutorRoute = switch (descriptor.family) {
+        .portable => .portable,
+        .compact => .compact,
+        .vector_edge => .vector_edge,
+        .three_m => .three_m,
+        .expanded_real => .expanded_real,
+    };
+    return descriptor.scalar == expected_scalar and route == expected_route;
+}
+
+pub fn hasComplexExecutorMapping(kernel: gemm_catalog.ComplexKernelId) bool {
+    return complexExecutorRouteMatchesDescriptor(kernel, complexExecutorRoute(kernel));
+}
+
+fn tryExecuteComplexKernel(comptime T: type, kernel: gemm_catalog.ComplexKernelId, policy: ComplexExecutionPolicy, options: ComplexExecutionOptions, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+    const descriptor = gemm_catalog.complexDescriptorForKernel(kernel) orelse return false;
+    if (descriptor.scalar != gemm_catalog.contractScalarKind(T)) return false;
+
+    return switch (complexExecutorRoute(kernel)) {
+        .portable => portable: {
+            gemmComplexPortable(T, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+            break :portable true;
+        },
+        .compact => compact: {
+            if (transa != .no_trans or transb != .no_trans) break :compact false;
+            if (T == ComplexF32) {
+                gemmNoTransComplexF32(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+            } else {
+                gemmNoTransComplexF64(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+            }
+            break :compact true;
+        },
+        .vector_edge => vector_edge: {
+            if (transa != .no_trans or transb != .no_trans) break :vector_edge false;
+            break :vector_edge gemmComplexVectorEdge(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        },
+        .three_m => if (T == ComplexF32)
+            tryGemmComplexF32ViaReal(policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
+        else
+            tryGemmComplexF64ViaReal(policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+        .expanded_real => if (T == ComplexF32)
+            tryGemmComplexF32ViaExpandedReal(policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
+        else if (transa == .no_trans and transb == .no_trans)
+            tryGemmNoTransComplexF64ViaExpandedReal(policy, options.workspace_available, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
+        else
+            false,
+    };
+}
+
+fn executeComplexKernelWithFallback(comptime T: type, requested: gemm_catalog.ComplexKernelId, policy: ComplexExecutionPolicy, options: ComplexExecutionOptions, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) ComplexExecutionResult {
+    if (T != ComplexF32 and T != ComplexF64) @compileError("complex GEMM execution requires a complex scalar type");
+    if (m_ <= 0 or n_ <= 0 or k_ < 0) return .{ .requested = requested, .executed = null, .fallback_count = 0 };
+    const requested_descriptor = gemm_catalog.complexDescriptorForKernel(requested) orelse
+        return .{ .requested = requested, .executed = null, .fallback_count = 0 };
+    if (requested_descriptor.scalar != gemm_catalog.contractScalarKind(T)) {
+        return .{ .requested = requested, .executed = null, .fallback_count = 0 };
+    }
+
+    var current = requested;
+    var fallback_count: usize = 0;
+    while (fallback_count <= gemm_catalog.complex_registry.len) : (fallback_count += 1) {
+        if (tryExecuteComplexKernel(T, current, policy, options, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) {
+            return .{ .requested = requested, .executed = current, .fallback_count = fallback_count };
+        }
+        const descriptor = gemm_catalog.complexDescriptorForKernel(current) orelse break;
+        current = descriptor.fallback orelse break;
+    }
+    return .{ .requested = requested, .executed = null, .fallback_count = fallback_count };
+}
+
+/// Executes a stable complex GEMM kernel ID.  Forced execution bypasses tuning
+/// cutoffs but retains hard layout/epilogue requirements and follows the
+/// descriptor chain when the requested implementation is infeasible.
+pub fn executeForcedComplexKernel(comptime T: type, requested: gemm_catalog.ComplexKernelId, options: ComplexExecutionOptions, transa: Order, transb: Order, m: BlasInt, n: BlasInt, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) ComplexExecutionResult {
+    return executeComplexKernelWithFallback(T, requested, .forced, options, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 
 pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
@@ -1213,32 +1413,11 @@ pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: Bla
         }
         return;
     }
-    if (transa == .no_trans and transb == .no_trans) {
-        if (T == ComplexF32) {
-            if ((m_ == 1 or n_ == 1) and k_ >= 128) {
-                gemmNoTransComplexF32(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-                return;
-            }
-            if (tryGemmComplexF32ViaExpandedReal(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-            if (tryGemmComplexF32ViaReal(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-            gemmNoTransComplexF32(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-            return;
-        } else if (T == ComplexF64) {
-            if ((m_ == 1 or n_ == 1) and k_ >= 128) {
-                gemmNoTransComplexF64(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-                return;
-            }
-            if (tryGemmNoTransComplexF64ViaExpandedReal(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-            if (tryGemmComplexF64ViaReal(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-            gemmNoTransComplexF64(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-            return;
-        }
-    }
-    if (T == ComplexF32) {
-        if (tryGemmComplexF32ViaExpandedReal(transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-        if (tryGemmComplexF32ViaReal(transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
-    } else if (T == ComplexF64) {
-        if (tryGemmComplexF64ViaReal(transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+    if (T == ComplexF32 or T == ComplexF64) {
+        const requested = preferredComplexKernel(T, transa, transb, m_, n_, k_, alpha, beta);
+        const result = executeComplexKernelWithFallback(T, requested, .tuned, .{}, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        std.debug.assert(result.executed != null);
+        return;
     }
     for (0..n) |j| {
         for (0..m) |i| {

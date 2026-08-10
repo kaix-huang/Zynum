@@ -1,119 +1,134 @@
 # Zig 0.16 `std.Io` And Threading
 
-Zig 0.16 introduced a new `std.Io` model. Zynum BLAS uses it carefully because
-BLAS tasks are often too small for generic asynchronous scheduling overhead.
+Zynum BLAS uses Zig 0.16 `std.Io` as the single lifecycle for optional parallel
+CPU work. BLAS calls can be shorter than general asynchronous scheduling
+overhead, so task composition and low-latency publication remain measured
+internal policy.
 
 ## Current Policy
 
-- Correctness code should not depend on global async state.
-- GEMM and selected Level 1/2 parallelism use explicit dispatch policy.
-- Coarse CPU-bound helper tasks should prefer `std.Io.Threaded` with
-  `std.Io.Group.concurrent`.
-- Low-latency helper paths may exist only as narrow internal dispatch rules with
-  focused benchmark evidence. They should still use `std.Io.Threaded` for helper
-  ownership instead of ad hoc thread spawning.
-- Worker strategy is internal implementation policy and must not be selected by
-  Zynum environment variables.
+- Correctness and portable fallbacks do not depend on global asynchronous state.
+- Coarse Level 1, Level 2, and Level 3 work uses the shared
+  `std.Io.Threaded` runtime with `std.Io.Group.concurrent`.
+- Narrow low-latency publication may exist only behind a measured internal gate
+  and still uses `std.Io.Threaded` for helper ownership.
+- Worker strategy is not selected by environment variables.
+- `ZYNUM_MAXIMUM_THREADS` is the only runtime thread control: unset uses
+  available execution capacity; a positive value caps it.
 
-## Why This Matters
+## Why Scheduling Cost Matters
 
-BLAS kernels can be extremely short. A scheduling strategy that looks clean at
-the API level can lose to raw thread or direct execution because:
+For short numerical kernels, these costs can dominate:
 
-- Closure setup costs are visible.
-- Worker wake-up costs are visible.
-- Per-call allocation costs are visible.
-- Persistent workers can affect later benchmark libraries in the same process.
+- closure and task construction;
+- helper wake-up and waiting;
+- per-call allocation;
+- cache-line contention in shared claim counters;
+- private-result merge; and
+- lazy worker initialization.
 
-For this reason, benchmark worker strategies with fresh-process isolation before
-making them default.
+Persistent helpers can also affect later measurements in the same process.
+Use fresh-process isolation for reportable comparisons.
 
-## Retained Patterns
+## Shared Runtime Contract
 
-- Use `std.Io.Group.concurrent` for normal coarse task submission. It keeps the
-  code simple and is appropriate when each task has enough arithmetic or memory
-  traffic to hide scheduler overhead.
-- Use process-lifetime `std.Io.Threaded` helpers only behind a dispatch gate that
-  is narrower than the evidence. The Level 2 DGER/DSYMV low-latency paths in
-  `src/blas/core/execution/thread_pool.zig` are examples: helpers are created by
-  `std.Io.Threaded`, then reused with per-helper generations, futex wake/wait,
-  and bounded spin waits.
-- Use a worker stack size that is valid on the target OS and threading runtime.
-  The H3C Linux/x86 nodes rejected 256 KiB worker stacks with `EINVAL`; the
-  shared core pool uses 512 KiB for `std.Io.Threaded` workers.
-- Prefer fixed task assignment over helper races for very small work. The DGER
-  128/256 probes showed that waking extra helpers and letting them race on a
-  shared claim counter was slower than publishing only the helpers needed.
-- Prefer fixed task assignment for large Level 1 hot-cache probes as well unless
-  a new design proves otherwise. A shared-generation claimed-worker experiment
-  reduced futex wake addresses but regressed copy, axpy, dot, and complex axpy
-  because it disturbed partition balance and wake timing.
-- On Linux/x86_64, persistent helpers may pin themselves to distinct CPUs from
-  the current `sched_getaffinity` mask when focused and full sweeps show a net
-  win. Do not pin the caller thread, and do not choose CPUs outside the
-  scheduler-provided affinity mask.
-- Keep caller participation unless measured otherwise. Fully offloading short
-  BLAS calls made the caller pay publication and wait overhead without doing
-  useful work.
-- Treat helper identity or offset tuning as machine-local evidence. If retained,
-  it must be behind shape predicates and documented in the relevant optimization
-  notes.
+`src/blas/core/execution/thread_pool.zig` owns the process-wide helper lifecycle.
+Parallel callers submit planned tasks to it instead of creating operation- or
+architecture-specific pools.
 
-## Rejected Patterns
+Every task path must:
 
-- Do not introduce raw `std.Thread.spawn` pools for BLAS dispatch while
-  `std.Io.Threaded` can provide the helper lifecycle.
-- Do not add runtime environment variables for scheduler modes. Use
-  `ZYNUM_MAXIMUM_THREADS` only as a thread cap.
-- Do not promote a low-latency worker path from a single focused best result.
-  Require repeated fresh-process samples, comparator reruns, and nearby-shape
-  checks.
-- Do not unload a dynamically loaded Zynum BLAS library while persistent helper
-  threads are still running. Call the exported shutdown hook first when a probe
-  or embedding process uses `dlopen`/`dlclose`.
+- derive usable concurrency from CPU capacity available to the process;
+- bound task count, stack use, and private workspace;
+- assign disjoint output or use explicit private reductions;
+- keep caller participation unless a measured plan says otherwise;
+- complete unsubmitted work synchronously after partial submission;
+- propagate failures without reporting partial success; and
+- provide an explicit shutdown before dynamic-library unloading.
 
-## Current Source Locations
+Worker stack size must satisfy every supported OS/runtime minimum and the
+maximum bounded kernel frame. Validate stack changes on representative targets;
+do not derive them from one environment's minimum accepted value.
+
+## Coarse Submission
+
+Use `std.Io.Group.concurrent` when each task contains enough arithmetic or memory
+traffic to hide publication and waiting. The planner owns task shapes and
+submits them to the shared runtime. Operation leaves do not manage workers.
+
+Fixed task ownership is usually preferable to helper races for short work. A
+shared claim counter adds contention and can disturb partition balance. Use a
+dynamic claim design only when traces show meaningful load imbalance and
+complete-call measurements justify it.
+
+## Low-Latency Publication
+
+A low-latency path may reuse process-lifetime helpers with generations and
+bounded wake/wait behavior. It remains valid only when:
+
+- the task set is fixed and bounded;
+- each helper receives explicit work ownership;
+- the caller can finish missing work;
+- shutdown waits for all helpers;
+- focused and broad fresh-process measurements show a repeatable gain; and
+- off-gate shapes remain on the ordinary submission path.
+
+Helper identity, processor number, and publication offset are not portable
+dispatch inputs. A retained asymmetric design expresses work classes or capacity
+ratios and remains correct under arbitrary placement.
+
+## Affinity
+
+Linux helpers may use CPUs only from the inherited affinity mask when a measured
+policy explicitly enables it. Do not pin outside the assigned cpuset and do not
+leave the caller competing unexpectedly with a helper.
+
+On platforms without an exact supported affinity contract, topology and QoS are
+hints only. See
+[`cpu_affinity_and_heterogeneous_scheduling.md`](cpu_affinity_and_heterogeneous_scheduling.md).
+
+## Dynamic-Library Lifetime
+
+Persistent helpers may execute code from the loaded Zynum library. A process
+using `dlopen`/`dlclose` must call `zynum_blas_shutdown` or
+`zynum_blas_shutdown_` before closing the handle. Process termination is the
+reliable cleanup boundary for benchmark isolation.
+
+## Rejected Designs
+
+- Do not add raw `std.Thread.spawn` pools around BLAS dispatch.
+- Do not add worker-strategy environment variables.
+- Do not instantiate a second pool in GEMM, an architecture backend, or an
+  isolated object.
+- Do not promote from a single best sample or a thread-capped diagnostic.
+- Do not return success after only part of a fixed task set executes.
+- Do not unload a library while its helpers may still run.
+
+## Source Locations
 
 - Thread-count policy: `src/blas/runtime.zig`.
+- Shared runtime: `src/blas/core/execution/thread_pool.zig`.
 - GEMM planning: `src/blas/core/matrix_matrix/planner.zig`.
-- Shared Level 1/2/GEMM runners and low-latency helpers:
-  `src/blas/core/execution/thread_pool.zig`. Do not add a separate GEMM worker pool.
-- Level 2 DGER task shaping: `src/blas/core/matrix_vector/rank_update.zig`.
-- Level 2 DSYMV task shaping: `src/blas/core/matrix_vector/symmetric.zig`.
-- Fresh-process comparator isolation: `bench/tools/run_gemm_sweep_isolated.py`.
+- Level 2 task shaping: operation-family modules under
+  `src/blas/core/matrix_vector/`.
+- Fresh-process GEMM isolation: `bench/tools/run_gemm_sweep_isolated.py`.
 
-## Development Rules
+## Validation
 
-- Do not add environment variables for worker strategy; only
-  `ZYNUM_MAXIMUM_THREADS` may cap Zynum threads.
-- Do not unload a dynamic library while its worker threads may still be running.
-  Use `zynum_blas_shutdown` or `zynum_blas_shutdown_` before closing a Zynum
-  BLAS handle in dynamic benchmark probes.
-- Prefer small focused probes before full sweeps, then confirm with full sweeps.
-- Document target features, thread cap, and relevant dispatch predicates in
-  benchmark notes.
-- Treat process boundaries as the reliable cleanup boundary for reportable data.
-
-## Recommended Validation
+Run ordinary tests with the default runtime, then explicit one-thread and
+low-thread diagnostics. For reportable timing:
 
 ```sh
 unset ZYNUM_MAXIMUM_THREADS
-zig build bench-gemm-sweep --release=fast -- --reps 30 --check
-```
-
-Use `ZYNUM_MAXIMUM_THREADS=1` only for explicit single-thread verification, and
-use other caps only for labeled cap experiments.
-
-For comparator numbers:
-
-```sh
 python3 bench/tools/run_gemm_sweep_isolated.py \
   --gemm-sweep zig-out/bin/gemm-sweep \
-  --zynum-blas zig-out/lib/libzynum_blas.dylib \
-  --csv zig-out/gemm_sweep_io_check.csv \
+  --zynum-blas zig-out/lib/libzynum_blas.so \
+  --csv zig-out/perf-report/gemm_threading.csv \
   --reps 30 \
-  --process-repeats 3 \
+  --process-repeats 4 \
   --check
 ```
 
-Keep dispatch gates narrow until isolated data is stable.
+Record runtime-observed concurrency, task count, task/merge timing, selected
+path, sample distribution, and the exact candidate/control identities. Keep a
+new path experimental until default-thread broad evidence is stable.

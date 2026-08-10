@@ -5,7 +5,9 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";
-pub const worker_stack_size: usize = 512 * 1024;
+// pthread stack reservations include static TLS on ELF. Debug and ReleaseSafe
+// test binaries can exceed 512 KiB of TLS before a worker executes any code.
+pub const worker_stack_size: usize = 2 * 1024 * 1024;
 
 var max_threads_override = std.atomic.Value(usize).init(0);
 var total_threads_cache = std.atomic.Value(usize).init(0);

@@ -56,3 +56,11 @@ pub fn matrixComplexConfig(comptime T: type) matrix_vector_simd.Config {
         .max_work = 512 * 512,
     };
 }
+
+pub fn matrixBodyConfig(comptime T: type) matrix_vector_simd.Config {
+    return .{
+        .lane_count = asimdLanes(T),
+        .row_unroll_vectors = 4,
+        .col_unroll = 1,
+    };
+}

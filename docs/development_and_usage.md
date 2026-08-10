@@ -1,64 +1,154 @@
 # Development And Usage
 
-This guide covers local development, package dependency setup, and public API
-usage for the current Zynum BLAS (`zynum-blas`) module.
-
-Canonical repository: <https://github.com/kaix-huang/Zynum>.
-
-Zynum `0.0.1-beta` is ready for public evaluation, experiments, and integration
-work, but it is not a stable 1.0 API contract. Prefer explicit module names and
-avoid depending on internal source layout, dispatch thresholds, or experimental
-runtime switches unless you are working inside this repository.
+This guide covers local development, package setup, and public API usage for
+Zynum BLAS (`zynum-blas`). Zynum `0.0.1-beta` is suitable for evaluation and
+integration but is not a stable 1.0 contract. Depend on public modules and APIs,
+not internal source layout or dispatch thresholds.
 
 ## Local Setup
 
-Use Zig 0.16.0 or newer in the 0.16 series.
+Use Zig 0.16.0 or newer in the 0.16 series and Python 3.10 or newer. Repository
+validation rejects inherited environment variables whose names start with
+`GIT_`, so run direct gates in a sanitized subprocess:
 
 ```sh
-zig build test
-zig build --release=safe test
-zig build --release=fast test
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_VALIDATION'
+python3 -B tools/check_build_inventory.py --root .
+python3 -B tools/check_test_inventory.py --structure-only
+zig build test-build-inventory --summary failures
+zig build test-test-inventory --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
 zig build
 zig build generate-headers
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
+ZYNUM_VALIDATION
 ```
 
 Useful target checks:
 
 ```sh
-zig build test -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
-zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline
-zig build test -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_TARGET_CHECKS'
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
+zig build test-native-feature -Dtarget=aarch64-macos \
+  -Dcpu=apple_m4+sme+sme2+sme2p1 \
+  -Dtest-optimize=ReleaseSafe --release=safe --summary failures
+zig build test-inventory-link -Dtarget=x86_64-linux-gnu -Dcpu=baseline \
+  -Dtest-optimize=ReleaseSafe --summary failures
+zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
+ZYNUM_TARGET_CHECKS
 ```
 
-`zig build` installs library and compatibility artifacts under `zig-out/` by
-default:
+Feature-specific build commands provide compile coverage. `test-native-feature`
+runs the same official test bodies for an explicit non-baseline profile only
+when the target matches the host and the host supports all requested features.
+It is native correctness evidence, not frozen inventory evidence. Performance
+claims still require measurements on hardware that provides the advertised
+feature tier.
+
+## Test Inventory
+
+Inventory-dependent tests require an exact `-Dcpu=baseline` query. `native`, an
+explicit CPU model, and feature modifiers are not inventory queries. Use
+`test-native-feature` for correctness on a matching native host; ordinary
+`zig build` remains host-native and unrestricted by the test inventory.
+
+`tools/test_inventory.json` records the supported test surface: logical roots,
+ordered compiler-enumerated sets, target applicability, optimize modes, and
+native-evidence joins. Official Zig test runners validate it before executing
+test bodies. A row without native evidence remains pending; cross-compilation,
+emulation, and observations from another target class cannot fill it.
+
+For a declared foreign target, compile the enumerator graph without claiming
+native execution:
+
+```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_FOREIGN_LINK'
+zig build test-inventory-link -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dtest-optimize=Debug --summary failures
+python3 -B tools/check_test_inventory.py --structure-only
+ZYNUM_FOREIGN_LINK
+```
+
+The checker without `--structure-only` is the full native-matrix gate. It exits
+nonzero while applicable rows remain pending. Inventory checkers use bounded,
+fail-closed file admission and reviewed code pins. These establish repository
+consistency, not cryptographic authenticity or proof of remote execution.
+
+Inventory refresh is a dedicated maintenance operation. Validate the full
+candidate, inspect the inventory and checker/runner changes together, and keep
+local evidence outside the repository. Do not hand-edit content-addressed IDs
+or infer native observations. The build-source refresh entry point is:
+
+```sh
+python3 -B tools/check_build_inventory.py --refresh-source-derived
+```
+
+For exact schemas, resource limits, publication behavior, and exit statuses,
+refer to `tools/check_build_inventory.py`, `tools/check_test_inventory.py`, and
+the runner sources. Publication tools must run without an untrusted writer that
+shares the publisher's effective filesystem credentials. Preserve any reported
+recovery material for offline inspection.
+
+The inventory's Python roots remain directly executable:
+
+```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_PYTHON_TESTS'
+python3 -B -m unittest discover -s test/abi/baseline -p "test_*.py"
+python3 -B test/abi/baseline/test_abi_artifact_parity.py
+python3 -B -m unittest discover -s bench/tools -p "test_*.py"
+python3 -B test/build/test_build_inventory.py
+python3 -B test/build/test_test_inventory.py
+ZYNUM_PYTHON_TESTS
+```
+
+The benchmark-tool discovery command runs controller and parser unit tests; it
+does not launch a performance measurement.
+
+## Installation
+
+`zig build` installs libraries and compatibility artifacts under `zig-out/`.
+ELF and Mach-O use:
 
 - `zig-out/lib/libzynum_blas.dylib`, `libzynum_blas.so`, or platform
-  equivalent.
+  equivalent;
 - `zig-out/lib/libzynum_blas.a`.
-- `zig-out/include/zynum/blas/cblas.h`.
-- `zig-out/include/zynum/blas/blas.h`.
-- `zig-out/include/zynum/blas/blas.f90`.
 
-Use Zig's standard install prefix option when you need a different install
-location:
+Windows installs:
+
+- `zig-out/bin/zynum_blas.dll`;
+- `zig-out/lib/zynum_blas.lib`, the import library;
+- `zig-out/lib/static/zynum_blas.lib`, the static archive.
+
+Use the library-only install step when probes and benchmarks are unnecessary:
+
+```sh
+zig build install-libraries --prefix zig-out/install
+```
+
+Windows static consumers must name `lib/static/zynum_blas.lib` explicitly and
+must not add `lib/static` to a general library-search path.
+
+Use Zig's standard prefix option for another install location:
 
 ```sh
 zig build --prefix /tmp/zynum-install
 ```
 
-Compatibility headers, the generated Fortran module, the ABI manifest, and the
-`pkg-config` file are installed by default. Disable that installation when only
-Zig modules or library artifacts are needed:
+Compatibility headers, the Fortran module, ABI manifest, and `pkg-config` file
+are installed by default. Disable them when only Zig modules or libraries are
+needed:
 
 ```sh
 zig build -Dcompat-headers=false
 ```
 
-After installation, C and Fortran builds that use `pkg-config` can query the
-library flags:
+Query installed C/Fortran flags with:
 
 ```sh
 PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
@@ -66,21 +156,19 @@ PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
 
 ## Package Imports
 
-Zynum exposes two Zig package modules:
+Zynum exposes two Zig modules:
 
-- `zynum`: top-level facade for current and future modules.
-- `zynum-blas`: Zynum BLAS, the BLAS-only submodule.
+- `zynum`: top-level facade for present and future numerical modules;
+- `zynum-blas`: BLAS-only submodule.
 
-The top-level module currently re-exports the BLAS API, but new code should
-prefer the explicit namespace:
+Prefer the explicit namespace from the facade:
 
 ```zig
 const zynum = @import("zynum");
 const blas = zynum.blas;
 ```
 
-Code that intentionally depends only on the BLAS module may import the submodule
-when the consuming build exposes it:
+BLAS-only consumers may import the submodule when their build exposes it:
 
 ```zig
 const blas = @import("zynum-blas");
@@ -88,10 +176,8 @@ const blas = @import("zynum-blas");
 
 ## Using Zynum From Another Zig Project
 
-During the beta line, prefer a local path dependency so the consuming project
-and Zynum checkout can move together.
-
-In the consuming project's `build.zig.zon`:
+During beta, a local path dependency lets the consumer and checkout move
+together. In `build.zig.zon`:
 
 ```zig
 .{
@@ -111,7 +197,7 @@ In the consuming project's `build.zig.zon`:
 }
 ```
 
-In the consuming project's `build.zig`:
+In `build.zig`:
 
 ```zig
 const std = @import("std");
@@ -141,60 +227,27 @@ pub fn build(b: *std.Build) void {
 }
 ```
 
-Then import the facade from `src/main.zig`:
-
-```zig
-const zynum = @import("zynum");
-const blas = zynum.blas;
-```
-
-For BLAS-only consumers, expose and import the submodule instead:
-
-```zig
-.imports = &.{
-    .{ .name = "zynum-blas", .module = zynum_dep.module("zynum-blas") },
-},
-```
-
-```zig
-const blas = @import("zynum-blas");
-```
-
-When consuming a published archive instead of a local checkout, replace the
-`.path` dependency with Zig's `.url` and `.hash` fields from the release you are
-using. Avoid inventing a hash: let `zig fetch` report the expected hash for the
-exact archive.
-
-Zynum currently has no third-party Zig package dependencies. Python 3,
-`gfortran`, and comparator BLAS libraries are optional tooling dependencies for
-benchmarks and compatibility checks.
+For a published archive, replace `.path` with the release's `.url` and `.hash`.
+Use `zig fetch` to obtain the expected hash for the exact archive.
 
 ## Runnable Examples
 
-Concise matrix multiplication examples live under `../examples/`:
+Examples live under `../examples/`:
 
-- `../examples/zig/matrix_multiply.zig` uses the typed Zig API.
-- `../examples/cblas/dgemm.c` uses the CBLAS compatibility API.
-- `../examples/fortran/dgemm.f90` uses the generated Fortran 2003 module.
-
-From the repository root, run the Zig example with:
+- `zig/matrix_multiply.zig` uses the typed Zig API;
+- `cblas/dgemm.c` uses CBLAS;
+- `fortran/dgemm.f90` uses the generated Fortran module.
 
 ```sh
 zig build --build-file examples/zig/build.zig run
 ```
 
-Build the installed library first for the C and Fortran examples:
-
-```sh
-zig build
-```
-
-Then follow `../examples/README.md` for the C compiler, Fortran compiler, module,
-and linker commands.
+Build the library first for C and Fortran examples, then follow
+`../examples/README.md` for compiler and linker commands.
 
 ## Typed Zig API
 
-The public Zig API uses checked views instead of raw BLAS argument lists:
+The API uses checked views instead of raw BLAS argument lists:
 
 ```zig
 const x = try blas.constVector(f64, x_values, .{});
@@ -207,7 +260,7 @@ try blas.addScaledVector(.{
 });
 ```
 
-Matrix operations use explicit row and column counts:
+Matrix operations use explicit dimensions:
 
 ```zig
 const a = try blas.constMatrix(f64, a_values, .{
@@ -230,32 +283,24 @@ try blas.matrixMultiply(.{
 });
 ```
 
-All builds check cheap structural shape fields such as lengths, strides, leading
-dimensions, and matrix dimensions. Debug, ReleaseSafe, and ReleaseSmall builds
-also check backing storage capacity and unsupported aliasing; ReleaseFast omits
-those capacity and alias checks.
-
-The repository test step uses ReleaseSafe test modules by default so these
-checks remain covered by `zig build test`. Use `-Dtest-optimize=ReleaseFast`
-when intentionally validating the reduced capacity/alias checking contract.
+All builds check structural fields such as dimensions, strides, and leading
+dimensions. Debug, ReleaseSafe, and ReleaseSmall also check backing capacity and
+unsupported aliasing; ReleaseFast omits those capacity and alias checks.
 
 ## Aliasing Model
 
-Default output operations are no-alias fast paths. Result buffers must not
-overlap input buffers unless the operation is inherently in-place.
+Default output operations require result buffers not to overlap inputs unless
+the operation is inherently in place.
 
-Use these API families intentionally:
-
-- In-place operations such as `scaleVector` allow their natural self-aliasing.
+- In-place operations such as `scaleVector` allow natural self-aliasing.
 - BLAS-shaped vector operations such as `swapVectors`, `copyVector`, and
-  `addScaledVector` operate over the shared prefix length of their vector
-  arguments.
-- `Into` vector operations such as `scaleVectorInto` require equal input and
-  result lengths so the output view is fully defined.
-- Workspace-driven aliasing support such as `matrixMultiplyWithWorkspace` uses
-  caller-provided temporary storage.
+  `addScaledVector` operate over the shared prefix length.
+- `Into` operations such as `scaleVectorInto` require equal input and result
+  lengths.
+- Workspace APIs such as `matrixMultiplyWithWorkspace` support documented
+  overlap with caller-provided temporary storage.
 
-Workspace lengths are queryable:
+Query required workspace before the operation:
 
 ```zig
 const workspace_len = try blas.matrixMultiplyWorkspaceLength(.{
@@ -263,20 +308,17 @@ const workspace_len = try blas.matrixMultiplyWorkspaceLength(.{
 });
 ```
 
-Callers are responsible for keeping workspace storage alive for the duration of
-the operation that uses it.
+The caller keeps workspace alive for the operation's duration.
 
 ## C, CBLAS, And Fortran Entry Points
 
-The Zig package modules are separate from the compatibility ABI library. C,
-C++, and Fortran users should build the library and include or compile the
-generated files under `zig-out/include/zynum/blas/`.
+Build the library before consuming generated compatibility files:
 
 ```sh
 zig build
 ```
 
-C and C++ users can include:
+C and C++ include:
 
 ```c
 #include <zynum/blas/cblas.h>
@@ -290,9 +332,6 @@ cc example.c -I zig-out/include -L zig-out/lib -lzynum_blas \
   -Wl,-rpath,zig-out/lib
 ```
 
-See `../examples/cblas/dgemm.c` for a compact CBLAS matrix multiplication
-example.
-
 Fortran 2003+ users can compile the generated module:
 
 ```sh
@@ -302,138 +341,65 @@ gfortran -std=f2008 -J build/zynum-blas-mod \
   -o build/zynum_blas_fortran.o
 ```
 
-See `../examples/fortran/dgemm.f90` for a compact Fortran matrix multiplication
-example. For ABI details, legacy Fortran notes, and complex value caveats, see
-`fortran_compatibility.md`.
+See `fortran_compatibility.md` for ABI details and complex-value caveats.
 
-## Runtime Controls For Local Experiments
+## Runtime Controls
 
-Set Zynum's project-specific environment variable before the first BLAS call in a
-process. This is the only supported Zynum environment variable.
-
-Development requirement: do not introduce any additional Zynum environment
-variables beyond `ZYNUM_MAXIMUM_THREADS`. New dispatch, backend,
-instruction-set, or worker-strategy controls must be internal policy or explicit
-APIs/build options, not process environment.
-
-| Variable | Purpose |
-| --- | --- |
-| `ZYNUM_MAXIMUM_THREADS` | Positive integer cap on the number of threads Zynum may use. Values above the runtime CPU count are capped to that count. When unset, the cap defaults to the runtime CPU count. |
-
-Benchmarking baseline:
+`ZYNUM_MAXIMUM_THREADS` is the only supported Zynum environment variable. Set
+it before the first BLAS call. A positive integer caps usable concurrency;
+values above runtime CPU capacity are capped. When unset, Zynum uses runtime
+capacity and may choose fewer threads internally.
 
 ```sh
-# Leave unset unless a test explicitly needs a thread cap.
 unset ZYNUM_MAXIMUM_THREADS
 ```
 
-Instruction-set selection, Apple AMX/SME use, and `std.Io` worker strategy are
-internal dispatch decisions rather than environment-variable modes. See
-`common/benchmarking.md` for comparator-library thread variables and
+Instruction-set selection, Apple AMX/SME use, and worker strategy are internal
+dispatch decisions. See `common/benchmarking.md` for comparator variables and
 reproducibility rules.
-
-Representative BLAS Level 1/2 comparisons are available through:
-
-```sh
-zig build bench-vector-matrix-sweep --release=fast -- --size 1024 --reps 60
-```
-
-This sweep loads Zynum plus configured Accelerate/OpenBLAS comparator libraries
-and times common double-precision Level 1/2 kernels. Treat the mixed-library
-step as a local probe; use fresh-process isolation before making reportable
-claims because Zynum and comparator libraries may keep worker or dispatch state
-after their first call.
 
 ## Dynamic BLAS Library Cleanup
 
-Processes that load Zynum BLAS with `dlopen` and then unload it with `dlclose`
-should call the exported cleanup hook before closing the handle:
+Code that loads Zynum BLAS with `dlopen` and later unloads it should call:
 
 ```c
 void zynum_blas_shutdown(void);
 ```
 
-The Fortran-style symbol `zynum_blas_shutdown_` is exported as well. The hook
-clears cached workspace owned by the calling thread and stops the shared core
-`std.Io.Threaded` helper state used by selected Level 1, Level 2, and GEMM paths.
-Thread-local caches owned by other application threads are released when those
-threads exit, so embedders should call the hook after their BLAS-using threads are
-quiescent. Normal process exit does not need an explicit call, but dynamic
-benchmark probes and plugin-style embedders should call it before unloading the
-library.
+`zynum_blas_shutdown_` is also exported for Fortran-style callers. Call the hook
+after BLAS-using threads are quiescent and before `dlclose`; it clears the
+calling thread's cached workspace and stops shared helper state. Normal process
+exit needs no explicit call.
 
-## Adding A Public Zig Operation
+## Extending Zynum
 
-1. Add or reuse core operands in `src/blas/core/checked/operands.zig`.
-2. Add a structured core entry point in `src/blas/core/checked/operations.zig`.
-3. Implement the portable behavior in the relevant semantic core module:
-   `src/blas/core/vector.zig`, `src/blas/core/matrix_vector.zig`,
-   `src/blas/core/matrix_matrix.zig`, or a focused leaf under the matching
-   directory.
-4. Add the public operation in `src/blas/api/operations.zig`.
-5. Re-export it from `src/blas/api.zig`, `src/blas.zig`, and, if it is part of
-   the top-level convenience surface, `src/zynum.zig`.
-6. Add tests in `test/api/zynum_test.zig` or another focused file under `test/api/`.
-7. Update public documentation when the operation changes user-facing behavior.
+For a public Zig operation, add or reuse checked operands and core semantics,
+then expose the operation through the API facades and add focused tests. Keep
+public names descriptive and preserve the no-alias/workspace contract.
 
-Keep public names descriptive. Keep BLAS abbreviations in ABI wrappers unless
-the abbreviation is the natural numerical term.
+For an ABI export, update the Fortran or CBLAS source, keep wrappers on
+`core/unchecked.zig`, run `zig build generate-headers`, review generated files,
+and add ABI and header smoke tests. Do not rename standard BLAS symbols.
 
-## Adding Or Changing ABI Exports
-
-1. Update `src/blas/abi/fortran.zig` or `src/blas/abi/cblas.zig`.
-2. Keep ABI wrappers calling through `src/blas/core/unchecked.zig`; do not import the
-   wider checked-operation facade from ABI files.
-3. Run `zig build generate-headers`.
-4. Review generated files under `include/zynum/blas/`.
-5. Add ABI compatibility tests in `test/abi/fortran_compat_test.zig` or
-   `test/abi/cblas_compat_test.zig`; add generated-header smoke tests under
-   `test/headers/`.
-6. Run `zig build test`.
-
-Do not rename standard BLAS ABI symbols. The shared library name is
-`zynum_blas`, but functions such as `dgemm_` and `cblas_dgemm` remain standard.
-
-## Adding A GEMM Kernel
-
-1. Decide whether the kernel can be represented by an existing shared body:
-   fixed-width packed-B SIMD should prefer
-   `src/blas/kernels/shared/matrix_matrix/packed_simd.zig`, and real-GEMM alpha/beta write-back
-   should use `src/blas/kernels/shared/matrix_matrix/epilogue.zig`.
-2. Put architecture-specific feature gates, hard feasibility checks, and
-   hardware state code under `src/blas/kernels/arch/<arch>/`.
-3. Add capability detection or compile-time feature checks in the architecture
-   feature file.
-4. Add or update the descriptor in `src/blas/kernels/shared/matrix_matrix/catalog.zig`. Prefer
-   parameter changes there for tile, packing, unroll, and minimum-work tuning.
-5. Add the candidate to `src/blas/kernels/dispatch/matrix_matrix.zig` for the relevant target
-   feature set.
-6. Update `src/blas/kernels/shared/matrix_matrix/tuning.zig` when the shape/scalar matching rule
-   changes.
-7. Map the descriptor's `KernelId` in `src/blas/kernels/shared/matrix_matrix/executor.zig`.
-8. Keep shared task fields in `src/blas/kernels/shared/matrix_matrix/task.zig`.
-9. Keep task splitting and threading policy in `src/blas/core/matrix_matrix/planner.zig`.
-10. Add correctness tests that hit the path where practical.
-11. Add benchmark commands and result summaries to the relevant docs.
-
-Kernel changes should be capability-based, not CPU-name-based. CPU names are
-valid benchmark labels but weak dispatch boundaries. Prefer new comptime
-parameters, prologue/epilogue hooks, or `ExecutionPlan` fields over cloning an
-existing micro-kernel loop.
+For a kernel, define its catalog contract first. Keep architecture capability
+and state handling under `src/blas/kernels/arch/<arch>/`; keep shape policy,
+planning, packing, workspace, and fallback in shared owners. Prove forced-path
+correctness, native execution, state restoration, focused gate boundaries, and
+the affected representative sweep before production promotion. See
+`architecture.md` and `common/benchmarking.md`.
 
 ## Generated Files
 
-The checked-in compatibility files are generated from ABI signatures:
+Regenerate compatibility files with:
 
 ```sh
 zig build generate-headers
 ```
 
-Generated files:
+Generated outputs are:
 
-- `include/zynum/blas/cblas.h`.
-- `include/zynum/blas/blas.h`.
+- `include/zynum/blas/cblas.h`;
+- `include/zynum/blas/blas.h`;
 - `include/zynum/blas/blas.f90`.
 
-The generator is intentionally small and deterministic. If a generated file
-changes unexpectedly, inspect the ABI export signatures first.
+If output changes unexpectedly, inspect the ABI export signatures first.

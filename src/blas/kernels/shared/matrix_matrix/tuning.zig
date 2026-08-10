@@ -18,6 +18,11 @@ pub const Shape = struct {
     k: usize,
 };
 
+pub const RequestLayout = enum {
+    no_trans,
+    transposed_b,
+};
+
 pub fn min3(a: usize, b: usize, c: usize) usize {
     return @min(a, @min(b, c));
 }
@@ -36,14 +41,31 @@ pub fn isNarrowN(desc: catalog.Descriptor, n: usize) bool {
     return n <= desc.tile.n_panel * 4;
 }
 
-pub fn directKernelAllowed(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T) bool {
+pub fn directKernelFeasible(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T) bool {
     if (desc.family != .streaming_matrix) return false;
-    if (alpha != 1 or beta != 0) return false;
+    if ((!desc.epilogue.arbitrary_alpha and alpha != 1) or (!desc.epilogue.arbitrary_beta and beta != 0)) return false;
     if (shape.m < desc.bounds.min_m_block or shape.n < desc.bounds.min_n_block or shape.k < desc.bounds.min_k_block) return false;
+    return true;
+}
+
+pub fn directKernelAllowed(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T) bool {
+    if (!directKernelFeasible(T, desc, shape, alpha, beta)) return false;
     return shape.m *| shape.n *| shape.k >= desc.bounds.min_work;
 }
 
-pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T, requested_threads: usize) i64 {
+pub fn isFeasible(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T, layout: RequestLayout) bool {
+    if (desc.scalar != catalog.contractScalarKind(T)) return false;
+    if (!desc.lifecycle.defaultEligible()) return false;
+    if (shape.m == 0 or shape.n == 0 or shape.k == 0) return false;
+    switch (layout) {
+        .no_trans => if (!desc.layouts.no_trans) return false,
+        .transposed_b => if (!desc.layouts.transposed_b) return false,
+    }
+    if (desc.family == .streaming_matrix) return directKernelFeasible(T, desc, shape, alpha, beta);
+    return true;
+}
+
+pub fn scoreFeasible(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T, requested_threads: usize) i64 {
     const work = shape.m *| shape.n *| shape.k;
     const min_dim = min3(shape.m, shape.n, shape.k);
     const squareish = isSquareish(shape);
@@ -95,6 +117,11 @@ pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T,
     return result;
 }
 
+pub fn score(comptime T: type, desc: catalog.Descriptor, shape: Shape, alpha: T, beta: T, requested_threads: usize) i64 {
+    if (!isFeasible(T, desc, shape, alpha, beta, .no_trans)) return std.math.minInt(i64) / 2;
+    return scoreFeasible(T, desc, shape, alpha, beta, requested_threads);
+}
+
 fn rejectNoTransStreamingLowK(comptime T: type, desc: catalog.Descriptor, shape: Shape) bool {
     if (desc.family != .streaming_matrix) return false;
     if (shape.k < desc.bounds.min_k_block or shape.k > 128) return false;
@@ -112,21 +139,22 @@ fn rejectNoTransStreamingLowK(comptime T: type, desc: catalog.Descriptor, shape:
 }
 
 pub fn select(comptime T: type, candidates: catalog.CandidateList, shape: Shape, alpha: T, beta: T, requested_threads: usize) catalog.Descriptor {
-    var best = candidates.at(0);
-    var best_score = if (rejectNoTransStreamingLowK(T, best, shape)) std.math.minInt(i64) / 2 else score(T, best, shape, alpha, beta, requested_threads);
-    var index: usize = 1;
+    var best: ?catalog.Descriptor = null;
+    var best_score: i64 = std.math.minInt(i64);
+    var index: usize = 0;
     while (index < candidates.len) : (index += 1) {
         const item = candidates.at(index);
-        const item_score = if (rejectNoTransStreamingLowK(T, item, shape)) std.math.minInt(i64) / 2 else score(T, item, shape, alpha, beta, requested_threads);
-        if (item_score > best_score) {
+        if (!isFeasible(T, item, shape, alpha, beta, .no_trans)) continue;
+        const item_score = if (rejectNoTransStreamingLowK(T, item, shape)) std.math.minInt(i64) / 2 else scoreFeasible(T, item, shape, alpha, beta, requested_threads);
+        if (best == null or item_score > best_score) {
             best = item;
             best_score = item_score;
         }
     }
-    return best;
+    return best orelse candidates.at(0);
 }
 
-fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
+fn selectAmx(comptime T: type, shape: Shape) gemm_task.AppleAmxKernelId {
     if (shape.k == 0) return .none;
     if (T == f32) {
         // A medium irregular panel still has a large regular 16x16 AMX
@@ -139,7 +167,7 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
             shape.n >= 96 and shape.n <= 160 and
             shape.k >= 65 and shape.k <= 256 and
             ((shape.m & 15) != 0 or (shape.n & 15) != 0);
-        if (medium_fringe) return .f32_n16;
+        if (medium_fringe) return .apple_amx_f32_n16;
         if ((shape.m & 15) != 0 or (shape.n & 15) != 0) return .none;
         if (shape.k > 512) return .none;
 
@@ -162,9 +190,9 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
         const high_k_chunk_n32 = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
         const high_k_panel_n32 = high_k_panel;
         if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or high_k_chunk_n32 or high_k_panel_n32 or narrow_n64_chunk)) {
-            return .f32_n32;
+            return .apple_amx_f32_n32;
         }
-        return .f32_n16;
+        return .apple_amx_f32_n16;
     }
     if (T == f64) {
         // The f64 N8 kernel has the least restrictive AMX tile and is the
@@ -173,7 +201,7 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
             shape.n >= 96 and shape.n <= 160 and
             shape.k >= 65 and shape.k <= 256 and
             ((shape.m & 7) != 0 or (shape.n & 7) != 0);
-        if (medium_fringe) return .f64_n8;
+        if (medium_fringe) return .apple_amx_f64_n8;
         if ((shape.m & 7) != 0 or (shape.n & 7) != 0) return .none;
         const short_wide = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
         const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64 and shape.m <= 384;
@@ -185,50 +213,50 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AmxKernel {
         const mid_k_large = shape.m >= 256 and shape.n >= 256 and shape.k <= 1024;
         if (!short_wide and !square and !high_k_panel and !tall_narrow_panel and !tall_n16 and !low_k_skinny_n32 and !low_k_large and !mid_k_large) return .none;
         const square_large_n32 = square and shape.m >= 256;
-        if (mid_k_large and shape.n <= 256 and (shape.m & 31) == 0 and (shape.n & 15) == 0) return .f64_n16;
-        if ((short_wide or (shape.m == 64 or shape.m == 96) or square_large_n32 or high_k_panel or tall_narrow_panel or low_k_skinny_n32 or low_k_large or mid_k_large) and (shape.m & 15) == 0 and (shape.n & 31) == 0) return .f64_n32;
-        if ((shape.m & 31) == 0 and (shape.n & 15) == 0) return .f64_n16;
-        return .f64_n8;
+        if (mid_k_large and shape.n <= 256 and (shape.m & 31) == 0 and (shape.n & 15) == 0) return .apple_amx_f64_n16;
+        if ((short_wide or (shape.m == 64 or shape.m == 96) or square_large_n32 or high_k_panel or tall_narrow_panel or low_k_skinny_n32 or low_k_large or mid_k_large) and (shape.m & 15) == 0 and (shape.n & 31) == 0) return .apple_amx_f64_n32;
+        if ((shape.m & 31) == 0 and (shape.n & 15) == 0) return .apple_amx_f64_n16;
+        return .apple_amx_f64_n8;
     }
     return .none;
 }
 
-pub fn amxMBlock(amx: gemm_task.AmxKernel) usize {
+pub fn amxMBlock(amx: gemm_task.AppleAmxKernelId) usize {
     return switch (amx) {
-        .f32_n16 => 16,
-        .f32_n32 => 32,
-        .f64_n8 => 8,
-        .f64_n16 => 32,
-        .f64_n32 => 16,
+        .apple_amx_f32_n16 => 16,
+        .apple_amx_f32_n32 => 32,
+        .apple_amx_f64_n8 => 8,
+        .apple_amx_f64_n16 => 32,
+        .apple_amx_f64_n32 => 16,
         .none => 0,
     };
 }
 
-pub fn amxNPanel(amx: gemm_task.AmxKernel) usize {
+pub fn amxNPanel(amx: gemm_task.AppleAmxKernelId) usize {
     return switch (amx) {
-        .f32_n16 => 16,
-        .f32_n32 => 32,
-        .f64_n8 => 8,
-        .f64_n16 => 16,
-        .f64_n32 => 32,
+        .apple_amx_f32_n16 => 16,
+        .apple_amx_f32_n32 => 32,
+        .apple_amx_f64_n8 => 8,
+        .apple_amx_f64_n16 => 16,
+        .apple_amx_f64_n32 => 32,
         .none => 0,
     };
 }
 
-pub fn amxKernelCompatible(comptime T: type, amx: gemm_task.AmxKernel, shape: Shape) bool {
+pub fn amxKernelCompatible(comptime T: type, amx: gemm_task.AppleAmxKernelId, shape: Shape) bool {
     if (shape.k == 0 or amx == .none) return false;
     const m_block = amxMBlock(amx);
     const n_panel = amxNPanel(amx);
     if (m_block == 0 or n_panel == 0) return false;
     if (shape.m % m_block != 0 or shape.n % n_panel != 0) return false;
     return switch (T) {
-        f32 => shape.k <= 512 and (amx == .f32_n16 or amx == .f32_n32),
-        f64 => amx == .f64_n8 or amx == .f64_n16 or amx == .f64_n32,
+        f32 => shape.k <= 512 and (amx == .apple_amx_f32_n16 or amx == .apple_amx_f32_n32),
+        f64 => amx == .apple_amx_f64_n8 or amx == .apple_amx_f64_n16 or amx == .apple_amx_f64_n32,
         else => false,
     };
 }
 
-fn selectF32AmxPartialN16(shape: Shape, amx: gemm_task.AmxKernel) bool {
+fn selectF32AmxPartialN16(shape: Shape, amx: gemm_task.AppleAmxKernelId) bool {
     if (amx != .none) return false;
     if (shape.m % 16 != 0 or shape.k == 0 or shape.k > 512) return false;
     const n_full = shape.n - shape.n % 16;
@@ -288,14 +316,11 @@ fn selectSmePanelBatch(comptime T: type, desc: catalog.Descriptor, shape: Shape,
 fn selectPackWorkspace(desc: catalog.Descriptor) gemm_task.PackWorkspacePlan {
     return .{
         .stack_bytes = desc.pack.stack_bytes,
-        .cache_bytes = switch (desc.family) {
-            .streaming_matrix => 16 * 1024 * 1024,
-            else => 0,
-        },
+        .cache_bytes = desc.pack.cache_bytes,
     };
 }
 
-fn selectAmxPackWorkspace(comptime T: type, amx: gemm_task.AmxKernel) gemm_task.PackWorkspacePlan {
+fn selectAmxPackWorkspace(comptime T: type, amx: gemm_task.AppleAmxKernelId) gemm_task.PackWorkspacePlan {
     if (amx == .none) return .{};
     return .{
         .stack_bytes = if (T == f32) 128 * 1024 else if (T == f64) 256 * 1024 else 0,
@@ -304,16 +329,62 @@ fn selectAmxPackWorkspace(comptime T: type, amx: gemm_task.AmxKernel) gemm_task.
 }
 
 pub fn executionPlan(comptime T: type, desc: catalog.Descriptor, shape: Shape, requested_threads: usize, performance_l2_bytes: usize) gemm_task.ExecutionPlan {
-    var result: gemm_task.ExecutionPlan = .{};
+    var result: gemm_task.ExecutionPlan = .{
+        .selected_kernel = desc.kernel,
+        .fallback_kernel = desc.fallback,
+    };
     result.pack = selectPackWorkspace(desc);
     if (desc.family != .streaming_matrix) return result;
 
     result.amx = selectAmx(T, shape);
     result.amx_partial_n16 = T == f32 and selectF32AmxPartialN16(shape, result.amx);
     result.amx_pack = selectAmxPackWorkspace(T, result.amx);
-    if (result.amx_partial_n16) result.amx_pack = selectAmxPackWorkspace(T, .f32_n16);
+    if (result.amx_partial_n16) result.amx_pack = selectAmxPackWorkspace(T, .apple_amx_f32_n16);
     result.b_pack = selectBPack(T, shape);
     if (T == f32) result.f32_panel = selectF32SmePanel(shape, desc.tile.vector_lanes);
     result.sme_panel_batch = selectSmePanelBatch(T, desc, shape, requested_threads, performance_l2_bytes);
     return result;
+}
+
+test "GEMM feasibility is independent from useful-work policy" {
+    const desc = catalog.aarch64SmeDescriptor(f32, 64);
+    const shape: Shape = .{ .m = 16, .n = 16, .k = 32 };
+    try std.testing.expect(directKernelFeasible(f32, desc, shape, 1, 0));
+    try std.testing.expect(!directKernelAllowed(f32, desc, shape, 1, 0));
+    try std.testing.expect(!isFeasible(f32, desc, shape, 2, 0, .no_trans));
+}
+
+test "GEMM selector preserves tiny and packed shape families" {
+    const candidates = catalog.candidateList(.{ catalog.aarch64AsimdDescriptor(f32), catalog.genericDescriptor(f32) });
+    try std.testing.expectEqual(catalog.KernelId.generic_f32_4x4, select(f32, candidates, .{ .m = 4, .n = 4, .k = 4 }, 1, 0, 1).kernel);
+    try std.testing.expectEqual(catalog.KernelId.aarch64_asimd_f32_12x8, select(f32, candidates, .{ .m = 512, .n = 512, .k = 512 }, 1, 0, 1).kernel);
+}
+
+test "GEMM selection regression corpus preserves shape scalar and thread policy" {
+    const asimd_f32 = catalog.candidateList(.{ catalog.aarch64AsimdDescriptor(f32), catalog.genericDescriptor(f32) });
+    const sme_f32 = catalog.candidateList(.{ catalog.aarch64SmeDescriptor(f32, 64), catalog.aarch64AsimdDescriptor(f32), catalog.genericDescriptor(f32) });
+    const sme_f64 = catalog.candidateList(.{ catalog.aarch64SmeDescriptor(f64, 64), catalog.aarch64AsimdDescriptor(f64), catalog.genericDescriptor(f64) });
+
+    const cases = .{
+        .{ asimd_f32, Shape{ .m = 1, .n = 256, .k = 1024 }, @as(f32, 1), @as(f32, 0), @as(usize, 1), catalog.KernelId.generic_f32_4x4 },
+        .{ asimd_f32, Shape{ .m = 32, .n = 32, .k = 32 }, @as(f32, 1), @as(f32, 0), @as(usize, 8), catalog.KernelId.aarch64_asimd_f32_12x8 },
+        .{ sme_f32, Shape{ .m = 128, .n = 128, .k = 1024 }, @as(f32, 1), @as(f32, 0), @as(usize, 1), catalog.KernelId.aarch64_sme_f32_2mx2n },
+        .{ sme_f32, Shape{ .m = 128, .n = 128, .k = 1024 }, @as(f32, 2), @as(f32, 0), @as(usize, 8), catalog.KernelId.aarch64_asimd_f32_12x8 },
+    };
+    inline for (cases) |case| {
+        try std.testing.expectEqual(case[5], select(f32, case[0], case[1], case[2], case[3], case[4]).kernel);
+    }
+
+    try std.testing.expectEqual(
+        catalog.KernelId.aarch64_sme_f64_4mx2n,
+        select(f64, sme_f64, .{ .m = 512, .n = 512, .k = 512 }, 1, 0, 4).kernel,
+    );
+    try std.testing.expect(!isFeasible(f64, sme_f64.at(0), .{ .m = 512, .n = 512, .k = 512 }, 1, 0, .transposed_b));
+}
+
+test "GEMM execution plan records selected and whole-operation fallback ids" {
+    const desc = catalog.aarch64AsimdDescriptor(f64);
+    const plan = executionPlan(f64, desc, .{ .m = 256, .n = 256, .k = 256 }, 4, 4 * 1024 * 1024);
+    try std.testing.expectEqual(desc.kernel, plan.selected_kernel);
+    try std.testing.expectEqual(desc.fallback, plan.fallback_kernel);
 }

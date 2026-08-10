@@ -4,6 +4,50 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
+pub const TestStreamingDepths = struct {
+    sm: usize,
+    za: usize,
+};
+
+threadlocal var test_sm_depth: usize = 0;
+threadlocal var test_za_depth: usize = 0;
+threadlocal var test_sm_entries: usize = 0;
+threadlocal var test_za_entries: usize = 0;
+
+inline fn testStart(sm: bool, za: bool) void {
+    if (comptime !builtin.is_test) return;
+    if (sm) {
+        test_sm_depth += 1;
+        test_sm_entries += 1;
+    }
+    if (za) {
+        test_za_depth += 1;
+        test_za_entries += 1;
+    }
+}
+
+inline fn testStop(sm: bool, za: bool) void {
+    if (comptime !builtin.is_test) return;
+    if (za) {
+        std.debug.assert(test_za_depth != 0);
+        test_za_depth -= 1;
+    }
+    if (sm) {
+        std.debug.assert(test_sm_depth != 0);
+        test_sm_depth -= 1;
+    }
+}
+
+pub fn testStreamingDepths() TestStreamingDepths {
+    if (comptime !builtin.is_test) @compileError("streaming depth counters are test-only");
+    return .{ .sm = test_sm_depth, .za = test_za_depth };
+}
+
+pub fn testStreamingEntries() TestStreamingDepths {
+    if (comptime !builtin.is_test) @compileError("streaming entry counters are test-only");
+    return .{ .sm = test_sm_entries, .za = test_za_entries };
+}
+
 // Changing PSTATE.SM makes the architectural Z/P/FFR contents unknown.  The
 // compiler cannot infer that effect from an inline `smstart`/`smstop`, so model
 // it explicitly at both state boundaries.  In particular, this prevents a
@@ -118,6 +162,7 @@ pub const StreamingModeState = struct {
         asm volatile (
             \\smstart sm
             ::: streaming_mode_clobbers);
+        testStart(true, false);
     }
 
     pub inline fn startSmZa(self: *StreamingModeState) void {
@@ -127,6 +172,7 @@ pub const StreamingModeState = struct {
             \\smstart sm
             \\smstart za
             ::: streaming_mode_clobbers);
+        testStart(true, true);
     }
 
     pub inline fn stopSm(self: *StreamingModeState) void {
@@ -135,17 +181,20 @@ pub const StreamingModeState = struct {
         asm volatile (
             \\smstop sm
             ::: streaming_mode_clobbers);
+        testStop(true, false);
     }
 
     pub inline fn stopSmRetU64(self: *StreamingModeState, result_bits: u64) u64 {
         if (comptime !has_sme) return result_bits;
         _ = self;
-        return asm volatile (
+        const result = asm volatile (
             \\mov x0, x11
             \\smstop sm
             : [result] "={x0}" (-> u64),
             : [result_bits] "{x11}" (result_bits),
             : streaming_mode_clobbers);
+        testStop(true, false);
+        return result;
     }
 
     pub inline fn stopSmZa(self: *StreamingModeState) void {
@@ -155,29 +204,60 @@ pub const StreamingModeState = struct {
             \\smstop za
             \\smstop sm
             ::: streaming_mode_clobbers);
+        testStop(true, true);
     }
 
     pub inline fn stopSmZaRetU64(self: *StreamingModeState, result_bits: u64) u64 {
         if (comptime !has_sme) return result_bits;
         _ = self;
-        return asm volatile (
+        const result = asm volatile (
             \\mov x0, x11
             \\smstop za
             \\smstop sm
             : [result] "={x0}" (-> u64),
             : [result_bits] "{x11}" (result_bits),
             : streaming_mode_clobbers);
+        testStop(true, true);
+        return result;
     }
 
     pub inline fn stopSmZaRetU32(self: *StreamingModeState, result_bits: u32) u32 {
         if (comptime !has_sme) return result_bits;
         _ = self;
-        return asm volatile (
+        const result = asm volatile (
             \\mov w0, w11
             \\smstop za
             \\smstop sm
             : [result] "={w0}" (-> u32),
             : [result_bits] "{w11}" (result_bits),
             : streaming_mode_clobbers);
+        testStop(true, true);
+        return result;
     }
 };
+
+/// Return PSTATE.SM in bit 0 and PSTATE.ZA in bit 1, matching SVCR.
+pub fn streamingModeBits() u2 {
+    if (comptime !has_sme) return 0;
+    const value = asm volatile ("mrs %[out], SVCR"
+        : [out] "=r" (-> usize),
+    );
+    return @truncate(value);
+}
+
+test "SM and ZA entry exit helpers restore disabled state" {
+    if (comptime !has_sme) return;
+    try std.testing.expectEqual(@as(u2, 0), streamingModeBits());
+
+    var state: StreamingModeState = undefined;
+    state.startSm();
+    try std.testing.expectEqual(@as(u2, 1), streamingModeBits());
+    state.stopSm();
+    try std.testing.expectEqual(@as(u2, 0), streamingModeBits());
+
+    state.startSmZa();
+    try std.testing.expectEqual(@as(u2, 3), streamingModeBits());
+    state.stopSmZa();
+    try std.testing.expectEqual(@as(u2, 0), streamingModeBits());
+    try std.testing.expectEqual(TestStreamingDepths{ .sm = 0, .za = 0 }, testStreamingDepths());
+}

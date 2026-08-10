@@ -12,12 +12,28 @@ pub const supports_avx2: bool = features.has_avx2;
 pub const supports_avx512f: bool = features.has_avx512f;
 pub const supports_fma: bool = features.has_fma;
 
-fn shape(comptime T: type) packed_params.PackedSimdShape {
-    return packed_params.x86Shape(T, features.has_avx, features.has_avx512f);
+pub const Tier = enum {
+    sse2,
+    avx,
+    avx2_fma,
+    avx512f_fma,
+};
+
+pub fn tierAvailable(comptime tier: Tier) bool {
+    return switch (tier) {
+        .sse2 => enabled,
+        .avx => supports_avx,
+        .avx2_fma => supports_avx2 and supports_fma,
+        .avx512f_fma => supports_avx512f and supports_fma,
+    };
 }
 
-fn config(comptime T: type) packed_simd.Config {
-    const s = shape(T);
+fn shape(comptime T: type, comptime tier: Tier) packed_params.PackedSimdShape {
+    return packed_params.x86Shape(T, tier != .sse2, tier == .avx512f_fma);
+}
+
+fn config(comptime T: type, comptime tier: Tier) packed_simd.Config {
+    const s = shape(T, tier);
     return .{
         .lane_count = s.lane_count,
         .tile_n = s.tile_n,
@@ -29,14 +45,10 @@ fn config(comptime T: type) packed_simd.Config {
     };
 }
 
-pub fn preferredColumnBlock(comptime T: type) usize {
-    return shape(T).tile_n;
+pub fn noTransRealF32For(comptime tier: Tier, task: gemm_task.Task(f32)) void {
+    packed_simd.noTransReal(f32, config(f32, tier), task);
 }
 
-pub fn noTransRealF32(task: gemm_task.Task(f32)) void {
-    packed_simd.noTransReal(f32, config(f32), task);
-}
-
-pub fn noTransRealF64(task: gemm_task.Task(f64)) void {
-    packed_simd.noTransReal(f64, config(f64), task);
+pub fn noTransRealF64For(comptime tier: Tier, task: gemm_task.Task(f64)) void {
+    packed_simd.noTransReal(f64, config(f64, tier), task);
 }

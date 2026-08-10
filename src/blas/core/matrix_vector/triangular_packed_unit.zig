@@ -6,7 +6,8 @@
 const builtin = @import("builtin");
 
 const scalar = @import("../shared/scalar.zig");
-const vector_ops = @import("../vector/operations.zig");
+const dependency_vector = @import("../../kernels/shared/matrix_vector/dependency_vector.zig");
+const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 
 const BlasInt = scalar.BlasInt;
 const Order = scalar.Order;
@@ -23,10 +24,7 @@ const conj = scalar.conj;
 const neg = scalar.neg;
 const isComplex = scalar.isComplex;
 const isZero = scalar.isZero;
-
-const vector_min = 64;
-const vector_parallel_min = 512 * 1024;
-const production_min_n = 128;
+const tuning = level2_tuning.active.triangular;
 
 const PackedColumn = struct {
     row0: usize,
@@ -40,8 +38,8 @@ fn isSupportedType(comptime T: type) bool {
 }
 
 fn productionGateAllows(comptime T: type, n: usize, incx: BlasInt) bool {
-    if (comptime builtin.cpu.arch != .x86_64 or !isSupportedType(T)) return false;
-    return incx == 1 and n >= production_min_n;
+    if (comptime !isSupportedType(T)) return false;
+    return incx == 1 and tuning.preferPackedX86(n);
 }
 
 fn packedColumn(comptime uplo: Uplo, n: usize, column: usize) PackedColumn {
@@ -66,23 +64,23 @@ fn packedColumn(comptime uplo: Uplo, n: usize, column: usize) PackedColumn {
 
 fn packedAxpy(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
     if (n == 0 or isZero(T, alpha)) return;
-    if (n >= vector_min) {
+    if (tuning.preferDenseVector(n)) {
         if (comptime isComplex(T)) {
             // A triangular dependency step must finish before the next column.
-            if (n < vector_parallel_min) return vector_ops.axpy(T, @intCast(n), alpha, a, 1, x, 1);
+            if (tuning.keepComplexDependencySerial(n)) return dependency_vector.axpy(T, n, alpha, a, x);
         } else {
-            return vector_ops.axpyUnitReal(T, n, alpha, a, x);
+            return dependency_vector.axpy(T, n, alpha, a, x);
         }
     }
     for (0..n) |i| x[i] = add(T, x[i], mul(T, alpha, a[i]));
 }
 
 fn packedDot(comptime T: type, comptime conjugate_a: bool, n: usize, a: [*]const T, x: [*]const T) T {
-    if (n >= vector_min) {
+    if (tuning.preferDenseVector(n)) {
         if (comptime isComplex(T)) {
-            if (n < vector_parallel_min) return vector_ops.dot(T, @intCast(n), a, 1, x, 1, conjugate_a);
+            if (tuning.keepComplexDependencySerial(n)) return dependency_vector.dot(T, n, a, x, conjugate_a);
         } else {
-            return vector_ops.dotUnitReal(T, n, a, x);
+            return dependency_vector.dot(T, n, a, x, false);
         }
     }
 

@@ -15,11 +15,23 @@ class ComplexF64(ctypes.Structure):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Run one Level 2 BLAS case in a tight loop.")
+    parser = argparse.ArgumentParser(
+        description="Run one Level 2 BLAS case in a tight loop."
+    )
     parser.add_argument("--library", default=DEFAULT_ACCELERATE)
     parser.add_argument(
         "--case",
-        choices=["sgemv_n", "sgemv_t", "sger", "dger", "ssymv", "zgemv_n", "zgemv_t", "zgeru", "zgerc"],
+        choices=[
+            "sgemv_n",
+            "sgemv_t",
+            "sger",
+            "dger",
+            "ssymv",
+            "zgemv_n",
+            "zgemv_t",
+            "zgeru",
+            "zgerc",
+        ],
         required=True,
     )
     parser.add_argument("--n", type=int, default=512)
@@ -70,7 +82,9 @@ def main():
     lib = ctypes.CDLL(args.library)
     ni = ctypes.c_int(n)
     one = ctypes.c_int(1)
-    trans = ctypes.create_string_buffer(b"T" if args.case in ("sgemv_t", "zgemv_t") else b"N")
+    trans = ctypes.create_string_buffer(
+        b"T" if args.case in ("sgemv_t", "zgemv_t") else b"N"
+    )
     uplo = ctypes.create_string_buffer(b"U")
     alpha = ctypes.c_float(0.7)
     beta = ctypes.c_float(0.3)

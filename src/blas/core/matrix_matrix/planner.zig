@@ -32,7 +32,6 @@ const Plan = struct {
     column_block: usize,
     allow_direct_kernel: bool,
     use_parallel_tasks: bool,
-    implementation: gemm_kernels.Implementation,
     execution: gemm_kernels.ExecutionPlan,
 
     fn taskCount(self: Plan) usize {
@@ -155,8 +154,8 @@ fn requestedThreadCountForPlan(m: usize, n: usize, k: usize) usize {
 }
 
 fn forceSingleThreadPlan(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T) bool {
-    if (comptime switch (gemm_kernels.active_backend) {
-        .x86_64_sse2, .x86_64_avx, .x86_64_avx2, .x86_64_avx512f => true,
+    if (comptime switch (gemm_kernels.active_capability) {
+        .x86_64_sse2, .x86_64_avx, .x86_64_avx2, .x86_64_avx2_fma, .x86_64_avx512f_fma => true,
         else => false,
     }) return false;
     return T == f32 and alpha == 1 and beta == 0 and m >= 1024 and m < 4096 and n <= 32 and k >= 128 and k <= 512;
@@ -207,7 +206,6 @@ fn planForDescriptor(comptime T: type, desc: catalog.Descriptor, m: usize, n: us
         .column_block = column_block,
         .allow_direct_kernel = allow_direct,
         .use_parallel_tasks = total_tasks > 1 and thread_count > 1,
-        .implementation = gemm_kernels.implementationFor(desc),
         .execution = execution,
     };
 }
@@ -226,9 +224,8 @@ fn selectTransposedBReal(comptime T: type, m: usize, n: usize, k: usize, alpha: 
     var index: usize = 0;
     while (index < candidates.len) : (index += 1) {
         const desc = candidates.at(index);
-        const supported = desc.family == .packed_simd or (T == f32 and desc.family == .streaming_matrix);
-        if (!supported) continue;
-        const score = tuning.score(T, desc, shape, alpha, beta, requested_threads);
+        if (!tuning.isFeasible(T, desc, shape, alpha, beta, .transposed_b)) continue;
+        const score = tuning.scoreFeasible(T, desc, shape, alpha, beta, requested_threads);
         if (best == null or score > best_score) {
             best = desc;
             best_score = score;
@@ -282,7 +279,6 @@ fn makeTask(comptime T: type, plan: Plan, m: usize, n0: usize, n1: usize, k: usi
         .ldc = ldc,
         .allow_sme = plan.allow_direct_kernel,
         .kernel = plan.kernel.kernel,
-        .implementation = plan.implementation,
         .execution = execution,
     };
 }

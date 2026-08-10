@@ -40,10 +40,10 @@ Release goals:
     Apple Silicon and other capable ARM systems.
   - x86_64 baseline/SSE-family, AVX, AVX2/FMA, AVX512/FMA, and current Intel and
     AMD desktop/server CPUs.
-- Make the documented Apple M5 local gate as of 2026-07 the primary native
-  performance gate. The target for 0.1 is that Zynum beats Accelerate across the
-  documented BLAS benchmark suite there, with `ZYNUM_MAXIMUM_THREADS` unset
-  unless a single-thread gate is being measured.
+- Maintain representative native gates for supported AArch64 and x86_64
+  capability tiers. The target for 0.1 is that Zynum matches or beats the best
+  eligible comparator across the documented BLAS benchmark suite, with
+  `ZYNUM_MAXIMUM_THREADS` unset unless a single-thread gate is being measured.
 - Treat any performance claim against Accelerate, OpenBLAS, MKL, or another
   comparator as invalid unless it has fresh-process isolation, exact commands,
   CSV artifacts, runtime thread counts, target features, and environment records.
@@ -87,7 +87,8 @@ Non-goals for 0.1.x:
   until native fresh-process evidence justifies a default rule. All retained
   parallel paths must use the shared core `std.Io.Threaded` helper lifecycle.
 - Record retained dispatch gates with target features, exact shape predicates,
-  runtime environment variables, commands, CSV paths, and rollback criteria.
+  runtime controls, reproducible commands, curated evidence identities, and
+  rollback criteria. Keep raw run artifacts outside the repository.
 - Add better x86_64 validation on real Intel and AMD hardware.
 - Keep shape policy in `src/blas/core/matrix_matrix/planner.zig`; keep instruction details
   under `src/blas/kernels/`.

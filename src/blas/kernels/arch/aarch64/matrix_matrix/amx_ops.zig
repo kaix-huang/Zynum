@@ -3,6 +3,22 @@
 
 //! Apple AMX instruction emitters and operand encoders.
 
+const builtin = @import("builtin");
+const std = @import("std");
+
+threadlocal var test_state_depth: usize = 0;
+threadlocal var test_state_entries: usize = 0;
+
+pub fn testStateDepth() usize {
+    if (comptime !builtin.is_test) @compileError("Apple AMX state depth is test-only");
+    return test_state_depth;
+}
+
+pub fn testStateEntries() usize {
+    if (comptime !builtin.is_test) @compileError("Apple AMX state entries are test-only");
+    return test_state_entries;
+}
+
 pub inline fn nopOpImm5(comptime op: usize, comptime imm5: usize) void {
     asm volatile ("nop\nnop\nnop\n.word (0x201000 + (%[op] << 5) + %[imm5])"
         :
@@ -53,10 +69,18 @@ pub inline fn matfp(gpr: usize) void {
 
 pub inline fn set() void {
     nopOpImm5(17, 0);
+    if (comptime builtin.is_test) {
+        test_state_depth += 1;
+        test_state_entries += 1;
+    }
 }
 
 pub inline fn clr() void {
     nopOpImm5(17, 1);
+    if (comptime builtin.is_test) {
+        std.debug.assert(test_state_depth != 0);
+        test_state_depth -= 1;
+    }
 }
 
 pub inline fn ptrRowFlags(ptr: anytype, row: usize, flags: usize) usize {

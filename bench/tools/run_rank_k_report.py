@@ -6,17 +6,34 @@ from __future__ import annotations
 
 import argparse
 import csv
-import ctypes
-import hashlib
-import json
+import io
 import os
 import platform
-import statistics
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from report_schedule import (  # noqa: E402
+    SCHEDULE_CHOICES,
+    collect_repeats,
+    validate_schedule,
+    validate_unique_library_labels,
+)
+from report_comparison import (  # noqa: E402
+    parse_positive_finite,
+    positive_finite_median,
+    validate_optional_metric_evidence,
+    validate_performance_fields,
+)
+import benchmark_artifacts  # noqa: E402
+import benchmark_metadata  # noqa: E402
+from report_publication import ReportOutput, publish_outputs  # noqa: E402
 
 DEFAULT_ACCELERATE = (
     "/System/Library/Frameworks/Accelerate.framework/Accelerate"
@@ -135,6 +152,10 @@ def default_zynum_blas():
     return "zig-out/lib/libzynum_blas.so"
 
 
+def default_executable(path):
+    return f"{path}.exe" if sys.platform == "win32" else path
+
+
 def parse_shape_spec(value):
     parts = value.split(":")
     if len(parts) != 3:
@@ -158,9 +179,7 @@ def parse_shape_spec(value):
 def parse_scalar(value):
     parts = value.split(",")
     if len(parts) not in (1, 2) or any(not part.strip() for part in parts):
-        raise argparse.ArgumentTypeError(
-            f"scalar must be RE or RE,IM, got {value!r}"
-        )
+        raise argparse.ArgumentTypeError(f"scalar must be RE or RE,IM, got {value!r}")
     try:
         real = float(parts[0])
         imaginary = float(parts[1]) if len(parts) == 2 else 0.0
@@ -199,6 +218,28 @@ def routine_name(value):
     return name
 
 
+def normalize_negative_scalar_args(argv):
+    values = list(sys.argv[1:] if argv is None else argv)
+    normalized = []
+    index = 0
+    while index < len(values):
+        value = values[index]
+        if value in ("--alpha", "--beta") and index + 1 < len(values):
+            scalar = values[index + 1]
+            if scalar.startswith("-"):
+                try:
+                    parse_scalar(scalar)
+                except argparse.ArgumentTypeError:
+                    pass
+                else:
+                    normalized.append(f"{value}={scalar}")
+                    index += 2
+                    continue
+        normalized.append(value)
+        index += 1
+    return normalized
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description=(
@@ -206,7 +247,9 @@ def parse_args(argv=None):
             "library/case/repeat and write an aggregate CSV."
         )
     )
-    parser.add_argument("--probe", default="zig-out/bin/rank-k-probe")
+    parser.add_argument(
+        "--probe", default=default_executable("zig-out/bin/rank-k-probe")
+    )
     parser.add_argument("--zynum", default=default_zynum_blas())
     parser.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     parser.add_argument("--openblas", default=DEFAULT_OPENBLAS)
@@ -268,9 +311,34 @@ def parse_args(argv=None):
         default=3,
         help="Independent processes per library and complete rank-k case.",
     )
+    parser.add_argument(
+        "--process-schedule",
+        choices=SCHEDULE_CHOICES,
+        help=(
+            "Fresh-process ordering; interleaved uses cyclic Latin rotations and "
+            "requires repeats to be a multiple of the selected library count."
+        ),
+    )
+    parser.add_argument(
+        "--schedule",
+        choices=SCHEDULE_CHOICES,
+        dest="legacy_schedule",
+        help="Compatibility alias for --process-schedule.",
+    )
     parser.add_argument("--csv", required=True)
     parser.add_argument("--skip-missing", action="store_true")
-    args = parser.parse_args(argv)
+    benchmark_metadata.add_identity_arguments(parser)
+    args = parser.parse_args(normalize_negative_scalar_args(argv))
+    if (
+        args.process_schedule is not None
+        and args.legacy_schedule is not None
+        and args.process_schedule != args.legacy_schedule
+    ):
+        parser.error("--process-schedule conflicts with --schedule")
+    args.process_schedule = (
+        args.process_schedule or args.legacy_schedule or "library-major"
+    )
+    del args.legacy_schedule
     if args.reps < 1:
         parser.error("--reps must be at least 1")
     if args.process_repeats < 1:
@@ -369,18 +437,28 @@ def libraries(args):
     if args.atlas:
         candidates.append(("ATLAS", args.atlas))
     append_extra_blas(candidates, args.extra_blas)
-    result.extend((label, path) for label, path in candidates if path and path != "none")
+    result.extend(
+        (label, path) for label, path in candidates if path and path != "none"
+    )
     return result
 
 
 def library_available(path):
     if Path(path).exists():
         return True
-    try:
-        ctypes.CDLL(path)
+    if platform_image_path(path):
         return True
-    except OSError:
-        return False
+    return "/" not in path and "\\" not in path
+
+
+def platform_image_path(path):
+    return sys.platform == "darwin" and path == DEFAULT_ACCELERATE
+
+
+def library_artifact_request(name, path):
+    if name == "Accelerate" and platform_image_path(path) and not Path(path).exists():
+        return benchmark_artifacts.ArtifactRequest.platform_image(name, path)
+    return benchmark_artifacts.ArtifactRequest.library(name, path)
 
 
 def selected_libraries(args):
@@ -395,9 +473,9 @@ def selected_libraries(args):
     return result
 
 
-def case_command(args, library_name, library_path, case):
+def case_command(args, library_name, library_path, case, *, probe_path=None):
     return [
-        args.probe,
+        args.probe if probe_path is None else probe_path,
         "--blas",
         library_path,
         "--library",
@@ -517,29 +595,57 @@ def child_environment():
     return env
 
 
-def run_one_process(args, library_name, library_path, case):
-    command = case_command(args, library_name, library_path, case)
-    result = subprocess.run(
-        command,
-        capture_output=True,
-        text=True,
-        check=False,
-        env=child_environment(),
+def run_one_process(
+    args,
+    library_name,
+    library_path,
+    case,
+    *,
+    probe_path,
+    public_library_path,
+    redact_private_paths,
+):
+    command = case_command(
+        args, library_name, library_path, case, probe_path=probe_path
     )
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=child_environment(),
+        )
+    except OSError as exc:
+        return error_row(
+            args,
+            library_name,
+            public_library_path,
+            case,
+            redact_private_paths(str(exc)),
+        )
     if result.returncode != 0:
         detail = f"exit={result.returncode}"
-        output = " ".join(part.strip() for part in (result.stdout, result.stderr) if part.strip())
+        output = " ".join(
+            part.strip() for part in (result.stdout, result.stderr) if part.strip()
+        )
         if output:
             detail += f" {output}"
-        return error_row(args, library_name, library_path, case, detail)
+        return error_row(
+            args,
+            library_name,
+            public_library_path,
+            case,
+            redact_private_paths(detail),
+        )
     rows = list(csv.DictReader(result.stdout.splitlines()))
     if len(rows) != 1:
         return error_row(
             args,
             library_name,
-            library_path,
+            public_library_path,
             case,
-            f"probe returned {len(rows)} rows",
+            redact_private_paths(f"probe returned {len(rows)} rows"),
         )
     row = rows[0]
     missing_fields = [field for field in PROBE_FIELDNAMES if field not in row]
@@ -547,29 +653,32 @@ def run_one_process(args, library_name, library_path, case):
         return error_row(
             args,
             library_name,
-            library_path,
+            public_library_path,
             case,
-            f"probe row missing fields: {','.join(missing_fields)}",
+            redact_private_paths(
+                f"probe row missing fields: {','.join(missing_fields)}"
+            ),
         )
-    mismatches = probe_row_matches(
-        args, row, library_name, library_path, case
-    )
+    mismatches = probe_row_matches(args, row, library_name, library_path, case)
     if mismatches:
         return error_row(
             args,
             library_name,
-            library_path,
+            public_library_path,
             case,
-            "probe row mismatch: " + "; ".join(mismatches),
+            redact_private_paths("probe row mismatch: " + "; ".join(mismatches)),
         )
-    return {field: row.get(field, "") for field in PROBE_FIELDNAMES}
+    result_row = {field: row.get(field, "") for field in PROBE_FIELDNAMES}
+    result_row["library_path"] = public_library_path
+    return redact_private_paths(result_row)
 
 
 def repeat_row_eligible(row):
     if row.get("status") != "ok" or row.get("check_status") not in CHECKED_STATUSES:
         return False
     try:
-        return float(row["median_gflops"]) >= 0 and int(row["median_ns"]) > 0
+        parse_positive_finite(row["median_gflops"], "median_gflops")
+        return int(row["median_ns"]) > 0
     except (KeyError, ValueError):
         return False
 
@@ -587,21 +696,45 @@ def failure_status(rows):
 def aggregate_repeats(rows):
     if not rows:
         raise ValueError("cannot aggregate an empty repeat list")
+    for repeat, row in enumerate(rows, 1):
+        if row.get("status") == "ok":
+            try:
+                validate_performance_fields(
+                    row,
+                    required=(
+                        "best_ns",
+                        "median_ns",
+                        "p95_ns",
+                        "max_ns",
+                        "gflops",
+                        "median_gflops",
+                    ),
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"invalid rank-k performance evidence in repeat {repeat}: {exc}"
+                ) from exc
     eligible = [row for row in rows if repeat_row_eligible(row)]
     base = dict(
         max(eligible, key=lambda row: float(row["gflops"])) if eligible else rows[0]
     )
     values = [float(row["median_gflops"]) for row in eligible]
+    summary = {
+        "metric_min": format(min(values), ".17g") if values else "",
+        "metric_median": (
+            format(positive_finite_median(values, "metric_median"), ".17g")
+            if values
+            else ""
+        ),
+        "metric_max": format(max(values), ".17g") if values else "",
+        "metric_samples": ",".join(format(value, ".17g") for value in values),
+    }
+    validate_optional_metric_evidence(summary)
     base.update(
         {
             "process_repeats": len(rows),
             "successful_repeats": len(eligible),
-            "metric_min": format(min(values), ".17g") if values else "",
-            "metric_median": format(statistics.median(values), ".17g")
-            if values
-            else "",
-            "metric_max": format(max(values), ".17g") if values else "",
-            "metric_samples": ",".join(format(value, ".17g") for value in values),
+            **summary,
         }
     )
     errors = []
@@ -630,23 +763,10 @@ def aggregate_repeats(rows):
 
 def command_output(command):
     try:
-        result = subprocess.run(
-            command, check=True, capture_output=True, text=True
-        )
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
     except Exception:
         return None
     return result.stdout.strip()
-
-
-def sha256_file(path):
-    candidate = Path(path)
-    if not candidate.is_file():
-        return None
-    digest = hashlib.sha256()
-    with candidate.open("rb") as file:
-        for chunk in iter(lambda: file.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def environment_snapshot():
@@ -677,8 +797,9 @@ def zynum_maximum_threads_detected():
     return max(1, os.cpu_count() or 1)
 
 
-def write_metadata(args, output, selected, cases):
-    source_status = command_output(["git", "status", "--short"])
+def serialize_metadata(args, selected, cases, benchmark_identity, artifacts):
+    source = benchmark_identity["source"]
+    probe_record = artifacts.legacy_records("binary")[0]
     metadata = {
         "generated_at_unix": time.time(),
         "argv": sys.argv,
@@ -686,16 +807,12 @@ def write_metadata(args, output, selected, cases):
         "platform": platform.platform(),
         "python_version": sys.version,
         "zig_version": command_output(["zig", "version"]),
-        "source": {
-            "revision": command_output(["git", "rev-parse", "HEAD"]),
-            "branch": command_output(["git", "branch", "--show-current"]),
-            "dirty": bool(source_status),
-            "status_short": source_status,
-        },
+        "source": benchmark_metadata.legacy_source_snapshot(source),
         "detected_cpu_count": os.cpu_count(),
         "zynum_maximum_threads": zynum_maximum_threads_detected(),
         "reps": args.reps,
         "process_repeats": args.process_repeats,
+        "schedule": args.process_schedule,
         "isolation": "fresh process per library/routine/shape/uplo/trans/scalars/repeat",
         "process_metric": "probe median_gflops",
         "correctness_check": (
@@ -704,11 +821,12 @@ def write_metadata(args, output, selected, cases):
         ),
         "case_count_per_library": len(cases),
         "environment": environment_snapshot(),
-        "probe": {"path": args.probe, "sha256": sha256_file(args.probe)},
-        "libraries": [
-            {"name": name, "path": path, "sha256": sha256_file(path)}
-            for name, path in selected
-        ],
+        "probe": {
+            "path": probe_record["path"],
+            "sha256": probe_record["sha256"],
+        },
+        "libraries": artifacts.legacy_records("library"),
+        "benchmark_identity": benchmark_identity,
         "shapes": [
             {"name": shape.name, "n": shape.n, "k": shape.k}
             for shape in requested_shapes(args)
@@ -719,10 +837,29 @@ def write_metadata(args, output, selected, cases):
         "alphas": args.alpha,
         "betas": args.beta,
     }
-    metadata_path = output.with_suffix(output.suffix + ".meta.json")
-    with metadata_path.open("w") as file:
-        json.dump(metadata, file, indent=2, sort_keys=True)
-        file.write("\n")
+    return benchmark_metadata.serialize_public_metadata(
+        metadata,
+        controller="run_rank_k_report.py",
+        parameter_keys=(
+            "reps",
+            "process_repeats",
+            "schedule",
+            "shapes",
+            "routines",
+            "uplos",
+            "transposes",
+            "alphas",
+            "betas",
+        ),
+    )
+
+
+def serialize_csv(rows):
+    file = io.StringIO(newline="")
+    writer = csv.DictWriter(file, fieldnames=CSV_FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(rows)
+    return file.getvalue().encode("utf-8")
 
 
 def run_controller(args):
@@ -731,37 +868,88 @@ def run_controller(args):
         raise ValueError(f"rank-k probe is not available: {args.probe}")
     cases = requested_cases(args)
     selected = selected_libraries(args)
-    rows = []
-    for library_name, library_path in selected:
-        for case_index, case in enumerate(cases, 1):
+    validate_unique_library_labels(selected)
+    validate_schedule(len(selected), args.process_repeats, args.process_schedule)
+
+    requests = [
+        benchmark_artifacts.ArtifactRequest.binary("rank_k_probe", args.probe),
+        *(library_artifact_request(name, path) for name, path in selected),
+    ]
+    artifacts = benchmark_artifacts.ArtifactSnapshotSet.capture(requests)
+    outputs = None
+    try:
+        frozen_probe = artifacts.for_role("binary")[0]
+        frozen_libraries = artifacts.for_role("library")
+        benchmark_identity = benchmark_metadata.collect_benchmark_identity_from_frozen(
+            args,
+            libraries=frozen_libraries,
+            binaries=(frozen_probe,),
+        )
+
+        def announce(library_index, case_index, repeat_index):
+            library_name, _ = selected[library_index]
+            case = cases[case_index]
+            repeat = (
+                ""
+                if repeat_index is None
+                else f" repeat={repeat_index + 1}/{args.process_repeats}"
+            )
             print(
-                f"[rank-k {library_name}] case={case_index}/{len(cases)} "
+                f"[rank-k {library_name}] case={case_index + 1}/{len(cases)}{repeat} "
                 f"{case.routine.name} shape={case.shape.name} "
                 f"n={case.shape.n} k={case.shape.k} uplo={case.uplo} "
                 f"trans={case.trans} alpha={case.alpha} beta={case.beta}",
                 file=sys.stderr,
                 flush=True,
             )
-            repeats = [
-                run_one_process(args, library_name, library_path, case)
-                for _ in range(args.process_repeats)
-            ]
-            rows.append(aggregate_repeats(repeats))
 
-    output = Path(args.csv)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=CSV_FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(rows)
-    write_metadata(args, output, selected, cases)
+        def run_one(library_index, case_index, _repeat_index):
+            library_name, public_library_path = selected[library_index]
+            return run_one_process(
+                args,
+                library_name,
+                frozen_libraries[library_index].execution_path,
+                cases[case_index],
+                probe_path=frozen_probe.execution_path,
+                public_library_path=public_library_path,
+                redact_private_paths=artifacts.redact_private_paths,
+            )
+
+        samples = collect_repeats(
+            selected,
+            cases,
+            args.process_repeats,
+            args.process_schedule,
+            run_one,
+            announce,
+        )
+        samples = artifacts.redact_private_paths(samples)
+        rows = []
+        for library_index, _ in enumerate(selected):
+            for case_index, _ in enumerate(cases):
+                rows.append(aggregate_repeats(samples[library_index][case_index]))
+
+        output = Path(args.csv)
+        csv_contents = artifacts.redact_private_paths(serialize_csv(rows))
+        metadata_contents = artifacts.redact_private_paths(
+            serialize_metadata(args, selected, cases, benchmark_identity, artifacts)
+        )
+        metadata_path = output.with_suffix(output.suffix + ".meta.json")
+        outputs = [
+            ReportOutput(output, csv_contents),
+            ReportOutput(metadata_path, metadata_contents),
+        ]
+        artifacts.finalize()
+    finally:
+        artifacts.close()
+    publish_outputs(outputs)
 
 
 def main(argv=None):
     args = parse_args(argv)
     try:
         run_controller(args)
-    except ValueError as exc:
+    except (ValueError, benchmark_artifacts.ArtifactSnapshotError) as exc:
         print(exc, file=sys.stderr)
         return 2
     return 0

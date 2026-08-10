@@ -7,6 +7,14 @@ import csv
 import sys
 from collections import defaultdict
 
+from report_comparison import (
+    best_higher_row,
+    metric_samples,
+    parse_positive_finite,
+    positive_finite_ratio,
+    validate_optional_metric_evidence,
+)
+
 CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
 
 
@@ -189,18 +197,55 @@ def metric_value(args, row):
         value = row.get(field)
         if value in (None, ""):
             raise KeyError(field)
-        return float(value)
-    return float(row["rate_gops"])
+        return parse_positive_finite(value, field)
+    return parse_positive_finite(row["rate_gops"], "rate_gops")
+
+
+def positive_integer(row, field):
+    value = row.get(field)
+    candidate = "" if value is None else str(value)
+    if not candidate.isascii() or not candidate.isdigit() or candidate.startswith("0"):
+        raise ValueError(f"{field} must be a canonical positive integer")
+    return int(candidate)
+
+
+def evidence_cardinality(row):
+    """Return and validate the fresh-process evidence counts for one Level 2 row."""
+
+    fields = ("process_repeats", "successful_repeats", "metric_samples")
+    missing = [field for field in fields if row.get(field) in (None, "")]
+    if missing:
+        raise ValueError(
+            "Level 2 gate requires process_repeats, successful_repeats, and "
+            f"metric_samples; missing {', '.join(missing)}"
+        )
+    process_repeats = positive_integer(row, "process_repeats")
+    successful_repeats = positive_integer(row, "successful_repeats")
+    sample_count = len(metric_samples(row))
+    if successful_repeats != process_repeats:
+        raise ValueError(
+            f"successful_repeats={successful_repeats}, "
+            f"process_repeats={process_repeats}"
+        )
+    if sample_count != successful_repeats:
+        raise ValueError(
+            f"metric_samples count={sample_count}, "
+            f"successful_repeats={successful_repeats}"
+        )
+    return process_repeats, successful_repeats, sample_count
 
 
 def main(argv=None):
     args = parse_args(argv)
-    if args.ratio <= 0:
-        print("--ratio must be positive", file=sys.stderr)
+    try:
+        args.ratio = parse_positive_finite(args.ratio, "--ratio")
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
         return 2
     comparators = args.comparator or ["Accelerate", "OpenBLAS"]
 
     groups = defaultdict(dict)
+    cardinalities = defaultdict(dict)
     with open(args.csv, newline="") as f:
         for row in csv.DictReader(f):
             if not row_allowed(args, row):
@@ -218,16 +263,42 @@ def main(argv=None):
                     )
                     return 2
             try:
+                validate_optional_metric_evidence(row)
+                cardinality = evidence_cardinality(row)
                 row["metric_value"] = metric_value(args, row)
-            except (KeyError, ValueError):
-                print(f"bad metric value in row: {row}", file=sys.stderr)
+                key = group_key(row)
+                library = row["library"]
+            except (KeyError, ValueError) as exc:
+                print(
+                    f"bad metric or cardinality evidence ({exc}): {row}",
+                    file=sys.stderr,
+                )
                 return 2
-            groups[group_key(row)][row["library"]] = row
+            if library in groups[key]:
+                print(
+                    f"duplicate library row for {key!r}: {library}",
+                    file=sys.stderr,
+                )
+                return 2
+            groups[key][library] = row
+            cardinalities[key][library] = cardinality
 
     failures = []
     missing = []
     checked = 0
-    for key, by_library in groups.items():
+    for key, by_library in sorted(groups.items()):
+        by_cardinality = cardinalities[key]
+        first_library = min(by_cardinality)
+        expected_cardinality = by_cardinality[first_library]
+        for library, cardinality in sorted(by_cardinality.items()):
+            if cardinality != expected_cardinality:
+                print(
+                    f"inconsistent evidence cardinality for {key!r}: "
+                    f"{first_library}={expected_cardinality}, "
+                    f"{library}={cardinality}",
+                    file=sys.stderr,
+                )
+                return 2
         zynum = by_library.get(args.zynum)
         if zynum is None and args.zynum == "Zynum":
             zynum = by_library.get("zynum-blas")
@@ -244,17 +315,17 @@ def main(argv=None):
             continue
 
         checked += 1
-        best = max(comparator_rows, key=lambda row: row["metric_value"])
-        required = args.ratio * best["metric_value"]
-        ratio = (
-            zynum["metric_value"] / best["metric_value"]
-            if best["metric_value"] > 0
-            else 1.0
-        )
-        if zynum["metric_value"] < required:
+        best = best_higher_row(comparator_rows, "metric_value")
+        try:
+            ratio = positive_finite_ratio(zynum["metric_value"], best["metric_value"])
+        except ValueError as exc:
+            print(f"bad comparison ratio for {key!r}: {exc}", file=sys.stderr)
+            return 2
+        if ratio < args.ratio:
             failures.append((ratio, key, zynum, best))
 
-    failures.sort(key=lambda item: item[0])
+    failures.sort(key=lambda item: (item[0], item[1]))
+    missing.sort(key=lambda item: (item[0], item[1]))
     print(
         f"checked={checked} passed={checked - len(failures)} "
         f"failed={len(failures)} missing={len(missing)} ratio={args.ratio:.6g} "

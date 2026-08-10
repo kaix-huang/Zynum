@@ -9,9 +9,7 @@
 [![status: beta](https://img.shields.io/badge/status-beta-orange)](#stability)
 [![license: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
 
-**Repository:** <https://github.com/kaix-huang/Zynum>
-
-Zynum is a `0.0.1-beta` numerical computing project. The current shipping module
+Zynum is a `0.0.1-beta` numerical computing project. The shipping module
 is **Zynum BLAS** (`zynum-blas`): BLAS Level 1, Level 2, and Level 3 compatibility
 coverage with a Zig-first API, standard CBLAS/Fortran ABI symbols, generated
 C/Fortran compatibility files, examples, tests, benchmarks, and
@@ -19,10 +17,9 @@ architecture-aware kernels.
 
 The active `0.1.x` development line is focused on finishing the complete BLAS
 surface in practical edge cases and making performance competitive with vendor
-BLAS libraries. Its primary native performance gate is the documented Apple M5
-local gate as of 2026-07: the 0.1 target is to beat Accelerate across the
-documented BLAS benchmark suite with correctness-checked fresh-process evidence.
-This is an engineering target, not a blanket performance claim for the current
+BLAS libraries. Performance gates are capability-specific and require
+correctness-checked, fresh-process evidence on representative native systems.
+This is an engineering target, not a blanket performance claim for this
 checkout.
 
 The long-term direction is broader than BLAS: Zynum is designed to grow into a
@@ -30,24 +27,24 @@ single C/Fortran-compatible, Zig-native numerical runtime spanning dense linear
 algebra, LAPACK-style decompositions, FFT, sparse kernels, CNN kernels, and
 Transformer workloads across portable and architecture-specific CPU kernels.
 
-## Current Performance Snapshot
+## Performance Snapshot
 
 The charts below compare Zynum, Accelerate, and OpenBLAS in that order. Higher
 is better in every panel. These are local Apple Silicon benchmark snapshots with
 fresh-process comparator isolation, not portable performance guarantees; see
 `docs/common/benchmarking.md` before quoting numbers.
 
-![Level 1 current all-type performance](docs/assets/benchmarks/current_level1_all_types_three_libs.svg)
+![Level 1 all-type performance](docs/assets/benchmarks/current_level1_all_types_three_libs.svg)
 
 <sub>Level 1 snapshot: real and complex f32/f64 vector routines plus copy paths;
 Accelerate does not export every extension symbol used by the all-type probe.</sub>
 
-![Level 2 current all-type performance](docs/assets/benchmarks/current_level2_all_types_three_libs.svg)
+![Level 2 all-type performance](docs/assets/benchmarks/current_level2_all_types_three_libs.svg)
 
 <sub>Level 2 snapshot: real f32/f64 GEMV/SYMV/GER and complex f32/f64
 GEMV/HEMV/GERU/GERC at n=128, 256, and 512.</sub>
 
-![Level 3 current GEMM performance](docs/assets/benchmarks/current_level3_all_types_more_shapes.svg)
+![Level 3 GEMM performance](docs/assets/benchmarks/current_level3_all_types_more_shapes.svg)
 
 <sub>Level 3 snapshot: SGEMM, DGEMM, CGEMM, and ZGEMM across the default GEMM
 sweep shape set, including square, remainder, skinny, wide, and K-varied
@@ -73,17 +70,17 @@ The `0.1.x` line is scoped to Zynum BLAS:
   Fortran module declarations.
 - Support ARM and x86 CPUs through portable fallbacks and feature-aware kernels
   for AArch64 ASIMD/SVE/SVE2/AMX/SME and x86_64 SSE/AVX/AVX2/AVX512 tiers.
-- Use the documented Apple M5 local gate as of 2026-07 as the primary native
-  performance gate, with the goal that Zynum beats Accelerate across the
-  documented BLAS benchmark suite before 0.1 is considered complete.
+- Maintain native performance gates for representative AArch64 and x86_64
+  capability tiers, with the goal of matching or beating the best eligible
+  comparator across the documented BLAS benchmark suite before 0.1 is complete.
 - Keep performance claims tied to reproducible benchmark commands, CSV artifacts,
   thread counts, target features, and fresh-process comparator isolation.
 
-## Current Module Matrix
+## Module Matrix
 
 | Module | Status | Scope |
 | --- | --- | --- |
-| `zynum` | Active | Top-level package facade for current and future numerical modules. |
+| `zynum` | Active | Top-level package facade for present and future numerical modules. |
 | `zynum-blas` | Beta | BLAS Level 1-3 compatibility coverage, typed Zig views, compatibility ABI, kernels, tests, examples, and benchmarks. |
 | `zynum-lapack` | Planned | Dense factorizations, solvers, eigenvalue/SVD routines, and LAPACK-compatible entry points. |
 | `zynum-fft` | Planned | FFT routines and compatibility layers. |
@@ -94,25 +91,64 @@ The `0.1.x` line is scoped to Zynum BLAS:
 ## Requirements
 
 - Zig 0.16.0 or newer in the 0.16 series.
+- Python 3.10 or newer for repository validation and benchmark tooling.
 - Optional: `gfortran` for the Fortran module smoke test and Fortran examples.
 - Optional: Accelerate, OpenBLAS, or MKL for comparator benchmarks.
-- Optional: Python 3 for benchmark plotting and isolated benchmark helpers.
 
 ## Quick Start
 
 From a checkout of this repository:
 
+The test gate fails closed if it inherits any `GIT_*` control variable. Run the
+checkout commands in a sanitized subprocess:
+
 ```sh
-zig build test
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_QUICK_START'
+zig build test -Dcpu=baseline
 zig build
 zig build generate-headers
 zig fmt --check build.zig build.zig.zon src test bench examples tools
+ZYNUM_QUICK_START
 ```
 
-Build artifacts are installed under `zig-out/` by default:
+Inventory-dependent test steps require the exact `-Dcpu=baseline` query. The
+ordinary `zig build` command remains host-native and unrestricted by the test
+inventory; use an explicit target and CPU tier there when doing compile-only
+feature coverage. The frozen AArch64 macOS and x86_64 Linux environments can
+validate native test enumeration today. AArch64 Linux and x86_64 Windows
+remain fail-closed for native tests until their enumeration gaps are frozen;
+their declared exact-baseline graphs remain available through the link-only
+inventory step.
+
+Build artifacts are installed under `zig-out/` by default. On ELF and Mach-O
+targets, the library layout remains:
 
 - `zig-out/lib/libzynum_blas.dylib`, `libzynum_blas.so`, or platform equivalent.
 - `zig-out/lib/libzynum_blas.a`.
+
+On Windows, the two library products have distinct installed paths:
+
+- `zig-out/bin/zynum_blas.dll`;
+- `zig-out/lib/zynum_blas.lib`, the DLL import library; and
+- `zig-out/lib/static/zynum_blas.lib`, the static archive.
+
+Use the library-only install step when a job or consumer needs no benchmark or
+probe executable:
+
+```sh
+zig build install-libraries --prefix zig-out/install
+```
+
+That step installs only the dynamic and static library products. On Windows,
+static consumers must name `lib/static/zynum_blas.lib` explicitly; do not add
+`lib/static` to an ordinary library-search path where it could shadow the import
+library. The default Windows install excludes `bench-zynum-blas`, `gemm-sweep`,
+`vector-matrix-sweep`, `level1-probe`, and `dcopy-probe`; their existing Unix
+install behavior is unchanged.
+
+The default install also includes:
+
 - `zig-out/include/zynum/blas/cblas.h`.
 - `zig-out/include/zynum/blas/blas.h`.
 - `zig-out/include/zynum/blas/blas.f90`.
@@ -122,7 +158,7 @@ Build artifacts are installed under `zig-out/` by default:
 Use Zig's standard install options if you want a different prefix:
 
 ```sh
-zig build --prefix /tmp/zynum-install
+zig build --prefix zig-out/install
 ```
 
 Compatibility headers and the Fortran module are installed by default. Disable
@@ -321,16 +357,38 @@ internally and are not controlled by environment variables.
 
 ## Tests And Validation
 
+Direct validation requires an environment containing no `GIT_*` name:
+
 ```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_VALIDATION'
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-zig build test --summary failures
+python3 -B tools/check_build_inventory.py --root .
+python3 -B tools/check_test_inventory.py --structure-only
+zig build test-build-inventory --summary failures
+zig build test-test-inventory --summary failures
+zig build test -Dcpu=baseline --summary failures
 zig build generate-headers --summary failures
 zig build --summary failures
+ZYNUM_VALIDATION
 ```
 
 The test step covers typed Zig APIs, Fortran compatibility wrappers, CBLAS
 compatibility wrappers, generated header smoke tests, and a Fortran module smoke
 test when `gfortran` is available.
+
+The public test inventory is a fail-closed index of the supported test matrix.
+Inventory-dependent commands require an exact `-Dcpu=baseline` query; declared
+rows without native observations remain pending and cannot borrow evidence from
+another OS, object format, or CPU profile. The inventory checkers validate the
+file and its reviewed native-evidence projection before official test bodies
+run. These checks establish repository consistency, not remote provenance or
+cryptographic authenticity. See `docs/development_and_usage.md` for supported
+commands and the maintenance boundary.
+
+For an explicit non-baseline CPU profile on matching hardware,
+`zig build test-native-feature -Dcpu=native` runs the official test bodies as
+native correctness evidence without claiming inventory completion.
 
 ## Benchmarks
 
@@ -345,8 +403,8 @@ explicit dependency path:
 
 ```sh
 zig build bench --release=fast \
-  -Dbench-openblas=/path/to/libopenblas.dylib \
-  -Dbench-accelerate=/System/Library/Frameworks/Accelerate.framework/Accelerate \
+  -Dbench-openblas=path/to/libopenblas \
+  -Dbench-accelerate=path/to/Accelerate \
   -- --size 1024 --reps 10
 ```
 
@@ -413,10 +471,11 @@ docs/assets/benchmarks/*      curated README chart SVGs only
 ```
 
 Generated benchmark CSVs, raw traces, sampling output, disassembly notes,
-temporary binaries, machine-local instructions, and build products are not part
-of the public package. Keep them under ignored locations such as `zig-out/`,
-`.zig-cache/`, `/tmp`, or local Git excludes. Only curated documentation assets
-under `docs/assets/benchmarks/` should be checked in.
+temporary binaries, host-local instructions, and build products are not part
+of the public package. Keep transient reproducible build products under
+`zig-out/`, `.zig-cache/`, or a temporary directory. Keep raw evidence and
+host-local instructions outside the repository. Only curated documentation
+assets under `docs/assets/benchmarks/` should be checked in.
 
 ## Stability
 
@@ -450,9 +509,8 @@ Important contribution rules:
 
 ## Contact
 
-For project questions, security coordination, or maintainer contact, use the
-GitHub repository at <https://github.com/kaix-huang/Zynum>. Security reports
-should follow `SECURITY.md`.
+Use [SUPPORT.md](SUPPORT.md) to route project questions, bug reports, and feature
+requests. Security reports must follow `SECURITY.md`.
 
 ## License
 

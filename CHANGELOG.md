@@ -18,9 +18,9 @@ The `0.1.x` line is the BLAS-completion and performance line.
 - Expand ARM and x86 support with portable fallbacks plus feature-aware kernels
   for modern Apple Silicon, AArch64 ASIMD/SVE/SVE2/AMX/SME, and x86_64
   SSE/AVX/AVX2/AVX512 tiers.
-- Use Apple's latest production silicon as the primary native performance gate,
-  targeting better-than-Accelerate results across the documented BLAS benchmark
-  suite before the 0.1 line is considered complete.
+- Maintain native performance gates on representative AArch64 and x86_64
+  systems, targeting the best eligible comparator across the documented BLAS
+  benchmark suite before the 0.1 line is considered complete.
 - Keep benchmark claims tied to fresh-process isolation, exact commands, CSV
   artifacts, target features, runtime thread counts, and environment records.
 

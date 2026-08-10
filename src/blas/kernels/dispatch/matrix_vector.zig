@@ -396,3 +396,70 @@ pub fn gerUnitReal(
         else => false,
     };
 }
+
+pub fn gerUnitComplex(
+    comptime T: type,
+    m: usize,
+    n: usize,
+    alpha: T,
+    x: [*]const T,
+    y: [*]const T,
+    a: [*]T,
+    lda: BlasInt,
+    conjugate_y: bool,
+) bool {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.gerUnitComplex(T, m, n, alpha, x, y, a, lda, conjugate_y),
+        .x86_64 => x86_64.gerUnitComplex(T, m, n, alpha, x, y, a, lda, conjugate_y),
+        else => false,
+    };
+}
+
+pub fn triangularAxpyUnit(
+    comptime T: type,
+    n: usize,
+    alpha: T,
+    a: [*]const T,
+    x: [*]T,
+) bool {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.triangularAxpyUnit(T, n, alpha, a, x),
+        .x86_64 => x86_64.triangularAxpyUnit(T, n, alpha, a, x),
+        else => false,
+    };
+}
+
+pub fn triangularDotUnit(
+    comptime T: type,
+    n: usize,
+    a: [*]const T,
+    x: [*]const T,
+    conjugate_a: bool,
+    result: *T,
+) bool {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.triangularDotUnit(T, n, a, x, conjugate_a, result),
+        .x86_64 => x86_64.triangularDotUnit(T, n, a, x, conjugate_a, result),
+        else => false,
+    };
+}
+
+pub fn symmetricColumnsUnit(
+    comptime T: type,
+    upper: bool,
+    hermitian: bool,
+    n: usize,
+    j0: usize,
+    j1: usize,
+    alpha: T,
+    a: [*]const T,
+    lda: BlasInt,
+    x: [*]const T,
+    y_delta: [*]T,
+) bool {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.symmetricColumnsUnit(T, upper, hermitian, n, j0, j1, alpha, a, lda, x, y_delta),
+        .x86_64 => x86_64.symmetricColumnsUnit(T, upper, hermitian, n, j0, j1, alpha, a, lda, x, y_delta),
+        else => false,
+    };
+}

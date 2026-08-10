@@ -19,6 +19,7 @@ pub const Config = struct {
 
 const RealAffineMode = enum { scal, axpy, axpby };
 const ComplexAffineMode = enum { scal, axpy, axpby };
+const RotmMode = enum { full, unit_diagonal, off_diagonal };
 
 fn isReal(comptime T: type) bool {
     return T == f32 or T == f64;
@@ -71,10 +72,25 @@ fn tailLaneCounts(comptime lanes: comptime_int) [3]comptime_int {
 }
 
 inline fn loadVec(comptime T: type, comptime lanes: comptime_int, ptr: [*]const T, index: usize) @Vector(lanes, T) {
+    if (comptime lanes * @sizeOf(T) < 16) {
+        var value: @Vector(lanes, T) = undefined;
+        inline for (0..lanes) |lane| {
+            const lane_ptr: *const volatile T = &ptr[index + lane];
+            value[lane] = lane_ptr.*;
+        }
+        return value;
+    }
     return @as(*align(1) const @Vector(lanes, T), @ptrCast(ptr + index)).*;
 }
 
 inline fn storeVec(comptime T: type, comptime lanes: comptime_int, ptr: [*]T, index: usize, value: @Vector(lanes, T)) void {
+    if (comptime lanes * @sizeOf(T) < 16) {
+        inline for (0..lanes) |lane| {
+            const lane_ptr: *volatile T = &ptr[index + lane];
+            lane_ptr.* = value[lane];
+        }
+        return;
+    }
     @as(*align(1) @Vector(lanes, T), @ptrCast(ptr + index)).* = value;
 }
 
@@ -92,6 +108,20 @@ fn pairSwapMask(comptime lanes: comptime_int) @Vector(lanes, i32) {
         values[i] = if (i % 2 == 0) @intCast(i + 1) else @intCast(i - 1);
     }
     return values;
+}
+
+fn pairHalfMask(comptime lanes: comptime_int, comptime part: comptime_int) @Vector(lanes / 2, i32) {
+    comptime var values: [lanes / 2]i32 = undefined;
+    inline for (0..lanes / 2) |i| values[i] = @intCast(2 * i + part);
+    return values;
+}
+
+inline fn pairAbsSums(comptime T: type, comptime lanes: comptime_int, ax: @Vector(lanes, T)) @Vector(lanes / 2, T) {
+    const even_mask = comptime pairHalfMask(lanes, 0);
+    const odd_mask = comptime pairHalfMask(lanes, 1);
+    const even: @Vector(lanes / 2, T) = @shuffle(T, ax, undefined, even_mask);
+    const odd: @Vector(lanes / 2, T) = @shuffle(T, ax, undefined, odd_mask);
+    return even + odd;
 }
 
 fn pairSignVector(comptime T: type, comptime lanes: comptime_int, im: T) @Vector(lanes, T) {
@@ -181,6 +211,25 @@ inline fn updateIamaxRange(comptime T: type, x: [*]const T, start: usize, end: u
     }
 }
 
+inline fn updateComplexIamaxRange(
+    comptime T: type,
+    x: [*]const T,
+    real_start: usize,
+    real_end: usize,
+    best: *usize,
+    best_abs: *Real(T),
+) void {
+    const real_x = asConstRealPtr(T, x);
+    var j = real_start;
+    while (j < real_end) : (j += 2) {
+        const ax = @abs(real_x[j]) + @abs(real_x[j + 1]);
+        if (ax > best_abs.*) {
+            best_abs.* = ax;
+            best.* = j / 2;
+        }
+    }
+}
+
 inline fn realAffineVec(
     comptime T: type,
     comptime lanes: comptime_int,
@@ -238,7 +287,7 @@ fn realAffineUnit(
         storeVec(T, cfg.lane_count, y, i, realAffineVec(T, cfg.lane_count, mode, xv, yv, alpha_v, beta_v));
     }
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             const TailV = @Vector(tail_lanes, T);
             const alpha_tail: TailV = @splat(alpha);
             const beta_tail: TailV = @splat(beta);
@@ -272,6 +321,95 @@ inline fn rotVecBlock(
     storeVec(T, lanes, y, index, @mulAdd(V, -xv, s_v, yv * c_v));
 }
 
+inline fn rotmVecBlock(
+    comptime T: type,
+    comptime lanes: comptime_int,
+    comptime mode: RotmMode,
+    x: [*]T,
+    y: [*]T,
+    index: usize,
+    h11_v: @Vector(lanes, T),
+    h21_v: @Vector(lanes, T),
+    h12_v: @Vector(lanes, T),
+    h22_v: @Vector(lanes, T),
+) void {
+    const V = @Vector(lanes, T);
+    const w = loadVec(T, lanes, x, index);
+    const z = loadVec(T, lanes, y, index);
+    switch (mode) {
+        .full => {
+            storeVec(T, lanes, x, index, @mulAdd(V, w, h11_v, z * h12_v));
+            storeVec(T, lanes, y, index, @mulAdd(V, w, h21_v, z * h22_v));
+        },
+        .unit_diagonal => {
+            storeVec(T, lanes, x, index, @mulAdd(V, z, h12_v, w));
+            storeVec(T, lanes, y, index, @mulAdd(V, w, h21_v, z));
+        },
+        .off_diagonal => {
+            storeVec(T, lanes, x, index, @mulAdd(V, w, h11_v, z));
+            storeVec(T, lanes, y, index, z * h22_v - w);
+        },
+    }
+}
+
+fn rotmUnitRealMode(
+    comptime T: type,
+    comptime cfg: Config,
+    comptime mode: RotmMode,
+    n: usize,
+    x: [*]T,
+    y: [*]T,
+    h11: T,
+    h21: T,
+    h12: T,
+    h22: T,
+) void {
+    const V = @Vector(cfg.lane_count, T);
+    const h11_v: V = @splat(h11);
+    const h21_v: V = @splat(h21);
+    const h12_v: V = @splat(h12);
+    const h22_v: V = @splat(h22);
+    var i: usize = 0;
+    while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        inline for (0..cfg.unroll_vectors) |k| {
+            rotmVecBlock(T, cfg.lane_count, mode, x, y, i + k * cfg.lane_count, h11_v, h21_v, h12_v, h22_v);
+        }
+    }
+    while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
+        rotmVecBlock(T, cfg.lane_count, mode, x, y, i, h11_v, h21_v, h12_v, h22_v);
+    }
+    inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
+            const TailV = @Vector(tail_lanes, T);
+            const h11_tail: TailV = @splat(h11);
+            const h21_tail: TailV = @splat(h21);
+            const h12_tail: TailV = @splat(h12);
+            const h22_tail: TailV = @splat(h22);
+            while (i + tail_lanes <= n) : (i += tail_lanes) {
+                rotmVecBlock(T, tail_lanes, mode, x, y, i, h11_tail, h21_tail, h12_tail, h22_tail);
+            }
+        }
+    }
+    while (i < n) : (i += 1) {
+        const w = x[i];
+        const z = y[i];
+        switch (mode) {
+            .full => {
+                x[i] = @mulAdd(T, w, h11, z * h12);
+                y[i] = @mulAdd(T, w, h21, z * h22);
+            },
+            .unit_diagonal => {
+                x[i] = @mulAdd(T, z, h12, w);
+                y[i] = @mulAdd(T, w, h21, z);
+            },
+            .off_diagonal => {
+                x[i] = @mulAdd(T, w, h11, z);
+                y[i] = z * h22 - w;
+            },
+        }
+    }
+}
+
 pub fn copyBytes(comptime cfg: Config, n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
     if (n_bytes == 0) return true;
     if (n_bytes < @max(cfg.min_len, @as(usize, cfg.copy_lane_count))) return false;
@@ -288,7 +426,7 @@ pub fn copyBytes(comptime cfg: Config, n_bytes: usize, x: [*]const u8, y: [*]u8)
         storeVec(u8, cfg.copy_lane_count, y, i, loadVec(u8, cfg.copy_lane_count, x, i));
     }
     inline for (tailLaneCounts(cfg.copy_lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(u8) >= 16) {
             while (i + tail_lanes <= n_bytes) : (i += tail_lanes) {
                 storeVec(u8, tail_lanes, y, i, loadVec(u8, tail_lanes, x, i));
             }
@@ -326,7 +464,7 @@ pub fn swapUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]T, y
         storeVec(T, cfg.lane_count, y, i, xv);
     }
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             while (i + tail_lanes <= n) : (i += tail_lanes) {
                 const xv = loadVec(T, tail_lanes, x, i);
                 const yv = loadVec(T, tail_lanes, y, i);
@@ -376,7 +514,7 @@ pub fn dotUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]const
     }
     var sum: T = @reduce(.Add, acc);
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             const TailV = @Vector(tail_lanes, T);
             var tail_acc: TailV = @splat(0);
             while (i + tail_lanes <= n) : (i += tail_lanes) {
@@ -386,6 +524,47 @@ pub fn dotUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]const
         }
     }
     while (i < n) : (i += 1) sum = @mulAdd(T, x[i], y[i], sum);
+    return sum;
+}
+
+/// Mixed-precision DOT over f32 inputs with f64 vector accumulators. `cfg`
+/// describes the f64 lane geometry of the target specialization.
+pub fn dotF32AccF64Unit(comptime cfg: Config, n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
+    comptime checkRealConfig(f64, cfg);
+    if (n < vectorThreshold(cfg)) return null;
+
+    const F64V = @Vector(cfg.lane_count, f64);
+    var accs: [cfg.unroll_vectors]F64V = [_]F64V{@splat(0)} ** cfg.unroll_vectors;
+    var i: usize = 0;
+    while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        inline for (0..cfg.unroll_vectors) |k| {
+            const offset = i + k * cfg.lane_count;
+            const xv: F64V = @floatCast(loadVec(f32, cfg.lane_count, x, offset));
+            const yv: F64V = @floatCast(loadVec(f32, cfg.lane_count, y, offset));
+            accs[k] = @mulAdd(F64V, xv, yv, accs[k]);
+        }
+    }
+    var acc: F64V = @splat(0);
+    inline for (0..cfg.unroll_vectors) |k| acc += accs[k];
+    while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
+        const xv: F64V = @floatCast(loadVec(f32, cfg.lane_count, x, i));
+        const yv: F64V = @floatCast(loadVec(f32, cfg.lane_count, y, i));
+        acc = @mulAdd(F64V, xv, yv, acc);
+    }
+    var sum: f64 = @reduce(.Add, acc);
+    inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(f32) >= 16) {
+            const TailF64V = @Vector(tail_lanes, f64);
+            var tail_acc: TailF64V = @splat(0);
+            while (i + tail_lanes <= n) : (i += tail_lanes) {
+                const xv: TailF64V = @floatCast(loadVec(f32, tail_lanes, x, i));
+                const yv: TailF64V = @floatCast(loadVec(f32, tail_lanes, y, i));
+                tail_acc = @mulAdd(TailF64V, xv, yv, tail_acc);
+            }
+            sum += @reduce(.Add, tail_acc);
+        }
+    }
+    while (i < n) : (i += 1) sum = @mulAdd(f64, @as(f64, x[i]), @as(f64, y[i]), sum);
     return sum;
 }
 
@@ -409,7 +588,7 @@ pub fn asumUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]cons
     }
     var sum: T = @reduce(.Add, acc);
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             var tail_acc: @Vector(tail_lanes, T) = @splat(0);
             while (i + tail_lanes <= n) : (i += tail_lanes) {
                 tail_acc += @abs(loadVec(T, tail_lanes, x, i));
@@ -439,7 +618,7 @@ pub fn nrm2UnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]cons
     }
     var scale: T = @reduce(.Max, max_v);
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             var tail_max: @Vector(tail_lanes, T) = @splat(0);
             while (i + tail_lanes <= n) : (i += tail_lanes) {
                 tail_max = @max(tail_max, @abs(loadVec(T, tail_lanes, x, i)));
@@ -468,7 +647,7 @@ pub fn nrm2UnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]cons
     }
     var ssq: T = @reduce(.Add, acc);
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             const TailV = @Vector(tail_lanes, T);
             const inv_scale_tail: TailV = @splat(1 / scale);
             var tail_acc: TailV = @splat(0);
@@ -511,7 +690,7 @@ pub fn nrm2UnitRealFastF32(comptime cfg: Config, n: usize, x: [*]const f32) ?f32
     var max_abs = @reduce(.Max, max_v);
     var ssq = @reduce(.Add, acc);
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(f32) >= 16) {
             const TailV = @Vector(tail_lanes, f32);
             var tail_max: TailV = @splat(0);
             var tail_acc: TailV = @splat(0);
@@ -571,6 +750,48 @@ pub fn iamaxUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]con
     return @intCast(best + 1);
 }
 
+pub fn iamaxUnitComplex(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T) ?types.BlasInt {
+    if (comptime !isComplex(T)) return null;
+    comptime checkComplexConfig(T, cfg);
+    if (n == 0) return 0;
+
+    const real_n = 2 * n;
+    if (real_n < vectorThreshold(cfg)) return null;
+    const R = Real(T);
+    const real_x = asConstRealPtr(T, x);
+    var best: usize = 0;
+    var best_abs: R = @abs(real_x[0]) + @abs(real_x[1]);
+    var i: usize = 0;
+    while (i + unrollCount(cfg) <= real_n) : (i += unrollCount(cfg)) {
+        var max_v: @Vector(cfg.lane_count / 2, R) = @splat(0);
+        inline for (0..cfg.unroll_vectors) |k| {
+            const ax = @abs(loadVec(R, cfg.lane_count, real_x, i + k * cfg.lane_count));
+            max_v = @max(max_v, pairAbsSums(R, cfg.lane_count, ax));
+        }
+        if (@reduce(.Max, max_v) > best_abs) {
+            updateComplexIamaxRange(T, x, i, i + unrollCount(cfg), &best, &best_abs);
+        }
+    }
+    while (i + cfg.lane_count <= real_n) : (i += cfg.lane_count) {
+        const ax = @abs(loadVec(R, cfg.lane_count, real_x, i));
+        if (@reduce(.Max, pairAbsSums(R, cfg.lane_count, ax)) > best_abs) {
+            updateComplexIamaxRange(T, x, i, i + cfg.lane_count, &best, &best_abs);
+        }
+    }
+    inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
+        if (comptime tail_lanes > 1 and tail_lanes % 2 == 0 and tail_lanes * @sizeOf(R) >= 16) {
+            while (i + tail_lanes <= real_n) : (i += tail_lanes) {
+                const ax = @abs(loadVec(R, tail_lanes, real_x, i));
+                if (@reduce(.Max, pairAbsSums(R, tail_lanes, ax)) > best_abs) {
+                    updateComplexIamaxRange(T, x, i, i + tail_lanes, &best, &best_abs);
+                }
+            }
+        }
+    }
+    updateComplexIamaxRange(T, x, i, real_n, &best, &best_abs);
+    return @intCast(best + 1);
+}
+
 pub fn rotUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
     if (comptime !isReal(T)) return false;
     comptime checkRealConfig(T, cfg);
@@ -589,7 +810,7 @@ pub fn rotUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]T, y:
         rotVecBlock(T, cfg.lane_count, x, y, i, c_v, s_v);
     }
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1) {
+        if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(T) >= 16) {
             const TailV = @Vector(tail_lanes, T);
             const tail_c_v: TailV = @splat(c);
             const tail_s_v: TailV = @splat(s);
@@ -603,6 +824,33 @@ pub fn rotUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]T, y:
         const yv = y[i];
         x[i] = @mulAdd(T, c, xv, s * yv);
         y[i] = @mulAdd(T, -xv, s, c * yv);
+    }
+    return true;
+}
+
+pub fn rotmUnitReal(
+    comptime T: type,
+    comptime cfg: Config,
+    n: usize,
+    x: [*]T,
+    y: [*]T,
+    flag: T,
+    h11: T,
+    h21: T,
+    h12: T,
+    h22: T,
+) bool {
+    if (comptime !isReal(T)) return false;
+    comptime checkRealConfig(T, cfg);
+    if (flag == -2) return true;
+    if (n < vectorThreshold(cfg)) return false;
+
+    if (flag < 0) {
+        rotmUnitRealMode(T, cfg, .full, n, x, y, h11, h21, h12, h22);
+    } else if (flag == 0) {
+        rotmUnitRealMode(T, cfg, .unit_diagonal, n, x, y, h11, h21, h12, h22);
+    } else {
+        rotmUnitRealMode(T, cfg, .off_diagonal, n, x, y, h11, h21, h12, h22);
     }
     return true;
 }
@@ -661,7 +909,7 @@ fn complexAffineUnit(
         storeVec(R, cfg.lane_count, real_y, i, complexAffineVec(R, cfg.lane_count, mode, xv, yv, alpha_re_v, alpha_im_sign_v, beta_re_v, beta_im_sign_v, swap_mask));
     }
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
-        if (comptime tail_lanes > 1 and tail_lanes % 2 == 0) {
+        if (comptime tail_lanes > 1 and tail_lanes % 2 == 0 and tail_lanes * @sizeOf(R) >= 16) {
             const TailV = @Vector(tail_lanes, R);
             const tail_alpha_re_v: TailV = @splat(realPart(T, alpha));
             const tail_alpha_im_sign_v = pairSignVector(R, tail_lanes, imagPart(T, alpha));

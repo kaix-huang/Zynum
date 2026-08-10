@@ -6,20 +6,13 @@ const catalog = @import("catalog.zig");
 
 pub const BlasInt = types.BlasInt;
 
-pub const Implementation = enum {
-    auto,
-    generic,
-    arch_simd,
-    streaming_matrix,
-};
-
-pub const AmxKernel = enum {
+pub const AppleAmxKernelId = enum {
     none,
-    f32_n16,
-    f32_n32,
-    f64_n8,
-    f64_n16,
-    f64_n32,
+    apple_amx_f32_n16,
+    apple_amx_f32_n32,
+    apple_amx_f64_n8,
+    apple_amx_f64_n16,
+    apple_amx_f64_n32,
 };
 
 pub const BPackPath = enum {
@@ -44,7 +37,9 @@ pub const PackWorkspacePlan = struct {
 };
 
 pub const ExecutionPlan = struct {
-    amx: AmxKernel = .none,
+    selected_kernel: catalog.KernelId = .auto,
+    fallback_kernel: catalog.KernelId = .auto,
+    amx: AppleAmxKernelId = .none,
     amx_partial_n16: bool = false,
     b_pack: BPackPath = .natural,
     f32_panel: SmeF32Panel = .panels2x2,
@@ -70,7 +65,6 @@ pub fn Task(comptime T: type) type {
         ldc: BlasInt,
         allow_sme: bool = false,
         kernel: catalog.KernelId = .auto,
-        implementation: Implementation = .auto,
         execution: ExecutionPlan = .{},
     };
 }

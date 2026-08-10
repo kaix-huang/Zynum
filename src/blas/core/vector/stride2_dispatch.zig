@@ -4,17 +4,20 @@
 const builtin = @import("builtin");
 
 const scalar = @import("../shared/scalar.zig");
-const stride2_parallel = @import("stride2_parallel.zig");
+const tuning = @import("../../kernels/shared/vector/tuning.zig");
+const stride2_parallel = @import("../../kernels/isolated/x86_64_stride2_bridge.zig");
 
 pub const BlasInt = scalar.BlasInt;
 pub const ComplexF32 = scalar.ComplexF32;
 pub const ComplexF64 = scalar.ComplexF64;
-pub const minimum_elements: usize = 512 * 1024;
+pub const minimum_elements: usize = tuning.active.x86_64.stride2_parallel_min_elements;
 
 fn targetUnary(n: BlasInt, incx: BlasInt) ?usize {
     if (comptime builtin.cpu.arch != .x86_64) return null;
-    if (n < @as(BlasInt, @intCast(minimum_elements)) or incx != 2) return null;
-    return @intCast(n);
+    if (n <= 0 or incx != 2) return null;
+    const count: usize = @intCast(n);
+    if (!tuning.active.x86_64.preferStride2Parallel(count)) return null;
+    return count;
 }
 
 fn targetBinary(n: BlasInt, incx: BlasInt, incy: BlasInt) ?usize {

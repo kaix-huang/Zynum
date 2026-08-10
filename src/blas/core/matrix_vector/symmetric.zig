@@ -10,6 +10,8 @@ const indexing = @import("../shared/indexing.zig");
 const access = @import("access.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
+const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 
 const BlasInt = scalar.BlasInt;
 const Uplo = scalar.Uplo;
@@ -30,6 +32,7 @@ const vectorGet = indexing.vectorGet;
 
 const symValue = access.symValue;
 const symPackedValue = access.symPackedValue;
+const tuning = level2_tuning.active.symmetric;
 
 threadlocal var symv_workspace_f32_ptr: ?[*]f32 = null;
 threadlocal var symv_workspace_f32_len: usize = 0;
@@ -199,12 +202,25 @@ fn mergeSymvUpperWorkspacesUnitReal(comptime T: type, n: usize, task_count: usiz
 }
 
 fn symvColumnsUnitReal(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) void {
+    if (tuning.enable_fixed_columns and matrix_vector_kernels.symmetricColumnsUnit(
+        T,
+        uplo == .upper,
+        false,
+        n,
+        j0,
+        j1,
+        alpha,
+        a,
+        lda,
+        x,
+        y,
+    )) return;
     const lane_count = lanes(T);
     const unroll_count = unroll(T);
     const V = @Vector(lane_count, T);
     if (uplo == .upper) {
         var j = j0;
-        while (n >= 256 and j + 4 <= j1) : (j += 4) {
+        while (tuning.preferFourColumnRealBody(n) and j + 4 <= j1) : (j += 4) {
             const c0 = a + indexing.matIndex(lda, 0, j);
             const c1 = a + indexing.matIndex(lda, 0, j + 1);
             const c2 = a + indexing.matIndex(lda, 0, j + 2);
@@ -414,17 +430,15 @@ fn runSymvTaskF64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 fn parallelSymvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) bool {
-    if (n *| n < 512 * 512) return false;
-    const min_cols_per_task: usize = if (T == f32 and n == 512) 64 else if (n >= 768) 64 else 128;
-    var task_count = core_pool.taskCount(n, min_cols_per_task);
-    const small_task_cap: usize = if (T == f32 and n == 512) 8 else 6;
-    if (n <= 1536) task_count = @min(task_count, small_task_cap);
+    if (!tuning.preferRealParallel(n)) return false;
+    var task_count = core_pool.taskCount(n, tuning.realMinColumns(T, n));
+    task_count = tuning.capRealTasks(T, n, task_count);
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * n;
-    if (workspace_len * @sizeOf(T) > 64 * 1024 * 1024) return false;
+    if (!tuning.workspaceAllowed(workspace_len, @sizeOf(T))) return false;
     const workspace = symvWorkspace(T, workspace_len) orelse return false;
-    const use_upper_ranged_workspace = T == f32 and uplo == .upper and n == 512;
+    const use_upper_ranged_workspace = tuning.useUpperRangedRealWorkspace(T, uplo == .upper, n);
     if (!use_upper_ranged_workspace) @memset(workspace, 0);
 
     var tasks: [core_pool.max_tasks]SymvTask(T) = undefined;
@@ -450,7 +464,7 @@ fn parallelSymvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]
     }
 
     const runner = if (T == f32) runSymvTaskF32 else runSymvTaskF64;
-    const ran = if ((T == f32 or T == f64) and n <= 1024)
+    const ran = if (tuning.useRealLowLatency(T, n))
         core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)
     else
         core_pool.run(runner, @ptrCast(&tasks), task_count);
@@ -617,6 +631,19 @@ fn hermvUpperColumnC64(j: usize, alpha: scalar.ComplexF64, col: [*]const scalar.
 }
 
 fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y_delta: [*]T) void {
+    if (tuning.enable_fixed_columns and matrix_vector_kernels.symmetricColumnsUnit(
+        T,
+        uplo == .upper,
+        true,
+        n,
+        j0,
+        j1,
+        alpha,
+        a,
+        lda,
+        x,
+        y_delta,
+    )) return;
     if (uplo == .upper) {
         for (j0..j1) |j| {
             const col = a + indexing.matIndex(lda, 0, j);
@@ -707,16 +734,14 @@ fn lowerTriangularTaskBoundary(n: usize, task_count: usize, task_index: usize) u
 }
 
 fn parallelHermvUnitComplex(comptime T: type, uplo: Uplo, n: usize, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
-    if (n *| n < 256 * 256) return false;
-    const min_cols_per_task: usize = 48;
-    var task_count = core_pool.taskCount(n, min_cols_per_task);
-    if (n <= 512) task_count = @min(task_count, 10);
-    const balance_upper = uplo == .upper and n >= 256;
-    if (balance_upper and T == scalar.ComplexF64 and n == 512) task_count = @min(task_count, 8);
+    if (!tuning.preferHermitianParallel(n)) return false;
+    var task_count = core_pool.taskCount(n, tuning.hermitianMinColumns());
+    task_count = tuning.capHermitianTasks(T, n, task_count);
+    const balance_upper = tuning.balanceUpperHermitian(uplo == .upper, n);
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * n;
-    if (workspace_len * @sizeOf(T) > 64 * 1024 * 1024) return false;
+    if (!tuning.workspaceAllowed(workspace_len, @sizeOf(T))) return false;
     const workspace = symvWorkspace(T, workspace_len) orelse return false;
     const use_upper_ranged_workspace = uplo == .upper;
     if (!use_upper_ranged_workspace) @memset(workspace, zero(T));
@@ -769,9 +794,13 @@ pub fn symv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, 
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (!herm and incx_ == 1 and incy_ == 1) return symvUnitReal(T, uplo, n, alpha, a, lda, x, beta, y);
+        const selected = level2_tuning.selectDefault(T, .symv, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ });
+        if (!herm and selected.kernel.implementation == .core_unit)
+            return symvUnitReal(T, uplo, n, alpha, a, lda, x, beta, y);
     } else if (comptime isComplex(T)) {
-        if (herm and incx_ == 1 and incy_ == 1) return hermvUnitComplex(T, uplo, n_, alpha, a, lda, x, beta, y);
+        const selected = level2_tuning.selectDefault(T, .hemv, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ });
+        if (herm and selected.kernel.implementation == .core_unit)
+            return hermvUnitComplex(T, uplo, n_, alpha, a, lda, x, beta, y);
     }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
@@ -792,7 +821,7 @@ pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (incx_ == 1 and incy_ == 1 and n >= 512 and k >= 8) {
+    if (incx_ == 1 and incy_ == 1 and tuning.preferBandUnit(n, k)) {
         if (comptime isReal(T)) {
             scaleUnitReal(T, n, beta, y);
         } else {
@@ -942,12 +971,10 @@ fn mergePackedMvWorkspacesUnit(comptime T: type, n: usize, task_count: usize, be
 }
 
 noinline fn parallelPackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T, herm: bool) bool {
-    const min_cols_per_task: usize = 64;
-    const task_count = core_pool.taskCount(n, min_cols_per_task);
+    const task_count = core_pool.taskCount(n, tuning.packedMinColumns());
     if (task_count <= 1) return false;
 
-    const max_workspace_bytes: usize = 64 * 1024 * 1024;
-    if (n > max_workspace_bytes / @sizeOf(T) / task_count) return false;
+    if (!tuning.workspaceAllowed(task_count *| n, @sizeOf(T))) return false;
     const workspace_len = task_count * n;
     const workspace = symvWorkspace(T, workspace_len) orelse return false;
     @memset(workspace, zero(T));
@@ -1012,8 +1039,26 @@ fn spmvSerial(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const 
 pub fn spmv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
-    if (n >= 512 and incx_ == 1 and incy_ == 1 and !isZero(T, alpha)) {
+    if (tuning.preferPackedParallel(n) and incx_ == 1 and incy_ == 1 and !isZero(T, alpha)) {
         if (parallelPackedMvUnit(T, uplo, n, alpha, ap, x, beta, y, herm)) return;
     }
     spmvSerial(T, uplo, n_, alpha, ap, x, incx_, beta, y, incy_, herm);
 }
+
+pub const testing = struct {
+    pub fn symmetricColumns(
+        comptime T: type,
+        uplo: Uplo,
+        n: usize,
+        j0: usize,
+        j1: usize,
+        alpha: T,
+        a: [*]const T,
+        lda: BlasInt,
+        x: [*]const T,
+        y_delta: [*]T,
+    ) void {
+        if (comptime isReal(T)) return symvColumnsUnitReal(T, uplo, n, j0, j1, alpha, a, lda, x, y_delta);
+        return hermvColumnsUnitComplex(T, uplo, n, j0, j1, alpha, a, lda, x, y_delta);
+    }
+};

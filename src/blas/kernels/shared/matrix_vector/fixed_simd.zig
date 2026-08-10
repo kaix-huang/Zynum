@@ -40,10 +40,25 @@ inline fn matIndex(lda: BlasInt, row: usize, col: usize) usize {
 }
 
 inline fn loadVec(comptime T: type, comptime lanes: comptime_int, ptr: [*]const T, index: usize) @Vector(lanes, T) {
+    if (comptime lanes * @sizeOf(T) < 16) {
+        var value: @Vector(lanes, T) = undefined;
+        inline for (0..lanes) |lane| {
+            const lane_ptr: *const volatile T = &ptr[index + lane];
+            value[lane] = lane_ptr.*;
+        }
+        return value;
+    }
     return @as(*align(1) const @Vector(lanes, T), @ptrCast(ptr + index)).*;
 }
 
 inline fn storeVec(comptime T: type, comptime lanes: comptime_int, ptr: [*]T, index: usize, value: @Vector(lanes, T)) void {
+    if (comptime lanes * @sizeOf(T) < 16) {
+        inline for (0..lanes) |lane| {
+            const lane_ptr: *volatile T = &ptr[index + lane];
+            lane_ptr.* = value[lane];
+        }
+        return;
+    }
     @as(*align(1) @Vector(lanes, T), @ptrCast(ptr + index)).* = value;
 }
 
@@ -61,6 +76,30 @@ inline fn complexAdd(comptime T: type, a: T, b: T) T {
 
 inline fn complexMul(comptime T: type, a: T, b: T) T {
     return .{ .re = a.re * b.re - a.im * b.im, .im = a.re * b.im + a.im * b.re };
+}
+
+inline fn complexConj(comptime T: type, value: T) T {
+    return .{ .re = value.re, .im = -value.im };
+}
+
+inline fn scalarAdd(comptime T: type, a: T, b: T) T {
+    if (comptime T == f32 or T == f64) return a + b;
+    return complexAdd(T, a, b);
+}
+
+inline fn scalarMul(comptime T: type, a: T, b: T) T {
+    if (comptime T == f32 or T == f64) return a * b;
+    return complexMul(T, a, b);
+}
+
+inline fn scalarConj(comptime T: type, value: T) T {
+    if (comptime T == f32 or T == f64) return value;
+    return complexConj(T, value);
+}
+
+inline fn symmetricDiagonal(comptime T: type, value: T, hermitian: bool) T {
+    if (comptime T == f32 or T == f64) return value;
+    return if (hermitian) .{ .re = value.re, .im = 0 } else value;
 }
 
 fn pairSwapMask(comptime lanes: comptime_int) @Vector(lanes, i32) {
@@ -85,6 +124,19 @@ fn pairPatternVector(comptime T: type, comptime lanes: comptime_int, comptime ev
         values[i] = if (i % 2 == 0) even else odd;
     }
     return values;
+}
+
+inline fn complexScaleVector(
+    comptime T: type,
+    comptime lanes: comptime_int,
+    values: @Vector(lanes, Real(T)),
+    coefficient: T,
+) @Vector(lanes, Real(T)) {
+    const R = Real(T);
+    const V = @Vector(lanes, R);
+    const swapped = @shuffle(R, values, undefined, pairSwapMask(lanes));
+    const re_v: V = @splat(coefficient.re);
+    return @mulAdd(V, values, re_v, swapped * pairSignVector(R, lanes, coefficient.im));
 }
 
 fn rowUnroll(comptime cfg: Config) comptime_int {
@@ -414,8 +466,6 @@ fn complexGemvNoTransCols(
     j: usize,
 ) void {
     const R = Real(T);
-    const V = @Vector(cfg.lane_count, R);
-    const swap_mask = comptime pairSwapMask(cfg.lane_count);
     const real_y = asRealPtr(T, y);
     var coeffs: [cols]T = undefined;
     var col_ptrs: [cols][*]const R = undefined;
@@ -432,10 +482,7 @@ fn complexGemvNoTransCols(
             var yv = loadVec(R, cfg.lane_count, real_y, offset);
             inline for (0..cols) |col| {
                 const av = loadVec(R, cfg.lane_count, col_ptrs[col], offset);
-                const swapped = @shuffle(R, av, undefined, swap_mask);
-                const re_v: V = @splat(coeffs[col].re);
-                const im_sign_v = pairSignVector(R, cfg.lane_count, coeffs[col].im);
-                yv += @mulAdd(V, av, re_v, swapped * im_sign_v);
+                yv += complexScaleVector(T, cfg.lane_count, av, coeffs[col]);
             }
             storeVec(R, cfg.lane_count, real_y, offset, yv);
         }
@@ -444,10 +491,7 @@ fn complexGemvNoTransCols(
         var yv = loadVec(R, cfg.lane_count, real_y, i);
         inline for (0..cols) |col| {
             const av = loadVec(R, cfg.lane_count, col_ptrs[col], i);
-            const swapped = @shuffle(R, av, undefined, swap_mask);
-            const re_v: V = @splat(coeffs[col].re);
-            const im_sign_v = pairSignVector(R, cfg.lane_count, coeffs[col].im);
-            yv += @mulAdd(V, av, re_v, swapped * im_sign_v);
+            yv += complexScaleVector(T, cfg.lane_count, av, coeffs[col]);
         }
         storeVec(R, cfg.lane_count, real_y, i, yv);
     }
@@ -690,6 +734,258 @@ pub fn gerUnitReal(
     while (j < n) : (j += 1) {
         const temp = alpha * y[j];
         if (temp != 0) axpyColumn(T, cfg, m, temp, x, a + matIndex(lda, 0, j));
+    }
+    return true;
+}
+
+fn complexGerCols(
+    comptime T: type,
+    comptime cfg: Config,
+    comptime cols: comptime_int,
+    m: usize,
+    alpha: T,
+    x: [*]const T,
+    y: [*]const T,
+    a: [*]T,
+    lda: BlasInt,
+    conjugate_y: bool,
+    j: usize,
+) void {
+    const R = Real(T);
+    var coefficients: [cols]T = undefined;
+    var columns: [cols][*]R = undefined;
+    inline for (0..cols) |col| {
+        const yj = if (conjugate_y) complexConj(T, y[j + col]) else y[j + col];
+        coefficients[col] = complexMul(T, alpha, yj);
+        columns[col] = asRealPtr(T, a + matIndex(lda, 0, j + col));
+    }
+
+    const real_x = asConstRealPtr(T, x);
+    const real_m = 2 * m;
+    var i: usize = 0;
+    while (i + rowUnroll(cfg) <= real_m) : (i += rowUnroll(cfg)) {
+        inline for (0..cfg.row_unroll_vectors) |u| {
+            const offset = i + u * cfg.lane_count;
+            const xv = loadVec(R, cfg.lane_count, real_x, offset);
+            inline for (0..cols) |col| {
+                const av = loadVec(R, cfg.lane_count, columns[col], offset);
+                storeVec(R, cfg.lane_count, columns[col], offset, av + complexScaleVector(T, cfg.lane_count, xv, coefficients[col]));
+            }
+        }
+    }
+    while (i + cfg.lane_count <= real_m) : (i += cfg.lane_count) {
+        const xv = loadVec(R, cfg.lane_count, real_x, i);
+        inline for (0..cols) |col| {
+            const av = loadVec(R, cfg.lane_count, columns[col], i);
+            storeVec(R, cfg.lane_count, columns[col], i, av + complexScaleVector(T, cfg.lane_count, xv, coefficients[col]));
+        }
+    }
+    while (i < real_m) : (i += 2) {
+        const xv: T = .{ .re = real_x[i], .im = real_x[i + 1] };
+        inline for (0..cols) |col| {
+            const av: T = .{ .re = columns[col][i], .im = columns[col][i + 1] };
+            const updated = complexAdd(T, av, complexMul(T, xv, coefficients[col]));
+            columns[col][i] = updated.re;
+            columns[col][i + 1] = updated.im;
+        }
+    }
+}
+
+pub fn gerUnitComplex(
+    comptime T: type,
+    comptime cfg: Config,
+    m: usize,
+    n: usize,
+    alpha: T,
+    x: [*]const T,
+    y: [*]const T,
+    a: [*]T,
+    lda: BlasInt,
+    conjugate_y: bool,
+) bool {
+    comptime checkComplexConfig(T, cfg);
+    if (!usefulComplex(cfg, m, n)) return false;
+
+    const Driver = struct {
+        m: usize,
+        alpha: T,
+        x: [*]const T,
+        y: [*]const T,
+        a: [*]T,
+        lda: BlasInt,
+        conjugate_y: bool,
+
+        fn run(self: @This(), comptime cols: comptime_int, j: usize) void {
+            complexGerCols(T, cfg, cols, self.m, self.alpha, self.x, self.y, self.a, self.lda, self.conjugate_y, j);
+        }
+    };
+
+    var j = driveColumnBlocks(cfg, n, Driver{
+        .m = m,
+        .alpha = alpha,
+        .x = x,
+        .y = y,
+        .a = a,
+        .lda = lda,
+        .conjugate_y = conjugate_y,
+    });
+    while (j < n) : (j += 1) {
+        complexGerCols(T, cfg, 1, m, alpha, x, y, a, lda, conjugate_y, j);
+    }
+    return true;
+}
+
+pub fn triangularAxpyUnit(
+    comptime T: type,
+    comptime cfg: Config,
+    n: usize,
+    alpha: T,
+    a: [*]const T,
+    x: [*]T,
+) bool {
+    if (comptime T == f32 or T == f64) {
+        comptime checkConfig(T, cfg);
+        if (n == 0) return false;
+        axpyColumn(T, cfg, n, alpha, a, x);
+        return true;
+    }
+
+    comptime checkComplexConfig(T, cfg);
+    if (n == 0) return false;
+    const R = Real(T);
+    const real_a = asConstRealPtr(T, a);
+    const real_x = asRealPtr(T, x);
+    const real_n = 2 * n;
+    var i: usize = 0;
+    while (i + rowUnroll(cfg) <= real_n) : (i += rowUnroll(cfg)) {
+        inline for (0..cfg.row_unroll_vectors) |u| {
+            const offset = i + u * cfg.lane_count;
+            const av = loadVec(R, cfg.lane_count, real_a, offset);
+            const xv = loadVec(R, cfg.lane_count, real_x, offset);
+            storeVec(R, cfg.lane_count, real_x, offset, xv + complexScaleVector(T, cfg.lane_count, av, alpha));
+        }
+    }
+    while (i + cfg.lane_count <= real_n) : (i += cfg.lane_count) {
+        const av = loadVec(R, cfg.lane_count, real_a, i);
+        const xv = loadVec(R, cfg.lane_count, real_x, i);
+        storeVec(R, cfg.lane_count, real_x, i, xv + complexScaleVector(T, cfg.lane_count, av, alpha));
+    }
+    while (i < real_n) : (i += 2) {
+        const av: T = .{ .re = real_a[i], .im = real_a[i + 1] };
+        const xv: T = .{ .re = real_x[i], .im = real_x[i + 1] };
+        const updated = complexAdd(T, xv, complexMul(T, alpha, av));
+        real_x[i] = updated.re;
+        real_x[i + 1] = updated.im;
+    }
+    return true;
+}
+
+fn realDotUnit(
+    comptime T: type,
+    comptime cfg: Config,
+    n: usize,
+    a: [*]const T,
+    x: [*]const T,
+) T {
+    const V = @Vector(cfg.lane_count, T);
+    var accs: [cfg.row_unroll_vectors]V = [_]V{@splat(0)} ** cfg.row_unroll_vectors;
+    var i: usize = 0;
+    while (i + rowUnroll(cfg) <= n) : (i += rowUnroll(cfg)) {
+        inline for (0..cfg.row_unroll_vectors) |u| {
+            const offset = i + u * cfg.lane_count;
+            accs[u] = @mulAdd(
+                V,
+                loadVec(T, cfg.lane_count, a, offset),
+                loadVec(T, cfg.lane_count, x, offset),
+                accs[u],
+            );
+        }
+    }
+    var acc: V = @splat(0);
+    inline for (0..cfg.row_unroll_vectors) |u| acc += accs[u];
+    while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
+        acc = @mulAdd(
+            V,
+            loadVec(T, cfg.lane_count, a, i),
+            loadVec(T, cfg.lane_count, x, i),
+            acc,
+        );
+    }
+    var result = @reduce(.Add, acc);
+    while (i < n) : (i += 1) result = @mulAdd(T, a[i], x[i], result);
+    return result;
+}
+
+pub fn triangularDotUnit(
+    comptime T: type,
+    comptime cfg: Config,
+    n: usize,
+    a: [*]const T,
+    x: [*]const T,
+    conjugate_a: bool,
+    result: *T,
+) bool {
+    if (comptime T == f32 or T == f64) {
+        comptime checkConfig(T, cfg);
+        if (n == 0) return false;
+        result.* = realDotUnit(T, cfg, n, a, x);
+        return true;
+    }
+
+    comptime checkComplexConfig(T, cfg);
+    if (n == 0) return false;
+    result.* = complexDotUnit(T, cfg, n, a, x, conjugate_a);
+    return true;
+}
+
+pub fn symmetricColumnsUnit(
+    comptime T: type,
+    comptime cfg: Config,
+    upper: bool,
+    hermitian: bool,
+    n: usize,
+    j0: usize,
+    j1: usize,
+    alpha: T,
+    a: [*]const T,
+    lda: BlasInt,
+    x: [*]const T,
+    y_delta: [*]T,
+) bool {
+    if (comptime T == f32 or T == f64) {
+        comptime checkConfig(T, cfg);
+        if (hermitian) return false;
+    } else {
+        comptime checkComplexConfig(T, cfg);
+        if (!hermitian) return false;
+    }
+    if (n == 0 or j0 >= j1 or j1 > n or lda <= 0) return false;
+
+    for (j0..j1) |j| {
+        const row0: usize = if (upper) 0 else j + 1;
+        const count: usize = if (upper) j else n - row0;
+        const off_diagonal = a + matIndex(lda, row0, j);
+        if (count != 0) {
+            const coefficient = scalarMul(T, alpha, x[j]);
+            _ = triangularAxpyUnit(T, cfg, count, coefficient, off_diagonal, y_delta + row0);
+        }
+
+        var reflected_dot: T = if (comptime T == f32 or T == f64) 0 else .{ .re = 0, .im = 0 };
+        if (count != 0) {
+            _ = triangularDotUnit(
+                T,
+                cfg,
+                count,
+                off_diagonal,
+                x + row0,
+                hermitian,
+                &reflected_dot,
+            );
+        }
+        const diagonal = symmetricDiagonal(T, a[matIndex(lda, j, j)], hermitian);
+        const diagonal_product = scalarMul(T, diagonal, x[j]);
+        const column_sum = scalarAdd(T, diagonal_product, reflected_dot);
+        y_delta[j] = scalarAdd(T, y_delta[j], scalarMul(T, alpha, column_sum));
     }
     return true;
 }

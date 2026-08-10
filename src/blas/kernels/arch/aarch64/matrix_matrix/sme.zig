@@ -449,7 +449,7 @@ fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
     const n = task.n1 - task.n0;
     if (task.m % 16 != 0 or n % 16 != 0 or task.k == 0) return false;
     if (task.k > 512) return false;
-    if (task.execution.amx != .f32_n16 and task.execution.amx != .f32_n32) return false;
+    if (task.execution.amx != .apple_amx_f32_n16 and task.execution.amx != .apple_amx_f32_n32) return false;
 
     const transposed_b = packing.isTransposedB(f32, task);
     const b_panel = if (transposed_b)
@@ -465,11 +465,11 @@ fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
     const ldc_c: c_int = @intCast(gemm_task.toUsize(task.ldc));
 
     return switch (task.execution.amx) {
-        .f32_n32 => if (transposed_b)
+        .apple_amx_f32_n32 => if (transposed_b)
             amx.sgemmN32TransB(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0
         else
             amx.sgemmN32(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
-        .f32_n16 => if (transposed_b)
+        .apple_amx_f32_n16 => if (transposed_b)
             amx.sgemmN16TransB(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0
         else
             amx.sgemmN16(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
@@ -481,7 +481,7 @@ fn noTransRealF32AmxInterior(task: gemm_task.Task(f32)) bool {
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;
-    if (task.execution.amx != .f32_n16 or task.k == 0 or task.k > 512) return false;
+    if (task.execution.amx != .apple_amx_f32_n16 or task.k == 0 or task.k > 512) return false;
 
     const n = task.n1 - task.n0;
     const m_full = task.m - task.m % 16;
@@ -666,7 +666,7 @@ fn noTransRealF64Amx(task: gemm_task.Task(f64)) bool {
     if (task.alpha != 1 or task.beta != 0) return false;
     const n = task.n1 - task.n0;
     if (task.m % 8 != 0 or n % 8 != 0 or task.k == 0) return false;
-    if (task.execution.amx != .f64_n8 and task.execution.amx != .f64_n16 and task.execution.amx != .f64_n32) return false;
+    if (task.execution.amx != .apple_amx_f64_n8 and task.execution.amx != .apple_amx_f64_n16 and task.execution.amx != .apple_amx_f64_n32) return false;
 
     const b_panel = task.b + matIndex(task.ldb, 0, task.n0);
     const c_panel = task.c + matIndex(task.ldc, 0, task.n0);
@@ -678,9 +678,9 @@ fn noTransRealF64Amx(task: gemm_task.Task(f64)) bool {
     const ldc_c: c_int = @intCast(gemm_task.toUsize(task.ldc));
 
     return switch (task.execution.amx) {
-        .f64_n32 => amx.dgemmN32(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
-        .f64_n16 => amx.dgemmN16(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
-        .f64_n8 => amx.dgemmN8(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
+        .apple_amx_f64_n32 => amx.dgemmN32(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
+        .apple_amx_f64_n16 => amx.dgemmN16(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
+        .apple_amx_f64_n8 => amx.dgemmN8(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
         else => false,
     };
 }
@@ -689,7 +689,7 @@ fn noTransRealF64AmxInterior(task: gemm_task.Task(f64)) bool {
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;
-    if (task.execution.amx != .f64_n8 or task.k == 0) return false;
+    if (task.execution.amx != .apple_amx_f64_n8 or task.k == 0) return false;
     if (packing.isTransposedB(f64, task)) return false;
 
     const n = task.n1 - task.n0;

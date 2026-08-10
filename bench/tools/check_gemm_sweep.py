@@ -7,6 +7,12 @@ import csv
 import sys
 from collections import defaultdict
 
+from report_comparison import (
+    best_higher_row,
+    parse_positive_finite,
+    positive_finite_ratio,
+)
+
 CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
 
 
@@ -24,7 +30,9 @@ def parse_args(argv=None):
         description="Check GEMM sweep CSV rows against the fastest comparator library."
     )
     parser.add_argument("csv", help="Path to a gemm_sweep CSV file.")
-    parser.add_argument("--zynum", default="Zynum", help="Library label for Zynum rows.")
+    parser.add_argument(
+        "--zynum", default="Zynum", help="Library label for Zynum rows."
+    )
     parser.add_argument(
         "--comparator",
         action="append",
@@ -37,8 +45,12 @@ def parse_args(argv=None):
         default=1.0,
         help="Required Zynum/comparator GFLOP/s ratio. Use 1.0 for strict no-slower-than.",
     )
-    parser.add_argument("--kind", action="append", help="Restrict to one or more GEMM kinds.")
-    parser.add_argument("--label", action="append", help="Restrict to one or more shape labels.")
+    parser.add_argument(
+        "--kind", action="append", help="Restrict to one or more GEMM kinds."
+    )
+    parser.add_argument(
+        "--label", action="append", help="Restrict to one or more shape labels."
+    )
     parser.add_argument(
         "--trans",
         action="append",
@@ -61,7 +73,9 @@ def parse_args(argv=None):
         action="store_true",
         help="Allow rows whose GEMM correctness check is absent or not checked.",
     )
-    parser.add_argument("--worst", type=int, default=20, help="Number of worst rows to print.")
+    parser.add_argument(
+        "--worst", type=int, default=20, help="Number of worst rows to print."
+    )
     return parser.parse_args(argv)
 
 
@@ -96,34 +110,62 @@ def flop_factor(kind):
 
 def row_gflops(row, stat):
     if stat == "best":
-        return float(row["gflops"])
+        return parse_positive_finite(row["gflops"], "gflops")
 
     timing_field = "median_ns" if stat == "median" else "max_ns"
     timing_text = row.get(timing_field) or row.get("best_ns")
     if not timing_text:
-        return float(row["gflops"])
-    elapsed_ns = int(timing_text)
-    if elapsed_ns <= 0:
-        raise ValueError(f"non-positive {timing_field}")
-    work = (
-        flop_factor(row["kind"])
-        * int(row["m"])
-        * int(row["n"])
-        * int(row["k"])
-    )
-    return work / elapsed_ns
+        return parse_positive_finite(row["gflops"], "gflops")
+    elapsed_ns = parse_positive_finite(timing_text, timing_field)
+    try:
+        work = flop_factor(row["kind"]) * int(row["m"]) * int(row["n"]) * int(row["k"])
+    except OverflowError as exc:
+        raise ValueError("GEMM work estimate overflowed") from exc
+    return parse_positive_finite(work / elapsed_ns, f"{stat} gflops")
+
+
+def validate_optional_gemm_evidence(row):
+    for field in ("gflops", "best_ns", "median_ns", "p95_ns", "max_ns"):
+        if row.get(field) not in (None, ""):
+            parse_positive_finite(row[field], field)
+
+
+def row_process_repeats(row):
+    value = row.get("process_repeats")
+    if value in (None, ""):
+        return None
+    try:
+        repeats = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("process_repeats must be a positive integer") from exc
+    if repeats < 1 or str(repeats) != str(value).strip():
+        raise ValueError("process_repeats must be a positive integer")
+    return repeats
 
 
 def main(argv=None):
     args = parse_args(argv)
-    if args.ratio <= 0:
-        print("--ratio must be positive", file=sys.stderr)
+    try:
+        args.ratio = parse_positive_finite(args.ratio, "--ratio")
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
         return 2
     comparators = args.comparator or ["Accelerate", "OpenBLAS"]
 
     groups = defaultdict(dict)
+    observed_process_repeats = set()
+    rows_without_process_repeats = 0
     with open(args.csv, newline="") as f:
         for row in csv.DictReader(f):
+            try:
+                process_repeats = row_process_repeats(row)
+            except ValueError as error:
+                print(f"bad process_repeats evidence ({error}): {row}", file=sys.stderr)
+                return 2
+            if process_repeats is None:
+                rows_without_process_repeats += 1
+            else:
+                observed_process_repeats.add(process_repeats)
             if not row_allowed(args, row):
                 continue
             if not args.allow_unchecked and row.get("check") not in CHECKED_STATUSES:
@@ -133,19 +175,43 @@ def main(argv=None):
                 )
                 return 2
             try:
+                validate_optional_gemm_evidence(row)
                 row["gflops_value"] = row_gflops(row, args.stat)
-            except (KeyError, TypeError, ValueError) as error:
+                key = group_key(row)
+                library = row["library"]
+            except (KeyError, OverflowError, TypeError, ValueError) as error:
                 print(
                     f"bad {args.stat} GFLOP/s value in row ({error}): {row}",
                     file=sys.stderr,
                 )
                 return 2
-            groups[group_key(row)][row["library"]] = row
+            if library in groups[key]:
+                print(
+                    f"duplicate library row for {key!r}: {library}",
+                    file=sys.stderr,
+                )
+                return 2
+            groups[key][library] = row
+
+    if observed_process_repeats and rows_without_process_repeats:
+        print(
+            "partial process_repeats evidence: some rows omit the repeat count",
+            file=sys.stderr,
+        )
+        return 2
+    if len(observed_process_repeats) > 1:
+        print(
+            "inconsistent process_repeats evidence: {}".format(
+                sorted(observed_process_repeats)
+            ),
+            file=sys.stderr,
+        )
+        return 2
 
     failures = []
     missing = []
     checked = 0
-    for key, by_library in groups.items():
+    for key, by_library in sorted(groups.items()):
         zynum = by_library.get(args.zynum)
         if zynum is None and args.zynum == "Zynum":
             zynum = by_library.get("zynum-blas")
@@ -162,13 +228,17 @@ def main(argv=None):
             continue
 
         checked += 1
-        best = max(comparator_rows, key=lambda row: row["gflops_value"])
-        required = args.ratio * best["gflops_value"]
-        ratio = zynum["gflops_value"] / best["gflops_value"] if best["gflops_value"] > 0 else 1.0
-        if zynum["gflops_value"] < required:
+        best = best_higher_row(comparator_rows, "gflops_value")
+        try:
+            ratio = positive_finite_ratio(zynum["gflops_value"], best["gflops_value"])
+        except ValueError as exc:
+            print(f"bad comparison ratio for {key!r}: {exc}", file=sys.stderr)
+            return 2
+        if ratio < args.ratio:
             failures.append((ratio, key, zynum, best))
 
-    failures.sort(key=lambda item: item[0])
+    failures.sort(key=lambda item: (item[0], item[1]))
+    missing.sort(key=lambda item: (item[0], item[1]))
     print(
         f"checked={checked} passed={checked - len(failures)} "
         f"failed={len(failures)} missing={len(missing)} ratio={args.ratio:.6g} stat={args.stat}"
@@ -188,8 +258,7 @@ def main(argv=None):
     for key, label in missing[: args.worst]:
         kind, transa, transb, shape, m, n, k = key
         print(
-            f"MISSING {label} {kind} trans={transa}{transb} "
-            f"{shape} m={m} n={n} k={k}"
+            f"MISSING {label} {kind} trans={transa}{transb} {shape} m={m} n={n} k={k}"
         )
 
     if no_checks:

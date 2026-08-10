@@ -3,39 +3,20 @@
 
 //! x86_64 BLAS Level 1 binary-vector kernel configuration.
 
-const builtin = @import("builtin");
-
 const simd_config = @import("../simd_config.zig");
 const fixed_simd = @import("../../../shared/vector/fixed_simd.zig");
+const tuning = @import("../../../shared/vector/tuning.zig");
 
 pub const enabled: bool = simd_config.enabled;
-
-comptime {
-    if (builtin.os.tag == .linux and builtin.abi == .gnu) {
-        asm (".symver zynum_glibc_memcpy, memcpy@GLIBC_2.14");
-    }
-}
-
-extern fn zynum_glibc_memcpy(dest: [*]u8, src: [*]const u8, n: usize) callconv(.c) [*]u8;
+const profile = tuning.active.x86_64;
 
 pub fn fixedCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
     if (comptime !enabled) return false;
     return fixed_simd.copyBytes(simd_config.byte_config, n_bytes, x, y);
 }
 
-inline fn preferCoreCopyBytes(n_bytes: usize) bool {
-    return n_bytes >= 32 * 1024 and n_bytes < 128 * 1024;
-}
-
-inline fn glibcCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
-    if (comptime builtin.os.tag != .linux or builtin.abi != .gnu) return false;
-    _ = zynum_glibc_memcpy(y, x, n_bytes);
-    return true;
-}
-
 pub fn copyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
-    if (n_bytes == 8 * 1024) return glibcCopyBytes(n_bytes, x, y);
-    if (preferCoreCopyBytes(n_bytes)) return false;
+    if (profile.preferCoreCopy(n_bytes)) return false;
     return fixedCopyBytes(n_bytes, x, y);
 }
 
@@ -56,7 +37,11 @@ pub fn swapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
 
 pub fn axpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
     if (comptime !enabled) return false;
-    return fixed_simd.axpyUnitReal(T, simd_config.vectorConfig(T), n, alpha, x, y);
+    const cfg = if (comptime simd_config.has_avx512_width and profile.preferAvx2WidthAxpy())
+        simd_config.avx2WidthVectorConfig(T)
+    else
+        simd_config.vectorConfig(T);
+    return fixed_simd.axpyUnitReal(T, cfg, n, alpha, x, y);
 }
 
 pub fn axpyUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
@@ -76,7 +61,22 @@ pub fn axpbyUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]const T, bet
 
 pub fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T {
     if (comptime !enabled) return null;
-    return fixed_simd.dotUnitReal(T, simd_config.vectorConfig(T), n, x, y);
+    const cfg = if (comptime simd_config.has_avx512_width and profile.preferAvx2WidthDot(T))
+        simd_config.avx2WidthVectorConfig(T)
+    else
+        simd_config.vectorConfig(T);
+    return fixed_simd.dotUnitReal(T, cfg, n, x, y);
+}
+
+pub fn dotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
+    if (comptime !enabled) return null;
+    if (!profile.preferFixedDotF32AccF64(n)) return null;
+    return fixedDotF32AccF64UnitCandidate(n, x, y);
+}
+
+pub fn fixedDotF32AccF64UnitCandidate(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
+    if (comptime !enabled) return null;
+    return fixed_simd.dotF32AccF64Unit(simd_config.vectorConfig(f64), n, x, y);
 }
 
 pub fn dotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
@@ -87,4 +87,14 @@ pub fn dotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, 
 pub fn rotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
     if (comptime !enabled) return false;
     return fixed_simd.rotUnitReal(T, simd_config.vectorConfig(T), n, x, y, c, s);
+}
+
+pub fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
+    if (comptime !enabled or !profile.enable_fixed_rotm) return false;
+    return fixedRotmUnitRealCandidate(T, n, x, y, flag, h11, h21, h12, h22);
+}
+
+pub fn fixedRotmUnitRealCandidate(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
+    if (comptime !enabled) return false;
+    return fixed_simd.rotmUnitReal(T, simd_config.vectorConfig(T), n, x, y, flag, h11, h21, h12, h22);
 }

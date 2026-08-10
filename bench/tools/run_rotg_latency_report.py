@@ -4,18 +4,34 @@
 
 import argparse
 import csv
-import ctypes
-import hashlib
-import json
+import io
 import math
 import os
 import platform
-import statistics
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+import benchmark_artifacts  # noqa: E402
+import benchmark_metadata  # noqa: E402
+from report_publication import ReportOutput, publish_outputs  # noqa: E402
+from report_comparison import (  # noqa: E402
+    positive_finite_median,
+    validate_optional_metric_evidence,
+    validate_performance_fields,
+)
+from report_schedule import (  # noqa: E402
+    SCHEDULE_CHOICES,
+    collect_repeats,
+    validate_schedule,
+    validate_unique_library_labels,
+)
 
 
 DEFAULT_ACCELERATE = (
@@ -122,6 +138,10 @@ def default_zynum_blas():
     return "zig-out/lib/libzynum_blas.so"
 
 
+def default_executable(path):
+    return f"{path}.exe" if sys.platform == "win32" else path
+
+
 def routine_name(value):
     result = value.lower()
     if result not in ROUTINES:
@@ -134,7 +154,9 @@ def routine_name(value):
 def case_name(value):
     result = value.lower()
     if result not in ROTG_CASES and result not in ROTMG_CASES:
-        raise argparse.ArgumentTypeError("unknown latency corpus case {!r}".format(value))
+        raise argparse.ArgumentTypeError(
+            "unknown latency corpus case {!r}".format(value)
+        )
     return result
 
 
@@ -155,7 +177,9 @@ def parse_args(argv=None):
             "per library/routine/corpus/repeat and write an aggregate CSV."
         )
     )
-    parser.add_argument("--probe", default="zig-out/bin/rotg-latency-probe")
+    parser.add_argument(
+        "--probe", default=default_executable("zig-out/bin/rotg-latency-probe")
+    )
     parser.add_argument("--zynum", default=default_zynum_blas())
     parser.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     parser.add_argument("--openblas", default=DEFAULT_OPENBLAS)
@@ -180,8 +204,15 @@ def parse_args(argv=None):
     parser.add_argument("--samples", type=positive_int, default=9)
     parser.add_argument("--calls-per-sample", type=positive_int, default=100_000)
     parser.add_argument("--process-repeats", type=positive_int, default=3)
+    parser.add_argument(
+        "--process-schedule",
+        choices=SCHEDULE_CHOICES,
+        default="library-major",
+        help="Fresh-process ordering (default: library-major).",
+    )
     parser.add_argument("--csv", required=True)
     parser.add_argument("--skip-missing", action="store_true")
+    benchmark_metadata.add_identity_arguments(parser)
     return parser.parse_args(argv)
 
 
@@ -248,20 +279,16 @@ def libraries(args):
     return result
 
 
-def library_available(path):
-    if Path(path).exists():
-        return True
-    try:
-        ctypes.CDLL(path)
-        return True
-    except OSError:
-        return False
+def library_available(name, path):
+    return Path(path).is_file() or (
+        sys.platform == "darwin" and name == "Accelerate" and path == DEFAULT_ACCELERATE
+    )
 
 
 def selected_libraries(args):
     result = []
     for index, (label, path) in enumerate(libraries(args)):
-        if library_available(path):
+        if library_available(label, path):
             result.append((label, path))
             continue
         if index == 0 or not args.skip_missing:
@@ -273,9 +300,17 @@ def selected_libraries(args):
     return result
 
 
-def case_command(args, library_name, library_path, case):
+def library_artifact_request(name, path):
+    if Path(path).is_file():
+        return benchmark_artifacts.ArtifactRequest.library(name, path)
+    if sys.platform == "darwin" and name == "Accelerate" and path == DEFAULT_ACCELERATE:
+        return benchmark_artifacts.ArtifactRequest.platform_image(name, path)
+    return benchmark_artifacts.ArtifactRequest.library(name, path)
+
+
+def case_command(args, library_name, library_path, case, probe_path=None):
     return [
-        args.probe,
+        probe_path or args.probe,
         "--blas",
         library_path,
         "--library",
@@ -370,8 +405,10 @@ def child_environment():
     return env
 
 
-def run_one_process(args, library_name, library_path, case):
-    command = case_command(args, library_name, library_path, case)
+def run_one_process(args, library_name, library_path, case, *, probe_path=None):
+    command = case_command(
+        args, library_name, library_path, case, probe_path=probe_path
+    )
     result = subprocess.run(
         command,
         stdout=subprocess.PIPE,
@@ -407,9 +444,7 @@ def run_one_process(args, library_name, library_path, case):
             case,
             "probe row missing fields: {}".format(",".join(missing_fields)),
         )
-    mismatches = probe_row_mismatches(
-        args, row, library_name, library_path, case
-    )
+    mismatches = probe_row_mismatches(args, row, library_name, library_path, case)
     if mismatches:
         return error_row(
             args,
@@ -426,11 +461,7 @@ def repeat_row_eligible(row):
         return False
     try:
         value = float(row["median_ns_per_call"])
-        return (
-            math.isfinite(value)
-            and value > 0
-            and int(row["nonpositive_pairs"]) == 0
-        )
+        return math.isfinite(value) and value > 0 and int(row["nonpositive_pairs"]) == 0
     except (KeyError, TypeError, ValueError):
         return False
 
@@ -448,6 +479,24 @@ def failure_status(rows):
 def aggregate_repeats(rows):
     if not rows:
         raise ValueError("cannot aggregate an empty repeat list")
+    for repeat, row in enumerate(rows, 1):
+        if row.get("status") == "ok":
+            try:
+                validate_performance_fields(
+                    row,
+                    required=(
+                        "best_ns_per_call",
+                        "median_ns_per_call",
+                        "p95_ns_per_call",
+                        "max_ns_per_call",
+                        "median_full_ns_per_call",
+                        "median_harness_ns_per_call",
+                    ),
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"invalid ROTG/ROTMG performance evidence in repeat {repeat}: {exc}"
+                ) from exc
     eligible = [row for row in rows if repeat_row_eligible(row)]
     base = dict(
         min(eligible, key=lambda row: float(row["median_ns_per_call"]))
@@ -455,16 +504,22 @@ def aggregate_repeats(rows):
         else rows[0]
     )
     values = [float(row["median_ns_per_call"]) for row in eligible]
+    summary = {
+        "metric_min": format(min(values), ".17g") if values else "",
+        "metric_median": (
+            format(positive_finite_median(values, "metric_median"), ".17g")
+            if values
+            else ""
+        ),
+        "metric_max": format(max(values), ".17g") if values else "",
+        "metric_samples": ",".join(format(value, ".17g") for value in values),
+    }
+    validate_optional_metric_evidence(summary)
     base.update(
         {
             "process_repeats": len(rows),
             "successful_repeats": len(eligible),
-            "metric_min": format(min(values), ".17g") if values else "",
-            "metric_median": (
-                format(statistics.median(values), ".17g") if values else ""
-            ),
-            "metric_max": format(max(values), ".17g") if values else "",
-            "metric_samples": ",".join(format(value, ".17g") for value in values),
+            **summary,
         }
     )
     abs_errors = []
@@ -508,17 +563,6 @@ def command_output(command):
     return result.stdout.strip()
 
 
-def sha256_file(path):
-    candidate = Path(path)
-    if not candidate.is_file():
-        return None
-    digest = hashlib.sha256()
-    with candidate.open("rb") as file:
-        for chunk in iter(lambda: file.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def environment_snapshot():
     names = [
         "ZYNUM_MAXIMUM_THREADS",
@@ -547,8 +591,8 @@ def zynum_maximum_threads_detected():
     return max(1, os.cpu_count() or 1)
 
 
-def write_metadata(args, output, selected, cases):
-    source_status = command_output(["git", "status", "--short"])
+def serialize_metadata(args, library_records, probe_record, cases, benchmark_identity):
+    source = benchmark_identity["source"]
     metadata = {
         "generated_at_unix": time.time(),
         "argv": sys.argv,
@@ -556,17 +600,13 @@ def write_metadata(args, output, selected, cases):
         "platform": platform.platform(),
         "python_version": sys.version,
         "zig_version": command_output(["zig", "version"]),
-        "source": {
-            "revision": command_output(["git", "rev-parse", "HEAD"]),
-            "branch": command_output(["git", "branch", "--show-current"]),
-            "dirty": bool(source_status),
-            "status_short": source_status,
-        },
+        "source": benchmark_metadata.legacy_source_snapshot(source),
         "detected_cpu_count": os.cpu_count(),
         "zynum_maximum_threads": zynum_maximum_threads_detected(),
         "samples": args.samples,
         "calls_per_sample": args.calls_per_sample,
         "process_repeats": args.process_repeats,
+        "schedule": args.process_schedule,
         "isolation": "fresh process per library/routine/corpus/process repeat",
         "process_metric": "paired-harness-subtracted median ns/call",
         "aggregate_metric": "median of per-process median ns/call",
@@ -580,19 +620,33 @@ def write_metadata(args, output, selected, cases):
         ),
         "case_count_per_library": len(cases),
         "environment": environment_snapshot(),
-        "probe": {"path": args.probe, "sha256": sha256_file(args.probe)},
-        "libraries": [
-            {"name": name, "path": path, "sha256": sha256_file(path)}
-            for name, path in selected
-        ],
-        "cases": [
-            {"routine": case.routine, "case": case.input_case} for case in cases
-        ],
+        "probe": {
+            "path": probe_record["path"],
+            "sha256": probe_record["sha256"],
+        },
+        "libraries": library_records,
+        "benchmark_identity": benchmark_identity,
+        "cases": [{"routine": case.routine, "case": case.input_case} for case in cases],
     }
-    metadata_path = output.with_suffix(output.suffix + ".meta.json")
-    with metadata_path.open("w") as file:
-        json.dump(metadata, file, indent=2, sort_keys=True)
-        file.write("\n")
+    return benchmark_metadata.serialize_public_metadata(
+        metadata,
+        controller="run_rotg_latency_report.py",
+        parameter_keys=(
+            "samples",
+            "calls_per_sample",
+            "process_repeats",
+            "schedule",
+            "cases",
+        ),
+    )
+
+
+def serialize_csv(rows):
+    file = io.StringIO(newline="")
+    writer = csv.DictWriter(file, fieldnames=CSV_FIELDNAMES)
+    writer.writeheader()
+    writer.writerows(rows)
+    return file.getvalue().encode("utf-8")
 
 
 def run_controller(args):
@@ -601,40 +655,108 @@ def run_controller(args):
         raise ValueError("ROTG latency probe is not available: {}".format(args.probe))
     cases = requested_cases(args)
     selected = selected_libraries(args)
-    rows = []
-    for library_name, library_path in selected:
-        for case_index, case in enumerate(cases, 1):
+    validate_unique_library_labels(selected)
+    validate_schedule(len(selected), args.process_repeats, args.process_schedule)
+    requests = [
+        benchmark_artifacts.ArtifactRequest.binary("rotg_latency_probe", args.probe)
+    ]
+    requests.extend(library_artifact_request(name, path) for name, path in selected)
+    artifacts = benchmark_artifacts.ArtifactSnapshotSet.capture(requests)
+    try:
+        frozen_probes = artifacts.for_role("binary")
+        frozen_libraries = artifacts.for_role("library")
+        if len(frozen_probes) != 1 or len(frozen_libraries) != len(selected):
+            raise ValueError(
+                "ROTG latency artifact snapshot projection is inconsistent"
+            )
+        benchmark_identity = benchmark_metadata.collect_benchmark_identity_from_frozen(
+            args,
+            libraries=frozen_libraries,
+            binaries=frozen_probes,
+        )
+
+        def announce(library_index, case_index, repeat_index):
+            library_name, _ = selected[library_index]
+            case = cases[case_index]
+            repeat = (
+                ""
+                if repeat_index is None
+                else " repeat={}/{}".format(repeat_index + 1, args.process_repeats)
+            )
             print(
-                "[rotg-latency {}] case={}/{} {} {}".format(
+                "[rotg-latency {}] case={}/{}{} {} {}".format(
                     library_name,
-                    case_index,
+                    case_index + 1,
                     len(cases),
+                    repeat,
                     case.routine,
                     case.input_case,
                 ),
                 file=sys.stderr,
                 flush=True,
             )
-            repeats = [
-                run_one_process(args, library_name, library_path, case)
-                for _ in range(args.process_repeats)
-            ]
-            rows.append(aggregate_repeats(repeats))
 
+        def run_one(library_index, case_index, _repeat_index):
+            library_name, _ = selected[library_index]
+            try:
+                row = run_one_process(
+                    args,
+                    library_name,
+                    frozen_libraries[library_index].execution_path,
+                    cases[case_index],
+                    probe_path=frozen_probes[0].execution_path,
+                )
+            except OSError as exc:
+                raise ValueError(
+                    artifacts.redact_private_paths(
+                        "cannot start ROTG latency probe for {}: {}".format(
+                            library_name, exc
+                        )
+                    )
+                ) from None
+            return artifacts.redact_private_paths(row)
+
+        samples = collect_repeats(
+            selected,
+            cases,
+            args.process_repeats,
+            args.process_schedule,
+            run_one,
+            announce,
+        )
+        rows = []
+        for library_index, _ in enumerate(selected):
+            for case_index, _ in enumerate(cases):
+                rows.append(aggregate_repeats(samples[library_index][case_index]))
+
+        csv_contents = artifacts.redact_private_paths(serialize_csv(rows))
+        metadata_contents = artifacts.redact_private_paths(
+            serialize_metadata(
+                args,
+                artifacts.legacy_records("library"),
+                frozen_probes[0].legacy_record(),
+                cases,
+                benchmark_identity,
+            )
+        )
+        artifacts.finalize()
+    finally:
+        artifacts.close()
     output = Path(args.csv)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=CSV_FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(rows)
-    write_metadata(args, output, selected, cases)
+    metadata_path = output.with_suffix(output.suffix + ".meta.json")
+    publish_outputs(
+        [
+            ReportOutput(output, csv_contents),
+            ReportOutput(metadata_path, metadata_contents),
+        ]
+    )
 
 
 def main(argv=None):
     args = parse_args(argv)
     try:
         run_controller(args)
-    except ValueError as exc:
+    except (ValueError, benchmark_artifacts.ArtifactSnapshotError) as exc:
         print(exc, file=sys.stderr)
         return 2
     return 0

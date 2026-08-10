@@ -33,6 +33,14 @@ pub fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     };
 }
 
+pub fn asumUnitComplexComponents(comptime T: type, n: usize, x: [*]const T) ?T {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.asumUnitComplexComponents(T, n, x),
+        .x86_64 => x86_64.asumUnitComplexComponents(T, n, x),
+        else => null,
+    };
+}
+
 pub fn nrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.nrm2UnitReal(T, n, x),
@@ -45,6 +53,14 @@ pub fn iamaxUnitReal(comptime T: type, n: usize, x: [*]const T) ?types.BlasInt {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.iamaxUnitReal(T, n, x),
         .x86_64 => x86_64.iamaxUnitReal(T, n, x),
+        else => null,
+    };
+}
+
+pub fn iamaxUnitComplex(comptime T: type, n: usize, x: [*]const T) ?types.BlasInt {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.iamaxUnitComplex(T, n, x),
+        .x86_64 => x86_64.iamaxUnitComplex(T, n, x),
         else => null,
     };
 }

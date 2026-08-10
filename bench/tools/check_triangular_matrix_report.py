@@ -8,6 +8,19 @@ import argparse
 import csv
 import sys
 from collections import defaultdict
+from pathlib import Path
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+from report_comparison import (  # noqa: E402
+    best_higher_row,
+    paired_median_ratio,
+    parse_positive_finite,
+    positive_finite_ratio,
+    validate_optional_metric_evidence,
+)
 
 CHECKED_STATUSES = {"checked-ok"}
 
@@ -41,9 +54,7 @@ def parse_args(argv=None):
             "BLAS using fresh-process statistics."
         )
     )
-    parser.add_argument(
-        "csv", help="Path to a run_triangular_matrix_report CSV file."
-    )
+    parser.add_argument("csv", help="Path to a run_triangular_matrix_report CSV file.")
     parser.add_argument("--zynum", default="Zynum")
     parser.add_argument(
         "--comparator",
@@ -59,9 +70,9 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--stat",
-        choices=("median", "best", "min"),
+        choices=("median", "best", "min", "paired-median"),
         default="median",
-        help="Fresh-process statistic to compare. Defaults to median.",
+        help="Fresh-process statistic to compare; paired-median uses same-repeat ratios.",
     )
     parser.add_argument("--routine", action="append")
     parser.add_argument("--family", action="append", choices=("trmm", "trsm"))
@@ -132,8 +143,7 @@ def row_allowed(args, row):
         (args.diag, row["diag"]),
     )
     if any(
-        selected is not None and value not in selected
-        for selected, value in filters
+        selected is not None and value not in selected for selected, value in filters
     ):
         return False
     try:
@@ -151,11 +161,12 @@ def metric_value(args, row):
         "median": "metric_median",
         "best": "metric_max",
         "min": "metric_min",
+        "paired-median": "metric_median",
     }[args.stat]
     value = row.get(field)
     if value in (None, ""):
         raise KeyError(field)
-    return float(value)
+    return parse_positive_finite(value, field)
 
 
 def describe_key(key):
@@ -189,8 +200,10 @@ def describe_key(key):
 
 def main(argv=None):
     args = parse_args(argv)
-    if args.ratio <= 0:
-        print("--ratio must be positive", file=sys.stderr)
+    try:
+        args.ratio = parse_positive_finite(args.ratio, "--ratio")
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
         return 2
     comparators = args.comparator or ["Accelerate", "OpenBLAS"]
 
@@ -225,6 +238,7 @@ def main(argv=None):
                     return 2
                 continue
             try:
+                validate_optional_metric_evidence(row)
                 row["metric_value"] = metric_value(args, row)
                 key = group_key(row)
             except (KeyError, ValueError):
@@ -235,8 +249,7 @@ def main(argv=None):
                 return 2
             if row["library"] in groups[key]:
                 print(
-                    f"duplicate library row for {describe_key(key)}: "
-                    f"{row['library']}",
+                    f"duplicate library row for {describe_key(key)}: {row['library']}",
                     file=sys.stderr,
                 )
                 return 2
@@ -245,7 +258,7 @@ def main(argv=None):
     failures = []
     missing = []
     checked_count = 0
-    for key, by_library in groups.items():
+    for key, by_library in sorted(groups.items()):
         zynum = by_library.get(args.zynum)
         if zynum is None:
             missing.append((key, args.zynum))
@@ -258,17 +271,37 @@ def main(argv=None):
                 missing.append((key, ",".join(comparators)))
             continue
         checked_count += 1
-        best = max(comparator_rows, key=lambda row: row["metric_value"])
-        required = args.ratio * best["metric_value"]
-        ratio = (
-            zynum["metric_value"] / best["metric_value"]
-            if best["metric_value"] > 0
-            else 1.0
-        )
-        if zynum["metric_value"] < required:
+        if args.stat == "paired-median":
+            try:
+                ratio, best = min(
+                    ((paired_median_ratio(zynum, row), row) for row in comparator_rows),
+                    key=lambda item: (item[0], item[1]["library"]),
+                )
+            except ValueError as exc:
+                print(
+                    f"bad paired TRMM/TRSM samples for {describe_key(key)}: {exc}",
+                    file=sys.stderr,
+                )
+                return 2
+        else:
+            best = best_higher_row(comparator_rows, "metric_value")
+            try:
+                ratio = positive_finite_ratio(
+                    zynum["metric_value"], best["metric_value"]
+                )
+            except ValueError as exc:
+                print(
+                    "bad TRMM/TRSM comparison ratio for {}: {}".format(
+                        describe_key(key), exc
+                    ),
+                    file=sys.stderr,
+                )
+                return 2
+        if ratio < args.ratio:
             failures.append((ratio, key, zynum, best))
 
-    failures.sort(key=lambda item: item[0])
+    failures.sort(key=lambda item: (item[0], item[1]))
+    missing.sort(key=lambda item: (item[0], item[1]))
     print(
         f"checked={checked_count} passed={checked_count - len(failures)} "
         f"failed={len(failures)} missing={len(missing)} "

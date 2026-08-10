@@ -7,24 +7,22 @@ const builtin = @import("builtin");
 
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
-const vector_ops = @import("../vector/operations.zig");
+const dependency_vector = @import("../../kernels/shared/matrix_vector/dependency_vector.zig");
+const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 
 const BlasInt = scalar.BlasInt;
 const Order = scalar.Order;
 const Uplo = scalar.Uplo;
 const Diag = scalar.Diag;
+const tuning = level2_tuning.active.triangular;
 
 fn isSupportedScalar(comptime T: type) bool {
     return T == f32 or T == f64 or T == scalar.ComplexF32 or T == scalar.ComplexF64;
 }
 
-const complex_vector_min = 64;
-const complex_vector_parallel_min = 512 * 1024;
-
 fn gateAllows(comptime T: type, require_x86: bool, n: BlasInt, k: BlasInt, incx: BlasInt) bool {
     if (comptime !isSupportedScalar(T)) return false;
-    if (require_x86 and builtin.cpu.arch != .x86_64) return false;
-    return incx == 1 and n >= 512 and k >= 0 and k <= @divTrunc(n, 16);
+    return tuning.bandWindowAllowed(require_x86, n, k, incx);
 }
 
 inline fn opValue(comptime T: type, comptime trans: Order, value: T) T {
@@ -59,18 +57,18 @@ inline fn bandColumn(comptime uplo: Uplo, n: usize, k: usize, lda: BlasInt, colu
 
 fn axpyContiguous(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
     if (n == 0 or scalar.isZero(T, alpha)) return;
-    if (comptime T == f32 or T == f64) return vector_ops.axpyUnitReal(T, n, alpha, a, x);
-    if (n >= complex_vector_min and n < complex_vector_parallel_min) {
-        return vector_ops.axpy(T, @intCast(n), alpha, a, 1, x, 1);
+    if (comptime T == f32 or T == f64) return dependency_vector.axpy(T, n, alpha, a, x);
+    if (tuning.preferDenseVector(n) and tuning.keepComplexDependencySerial(n)) {
+        return dependency_vector.axpy(T, n, alpha, a, x);
     }
     for (0..n) |i| x[i] = scalar.add(T, x[i], scalar.mul(T, alpha, a[i]));
 }
 
 fn dotContiguous(comptime T: type, comptime trans: Order, n: usize, a: [*]const T, x: [*]const T) T {
     if (n == 0) return scalar.zero(T);
-    if (comptime T == f32 or T == f64) return vector_ops.dotUnitReal(T, n, a, x);
-    if (n >= complex_vector_min and n < complex_vector_parallel_min) {
-        return vector_ops.dot(T, @intCast(n), a, 1, x, 1, trans == .conj_trans);
+    if (comptime T == f32 or T == f64) return dependency_vector.dot(T, n, a, x, false);
+    if (tuning.preferDenseVector(n) and tuning.keepComplexDependencySerial(n)) {
+        return dependency_vector.dot(T, n, a, x, trans == .conj_trans);
     }
 
     var sum = scalar.zero(T);

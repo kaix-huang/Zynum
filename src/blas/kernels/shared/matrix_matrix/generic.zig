@@ -4,11 +4,6 @@
 const basic = @import("generic/basic.zig");
 const gemm_task = @import("task.zig");
 
-pub fn preferredColumnBlock(comptime T: type) usize {
-    if (T == f32 or T == f64) return 4;
-    @compileError("generic GEMM kernels support f32 and f64");
-}
-
 pub fn noTransReal(comptime T: type, task: gemm_task.Task(T)) void {
     if (T == f32) {
         noTransRealF32(task);

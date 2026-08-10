@@ -13,6 +13,7 @@ const access = @import("matrix_vector/access.zig");
 const general = @import("matrix_vector/general.zig");
 const symmetric = @import("matrix_vector/symmetric.zig");
 const triangular = @import("matrix_vector/triangular.zig");
+const compact_triangular = @import("matrix_vector/compact_triangular_entry.zig");
 const rank_update = @import("matrix_vector/rank_update.zig");
 
 pub const BlasInt = scalar.BlasInt;
@@ -38,10 +39,10 @@ pub const spmv = symmetric.spmv;
 
 pub const trmv = triangular.trmv;
 pub const tbmv = triangular.tbmv;
-pub const tpmv = triangular.tpmv;
+pub const tpmv = compact_triangular.tpmv;
 pub const trsv = triangular.trsv;
-pub const tbsv = triangular.tbsv;
-pub const tpsv = triangular.tpsv;
+pub const tbsv = compact_triangular.tbsv;
+pub const tpsv = compact_triangular.tpsv;
 
 pub const ger = rank_update.ger;
 pub const syr = rank_update.syr;

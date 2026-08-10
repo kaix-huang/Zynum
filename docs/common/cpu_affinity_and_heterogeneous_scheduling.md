@@ -1,132 +1,122 @@
-# CPU Affinity And Heterogeneous Scheduling Notes
+# CPU Affinity And Heterogeneous Scheduling
 
-This note records what Zynum can and cannot assume about CPU placement when
-tuning BLAS task splits on heterogeneous machines.
+This document defines portable rules for interpreting CPU topology, affinity,
+and heterogeneous task placement while tuning BLAS paths. Topology is evidence
+about available capacity; it is not permission to encode one machine's processor
+numbering into dispatch.
 
-## Apple Silicon / macOS
+## General Rules
 
-Public macOS APIs do not provide Linux-style "pin this thread to CPU N" control
-for Apple Silicon. The Mach `THREAD_AFFINITY_POLICY` interface is an
-experimental affinity-tag hint. Apple's public XNU header describes matching
-tags as a request for threads to share an L2 cache if possible; it is not a CPU
-ID, P-core, E-core, or cluster selector.
+- Derive usable concurrency from the CPU allocation visible to the process.
+- Distinguish physical topology, allowed cpuset, task placement, and observed
+  performance; they are different facts.
+- Treat processor IDs as ephemeral identifiers, not performance classes.
+- Measure task bodies, submission, waiting, and merge time separately before
+  changing a split.
+- Keep all algorithms correct when fewer helpers run than requested or when every
+  task lands on the same capacity class.
+- Use `ZYNUM_MAXIMUM_THREADS` only as a diagnostic cap. Default gates leave it
+  unset and record the runtime-observed capacity.
 
-On the local Apple M5 machine used for the 2026 tuning pass, the public affinity
-interface is not usable even as an L2 hint:
+## macOS On Heterogeneous AArch64
 
-```text
-thread_policy_set THREAD_AFFINITY_POLICY tag=1 kr=46
-task_info TASK_AFFINITY_TAG_INFO kr=0 count=4 set_count=0 task_count=0 min=0 max=0
-thread_policy_get THREAD_AFFINITY_POLICY kr=46 count=1 default=0 tag=0
-```
+Public macOS APIs do not provide a general supported contract for pinning a
+thread to an exact CPU or performance/efficiency core. The following are not
+equivalent to CPU affinity:
 
-`KERN_NOT_SUPPORTED` is value 46 in the macOS SDK, and
-`TASK_AFFINITY_TAG_INFO` reports zero available affinity sets. A runtime path
-must therefore treat Mach affinity tags as unavailable on this M5 unless a
-fresh probe on the measured OS reports otherwise.
+- `hw.perflevel*` topology information;
+- quality-of-service classes;
+- Mach affinity tags; or
+- observing one scheduling pattern in a trace.
 
-The available local topology information is still useful as a capacity hint:
+Topology queries can estimate capacity classes and cache groupings. QoS can
+express scheduling intent. Affinity tags may encourage related placement. None
+of these proves an exact CPU, stable core class, or persistent cluster assignment.
 
-```text
-hw.ncpu: 10
-hw.logicalcpu: 10
-hw.physicalcpu: 10
-hw.perflevel0.logicalcpu: 4
-hw.perflevel1.logicalcpu: 6
-hw.perflevel0.l2cachesize: 16777216
-hw.cachelinesize: 128
-```
+Do not describe a result as pinned unless a supported API and runtime trace prove
+the claim. Record the mechanism exactly, along with the process's runtime CPU
+capacity and actual task durations.
 
-Zynum may use `hw.perflevel0.logicalcpu`, `hw.perflevel1.logicalcpu`,
-`hw.perflevel0.l2cachesize`, and `hw.cachelinesize` as shape-policy inputs, as
-`src/blas/runtime.zig` already does. It must not infer that helper ordinal 0..3
-will stay on the four performance cores.
+A heterogeneous split may use capacity-weighted task sizes only after repeated
+traces show the intended imbalance and boundary controls show a complete-call
+gain. The path must remain correct under arbitrary placement and should fall back
+to uniform work when runtime evidence is unavailable.
 
-The main public scheduling knob left on macOS is thread QoS. The current runtime
-sets worker threads to `QOS_CLASS_USER_INITIATED` with
-`pthread_set_qos_class_self_np`. QoS is a scheduler priority/quality request,
-not an affinity contract. Raising workers to `QOS_CLASS_USER_INTERACTIVE` should
-only be tried as an explicit experiment with benchmark evidence; it is not a
-library default to promote without wider latency and system-impact checks.
+## Linux Affinity
 
-That QoS A/B was tested for the remaining c64 GER512 gap and removed. Raising
-Zynum worker threads to `QOS_CLASS_USER_INTERACTIVE` passed target correctness,
-but the focused fresh-process report
-`zig-out/perf-report/level2_qos_interactive_n512_probe_20260707.csv` measured
-`zgeru/zgerc c64 n=512` at 74.235/73.693 Gops, below the same-day baseline
-74.457/74.125 Gops in
-`zig-out/perf-report/level2_baseline_n512_before_next_20260707.csv`.
-Sampling (`/tmp/zynum_zgeru512_qos_interactive_sample.txt`) still put useful
-time in `runComplexGerTaskC64 -> vector.operations.axpy`, with `runLowLatency`
-and `__ulock_wait2` secondary. The result does not support promoting
-`USER_INTERACTIVE` as a default scheduling hint on this M5; the runtime remains
-at `QOS_CLASS_USER_INITIATED`.
+Linux affinity masks are enforceable, but only inside the cpuset assigned to the
+process. In containers and batch-scheduled environments, that set may be smaller
+or differently numbered than the physical system.
 
-SME/SM state does not change the affinity conclusion. SM/ZA/SIMD state belongs
-to the executing thread and is preserved by the OS as required, but a BLAS task
-split still cannot assume that a helper keeps the same core, cluster, or P/E
-class across wakeups. When a candidate depends on streaming mode, its evidence
-must distinguish kernel-body cost from `smstart`/`smstop`, ABI save/restore, and
-wait/migration effects.
+Before an affinity experiment, record:
 
-## Linux / x86_64
+- the inherited process affinity mask;
+- package, core, SMT-sibling, cache, and NUMA topology within that mask;
+- the runtime CPU capacity reported to Zynum;
+- comparator thread and affinity settings; and
+- whether the caller and helpers are all covered by the policy.
 
-Linux provides real CPU affinity masks through `sched_setaffinity` and
-`pthread_setaffinity_np`. The current Zynum runtime only pins persistent helper
-threads, and only inside the CPU set already allowed by the scheduler. It does
-not pin the caller thread and does not choose CPUs outside the job's cpuset.
+A helper-pinning policy must choose only CPUs in the inherited mask. It must not
+assume contiguous numbering, select CPUs outside the allocation, or leave the
+caller competing unexpectedly with a pinned helper.
 
-For H3C and other Linux hosts, topology-aware experiments should first record:
+Affinity can diagnose migration, SMT contention, or NUMA placement. It becomes a
+production policy only when it improves representative complete calls across
+valid allocations and does not harm fairness or integration with the embedding
+application.
 
-- the process affinity mask from `sched_getaffinity`;
-- per-CPU topology from `/sys/devices/system/cpu/cpu*/topology/`;
-- package, core, SMT sibling, NUMA, and job scheduler cpuset boundaries;
-- comparator thread-count and dynamic-threading settings for MKL/OpenBLAS.
+## Designing Task Splits
 
-Use `sched_getcpu` or equivalent tracing to validate where tasks actually ran
-when a result depends on placement. Do not infer that worker ordinal maps to a
-specific socket, core, or SMT sibling unless the affinity mask and trace both
-show it.
+For each candidate split, state:
 
-## Split-Design Consequences
+- independent work and output ownership;
+- minimum useful grain size;
+- expected bandwidth or arithmetic balance;
+- private workspace and merge cost;
+- maximum task count;
+- behavior after partial submission; and
+- serial fallback.
 
-Apple M5 split design should treat the 4P/6E topology as a planning signal, not
-as a binding mechanism. Static weighted task arrays such as "four larger P-core
-tasks plus smaller E-core tasks" are brittle without usable affinity. They can
-win in one run if the scheduler happens to place helpers favorably, then regress
-when helper wake order or core migration changes.
+Prefer disjoint output ranges. Reductions use bounded private partials and one
+explicit merge. Dependency-ordered operations remain serial across dependency
+steps even if work inside one step can use helpers.
 
-Retain or reject heterogeneous split policies only with diagnostics that show
-the mechanism:
+Helper identity must not become part of numerical semantics. If a measured path
+uses asymmetric shard sizes, encode a capacity ratio or task class in tuning,
+not a processor ID or helper offset.
 
-- per-task start/end timing and participant identity;
-- samples or traces separating task-body work from `runLowLatency` wait/wake
-  overhead;
-- migration or current-CPU observations when the platform exposes them;
-- disassembly when the result depends on SM/ZA/SIMD state transitions or a
-  specific load/store schedule;
-- repeated fresh-process reports for both default-thread and relevant
-  single-thread/thread-cap runs.
+## Measurement Protocol
 
-On macOS, useful next experiments are QoS A/B runs, per-task timing, and
-Instruments/System Trace or `sample` captures around outliers. Mach affinity
-tagging should stay behind a probe and is currently expected to be disabled on
-this M5.
+1. Run correctness with the default scheduler and with explicit one-thread and
+   low-thread caps.
+2. Record available cpuset or topology hints without changing placement.
+3. Collect per-task start, stop, processed work, and caller/helper identity.
+4. Repeat in fresh processes and inspect placement and duration distributions.
+5. Apply one affinity, QoS, or weighting change at a time.
+6. Compare the complete call, not only the fastest task.
+7. Re-run off-gate shapes and comparator controls.
 
-On Linux/x86_64, useful next experiments are cpuset-aware helper ordering,
-NUMA/socket-aware grouping, and SMT-aware masks. Those are valid implementation
-directions for the later H3C pass, but performance runs must follow the remote
-job-submission rules and keep comparator thread counts pinned.
+An apparent win caused by a favorable placement in one process is noise until it
+survives repeated balanced-order measurements. A slower complete call with more
+uniform task durations is still a regression.
+
+## Retention And Rollback
+
+Retain a topology-aware policy only when:
+
+- the platform mechanism is supported and accurately described;
+- it stays inside the execution allocation;
+- all submission and fallback paths remain complete;
+- native traces confirm the intended mechanism; and
+- fresh-process complete-call results improve beyond variance.
+
+Rollback when the policy depends on processor numbering, harms restricted
+allocations, creates a second worker lifecycle, improves only capped diagnostics,
+or loses its gain after balanced process ordering.
 
 ## Primary References
 
-- Apple XNU `thread_policy.h`:
-  https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/thread_policy.h
-- Apple libpthread `pthread/qos.h`:
-  https://github.com/apple-oss-distributions/libpthread/blob/main/include/pthread/qos.h
-- Linux `sched_setaffinity(2)`:
-  https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html
-- Linux `sched_getcpu(3)`:
-  https://man7.org/linux/man-pages/man3/sched_getcpu.3.html
-- Linux CPU topology sysfs:
-  https://docs.kernel.org/admin-guide/cputopology.html
+- [Apple Quality of Service classes](https://developer.apple.com/documentation/dispatch/dispatchqos)
+- [Linux `sched_setaffinity(2)`](https://man7.org/linux/man-pages/man2/sched_setaffinity.2.html)
+- [Linux cpuset control](https://docs.kernel.org/admin-guide/cgroup-v2.html)
+- [hwloc documentation](https://www.open-mpi.org/projects/hwloc/)

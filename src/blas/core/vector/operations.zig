@@ -63,6 +63,13 @@ fn unroll(comptime T: type) comptime_int {
     return 4 * lanes(T);
 }
 
+/// Zig 0.16 Debug x86_64 may widen sub-128-bit vector pointer accesses and
+/// propagate poisoned high lanes. Keep vector tails at 16 bytes or wider; the
+/// scalar remainder owns every narrower suffix.
+fn safeTailLaneCounts(comptime lane_count: comptime_int) [2]comptime_int {
+    return .{ lane_count / 2, lane_count / 4 };
+}
+
 inline fn loadVec(comptime T: type, comptime lane_count: comptime_int, ptr: [*]const T, index: usize) @Vector(lane_count, T) {
     const V = @Vector(lane_count, T);
     return @as(*align(1) const V, @ptrCast(ptr + index)).*;
@@ -172,7 +179,7 @@ pub fn scalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) void {
     while (i + lane_count <= n) : (i += lane_count) {
         storeVec(T, lane_count, x, i, loadVec(T, lane_count, x, i) * alpha_v);
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, T);
             const alpha_tail: TailV = @splat(alpha);
@@ -227,7 +234,7 @@ fn swapUnit(comptime T: type, n: usize, x: [*]T, y: [*]T) void {
             storeVec(T, lane_count, x, i, yv);
             storeVec(T, lane_count, y, i, xv);
         }
-        inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+        inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
             if (comptime tail_lanes > 1) {
                 while (i + tail_lanes <= n) : (i += tail_lanes) {
                     const xv = loadVec(T, tail_lanes, x, i);
@@ -307,7 +314,7 @@ pub fn axpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T
         const yv = loadVec(T, lane_count, y, i);
         storeVec(T, lane_count, y, i, @mulAdd(V, xv, alpha_v, yv));
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, T);
             const alpha_tail: TailV = @splat(alpha);
@@ -356,7 +363,7 @@ fn axpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y
         const yv = loadVec(T, lane_count, y, i);
         storeVec(T, lane_count, y, i, @mulAdd(V, xv, alpha_v, yv * beta_v));
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, T);
             const alpha_tail: TailV = @splat(alpha);
@@ -392,7 +399,7 @@ pub fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) T {
         acc = @mulAdd(V, loadVec(T, lane_count, x, i), loadVec(T, lane_count, y, i), acc);
     }
     var sum: T = @reduce(.Add, acc);
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, T);
             var tail_acc: TailV = @splat(0);
@@ -431,6 +438,7 @@ fn dotStride2Real(comptime T: type, n: usize, x: [*]const T, y: [*]const T) T {
 }
 
 fn dotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) f64 {
+    if (vector_binary_kernels.dotF32AccF64Unit(n, x, y)) |result| return result;
     const F32V = @Vector(4, f32);
     const F64V = @Vector(4, f64);
     var acc0: F64V = @splat(0);
@@ -495,8 +503,12 @@ fn dotF32AccF64Stride2(n: usize, x: [*]const f32, y: [*]const f32) f64 {
     return sum;
 }
 
-fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) T {
-    if (vector_unary_kernels.asumUnitReal(T, n, x)) |result| return result;
+const AsumOperandCategory = enum {
+    real,
+    complex_components,
+};
+
+fn asumUnitPortable(comptime T: type, n: usize, x: [*]const T) T {
     const lane_count = lanes(T);
     const unroll_count = unroll(T);
     const V = @Vector(lane_count, T);
@@ -516,7 +528,7 @@ fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) T {
         acc += @abs(loadVec(T, lane_count, x, i));
     }
     var sum: T = @reduce(.Add, acc);
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             var tail_acc: @Vector(tail_lanes, T) = @splat(0);
             while (i + tail_lanes <= n) : (i += tail_lanes) {
@@ -527,6 +539,22 @@ fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) T {
     }
     while (i < n) : (i += 1) sum += @abs(x[i]);
     return sum;
+}
+
+fn asumUnit(comptime T: type, comptime category: AsumOperandCategory, n: usize, x: [*]const T) T {
+    const architecture_result = switch (category) {
+        .real => vector_unary_kernels.asumUnitReal(T, n, x),
+        .complex_components => vector_unary_kernels.asumUnitComplexComponents(T, n, x),
+    };
+    return architecture_result orelse asumUnitPortable(T, n, x);
+}
+
+fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) T {
+    return asumUnit(T, .real, n, x);
+}
+
+fn asumUnitComplexComponents(comptime T: type, n: usize, x: [*]const T) T {
+    return asumUnit(T, .complex_components, n, x);
 }
 
 fn asumStride2Real(comptime T: type, n: usize, x: [*]const T) T {
@@ -569,7 +597,7 @@ fn nrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
         max_v = @max(max_v, @abs(loadVec(T, lane_count, x, i)));
     }
     var scale: T = @reduce(.Max, max_v);
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             var tail_max: @Vector(tail_lanes, T) = @splat(0);
             while (i + tail_lanes <= n) : (i += tail_lanes) {
@@ -604,7 +632,7 @@ fn nrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
         acc = @mulAdd(V, v, v, acc);
     }
     var ssq: T = @reduce(.Add, acc);
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, T);
             const inv_scale_tail: TailV = @splat(1 / scale);
@@ -984,7 +1012,7 @@ fn complexScalUnit(comptime T: type, n: usize, alpha: T, x: [*]T) void {
         const swapped = @shuffle(R, xv, undefined, swap_mask);
         storeVec(R, lane_count, real_x, i, @mulAdd(V, xv, re_v, swapped * im_sign_v));
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, R);
             const tail_re_v: TailV = @splat(realPart(T, alpha));
@@ -1033,7 +1061,7 @@ fn complexAxpyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T)
         const swapped = @shuffle(R, xv, undefined, swap_mask);
         storeVec(R, lane_count, real_y, i, yv + @mulAdd(V, xv, re_v, swapped * im_sign_v));
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, R);
             const tail_re_v: TailV = @splat(realPart(T, alpha));
@@ -1090,7 +1118,7 @@ fn complexAxpbyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T
         const y_term = @mulAdd(V, yv, beta_re_v, y_swapped * beta_im_sign_v);
         storeVec(R, lane_count, real_y, i, x_term + y_term);
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, R);
             const tail_alpha_re_v: TailV = @splat(realPart(T, alpha));
@@ -1178,7 +1206,7 @@ fn complexDotUnit(comptime T: type, n: usize, x: [*]const T, y: [*]const T, conj
     }
     var re_sum: R = @reduce(.Add, re_acc);
     var im_sum: R = @reduce(.Add, im_acc);
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, R);
             const tail_swap_mask = comptime pairSwapMask(tail_lanes);
@@ -1259,7 +1287,7 @@ fn iamaxUnitReal(comptime T: type, n: usize, x: [*]const T) BlasInt {
             }
         }
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             while (i + tail_lanes <= n) : (i += tail_lanes) {
                 const max_v = @abs(loadVec(T, tail_lanes, x, i));
@@ -1288,6 +1316,7 @@ fn iamaxUnitReal(comptime T: type, n: usize, x: [*]const T) BlasInt {
 }
 
 fn iamaxUnitComplex(comptime T: type, n: usize, x: [*]const T) BlasInt {
+    if (vector_unary_kernels.iamaxUnitComplex(T, n, x)) |result| return result;
     if (n == 0) return 0;
     const R = Real(T);
     const lane_count = lanes(R);
@@ -1332,7 +1361,7 @@ fn iamaxUnitComplex(comptime T: type, n: usize, x: [*]const T) BlasInt {
             }
         }
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             while (i + tail_lanes <= real_n) : (i += tail_lanes) {
                 const ax = @abs(loadVec(R, tail_lanes, real_x, i));
@@ -1437,7 +1466,7 @@ fn rotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) void {
         storeVec(T, lane_count, x, i, @mulAdd(V, xv, c_v, yv * s_v));
         storeVec(T, lane_count, y, i, @mulAdd(V, -xv, s_v, yv * c_v));
     }
-    inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+    inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1) {
             const TailV = @Vector(tail_lanes, T);
             const c_tail: TailV = @splat(c);
@@ -1585,7 +1614,7 @@ fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h
             storeVec(T, lane_count, x, i, @mulAdd(V, w, h11_v, z * h12_v));
             storeVec(T, lane_count, y, i, @mulAdd(V, w, h21_v, z * h22_v));
         }
-        inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+        inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
             if (comptime tail_lanes > 1) {
                 const TailV = @Vector(tail_lanes, T);
                 const h11_tail: TailV = @splat(h11);
@@ -1618,7 +1647,7 @@ fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h
             storeVec(T, lane_count, x, i, @mulAdd(V, z, h12_v, w));
             storeVec(T, lane_count, y, i, @mulAdd(V, w, h21_v, z));
         }
-        inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+        inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
             if (comptime tail_lanes > 1) {
                 const TailV = @Vector(tail_lanes, T);
                 const h21_tail: TailV = @splat(h21);
@@ -1649,7 +1678,7 @@ fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h
             storeVec(T, lane_count, x, i, @mulAdd(V, w, h11_v, z));
             storeVec(T, lane_count, y, i, z * h22_v - w);
         }
-        inline for (.{ lane_count / 2, lane_count / 4, lane_count / 8 }) |tail_lanes| {
+        inline for (safeTailLaneCounts(lane_count)) |tail_lanes| {
             if (comptime tail_lanes > 1) {
                 const TailV = @Vector(tail_lanes, T);
                 const h11_tail: TailV = @splat(h11);
@@ -2528,21 +2557,29 @@ fn parallelDotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const
     return result;
 }
 
-fn runAsumTask(comptime T: type, raw_tasks: *const anyopaque, index: usize) void {
+fn runAsumTask(comptime T: type, comptime category: AsumOperandCategory, raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const RangeTask(T) = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    task.out.* = asumUnitReal(T, task.n1 - task.n0, task.x + task.n0);
+    task.out.* = asumUnit(T, category, task.n1 - task.n0, task.x + task.n0);
 }
 
-fn runAsumTaskF32(raw_tasks: *const anyopaque, index: usize) void {
-    runAsumTask(f32, raw_tasks, index);
+fn runAsumRealTaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runAsumTask(f32, .real, raw_tasks, index);
 }
 
-fn runAsumTaskF64(raw_tasks: *const anyopaque, index: usize) void {
-    runAsumTask(f64, raw_tasks, index);
+fn runAsumRealTaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runAsumTask(f64, .real, raw_tasks, index);
 }
 
-fn parallelAsumUnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
+fn runAsumComplexComponentsTaskF32(raw_tasks: *const anyopaque, index: usize) void {
+    runAsumTask(f32, .complex_components, raw_tasks, index);
+}
+
+fn runAsumComplexComponentsTaskF64(raw_tasks: *const anyopaque, index: usize) void {
+    runAsumTask(f64, .complex_components, raw_tasks, index);
+}
+
+fn parallelAsumUnit(comptime T: type, comptime category: AsumOperandCategory, n: usize, x: [*]const T) ?T {
     if (comptime builtin.cpu.arch == .x86_64) {
         if (n < 512 * 1024) return null;
     } else {
@@ -2569,7 +2606,10 @@ fn parallelAsumUnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
             .out = &partial[task_index],
         };
     }
-    const runner = if (T == f32) runAsumTaskF32 else runAsumTaskF64;
+    const runner = switch (category) {
+        .real => if (T == f32) runAsumRealTaskF32 else runAsumRealTaskF64,
+        .complex_components => if (T == f32) runAsumComplexComponentsTaskF32 else runAsumComplexComponentsTaskF64,
+    };
     if (!runLevel1Tasks(runner, @ptrCast(&tasks), task_count)) return null;
 
     var result: T = 0;
@@ -2935,14 +2975,15 @@ pub fn asum(comptime T: type, n_: BlasInt, x: [*]const T, incx_: BlasInt) Real(T
     if (n_ <= 0 or incx_ == 0) return 0;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (incx_ == 1) return parallelAsumUnitReal(T, n, x) orelse asumUnitReal(T, n, x);
+        if (incx_ == 1) return parallelAsumUnit(T, .real, n, x) orelse asumUnitReal(T, n, x);
         if (incx_ == 2) return asumStride2Real(T, n, x);
     } else if (comptime isComplex(T)) {
         if (incx_ == 1) {
             const R = Real(T);
             const real_n = 2 * n;
             const real_x = asConstRealPtr(T, x);
-            return parallelAsumUnitReal(R, real_n, real_x) orelse asumUnitReal(R, real_n, real_x);
+            return parallelAsumUnit(R, .complex_components, real_n, real_x) orelse
+                asumUnitComplexComponents(R, real_n, real_x);
         }
     }
     const sx = startIndex(n_, incx_);

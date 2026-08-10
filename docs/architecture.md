@@ -1,32 +1,27 @@
 # Architecture
 
-Zynum is organized as a top-level project with numerical submodules. The first
-submodule is Zynum BLAS (`zynum-blas`).
+Zynum is a Zig-native numerical runtime organized as a top-level package and
+independent numerical submodules. Zynum BLAS (`zynum-blas`) is the first
+shipping submodule. Public API, BLAS semantics, compatibility ABI, kernel
+contracts, tuning policy, and low-level execution have separate owners.
 
 ## Module Boundary
 
-Zynum keeps Zig package facades, implementation modules, and ABI export roots
-separate so each surface has a narrow responsibility:
+- `src/zynum.zig` is the top-level facade and must not contain BLAS
+  implementation details.
+- `src/blas.zig` is the `zynum-blas` module root.
+- `src/blas/api.zig` is the checked Zig API facade.
+- `src/blas/compat.zig` is the shared/static library export root.
+- `src/blas/compat_fortran.zig` and `src/blas/compat_cblas.zig` expose the
+  compatibility modules used by tests and Zig consumers.
+- `include/zynum/blas/` contains generated C, CBLAS, Fortran, and ABI metadata.
 
-- `src/zynum.zig` is the top-level package facade. It exposes `pub const blas`
-  as the explicit BLAS namespace and currently re-exports the BLAS API at the
-  top level for convenience. It should not contain BLAS implementation details.
-- `src/blas.zig` is the Zynum BLAS (`zynum-blas`) Zig module root. Import it
-  directly when a build only wants the BLAS submodule, or through `zynum.blas`
-  when importing the top-level package. It exposes typed Zig API names, shared
-  types, and runtime controls, but it is not the native ABI export root.
-- `src/blas/api.zig` is the checked public Zig BLAS API facade.
-- `src/blas/` contains all implementation files for the BLAS module.
-- `src/blas/compat.zig` is the ABI export root used to build the `zynum_blas`
-  shared and static libraries. It imports the Fortran and CBLAS ABI modules so
-  their `pub export` symbols are present in the final artifact.
-- `src/blas/compat_fortran.zig` and `src/blas/compat_cblas.zig` are build-module
-  roots for testable Zig compatibility imports.
-- `src/blas/compat/fortran.zig` and `src/blas/compat/cblas.zig` are leaf facades
-  that re-export ABI functions and constants as ordinary Zig declarations for
-  tests and compatibility-focused consumers.
-- `include/zynum/blas/` contains generated compatibility files for C, CBLAS,
-  and Fortran users.
+`zig build install-libraries` installs only the dynamic and static libraries.
+ELF and Mach-O use their conventional `zig-out/lib/` layout. Windows installs
+`bin/zynum_blas.dll`, the import library at `lib/zynum_blas.lib`, and the static
+archive at `lib/static/zynum_blas.lib`. Static Windows consumers name that
+archive explicitly and must not add `lib/static` to a normal library-search
+path where it could shadow the import library.
 
 Future modules should follow the same shape:
 
@@ -39,296 +34,224 @@ docs/<module or platform>/
 
 ## Public Zig API
 
-- `src/blas/api.zig` is the public BLAS API facade.
-- `src/blas/api/views.zig` owns checked vector and matrix views.
-- `src/blas/api/aliasing.zig` owns Debug/Safe alias checks.
-- `src/blas/api/operations.zig` translates user-facing operations into core
-  BLAS calls.
+`src/blas/api/views.zig` owns checked vector and matrix views,
+`src/blas/api/aliasing.zig` owns checked-build alias validation, and
+`src/blas/api/operations.zig` translates descriptive operations into the core.
 
-Public Zig names should be descriptive. Use names such as `matrixMultiply`
-instead of exposing BLAS abbreviations unless the abbreviation is the domain
-term itself.
+Public names describe operations rather than ABI abbreviations. Default output
+APIs use a no-alias contract. Supported overlap is explicit through an in-place,
+`Into`, or `WithWorkspace` form with documented ownership. The checked API
+validates dimensions, strides, storage, and aliasing; it must not import
+architecture-specific dispatch or instruction modules.
 
-Default output operations use a no-alias contract. If input/output aliasing is
-needed, expose it explicitly through `Into` or `WithWorkspace` APIs.
+## Core Semantics
 
-## Core Reference Layer
+- `src/blas/core.zig` is the checked internal facade.
+- `src/blas/core/unchecked.zig` is the narrow ABI-facing facade.
+- `src/blas/core/shared/` owns scalar arithmetic and indexing.
+- `src/blas/core/checked/` owns validated operands and checked execution.
+- `src/blas/core/vector/`, `matrix_vector/`, and `matrix_matrix/` own portable
+  semantics and fallbacks by operation family.
 
-- `src/blas/core.zig` is the internal BLAS semantics facade. It extends the
-  unchecked ABI facade with checked operands and structured operation entry
-  points.
-- `src/blas/core/shared/scalar.zig` owns scalar arithmetic, complex helpers, BLAS
-  character parsing, and enum aliases.
-- `src/blas/core/shared/indexing.zig` owns vector, dense, packed, and banded indexing.
-- `src/blas/core/unchecked.zig` is the narrow unchecked facade for ABI wrappers. It
-  re-exports scalar helpers, indexing helpers, and unchecked vector,
-  matrix-vector, and matrix-matrix BLAS entry points, but it does not expose
-  checked public views or structured operations.
-- `src/blas/core/checked/operands.zig` owns structured internal operand
-  carriers.
-- `src/blas/core/checked/operations.zig` owns readable checked execution entry
-  points.
-- `src/blas/core/vector.zig`, `src/blas/core/matrix_vector.zig`, and
-  `src/blas/core/matrix_matrix.zig` are stable semantic facades.
-- `src/blas/core/vector/`, `src/blas/core/matrix_vector/`, and
-  `src/blas/core/matrix_matrix/` group portable implementations by operand
-  category and storage family. Vector operations currently keep BLAS entry
-  semantics and contiguous fast paths in `vector/operations.zig`; split it
-  further by operation family when another independently testable group is
-  added or when reviewability suffers.
+The core owns argument normalization, traversal, alpha/beta behavior,
+conjugation, task composition, workspace acquisition, and whole-operation
+fallback. The portable implementation is total. An optimized route may reject
+a call only before caller-visible mutation; it cannot partially update output
+and restart through the fallback.
 
-The typed Zig API validates inputs. Core operands do not validate inputs and
-should remain small data carriers. ABI wrappers should import
-`src/blas/core/unchecked.zig` instead of the wider `src/blas/core.zig` facade so the
-external ABI path stays independent of checked public API conveniences.
+## Compatibility ABI
 
-Level 1 and Level 2 keep BLAS argument semantics, stride handling, complex
-fallbacks, and portable scalar loops in the core operation files. Common
-contiguous real fast paths first call the operation-level facades under
-`src/blas/kernels/dispatch/`: `vector_unary.zig`, `vector_binary.zig`, and
-`matrix_vector.zig`. If no target-specific kernel accepts the shape,
-core falls back to shared Zig vector loops for scaling, axpy, reductions, GEMV,
-SYMV, and GER helpers. Higher-level portable paths should reuse lower-level
-unit-stride helpers where practical; for example GEMV and GER fallback code
-calls Level 1 `scal`, `axpy`, and `dot` helpers instead of maintaining separate
-vector loops. General strides, complex values, packed/banded storage, and
-conjugating variants stay on the scalar portable loops.
+Compatibility is layered deliberately:
 
-`src/blas/core/execution/thread_pool.zig` owns the single optional `std.Io.Threaded` helper
-lifecycle used by large contiguous Level 1 kernels, selected Level 2 kernels,
-and GEMM task execution. The normal path uses `std.Io.Group.concurrent`; narrow
-measured paths may use internal low-latency helper publication while still
-relying on `std.Io.Threaded` for helper lifecycle. On Linux/x86_64, persistent
-helpers may also pin themselves inside the scheduler-provided affinity mask when
-that is part of the retained dispatch evidence. On Apple Silicon/macOS, public
-affinity APIs must not be treated as CPU or P/E-core pinning; use the dedicated
-affinity notes before changing split policy. The pool also owns the explicit
-shutdown path used by dynamic library probes before unloading Zynum BLAS. Level 2
-direct parallelism is only for column-disjoint work such as real unit-stride GER
-and large transposed GEMV, or for kernels such as SYMV that use explicit
-per-task reduction storage before writing the shared output. GEMM planning must
-submit planned tasks to this core pool rather than introducing a second worker
-pool.
+1. `src/blas/abi/fortran.zig` exports classic Fortran symbols.
+2. `src/blas/abi/cblas.zig` exports CBLAS symbols and normalizes C layouts.
+3. `src/blas/compat.zig` imports both into the native libraries.
+4. Leaf facades under `src/blas/compat/` support Zig compatibility tests.
+5. `tools/generate_compat_headers.zig` generates C headers, the Fortran module,
+   and the ABI manifest from the ordered export sources.
 
-Level 1/2 architecture kernels use the same operand categories in
-`src/blas/kernels/arch/<arch>/vector/` and
-`src/blas/kernels/arch/<arch>/matrix_vector.zig`. For example,
-`src/blas/kernels/arch/aarch64/vector/unary.zig` owns single-vector feature
-gates such as scale and reductions,
-`src/blas/kernels/arch/aarch64/vector/binary.zig` owns two-vector kernels such
-as copy, axpy, and dot, and
-`src/blas/kernels/arch/aarch64/matrix_vector.zig` owns GEMV and GER
-dispatch. Vector wrappers live in `asm/vector.zig`, GEMV-transpose wrappers
-live in `asm/matrix_vector.zig`, and the ASIMD GER fast path is kept as Zig
-`@Vector` column-block code in `matrix_vector.zig` instead of a NEON assembly
-wrapper.
-Keep experimental ASIMD/SVE/SME kernels behind shape and feature predicates
-until focused benchmarks show they beat the shared Zig vector fallback. SME
-kernels that mutate existing matrices must preserve BLAS additive semantics;
-for example GER needs `A += alpha*x*y^T`, not the overwrite-only GEMM
-direct-store epilogue.
+ABI wrappers mirror external names and calling conventions and call
+`core/unchecked.zig`. They do not contain target selection, tuning, or
+descriptive Zig aliases. After moving or changing exports, regenerate
+`include/zynum/blas/` and verify both shared and static libraries.
 
-Shared fixed-width microkernels live under operation-family directories before
-they become architecture files. `src/blas/kernels/shared/vector/fixed_simd.zig` owns the
-parameterized Level 1 SIMD skeletons for copy, swap, scale, AXPY-like updates,
-reductions, rotations, and complex vector operations.
-`src/blas/kernels/shared/matrix_vector/fixed_simd.zig` owns the parameterized Level 2
-GEMV and GER skeletons. Architecture wrappers should pass comptime
-configuration such as lane counts, unroll factors, copy lane counts, and maximum
-work gates into these shared skeletons before adding a new target-specific loop
-body.
+## Kernel Contract Layer
 
-AArch64 whole-function inline assembly builders are centralized in
-`src/blas/kernels/arch/aarch64/asm/builders.zig`; SVE/SME callers should build
-variants through those comptime string builders instead of duplicating lane,
-unroll, reduction, prologue, or epilogue text. Operation-family wrapper files
-under `src/blas/kernels/arch/aarch64/asm/` own the naked function boundaries.
-Apple AMX opcode emission and
-operand encoding live in `src/blas/kernels/arch/aarch64/matrix_matrix/amx_ops.zig`, leaving
-`src/blas/kernels/arch/aarch64/matrix_matrix/amx.zig` responsible for GEMM algorithm
-structure and gate checks. Shared
-packed SIMD descriptor parameters for ASIMD and x86_64 belong in
-`src/blas/kernels/shared/matrix_matrix/packed_params.zig`.
+`src/blas/kernels/contract.zig` defines the shared catalog vocabulary:
 
-Current Level 1/2 tuning keeps the common arithmetic in core Zig vector loops
-and uses architecture code only for narrow, measured cases. GEMV has two facade
-entry styles: `gemvNoTransFullUnitReal` and `gemvTransFullUnitReal` accept a
-complete BLAS call before core scales `y` or splits work, while the panel
-facades accept a row/column slice after shared core setup. On Apple M-series
-targets with SME2, the full-shape f64 GEMV-N gate may use a 256-row ZA kernel
-that owns the `beta*y + alpha*A*x` epilogue, and the full-shape f64 GEMV-T gate
-may use an 8-column by 32-row ZA kernel that owns the
-`beta*y + alpha*A^T*x` epilogue. Both gates require 64-byte streaming vector
-length and measured medium-matrix shape constraints. Rejected or partial shapes
-fall back to core beta scaling, the parallel splitter, and AMX/SVE/core f64
-panel chains. ASIMD Level 1 helpers remain split behind per-routine gates: only
-measured narrow copy shards are enabled by default, while axpy/reduction/GER
-helpers stay off unless their focused sweep beats the shared fallback. Level 1
-SVE/SME scal candidates may be enabled only behind a length and feature gate
-with fresh focused data; streaming SME helpers must use the same ABI prologue
-and epilogue discipline as GEMM/GEMV. They must preserve only the ABI-visible
-callee-saved FP lanes they actually use, such as the low 64 bits of touched
-`v8`-`v15`/`z8`-`z15`, and scalar FP values that must survive `SMSTOP` should be
-ferried through GPRs and restored after leaving streaming mode. SVE copy and
-SVE GER helpers remain candidate kernels only; keep them disabled by default on
-Apple M-series unless fresh focused data shows a repeatable win over ASIMD copy
-or the core Zig GER panel.
-Level 1 parallelism is intentionally chunked more coarsely than GEMV/GER; it is
-a bandwidth path, not a latency path.
+- stable semantic kernel identity;
+- operation, scalar, layout, and entry surface;
+- required ISA capability and architecture state;
+- lifecycle (`production`, `experimental`, `rejected`, or unavailable);
+- stride, alignment, alias, tail, and epilogue behavior;
+- whole-operation or sub-operation ownership;
+- packing and bounded-workspace requirements; and
+- total fallback.
 
-## File Ownership And Split Rules
+Catalogs describe executable facts. Coverage enumerates supported and missing
+cells. Tuning records measured preference. Executors map stable IDs to bodies.
+Planners compose tasks, packing, workspace, and fallback.
 
-Prefer small, purposeful files over broad utility buckets, but do not split a
-file just because it is long. Split when ownership becomes ambiguous or when a
-new behavior creates an independently testable unit.
+Build, native correctness, and native performance are separate evidence axes.
+Cross-build or emulated results cannot promote native performance support.
+Kernel IDs are lowercase dot-separated semantic names, not source paths,
+benchmark revisions, or processor product names.
 
-Recommended split triggers:
+## Level 1 And Level 2 Kernels
 
-- A semantic core file grows multiple unrelated operation families with
-  different invariants. Split by operation family, for example
-  `matrix_vector/general.zig`, `matrix_vector/triangular.zig`,
-  `matrix_matrix/gemm.zig`, or `matrix_matrix/symmetric.zig`.
-- An ABI file accumulates generated-looking wrapper groups that are easier to
-  review by BLAS level. Split into level-specific ABI leaves while keeping the
-  public export root stable.
-- A GEMM kernel file mixes target-feature detection, candidate metadata,
-  tuning, packing, micro-kernels, and dispatch policy. Keep feature detection in
-  `features.zig`, task/thread policy in `core/matrix_matrix/planner.zig`, shared candidate
-  metadata, matching, reusable prologue/epilogue helpers, and parameterized
-  kernel bodies under `kernels/shared/matrix_matrix/`, and instruction details under
-  `kernels/arch/<arch>/`. Architecture files should pass comptime parameters into
-  shared kernels before forking a new loop body.
-- A test file starts combining unrelated public API, ABI, and kernel behaviors.
-  Split tests by the surface being validated: API shape/aliasing, CBLAS ABI,
-  Fortran ABI, generated headers, and GEMM correctness. Keep surface-level test
-  roots under `test/api/`, `test/abi/`, or `test/headers/` as appropriate.
+Operation dispatch lives under `src/blas/kernels/dispatch/`; reusable loops live
+under `src/blas/kernels/shared/vector/` and
+`src/blas/kernels/shared/matrix_vector/`. Architecture wrappers add capability
+checks and instruction-specific geometry only when the body is genuinely
+different.
 
-When splitting, preserve import roots and public module names unless the change is
-explicitly documented as breaking. Prefer facade files that re-export smaller
-leaves over moving public names directly.
+Level 1 contracts distinguish scalar, contiguous, fixed-width, streaming, and
+isolated-object routes plus total fallbacks. Level 2 contracts distinguish
+complete calls from panels, columns, private deltas, and dependency steps. A
+sub-operation must state output ownership and merge obligations and cannot
+impersonate a complete BLAS call.
+
+Private fixed-layout objects may isolate architecture experiments, but they
+must keep symbols hidden, verify hard predicates before writing, submit work
+through the shared task runtime, and leave non-applicable targets on the total
+fallback. The positive-only `-Dlevel2-width-candidates` option selects its
+experimental profile; build-only evidence does not establish native
+correctness.
+
+See [`common/level1_optimization_notes.md`](common/level1_optimization_notes.md)
+and [`common/level2_optimization_notes.md`](common/level2_optimization_notes.md).
 
 ## GEMM Fast Path
 
-- `src/blas/core/matrix_matrix.zig` is the matrix-matrix facade.
-  `matrix_matrix/gemm.zig` detects no-transpose real GEMM and delegates.
-- `src/blas/core/matrix_matrix/planner.zig` owns shape policy, task splitting, and threading
-  choices.
-- `src/blas/core/execution/thread_pool.zig` owns the single BLAS helper pool used by Level 1,
-  selected Level 2 paths, and GEMM task execution. GEMM does not keep a separate
-  worker pool; `planner.zig` only builds tasks and submits them to the core
-  pool.
-- `src/blas/kernels/dispatch/matrix_matrix.zig` selects the target-feature candidate set.
-- `src/blas/kernels/shared/matrix_matrix/catalog.zig` describes available kernels using stable
-  `KernelId`, tile, packing, and minimum-work metadata.
-- `src/blas/kernels/shared/matrix_matrix/tuning.zig` scores candidate combinations for the
-  current shape and scalar epilogue, and fills execution-plan parameters such as
-  pack mode, AMX/SME sub-kernel, panel batching, and workspace budgets.
-- `src/blas/kernels/shared/matrix_matrix/executor.zig` maps the selected `KernelId` to the
-  implementation module.
-- `src/blas/kernels/shared/matrix_matrix/packed_simd.zig` owns the reusable fixed-width packed-B
-  SIMD panel prologue, K loop, row/tail handling, and write-back wrapper used by
-  ASIMD and x86 SIMD backends.
-- `src/blas/kernels/shared/matrix_matrix/epilogue.zig` owns shared real-GEMM alpha/beta
-  write-back formulas for scalar and vector kernels.
-- `src/blas/kernels/shared/matrix_matrix/task.zig` defines shared task shapes and carries the
-  selected runtime kernel id plus `ExecutionPlan`.
-- `src/blas/kernels/shared/matrix_matrix/generic.zig` is the portable backend.
-- `src/blas/kernels/arch/aarch64/` and `src/blas/kernels/arch/x86_64/` contain
-  architecture-specific feature gates, feasibility checks, state handling, and
-  parameter choices for shared kernel bodies.
+The matrix-matrix control flow is:
 
-Keep shape policy in `core/matrix_matrix/planner.zig` and `kernels/shared/matrix_matrix/tuning.zig`. Keep
-instruction details in `kernels/arch/<arch>/`, but keep reusable loop bodies,
-packed-panel setup, and scalar/vector epilogues in `kernels/shared/matrix_matrix/` when they can
-be expressed by comptime parameters. Architecture-specific kernel files may
-branch on feasibility and correctness only: ISA/OS support, alignment, tile
-availability, alpha/beta constraints, state cleanup, and whether the caller's
-`ExecutionPlan` requested a variant. Future GEMM tuning should first adjust
-descriptor parameters, `ExecutionPlan` fields, shared `Config` parameters, or
-`kernels/shared/matrix_matrix/tuning.zig` matching rules before changing micro-kernel code.
+1. Core code normalizes BLAS semantics and requests a whole-operation plan.
+2. Dispatch exposes candidates compiled for the active capability tier.
+3. Tuning filters hard feasibility and applies measured shape preferences.
+4. The planner composes packing, bounded workspace, epilogue, and task topology.
+5. The executor maps the selected stable ID to a body.
+6. Any pre-compute rejection follows the catalog's total fallback.
 
-## ABI And Compatibility
+Key shared files are `catalog.zig`, `structured_catalog.zig`, `tuning.zig`,
+`task.zig`, `executor.zig`, `coverage.zig`, and `generic.zig`. Architecture
+directories own feature checks, state handling, and instructions. Shape policy,
+packing, tails, and epilogues remain shared when they can be parameterized.
 
-Compatibility is intentionally layered:
+Complex descriptors are distinct because plane materialization, conjugation,
+combination, and scalar restrictions are whole-call contracts. Structured
+descriptors additionally record side, triangle, diagonal, output ownership,
+dependency order, and merge behavior.
 
-1. ABI implementation files mirror external symbol contracts:
-   - `src/blas/abi/fortran.zig` exports classic Fortran BLAS symbols.
-   - `src/blas/abi/cblas.zig` exports CBLAS symbols.
-   These files should call through `src/blas/core/unchecked.zig` for unchecked BLAS
-   semantics instead of importing the wider core facade.
-2. `src/blas/compat.zig` is the native library export root for `libzynum_blas`.
-   It exists to pull both ABI modules into the shared/static library build and
-   should stay minimal.
-3. `src/blas/compat_fortran.zig` and `src/blas/compat_cblas.zig` are testable
-   Zig module roots. They delegate to `src/blas/compat/fortran.zig` and
-   `src/blas/compat/cblas.zig`, which re-export the same ABI-backed functions as
-   Zig declarations. This two-step wrapper is intentional: build roots provide
-   importable module names, while leaf facades keep the Fortran and CBLAS
-   compatibility namespaces focused.
-4. `tools/generate_compat_headers.zig` regenerates headers, the Fortran module,
-   and the ABI manifest from exported ABI signatures. It reads explicit ordered
-   ABI source lists and checks expected export counts so future ABI file splits
-   do not silently drop declarations.
+See [`common/gemm_optimization_notes.md`](common/gemm_optimization_notes.md).
 
-ABI and compat files may use BLAS names because they mirror external contracts.
-They should not contain architecture-specific tuning policy or descriptive Zig
-API aliases; those belong in `src/blas/api.zig` and its submodules. When adding
-or moving exported ABI functions, update the generator source lists and expected
-export counts in `tools/generate_compat_headers.zig` intentionally, regenerate
-`include/zynum/blas/abi_manifest.json`, and verify the manifest against built
-static and dynamic libraries.
+## AArch64 State Boundaries
 
-## Kernel Layer
+ASIMD, non-streaming SVE, and streaming SME are independent capabilities. SME
+availability does not prove ordinary SVE availability. Streaming descriptors
+declare SM/ZA ownership, required vector length and features, and balanced
+entry/exit behavior. Architecture wrappers preserve ABI-visible state, and
+transition cost is part of route selection.
 
-`src/blas/kernels/dispatch/matrix_matrix.zig` reports the active CPU instruction level and
-exposes a candidate list to `src/blas/core/matrix_matrix/planner.zig`. The candidate list is
-metadata only; it does not execute kernels.
+Apple AMX encoding stays in a narrow architecture module; algorithm structure
+and hard gates remain in its matrix-matrix wrapper. AMX and SME are internal
+implementation details, not public API modes.
 
-`src/blas/kernels/shared/matrix_matrix/catalog.zig` is the shared descriptor schema. Descriptors
-are intentionally parameter-oriented: tile sizes, K unroll, packing kind, stack
-pack budget, minimum useful work, ISA level, family, and stable `KernelId`.
-`src/blas/kernels/shared/matrix_matrix/tuning.zig` is the first place to adjust matching rules
-for shape classes and performance-related sub-kernel parameters. It produces
-the execution plan carried by `src/blas/kernels/shared/matrix_matrix/task.zig`, including
-pack-layout choices, AMX/SME variants, panel batching, and workspace budgets.
-`src/blas/kernels/shared/matrix_matrix/executor.zig` is the only shared runtime bridge from
-`KernelId` to architecture modules.
+## Shared Task Runtime
 
-Reusable real-GEMM kernel mechanics live beside the descriptor/tuning layer:
-`src/blas/kernels/shared/matrix_matrix/packed_simd.zig` implements a comptime-configured
-packed-B SIMD skeleton with panel preparation, main accumulation, tail handling,
-and write-back hooks, while `src/blas/kernels/shared/matrix_matrix/epilogue.zig` centralizes
-alpha/beta write-back rules. ASIMD and x86 SIMD modules should provide only
-feature gates, lane counts, panel widths, row-group counts, stack-pack limits,
-and fallback policy for this shared skeleton. Generic fallback kernels may also
-reuse the shared epilogue helpers.
+`src/blas/core/execution/thread_pool.zig` owns the optional `std.Io.Threaded`
+lifecycle shared by BLAS Levels 1-3. Normal task composition uses
+`std.Io.Group.concurrent`.
 
-CPU GEMM task splitting and thread selection remain in
-`src/blas/core/matrix_matrix/planner.zig`, while instruction details remain under
-`src/blas/kernels/arch/<arch>/`. Do not add performance dispatch inside
-instruction-set files. They may keep hard safety caps for fixed-size stack
-frames, compatibility ABI aliases, and mandatory hardware state prologue/cleanup
-such as SME streaming mode or Apple AMX state. The choice to use a performance
-path must come from descriptors, tuning, planner-selected policy, or
-`ExecutionPlan`. Do not add another backend dispatch layer unless it has a concrete, tested
-implementation boundary.
+Parallel paths must:
 
-For Level 1/2, the equivalent dispatch boundary is intentionally narrower:
-core files decide whether a BLAS call is a real unit-stride fast path, the
-operand-category facade selects an architecture module, and the architecture
-module may accept only shapes proven by benchmark gates. Architecture modules
-must return `false` rather than partially handling unsupported tails unless the
-caller explicitly owns the remaining work.
+- derive concurrency from CPU capacity available to the process;
+- use disjoint output ownership or bounded private reductions;
+- acquire workspace before caller-visible mutation;
+- finish unsubmitted work synchronously after partial submission;
+- provide explicit shutdown before dynamic-library unloading; and
+- avoid nested or architecture-specific worker pools.
+
+Affinity and heterogeneous scheduling are platform constraints, not kernel
+semantics. See
+[`common/cpu_affinity_and_heterogeneous_scheduling.md`](common/cpu_affinity_and_heterogeneous_scheduling.md)
+and [`common/zig_0_16_std_io_threading.md`](common/zig_0_16_std_io_threading.md).
+
+## Runtime Configuration
+
+`ZYNUM_MAXIMUM_THREADS` is the only project-specific environment variable.
+When unset, concurrency derives from the execution environment; a positive
+value caps it. Instruction tier, backend, task strategy, and tuning profile are
+internal policy or explicit build/API choices, not environment variables.
+
+## File Ownership And Split Rules
+
+Split files when a new independently testable responsibility appears:
+
+- semantic code splits by operation or storage family;
+- ABI exports split by BLAS level while stable roots remain facades;
+- kernel metadata, tuning, packing, execution, and instructions stay separate;
+- tests split by public API, ABI, generated artifacts, registries, and numerical
+  behavior.
+
+Prefer precise names such as `catalog.zig`, `coverage.zig`, `tuning.zig`,
+`executor.zig`, `planner.zig`, and `asm/<family>.zig`. Preserve public import
+roots when moving implementation leaves.
+
+## Validation Boundaries
+
+Registry tests may bypass preference thresholds to force an executable ID, but
+they still enforce capability, layout, epilogue, state, workspace, and
+failure-before-write constraints. Ordinary API and ABI tests validate selected
+production routes and the fallback chain.
+
+The public test inventory owns logical roots, ordered compiler-enumerated sets,
+environment predicates, modes, native-enumeration state, and evidence joins.
+Official test runners validate it before executing test bodies. Inventory
+commands accept only the exact `-Dcpu=baseline` request for a declared
+environment. Cross-linking and emulation never fill native evidence, and an
+undeclared class cannot infer results from another OS, libc, object format, or
+CPU profile.
+
+`test-native-feature` is a separate correctness-only path for explicit
+non-baseline CPU profiles. It reuses the official test bodies, requires the
+target ABI and object format to match the host, and requires the host feature
+set to cover the requested profile. It neither invokes the inventory runner nor
+creates inventory evidence; the default `test` step remains inventory-certified
+and fail-closed.
+
+The build and test inventory checkers use bounded, fail-closed file admission
+and code-reviewed digests. Those controls establish repository consistency;
+they are not signatures, remote provenance, or authentication. Refresh and
+publication validate complete candidates before replacement and preserve
+uncertain recovery material. The authoritative schema, resource bounds, and
+exit statuses live in `tools/check_build_inventory.py`,
+`tools/check_test_inventory.py`, and the runner sources.
+
+Run these security and consistency gates in a process with no inherited
+`GIT_*` variables:
+
+```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_INVENTORY_CHECKS'
+python3 -B tools/check_build_inventory.py --root .
+python3 -B tools/check_test_inventory.py --structure-only
+zig build test-build-inventory --summary failures
+zig build test-test-inventory --summary failures
+ZYNUM_INVENTORY_CHECKS
+```
+
+Performance changes require correctness-checked native evidence for
+representative shapes on the advertised AArch64 or x86_64 capability tier.
+Raw reports and host-specific records remain outside the public repository.
 
 ## Naming Rules
 
 - Project: `Zynum`.
 - Repository/package slug: `zynum`.
-- Current module slug: `zynum-blas`.
+- Shipping module slug: `zynum-blas`.
 - Link library: `zynum_blas`.
-- Internal C-visible helper symbols: `zynum_blas_*`.
-- Project-specific runtime environment variables: only `ZYNUM_MAXIMUM_THREADS`.
-  Do not add other `ZYNUM_*` environment variables; instruction-set, backend, and
-  worker policy belong in internal dispatch or explicit APIs/build options.
-- Standard BLAS ABI symbols remain unchanged, for example `dgemm_` and
+- Internal C-visible helpers: `zynum_blas_*`.
+- Standard BLAS ABI symbols remain unchanged, such as `dgemm_` and
   `cblas_dgemm`.
+- `portable_scalar` names a terminal complete fallback. Architecture names are
+  reserved for distinct executable bodies or independently compiled tiers.

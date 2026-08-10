@@ -1,36 +1,35 @@
 # Zynum Documentation
 
-Zynum is a Zig-native numerical runtime project. The current shipping module is
-Zynum BLAS (`zynum-blas`): BLAS Level 1-3 coverage, typed Zig views,
-C/CBLAS/Fortran ABI compatibility, generated headers/modules, tests, examples,
-benchmarks, and selected architecture-aware kernels.
+Zynum is a Zig-native numerical runtime project. The shipping Zynum BLAS
+(`zynum-blas`) module provides BLAS Level 1-3 coverage, typed Zig views,
+C/CBLAS/Fortran ABI compatibility, generated headers and modules, tests,
+examples, benchmarks, and selected architecture-aware kernels.
 
-This documentation is organized by audience. Start at the layer that matches
-what you are trying to do, then follow links into deeper implementation notes
-only when needed.
+Choose the entry point that matches your task. Deeper implementation notes are
+useful for kernel work but are not part of the public API contract.
 
-## Audience Layers
+## Audience Guides
 
 | Audience | Entry point | Scope |
 | --- | --- | --- |
-| Users | [`users/README.md`](users/README.md) | Build, install, Zig API usage, C/Fortran calls, runtime controls, examples, beta stability. |
-| Contributors | [`contributors/README.md`](contributors/README.md) | Development checks, PR hygiene, ABI maintenance, benchmark evidence requirements. |
-| Internal design | [`internals/README.md`](internals/README.md) | Module boundaries, facade pattern, core/ABI/kernel ownership, threading rules. |
-| Performance work | [`performance/README.md`](performance/README.md) | Benchmark methodology, retained optimization rules, kernel tuning records. |
+| Users | [`users/README.md`](users/README.md) | Build, install, API usage, C/Fortran calls, runtime controls, and examples. |
+| Contributors | [`contributors/README.md`](contributors/README.md) | Development checks, ABI maintenance, and benchmark evidence. |
+| Architecture | [`internals/README.md`](internals/README.md) | Facades, core/ABI/kernel ownership, and threading policy. |
+| Performance work | [`performance/README.md`](performance/README.md) | Benchmark methodology and kernel tuning notes. |
 
-## Stable Public Entry Points
+## Reference Map
 
 | Goal | Read |
 | --- | --- |
-| Understand the project quickly | [`../README.md`](../README.md) |
+| Understand the project | [`../README.md`](../README.md) |
 | Build and use Zynum | [`development_and_usage.md`](development_and_usage.md) |
 | Call BLAS from C, C++, or Fortran | [`fortran_compatibility.md`](fortran_compatibility.md) |
 | Run examples | [`../examples/README.md`](../examples/README.md) |
-| Understand architecture and source ownership | [`architecture.md`](architecture.md) |
+| Understand architecture and ownership | [`architecture.md`](architecture.md) |
 | Prepare a release | [`open_source_release_checklist.md`](open_source_release_checklist.md) |
-| See future modules | [`roadmap.md`](roadmap.md) |
+| See planned modules | [`roadmap.md`](roadmap.md) |
 
-## Performance And Kernel Notes
+## Performance Notes
 
 | Area | Read |
 | --- | --- |
@@ -46,47 +45,70 @@ only when needed.
 
 ## Common Checks
 
+Repository validation rejects inherited environment variables whose names start
+with `GIT_`. Run direct gates in a sanitized subprocess:
+
 ```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  sh <<'ZYNUM_VALIDATION'
 zig fmt --check build.zig build.zig.zon src test bench examples tools
-env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
-zig build test --summary failures
-zig build --release=safe test --summary failures
-zig build --release=fast test --summary failures
+PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py
+python3 -B tools/check_build_inventory.py --root .
+python3 -B tools/check_test_inventory.py --structure-only
+zig build test-build-inventory --summary failures
+zig build test-test-inventory --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
 zig build generate-headers --summary failures
 zig build --summary failures
+ZYNUM_VALIDATION
 ```
 
-`zig build test` defaults to ReleaseSafe test modules so checked API behavior is
-covered even though normal build artifacts prefer ReleaseFast. Use explicit test
-optimize modes when a change needs a different contract:
+Inventory-dependent test steps require the exact `-Dcpu=baseline` query.
+Ordinary `zig build` remains host-native and unrestricted by the inventory.
+Use `test-inventory-link` to compile a declared foreign test graph without
+claiming native execution evidence:
 
 ```sh
-zig build -Dtest-optimize=Debug test --summary failures
-zig build -Dtest-optimize=ReleaseFast test --summary failures
+zig build test-inventory-link \
+  -Dtarget=x86_64-linux-gnu \
+  -Dcpu=baseline \
+  -Dtest-optimize=Debug \
+  --summary failures
 ```
+
+The public test inventory records logical roots, ordered compiler-enumerated
+sets, target applicability, modes, and native-evidence joins. Pending rows stay
+pending until the exact native environment supplies validated enumeration; they
+cannot borrow evidence from cross-compilation, emulation, or another target
+class. The checkers run before official test bodies and reject unreviewed or
+inconsistent inputs.
+
+Use `--structure-only` for the declared matrix while native rows remain pending.
+Running `tools/check_test_inventory.py` without that option is the full native
+matrix gate. For exact schemas, resource bounds, and refresh behavior, use the
+checker and runner sources as the authoritative reference rather than copying
+their implementation details into public documentation.
 
 ## Documentation Rules
 
-- Public documentation should be English.
-- Keep user docs focused on observable behavior and stable commands.
-- Keep contributor docs focused on repeatable workflows and validation gates.
-- Keep implementation notes tied to concrete ownership boundaries.
-- Keep performance claims tied to correctness commands, focused probes, full
-  sweeps where applicable, CSV artifacts, comparator libraries, target details,
-  and thread policy.
-- Keep local machine instructions, private runbooks, profiler captures, raw
-  benchmark CSVs, temporary plots, and uncurated sampling/disassembly notes out
-  of the public tree. Put local-only paths in `.git/info/exclude`.
+- Write public documentation in English.
+- Focus user docs on observable behavior and stable commands.
+- Focus contributor docs on repeatable workflows and validation gates.
+- Keep implementation notes tied to durable ownership boundaries.
+- Tie performance claims to correctness, focused probes, representative full
+  sweeps, target details, thread policy, and fresh-process comparator evidence.
+- Keep host-local instructions, private runbooks, raw benchmark data, profiler
+  captures, and uncurated sampling or disassembly notes out of the public tree.
 
 ## Public Artifact Boundary
 
-Track source files, tests, examples, generated compatibility headers/modules,
-benchmark tools, documentation, and curated chart SVGs under `docs/assets/`.
-Do not track `zig-out/`, `.zig-cache/`, Python caches, `.DS_Store`, raw CSV
-reports, profiler captures, temporary probe binaries, local agent instructions,
-or machine-specific setup notes.
+Track source, tests, examples, generated compatibility files, benchmark tools,
+documentation, and curated chart SVGs under `docs/assets/`. Do not track build
+outputs, caches, raw reports, profiler captures, temporary probe binaries, or
+host-specific setup notes. Keep durable local records outside the repository.
 
-Zynum `0.0.1-beta` is ready for public evaluation and integration work, but it
-is not a stable 1.0 API contract. Zig API names, module layout, dispatch
-thresholds, runtime policy, and benchmark output formats may still change during
-the beta line.
+Zynum `0.0.1-beta` is suitable for public evaluation and integration, but it is
+not a stable 1.0 contract. Zig API names, module layout, dispatch thresholds,
+runtime policy, and benchmark output formats may still change during beta.

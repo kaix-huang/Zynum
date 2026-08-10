@@ -5,7 +5,7 @@
 import argparse
 import csv
 import ctypes
-import hashlib
+import io
 import json
 import math
 import os
@@ -14,6 +14,25 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+
+import benchmark_metadata
+from benchmark_artifacts import (
+    ArtifactRequest,
+    ArtifactSnapshotError,
+    ArtifactSnapshotSet,
+)
+from report_comparison import (
+    positive_finite_median,
+    validate_optional_metric_evidence,
+    validate_performance_fields,
+)
+from report_publication import ReportOutput, publish_outputs
+from report_schedule import (
+    SCHEDULE_CHOICES,
+    library_repeat_schedule,
+    validate_schedule,
+    validate_unique_library_labels,
+)
 
 DEFAULT_ACCELERATE = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 DEFAULT_OPENBLAS = "/opt/homebrew/opt/openblas/lib/libopenblas.dylib"
@@ -181,6 +200,10 @@ def default_zynum_blas():
     return "zig-out/lib/libzynum_blas.so"
 
 
+def default_executable(path):
+    return f"{path}.exe" if sys.platform == "win32" else path
+
+
 def parse_byte_size(value):
     raw = value.strip().lower().replace("_", "")
     match = re.fullmatch(r"([0-9]+)([a-z]*)", raw)
@@ -245,9 +268,13 @@ def parse_args(argv=None):
         description="Run representative Level 1 fresh-process probes and write a report CSV."
     )
     parser.add_argument(
-        "--level1-probe", default="zig-out/perf-report/bin/level1_probe"
+        "--level1-probe",
+        default=default_executable("zig-out/perf-report/bin/level1_probe"),
     )
-    parser.add_argument("--copy-probe", default="zig-out/perf-report/bin/dcopy_probe")
+    parser.add_argument(
+        "--copy-probe",
+        default=default_executable("zig-out/perf-report/bin/dcopy_probe"),
+    )
     parser.add_argument("--zynum", default=default_zynum_blas())
     parser.add_argument("--accelerate", default=DEFAULT_ACCELERATE)
     parser.add_argument("--openblas", default=DEFAULT_OPENBLAS)
@@ -316,8 +343,15 @@ def parse_args(argv=None):
         "--op", action="append", help="Restrict to one or more operations."
     )
     parser.add_argument("--process-repeats", type=int, default=1)
+    parser.add_argument(
+        "--process-schedule",
+        choices=SCHEDULE_CHOICES,
+        default="library-major",
+        help="Fresh-process library schedule (default: library-major).",
+    )
     parser.add_argument("--csv", required=True)
     parser.add_argument("--skip-missing", action="store_true")
+    benchmark_metadata.add_identity_arguments(parser)
     args = parser.parse_args(argv)
     if args.process_repeats < 1:
         parser.error("--process-repeats must be at least 1")
@@ -406,34 +440,10 @@ def case_allowed(args, group, op):
     return True
 
 
-def sha256_file(path):
-    candidate = Path(path)
-    if not candidate.is_file():
-        return None
-    digest = hashlib.sha256()
-    with candidate.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
 def zig_version():
     try:
         result = subprocess.run(
             ["zig", "version"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except Exception:
-        return None
-    return result.stdout.strip()
-
-
-def git_revision():
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
             check=True,
             capture_output=True,
             text=True,
@@ -494,14 +504,20 @@ def libraries(args):
     return result
 
 
+def platform_image_path(path):
+    return sys.platform == "darwin" and path == DEFAULT_ACCELERATE
+
+
 def library_available(path):
-    if Path(path).exists():
-        return True
-    try:
-        ctypes.CDLL(path)
-        return True
-    except OSError:
-        return False
+    return Path(path).is_file() or platform_image_path(path)
+
+
+def library_artifact_request(name, path):
+    if Path(path).is_file():
+        return ArtifactRequest.library(name, path)
+    if name == "Accelerate" and platform_image_path(path):
+        return ArtifactRequest.platform_image(name, path)
+    return ArtifactRequest.library(name, path)
 
 
 def check_result(
@@ -835,11 +851,21 @@ def check_copy_op(library_path, kind):
 
 
 def check_worker_result(
-    check_type, library_path, name, incx=1, incy=1, variant="default"
+    check_type,
+    library_path,
+    name,
+    incx=1,
+    incy=1,
+    variant="default",
+    *,
+    controller_script=None,
+    public_library_path=None,
+    artifacts=None,
 ):
+    script_path = controller_script or __file__
     cmd = [
         sys.executable,
-        __file__,
+        script_path,
         "--check-worker",
         "--check-type",
         check_type,
@@ -854,15 +880,32 @@ def check_worker_result(
         "--check-variant",
         variant,
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    output = (result.stdout or "") + (result.stderr or "")
+    if controller_script is not None and cmd[1] != controller_script:
+        raise ValueError("check worker did not use the frozen controller script")
+    library_arg = cmd[cmd.index("--check-library") + 1]
+    if library_arg != library_path:
+        raise ValueError("check worker did not use the frozen library")
+    env = os.environ.copy()
+    tool_dir = str(Path(__file__).resolve().parent)
+    env["PYTHONPATH"] = os.pathsep.join(
+        part for part in (tool_dir, env.get("PYTHONPATH")) if part
+    )
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    except OSError:
+        return check_result("error", raw="failed to start frozen check worker")
+    stdout = result.stdout or ""
+    stderr = result.stderr or ""
+    if artifacts is not None:
+        stdout, stderr = artifacts.redact_private_paths((stdout, stderr))
+    output = stdout + stderr
     if result.returncode != 0:
         return check_result(
             "error",
             raw=f"check worker exited {result.returncode}: {output.strip()}",
         )
     try:
-        decoded = json.loads(result.stdout)
+        decoded = json.loads(stdout)
     except json.JSONDecodeError as exc:
         return check_result(
             "error", raw=f"invalid check worker output: {exc}: {output.strip()}"
@@ -879,19 +922,51 @@ def check_worker_result(
     return {field: decoded.get(field, "") for field in fields}
 
 
-def check_level1_op_isolated(library_path, op, incx=1, incy=1, variant="default"):
+def check_level1_op_isolated(
+    library_path,
+    op,
+    incx=1,
+    incy=1,
+    variant="default",
+    *,
+    controller_script=None,
+    public_library_path=None,
+    artifacts=None,
+):
     cache_key = (library_path, op, incx, incy, variant)
     if cache_key not in LEVEL1_CHECK_CACHE:
         LEVEL1_CHECK_CACHE[cache_key] = check_worker_result(
-            "level1", library_path, op, incx, incy, variant
+            "level1",
+            library_path,
+            op,
+            incx,
+            incy,
+            variant,
+            controller_script=controller_script,
+            public_library_path=public_library_path,
+            artifacts=artifacts,
         )
     return LEVEL1_CHECK_CACHE[cache_key]
 
 
-def check_copy_op_isolated(library_path, kind):
+def check_copy_op_isolated(
+    library_path,
+    kind,
+    *,
+    controller_script=None,
+    public_library_path=None,
+    artifacts=None,
+):
     cache_key = (library_path, kind)
     if cache_key not in COPY_CHECK_CACHE:
-        COPY_CHECK_CACHE[cache_key] = check_worker_result("copy", library_path, kind)
+        COPY_CHECK_CACHE[cache_key] = check_worker_result(
+            "copy",
+            library_path,
+            kind,
+            controller_script=controller_script,
+            public_library_path=public_library_path,
+            artifacts=artifacts,
+        )
     return COPY_CHECK_CACHE[cache_key]
 
 
@@ -1337,9 +1412,34 @@ def parse_probe_output(output):
     )
 
 
-def run_once(cmd):
-    result = subprocess.run(cmd, capture_output=True, text=True)
+def run_once(
+    cmd,
+    *,
+    expected_binary=None,
+    expected_library=None,
+    artifacts=None,
+):
+    if expected_binary is not None and cmd[0] != expected_binary:
+        raise ValueError("probe command did not use the frozen binary")
+    if expected_library is not None:
+        library_arg = cmd[cmd.index("--lib") + 1]
+        if library_arg != expected_library:
+            raise ValueError("probe command did not use the frozen library")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True)
+    except OSError:
+        return {
+            "status": "error",
+            "returncode": "",
+            "rate_gops": None,
+            "bandwidth_gbps": None,
+            "symbol": "",
+            "abi_surface": "",
+            "raw_output": "failed to start frozen Level 1 probe",
+        }
     output = (result.stdout or "") + (result.stderr or "")
+    if artifacts is not None:
+        output = artifacts.redact_private_paths(output)
     if result.returncode != 0:
         return {
             "status": "missing"
@@ -1381,40 +1481,46 @@ def metric_value(row):
 
 
 def choose_best(rows):
-    ok_rows = [
-        row for row in rows if row["status"] == "ok" and metric_value(row) is not None
-    ]
-    if ok_rows:
-        values = [metric_value(row) for row in ok_rows]
-        ordered = sorted(values)
-        middle = len(ordered) // 2
-        median = (
-            ordered[middle]
-            if len(ordered) % 2 == 1
-            else (ordered[middle - 1] + ordered[middle]) / 2
+    if not rows:
+        raise ValueError("cannot aggregate an empty Level 1 repeat group")
+    for repeat, row in enumerate(rows, 1):
+        if row is None:
+            raise ValueError(f"repeat {repeat} is missing its result")
+        status = row.get("status")
+        if status != "ok":
+            raise ValueError(
+                f"repeat {repeat} returned non-ok status {status!r}: "
+                f"{row.get('raw_output', '')}"
+            )
+        metric_field = (
+            "bandwidth_gbps" if row["metric"] == "bandwidth_gbps" else "rate_gops"
         )
-        best = dict(max(ok_rows, key=metric_value))
-        best.update(
-            {
-                "successful_repeats": len(ok_rows),
-                "metric_min": ordered[0],
-                "metric_median": median,
-                "metric_max": ordered[-1],
-                "metric_samples": ",".join(format(value, ".17g") for value in values),
-            }
+        other_field = (
+            "rate_gops" if metric_field == "bandwidth_gbps" else "bandwidth_gbps"
         )
-        return best
-    first = dict(rows[0])
-    first.update(
+        validate_performance_fields(
+            row,
+            required=(metric_field,),
+            optional=(other_field,),
+        )
+    values = [metric_value(row) for row in rows]
+    ordered = sorted(values)
+    best = dict(max(rows, key=metric_value))
+    summary = {
+        "metric_min": ordered[0],
+        "metric_median": positive_finite_median(values, "metric_median"),
+        "metric_max": ordered[-1],
+        "metric_samples": ",".join(format(value, ".17g") for value in values),
+    }
+    validate_optional_metric_evidence(summary)
+    best.update(
         {
-            "successful_repeats": 0,
-            "metric_min": "",
-            "metric_median": "",
-            "metric_max": "",
-            "metric_samples": "",
+            "process_repeats": len(rows),
+            "successful_repeats": len(rows),
+            **summary,
         }
     )
-    return first
+    return best
 
 
 def unchecked_row(
@@ -1461,9 +1567,32 @@ def unchecked_row(
     return row
 
 
-def run_level1_op(args, library_name, library_path, group, op, variant, incx, incy):
+def run_level1_op(
+    args,
+    library_name,
+    library_path,
+    group,
+    op,
+    variant,
+    incx,
+    incy,
+    *,
+    execution_library_path=None,
+    controller_script_path=None,
+    artifacts=None,
+):
+    private_library = execution_library_path or library_path
     metric = "bandwidth_gbps" if op in LEVEL1_BANDWIDTH_OPS else "rate_gops"
-    check = check_level1_op_isolated(library_path, op, incx, incy, variant)
+    check = check_level1_op_isolated(
+        private_library,
+        op,
+        incx,
+        incy,
+        variant,
+        controller_script=controller_script_path,
+        public_library_path=library_path,
+        artifacts=artifacts,
+    )
     if check["check_status"] != "sampled-ok":
         return unchecked_row(
             args,
@@ -1481,7 +1610,7 @@ def run_level1_op(args, library_name, library_path, group, op, variant, incx, in
     cmd = [
         args.level1_probe,
         "--lib",
-        library_path,
+        private_library,
         "--op",
         op,
         "--variant",
@@ -1496,7 +1625,12 @@ def run_level1_op(args, library_name, library_path, group, op, variant, incx, in
         str(args.seconds),
     ]
     for repeat in range(args.process_repeats):
-        result = run_once(cmd)
+        result = run_once(
+            cmd,
+            expected_binary=args.level1_probe if artifacts is not None else None,
+            expected_library=private_library if artifacts is not None else None,
+            artifacts=artifacts,
+        )
         expected_surface = (
             check.get("preflight_symbol", ""),
             check.get("preflight_abi_surface", ""),
@@ -1535,7 +1669,17 @@ def run_level1_op(args, library_name, library_path, group, op, variant, incx, in
     return choose_best(rows)
 
 
-def run_copy_op(args, library_name, library_path, case):
+def run_copy_op(
+    args,
+    library_name,
+    library_path,
+    case,
+    *,
+    execution_library_path=None,
+    controller_script_path=None,
+    artifacts=None,
+):
+    private_library = execution_library_path or library_path
     group = case["group"]
     op = case["op"]
     kind = case["kind"]
@@ -1546,7 +1690,13 @@ def run_copy_op(args, library_name, library_path, case):
         "copy_kind": kind,
         "copy_elements": copy_elements,
     }
-    check = check_copy_op_isolated(library_path, kind)
+    check = check_copy_op_isolated(
+        private_library,
+        kind,
+        controller_script=controller_script_path,
+        public_library_path=library_path,
+        artifacts=artifacts,
+    )
     if check["check_status"] != "sampled-ok":
         return unchecked_row(
             args,
@@ -1564,7 +1714,7 @@ def run_copy_op(args, library_name, library_path, case):
     cmd = [
         args.copy_probe,
         "--lib",
-        library_path,
+        private_library,
         "--kind",
         kind,
         "--n",
@@ -1573,7 +1723,12 @@ def run_copy_op(args, library_name, library_path, case):
         str(args.copy_seconds),
     ]
     for repeat in range(args.process_repeats):
-        result = run_once(cmd)
+        result = run_once(
+            cmd,
+            expected_binary=args.copy_probe if artifacts is not None else None,
+            expected_library=private_library if artifacts is not None else None,
+            artifacts=artifacts,
+        )
         if not result.get("symbol"):
             result["symbol"] = check.get("preflight_symbol", "")
             result["abi_surface"] = check.get("preflight_abi_surface", "")
@@ -1625,63 +1780,14 @@ def check_worker_main():
     return 0
 
 
-def main():
-    if "--check-worker" in sys.argv:
-        return check_worker_main()
-
-    args = parse_args()
-    if not Path(args.level1_probe).exists():
-        print(f"missing --level1-probe {args.level1_probe}", file=sys.stderr)
-        return 2
-    if not Path(args.copy_probe).exists():
-        print(f"missing --copy-probe {args.copy_probe}", file=sys.stderr)
-        return 2
-
-    output_path = Path(args.csv)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    rows = []
-    copy_case_list = selected_copy_cases(args)
-    level1_ops = [
-        (group, op, variant, incx, incy)
-        for group, op, variant, incx, incy in level1_cases(args.stride_pairs)
-        if case_allowed(args, group, op)
-    ]
-    for library_name, library_path in libraries(args):
-        if args.skip_missing and not library_available(library_path):
-            continue
-        for case in copy_case_list:
-            row = run_copy_op(args, library_name, library_path, case)
-            rows.append(row)
-            size = format_byte_size(case["copy_bytes"])
-            print(
-                f"{library_name:10s} {case['op']:8s} "
-                f"{size:>6s}/{case['kind']:<1s} {row['status']:11s} {metric_value(row)}"
-            )
-        if not args.copy_only:
-            for group, op, variant, incx, incy in level1_ops:
-                row = run_level1_op(
-                    args,
-                    library_name,
-                    library_path,
-                    group,
-                    op,
-                    variant,
-                    incx,
-                    incy,
-                )
-                rows.append(row)
-                case_label = op if variant == "default" else f"{op}:{variant}"
-                if incx == incy:
-                    if incx != 1:
-                        case_label += f":inc{incx}"
-                else:
-                    case_label += f":incx{incx}:incy{incy}"
-                print(
-                    f"{library_name:10s} {case_label:16s} "
-                    f"{row['status']:11s} {metric_value(row)}"
-                )
-
+def serialize_report(
+    args,
+    selected_libraries,
+    rows,
+    identity,
+    binary_records,
+    library_records,
+):
     fields = [
         "group",
         "op",
@@ -1697,6 +1803,7 @@ def main():
         "seconds",
         "repeat",
         "metric",
+        "process_repeats",
         "successful_repeats",
         "metric_min",
         "metric_median",
@@ -1717,12 +1824,15 @@ def main():
         "check_raw_output",
         "raw_output",
     ]
-    with output_path.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({field: row.get(field, "") for field in fields})
+    csv_buffer = io.StringIO(newline="")
+    writer = csv.DictWriter(csv_buffer, fieldnames=fields)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({field: row.get(field, "") for field in fields})
+    csv_bytes = csv_buffer.getvalue().encode("utf-8")
 
+    binaries_by_name = {record["name"]: record for record in binary_records}
+    libraries_by_name = {record["name"]: record for record in library_records}
     meta = {
         "generated_at_unix": time.time(),
         "isolation": (
@@ -1759,23 +1869,229 @@ def main():
         "environment": environment_snapshot(),
         "zynum_maximum_threads_detected": zynum_maximum_threads_detected(),
         "zig_version": zig_version(),
-        "git_revision": git_revision(),
+        "git_revision": benchmark_metadata.source_git_revision(identity["source"]),
         "probes": {
             "level1_probe": args.level1_probe,
-            "level1_probe_sha256": sha256_file(args.level1_probe),
+            "level1_probe_sha256": binaries_by_name["level1_probe"]["sha256"],
             "copy_probe": args.copy_probe,
-            "copy_probe_sha256": sha256_file(args.copy_probe),
+            "copy_probe_sha256": binaries_by_name["copy_probe"]["sha256"],
         },
         "libraries": {
-            name: {"path": path, "sha256": sha256_file(path)}
-            for name, path in libraries(args)
+            name: {
+                "path": path,
+                "sha256": libraries_by_name[name]["sha256"],
+            }
+            for name, path in selected_libraries
         },
+        "benchmark_identity": identity,
     }
-    with output_path.with_suffix(output_path.suffix + ".meta.json").open("w") as f:
-        json.dump(meta, f, indent=2, sort_keys=True)
-        f.write("\n")
+    metadata_bytes = benchmark_metadata.serialize_public_metadata(
+        meta,
+        controller="run_level1_report.py",
+        parameter_keys=(
+            "n",
+            "seconds",
+            "copy_seconds",
+            "copy_only",
+            "copy_byte_coverage",
+            "copy_byte_sizes",
+            "groups",
+            "ops",
+            "level1_strides",
+            "level1_stride_pairs",
+            "process_repeats",
+        ),
+    )
+    return csv_bytes, metadata_bytes
+
+
+def run_controller(args, selected_libraries, scheduled_cases, schedule):
+    requests = [
+        ArtifactRequest.binary("level1_probe", args.level1_probe),
+        ArtifactRequest.binary("copy_probe", args.copy_probe),
+        ArtifactRequest.interpreter_script("run_level1_report", __file__),
+    ]
+    requests.extend(
+        library_artifact_request(name, path) for name, path in selected_libraries
+    )
+    artifacts = ArtifactSnapshotSet.capture(requests)
+    try:
+        frozen_binaries = artifacts.for_role("binary")
+        frozen_libraries = artifacts.for_role("library")
+        identity = benchmark_metadata.collect_benchmark_identity_from_frozen(
+            args,
+            libraries=frozen_libraries,
+            binaries=frozen_binaries,
+        )
+        repeat_rows = [
+            [[None] * args.process_repeats for _ in scheduled_cases]
+            for _ in selected_libraries
+        ]
+        sample_args = argparse.Namespace(**vars(args))
+        sample_args.process_repeats = 1
+        for library_index, case_index, repeat in schedule:
+            library_name, public_library = selected_libraries[library_index]
+            case_type, case = scheduled_cases[case_index]
+            sample_args.level1_probe = frozen_binaries[0].execution_path
+            sample_args.copy_probe = frozen_binaries[1].execution_path
+            private_controller = frozen_binaries[2].execution_path
+            private_library = frozen_libraries[library_index].execution_path
+            try:
+                if case_type == "copy":
+                    row = run_copy_op(
+                        sample_args,
+                        library_name,
+                        public_library,
+                        case,
+                        execution_library_path=private_library,
+                        controller_script_path=private_controller,
+                        artifacts=artifacts,
+                    )
+                else:
+                    group, op, variant, incx, incy = case
+                    row = run_level1_op(
+                        sample_args,
+                        library_name,
+                        public_library,
+                        group,
+                        op,
+                        variant,
+                        incx,
+                        incy,
+                        execution_library_path=private_library,
+                        controller_script_path=private_controller,
+                        artifacts=artifacts,
+                    )
+            except ValueError as exc:
+                raise ValueError(
+                    f"invalid Level 1 performance evidence: {exc}"
+                ) from None
+            if row["status"] == "ok":
+                row["repeat"] = repeat
+            repeat_rows[library_index][case_index][repeat] = row
+
+        rows = []
+        for library_index, (library_name, _library_path) in enumerate(
+            selected_libraries
+        ):
+            for case_index, (case_type, case) in enumerate(scheduled_cases):
+                try:
+                    row = choose_best(repeat_rows[library_index][case_index])
+                except ValueError as exc:
+                    raise ValueError(
+                        f"invalid Level 1 performance evidence: {exc}"
+                    ) from None
+                rows.append(row)
+                if case_type == "copy":
+                    size = format_byte_size(case["copy_bytes"])
+                    print(
+                        f"{library_name:10s} {case['op']:8s} "
+                        f"{size:>6s}/{case['kind']:<1s} "
+                        f"{row['status']:11s} {metric_value(row)}"
+                    )
+                else:
+                    group, op, variant, incx, incy = case
+                    case_label = op if variant == "default" else f"{op}:{variant}"
+                    if incx == incy:
+                        if incx != 1:
+                            case_label += f":inc{incx}"
+                    else:
+                        case_label += f":incx{incx}:incy{incy}"
+                    print(
+                        f"{library_name:10s} {case_label:16s} "
+                        f"{row['status']:11s} {metric_value(row)}"
+                    )
+
+        rows = artifacts.redact_private_paths(rows)
+        binary_records = artifacts.legacy_records("binary")
+        library_records = artifacts.legacy_records("library")
+        csv_bytes, metadata_bytes = serialize_report(
+            args,
+            selected_libraries,
+            rows,
+            identity,
+            binary_records,
+            library_records,
+        )
+        csv_bytes, metadata_bytes = artifacts.redact_private_paths(
+            (csv_bytes, metadata_bytes)
+        )
+        artifacts.finalize()
+    except ValueError as exc:
+        raise ValueError(artifacts.redact_private_paths(str(exc))) from None
+    finally:
+        artifacts.close()
+
+    output_path = Path(args.csv)
+    publish_outputs(
+        [
+            ReportOutput(output_path, csv_bytes),
+            ReportOutput(
+                output_path.with_suffix(output_path.suffix + ".meta.json"),
+                metadata_bytes,
+            ),
+        ]
+    )
 
     return 0
+
+
+def main():
+    if "--check-worker" in sys.argv:
+        return check_worker_main()
+
+    args = parse_args()
+    if not Path(args.level1_probe).exists():
+        print(f"missing --level1-probe {args.level1_probe}", file=sys.stderr)
+        return 2
+    if not Path(args.copy_probe).exists():
+        print(f"missing --copy-probe {args.copy_probe}", file=sys.stderr)
+        return 2
+
+    try:
+        configured_libraries = libraries(args)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    selected_libraries = []
+    for library_name, library_path in configured_libraries:
+        if args.skip_missing and not library_available(library_path):
+            if library_name == "Zynum":
+                print(
+                    f"--skip-missing cannot skip required Zynum library {library_path}",
+                    file=sys.stderr,
+                )
+                return 2
+            continue
+        selected_libraries.append((library_name, library_path))
+    try:
+        validate_unique_library_labels(selected_libraries)
+        copy_case_list = selected_copy_cases(args)
+        level1_ops = [
+            (group, op, variant, incx, incy)
+            for group, op, variant, incx, incy in level1_cases(args.stride_pairs)
+            if case_allowed(args, group, op)
+        ]
+        scheduled_cases = [("copy", case) for case in copy_case_list]
+        if not args.copy_only:
+            scheduled_cases.extend(("level1", case) for case in level1_ops)
+        validate_schedule(
+            len(selected_libraries), args.process_repeats, args.process_schedule
+        )
+        schedule = (
+            library_repeat_schedule(
+                len(selected_libraries),
+                args.process_repeats,
+                args.process_schedule,
+                case_count=len(scheduled_cases),
+            )
+            if scheduled_cases
+            else []
+        )
+        return run_controller(args, selected_libraries, scheduled_cases, schedule)
+    except (ArtifactSnapshotError, ValueError) as exc:
+        print(exc, file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

@@ -7,6 +7,8 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const vector_ops = @import("../vector/operations.zig");
 const access = @import("access.zig");
+const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
+const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 
 const BlasInt = scalar.BlasInt;
 const Order = scalar.Order;
@@ -33,21 +35,20 @@ const vectorSet = indexing.vectorSet;
 
 const triValue = access.triValue;
 const triPackedValue = access.triPackedValue;
+const tuning = level2_tuning.active.triangular;
 
 fn opIsUpper(uplo: Uplo, trans_: Order) bool {
     return (trans_ == .no_trans and uplo == .upper) or (trans_ != .no_trans and uplo == .lower);
 }
 
-const dense_vector_min = 64;
-const dense_vector_parallel_min = 512 * 1024;
-
 fn denseAxpy(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
     if (n == 0 or isZero(T, alpha)) return;
-    if (n >= dense_vector_min) {
+    if (tuning.enable_fixed_bodies and matrix_vector_kernels.triangularAxpyUnit(T, n, alpha, a, x)) return;
+    if (tuning.preferDenseVector(n)) {
         if (comptime isComplex(T)) {
             // Keep each triangular dependency step serial. The general complex
-            // helper only starts tasking at dense_vector_parallel_min.
-            if (n < dense_vector_parallel_min) return vector_ops.axpy(T, @intCast(n), alpha, a, 1, x, 1);
+            // helper is allowed only while the tuning profile keeps it serial.
+            if (tuning.keepComplexDependencySerial(n)) return vector_ops.axpy(T, @intCast(n), alpha, a, 1, x, 1);
         } else {
             return vector_ops.axpyUnitReal(T, n, alpha, a, x);
         }
@@ -56,10 +57,14 @@ fn denseAxpy(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void 
 }
 
 fn denseDot(comptime T: type, n: usize, a: [*]const T, x: [*]const T, conjugate_a: bool) T {
-    if (n >= dense_vector_min) {
+    if (tuning.enable_fixed_bodies) {
+        var result = zero(T);
+        if (matrix_vector_kernels.triangularDotUnit(T, n, a, x, conjugate_a, &result)) return result;
+    }
+    if (tuning.preferDenseVector(n)) {
         if (comptime isComplex(T)) {
             // As above, do not let one solve step fan out into Level 1 tasks.
-            if (n < dense_vector_parallel_min) return vector_ops.dot(T, @intCast(n), a, 1, x, 1, conjugate_a);
+            if (tuning.keepComplexDependencySerial(n)) return vector_ops.dot(T, @intCast(n), a, 1, x, 1, conjugate_a);
         } else {
             return vector_ops.dotUnitReal(T, n, a, x);
         }
@@ -297,7 +302,8 @@ fn triPackedOpValue(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: 
 pub fn trmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
     if (n_ <= 0 or incx_ == 0) return;
     const n = toUsize(n_);
-    if (incx_ == 1) return trmvUnit(T, uplo, trans_, diag, n, a, lda, x);
+    const selected = level2_tuning.selectDefault(T, .trmv, .{ .m = n, .n = n, .incx = incx_ });
+    if (selected.kernel.implementation == .core_unit) return trmvUnit(T, uplo, trans_, diag, n, a, lda, x);
     trmvFallback(T, uplo, trans_, diag, n_, a, lda, x, incx_);
 }
 
@@ -306,7 +312,7 @@ pub fn tbmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt
     if (k_ < 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (incx_ == 1 and n >= 512 and k <= n / 16) return tbmvBandWindowUnitDispatch(T, uplo, trans_, diag, n, k, a, lda, x);
+    if (incx_ == 1 and tuning.preferBandWindow(n, k)) return tbmvBandWindowUnitDispatch(T, uplo, trans_, diag, n, k, a, lda, x);
     const sx = startIndex(n_, incx_);
 
     if (opIsUpper(uplo, trans_)) {
@@ -429,7 +435,8 @@ fn trsvFallback(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: Bla
 pub fn trsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
     if (n_ <= 0 or incx_ == 0) return;
     const n = toUsize(n_);
-    if (incx_ == 1) return trsvUnit(T, uplo, trans_, diag, n, a, lda, x);
+    const selected = level2_tuning.selectDefault(T, .trsv, .{ .m = n, .n = n, .incx = incx_ });
+    if (selected.kernel.implementation == .core_unit) return trsvUnit(T, uplo, trans_, diag, n, a, lda, x);
     trsvFallback(T, uplo, trans_, diag, n_, a, lda, x, incx_);
 }
 
@@ -480,3 +487,13 @@ pub fn tpsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt
         }
     }
 }
+
+pub const testing = struct {
+    pub fn axpyBody(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
+        denseAxpy(T, n, alpha, a, x);
+    }
+
+    pub fn dotBody(comptime T: type, n: usize, a: [*]const T, x: [*]const T, conjugate_a: bool) T {
+        return denseDot(T, n, a, x, conjugate_a);
+    }
+};

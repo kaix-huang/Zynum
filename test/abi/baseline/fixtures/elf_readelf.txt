@@ -1,0 +1,6 @@
+Dynamic section at offset 0x1000 contains 4 entries:
+ 0x000000000000000e (SONAME)             Library soname: [libzynum_blas.so.1]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000001d (RUNPATH)            Library runpath: [$ORIGIN]
+Version definition section '.gnu.version_d' contains 1 entry:
+  Name: ZYNUM_BLAS_1.0

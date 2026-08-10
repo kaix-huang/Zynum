@@ -91,6 +91,14 @@ pub fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T 
     };
 }
 
+pub fn dotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.dotF32AccF64Unit(n, x, y),
+        .x86_64 => x86_64.dotF32AccF64Unit(n, x, y),
+        else => null,
+    };
+}
+
 pub fn dotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.dotUnitComplex(T, n, x, y, conjx),
@@ -117,6 +125,7 @@ pub fn rotUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, 
 pub fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.rotmUnitReal(T, n, x, y, flag, h11, h21, h12, h22),
+        .x86_64 => x86_64.rotmUnitReal(T, n, x, y, flag, h11, h21, h12, h22),
         else => false,
     };
 }

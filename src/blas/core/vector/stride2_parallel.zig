@@ -5,7 +5,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const scalar = @import("../shared/scalar.zig");
-const core_pool = @import("../execution/thread_pool.zig");
+const core_pool = @import("../../kernels/isolated/task_runtime_client.zig");
 
 pub const BlasInt = scalar.BlasInt;
 pub const ComplexF32 = scalar.ComplexF32;

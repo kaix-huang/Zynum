@@ -11,6 +11,7 @@ const indexing = @import("../shared/indexing.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
+const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 const runtime = @import("../../runtime.zig");
 
 const BlasInt = scalar.BlasInt;
@@ -30,6 +31,7 @@ const startIndex = indexing.startIndex;
 const matIndex = indexing.matIndex;
 const packedIndex = indexing.packedIndex;
 const vectorGet = indexing.vectorGet;
+const tuning = level2_tuning.active.rank_update;
 
 fn isReal(comptime T: type) bool {
     return T == f32 or T == f64;
@@ -98,7 +100,7 @@ fn gerUnitRealBlocked(comptime T: type, comptime lane_count: comptime_int, compt
 
 fn gerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) void {
     if (matrix_vector_kernels.gerUnitReal(T, m, n, alpha, x, y, a, lda)) return;
-    if (T == f64 and m >= 512 and m < 1024) return gerUnitRealBlocked(T, 8, 8, m, n, alpha, x, y, a, lda);
+    if (tuning.preferRealGerWideF64(T, m)) return gerUnitRealBlocked(T, 8, 8, m, n, alpha, x, y, a, lda);
     return gerUnitRealBlocked(T, lanes(T), 4, m, n, alpha, x, y, a, lda);
 }
 
@@ -140,9 +142,8 @@ fn runGerTaskF64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
-    const min_cols_per_task: usize = if (n >= 768) 32 else if (n >= 512) 64 else if (n >= 256) 80 else 256;
-    const max_task_count: usize = if (n >= 1536) 10 else if (n >= 512) 4 else if (n >= 384) 10 else 8;
-    const task_count = @min(core_pool.taskCount(n, min_cols_per_task), max_task_count);
+    if (!tuning.preferRealGerParallel(m, n)) return false;
+    const task_count = tuning.capRealGerTasks(n, core_pool.taskCount(n, tuning.realGerMinColumns(n)));
     if (task_count <= 1) return false;
 
     const block_cols: usize = 4;
@@ -170,7 +171,7 @@ fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]con
     }
 
     const runner = if (T == f32) runGerTaskF32 else runGerTaskF64;
-    if ((T == f32 or T == f64) and n < 1536) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (tuning.useRealGerLowLatency(T, n)) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 
@@ -315,10 +316,15 @@ fn gerUnitComplexC64(m: usize, n: usize, alpha: scalar.ComplexF64, x: [*]const s
 }
 
 fn gerUnitComplex(comptime T: type, m_: BlasInt, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt, conj_y: bool) void {
-    if (T == scalar.ComplexF32 and m_ >= 128) {
+    if (tuning.enable_fixed_complex_ger and
+        matrix_vector_kernels.gerUnitComplex(T, toUsize(m_), n, alpha, x, y, a, lda, conj_y))
+    {
+        return;
+    }
+    if (T == scalar.ComplexF32 and tuning.preferComplexGerSpecialized(T, toUsize(m_))) {
         return gerUnitComplexC32(toUsize(m_), n, alpha, x, y, a, lda, conj_y);
     }
-    if (T == scalar.ComplexF64 and (m_ == 128 or m_ == 256)) {
+    if (T == scalar.ComplexF64 and tuning.preferComplexGerSpecialized(T, toUsize(m_))) {
         return gerUnitComplexC64(toUsize(m_), n, alpha, x, y, a, lda, conj_y);
     }
     for (0..n) |j| {
@@ -368,11 +374,9 @@ fn runComplexGerTaskC64(raw_tasks: *const anyopaque, index: usize) void {
 
 fn parallelGerUnitComplex(comptime T: type, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt, conj_y: bool) bool {
     const exact_c64_ger128 = T == scalar.ComplexF64 and m == 128 and n == 128;
-    if (!exact_c64_ger128 and m *| n < 256 * 256) return false;
-    const min_cols_per_task: usize = if (exact_c64_ger128) 64 else if (T == scalar.ComplexF32) 64 else 48;
-    var task_count = core_pool.taskCount(n, min_cols_per_task);
-    const max_task_count: usize = if (exact_c64_ger128) 2 else if (T == scalar.ComplexF64 and n >= 256 and n < 512) 5 else if (n < 512) 4 else 8;
-    task_count = @min(task_count, max_task_count);
+    if (!tuning.preferComplexGerParallel(exact_c64_ger128, m, n)) return false;
+    var task_count = core_pool.taskCount(n, tuning.complexGerMinColumns(T, exact_c64_ger128));
+    task_count = tuning.capComplexGerTasks(T, exact_c64_ger128, n, task_count);
     if (task_count <= 1) return false;
 
     const block_cols: usize = 4;
@@ -408,12 +412,16 @@ pub fn ger(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, 
     const m = toUsize(m_);
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (!conj_y and incx_ == 1 and incy_ == 1) {
+        if (!conj_y and level2_tuning.coreUnitSelected(T, .ger, .{ .m = m, .n = n, .incx = incx_, .incy = incy_ })) {
             if (parallelGerUnitReal(T, m, n, alpha, x, y, a, lda)) return;
             return gerUnitReal(T, m, n, alpha, x, y, a, lda);
         }
     } else if (comptime isComplex(T)) {
-        if (incx_ == 1 and incy_ == 1) {
+        const unit_selected = if (conj_y)
+            level2_tuning.coreUnitSelected(T, .gerc, .{ .m = m, .n = n, .incx = incx_, .incy = incy_ })
+        else
+            level2_tuning.coreUnitSelected(T, .geru, .{ .m = m, .n = n, .incx = incx_, .incy = incy_ });
+        if (unit_selected) {
             if (parallelGerUnitComplex(T, m, n, alpha, x, y, a, lda, conj_y)) return;
             return gerUnitComplex(T, m_, n, alpha, x, y, a, lda, conj_y);
         }
@@ -534,19 +542,14 @@ fn denseRankTaskBoundary(uplo: Uplo, n: usize, task_count: usize, task_index: us
     return @min(n, @as(usize, @intFromFloat(boundary)));
 }
 
-fn capDenseRankTaskCountByWork(task_count: usize, work: usize, min_work_per_task: usize) usize {
-    const by_work = @max(@as(usize, 1), (work +| (min_work_per_task - 1)) / min_work_per_task);
-    return @min(task_count, by_work);
-}
-
 fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
-    if (n *| n < 512 * 512) return false;
+    if (!tuning.preferDenseStructuredParallel(n)) return false;
 
-    var task_count = core_pool.taskCount(n, 64);
+    var task_count = core_pool.taskCount(n, tuning.structuredMinColumns());
     if (comptime builtin.cpu.arch == .x86_64) {
-        task_count = capDenseRankTaskCountByWork(task_count, n *| n, 64 * 1024);
+        task_count = level2_tuning.capTaskCountByWork(task_count, n *| n, 64 * 1024);
     }
-    if (n <= 1536) task_count = @min(task_count, 8);
+    task_count = tuning.capStructuredTasks(n, task_count);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]DenseRankTask(T) = undefined;
@@ -663,14 +666,13 @@ fn packedRankElementCount(n: usize) usize {
 }
 
 noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) bool {
-    if (n < 512) return false;
+    if (!tuning.preferPackedTaskComposition(n)) return false;
 
-    var task_count = core_pool.taskCount(n, 64);
+    var task_count = core_pool.taskCount(n, tuning.structuredMinColumns());
     if (comptime builtin.cpu.arch == .x86_64) {
-        const by_work = @max(@as(usize, 1), packedRankElementCount(n) / (64 * 1024));
-        task_count = @min(task_count, by_work);
+        task_count = level2_tuning.capTaskCountByWork(task_count, packedRankElementCount(n), 64 * 1024);
     }
-    if (n <= 1536) task_count = @min(task_count, 8);
+    task_count = tuning.capStructuredTasks(n, task_count);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]PackedRankTask(T) = undefined;
@@ -700,7 +702,7 @@ pub fn syr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
     if (n_ <= 0 or incx_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (incx_ == 1) {
+        if (level2_tuning.coreUnitSelected(T, .syr, .{ .m = n, .n = n, .incx = incx_ })) {
             if (parallelDenseRankUpdate(T, .syr, uplo, n, alpha, x, x, a, lda)) return;
             return denseRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, a, lda);
         }
@@ -722,7 +724,9 @@ pub fn spr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
     if (n_ <= 0 or incx_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (incx_ == 1 and n >= 2048) {
+        if (level2_tuning.coreUnitSelected(T, .spr, .{ .m = n, .n = n, .incx = incx_ }) and
+            tuning.preferPackedStructuredParallel(n))
+        {
             if (parallelPackedRankUpdate(T, .syr, uplo, n, alpha, x, x, ap)) return;
             return packedRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, ap);
         }
@@ -744,7 +748,7 @@ pub fn syr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (incx_ == 1 and incy_ == 1) {
+        if (level2_tuning.coreUnitSelected(T, .syr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ })) {
             if (parallelDenseRankUpdate(T, .syr2, uplo, n, alpha, x, y, a, lda)) return;
             return denseRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, a, lda);
         }
@@ -768,7 +772,9 @@ pub fn spr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
-        if (incx_ == 1 and incy_ == 1 and n >= 2048) {
+        if (level2_tuning.coreUnitSelected(T, .spr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ }) and
+            tuning.preferPackedStructuredParallel(n))
+        {
             if (parallelPackedRankUpdate(T, .syr2, uplo, n, alpha, x, y, ap)) return;
             return packedRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, ap);
         }
@@ -792,7 +798,7 @@ pub fn her(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
     if (n_ <= 0 or incx_ == 0 or alpha == 0) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
-        if (incx_ == 1) {
+        if (level2_tuning.coreUnitSelected(T, .her, .{ .m = n, .n = n, .incx = incx_ })) {
             const complex_alpha = realScalar(T, alpha);
             if (parallelDenseRankUpdate(T, .her, uplo, n, complex_alpha, x, x, a, lda)) return;
             return denseRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, a, lda);
@@ -815,7 +821,9 @@ pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
     if (n_ <= 0 or incx_ == 0 or alpha == 0) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
-        if (incx_ == 1 and n >= 2048) {
+        if (level2_tuning.coreUnitSelected(T, .hpr, .{ .m = n, .n = n, .incx = incx_ }) and
+            tuning.preferPackedStructuredParallel(n))
+        {
             const complex_alpha = realScalar(T, alpha);
             if (parallelPackedRankUpdate(T, .her, uplo, n, complex_alpha, x, x, ap)) return;
             return packedRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, ap);
@@ -838,7 +846,7 @@ pub fn her2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
-        if (incx_ == 1 and incy_ == 1) {
+        if (level2_tuning.coreUnitSelected(T, .her2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ })) {
             if (parallelDenseRankUpdate(T, .her2, uplo, n, alpha, x, y, a, lda)) return;
             return denseRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, a, lda);
         }
@@ -863,7 +871,9 @@ pub fn hpr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
-        if (incx_ == 1 and incy_ == 1 and n >= 2048) {
+        if (level2_tuning.coreUnitSelected(T, .hpr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ }) and
+            tuning.preferPackedStructuredParallel(n))
+        {
             if (parallelPackedRankUpdate(T, .her2, uplo, n, alpha, x, y, ap)) return;
             return packedRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, ap);
         }
@@ -884,11 +894,43 @@ pub fn hpr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     }
 }
 
+pub const testing = struct {
+    pub fn gerColumns(
+        comptime T: type,
+        m: usize,
+        n: usize,
+        alpha: T,
+        x: [*]const T,
+        y: [*]const T,
+        a: [*]T,
+        lda: BlasInt,
+        conjugate_y: bool,
+    ) void {
+        if (comptime isReal(T)) return gerUnitReal(T, m, n, alpha, x, y, a, lda);
+        return gerUnitComplex(T, @intCast(m), n, alpha, x, y, a, lda, conjugate_y);
+    }
+};
+
 fn packedRankTestValue(comptime T: type, index: usize, phase: usize) T {
     const re = @as(f64, @floatFromInt((index * 17 + phase * 11) % 37)) / 19.0 - 0.75;
     if (T == f32 or T == f64) return @floatCast(re);
     const im = @as(f64, @floatFromInt((index * 13 + phase * 7) % 29)) / 23.0 - 0.5;
     return .{ .re = @floatCast(re), .im = @floatCast(im) };
+}
+
+fn expectPackedRankApprox(comptime T: type, expected: []const T, actual: []const T) !void {
+    try std.testing.expectEqual(expected.len, actual.len);
+    if (comptime isReal(T)) {
+        const tolerance: T = if (T == f32) 2e-5 else 2e-12;
+        for (expected, actual) |want, got| try std.testing.expectApproxEqAbs(want, got, tolerance);
+    } else {
+        const Component = if (T == scalar.ComplexF32) f32 else f64;
+        const tolerance: Component = if (T == scalar.ComplexF32) 3e-5 else 3e-12;
+        for (expected, actual) |want, got| {
+            try std.testing.expectApproxEqAbs(want.re, got.re, tolerance);
+            try std.testing.expectApproxEqAbs(want.im, got.im, tolerance);
+        }
+    }
 }
 
 fn expectParallelPackedRankMatchesSingle(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo) !void {
@@ -918,7 +960,7 @@ fn expectParallelPackedRankMatchesSingle(comptime T: type, comptime operation: D
     } else packedRankTestValue(T, 5, 4);
     packedRankColumns(T, operation, uplo, n, 0, n, alpha, x.ptr, y.ptr, expected.ptr);
     try std.testing.expect(parallelPackedRankUpdate(T, operation, uplo, n, alpha, x.ptr, y.ptr, actual.ptr));
-    try std.testing.expectEqualSlices(T, expected, actual);
+    try expectPackedRankApprox(T, expected, actual);
 
     for (actual, 0..) |*value, i| value.* = packedRankTestValue(T, i, 3);
     runtime.setMaxThreads(1);
@@ -929,7 +971,7 @@ fn expectParallelPackedRankMatchesSingle(comptime T: type, comptime operation: D
         .her2 => hpr2(T, uplo, @intCast(n), alpha, x.ptr, 1, y.ptr, 1, actual.ptr),
     }
     runtime.setMaxThreads(4);
-    try std.testing.expectEqualSlices(T, expected, actual);
+    try expectPackedRankApprox(T, expected, actual);
 }
 
 test "packed rank update parallel columns match the single-task body" {

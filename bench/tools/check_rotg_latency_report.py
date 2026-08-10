@@ -4,10 +4,15 @@
 
 import argparse
 import csv
-import math
 import sys
 from collections import defaultdict
 
+from report_comparison import (
+    best_lower_row,
+    parse_positive_finite,
+    positive_finite_ratio,
+    validate_optional_metric_evidence,
+)
 
 CHECKED_STATUSES = {"sampled-ok", "checked-ok"}
 
@@ -61,8 +66,7 @@ def row_allowed(args, row):
         (args.case, row["case"]),
     )
     return not any(
-        selected is not None and value not in selected
-        for selected, value in filters
+        selected is not None and value not in selected for selected, value in filters
     )
 
 
@@ -89,13 +93,9 @@ def row_eligible(row):
     try:
         repeats = int(row["process_repeats"])
         successful = int(row["successful_repeats"])
-        median = float(row["metric_median"])
+        parse_positive_finite(row["metric_median"], "metric_median")
         return (
-            repeats > 0
-            and successful == repeats
-            and math.isfinite(median)
-            and median > 0
-            and row.get("metric") == "ns_per_call"
+            repeats > 0 and successful == repeats and row.get("metric") == "ns_per_call"
         )
     except (KeyError, TypeError, ValueError):
         return False
@@ -103,8 +103,10 @@ def row_eligible(row):
 
 def main(argv=None):
     args = parse_args(argv)
-    if args.ratio <= 0 or not math.isfinite(args.ratio):
-        print("--ratio must be finite and positive", file=sys.stderr)
+    try:
+        args.ratio = parse_positive_finite(args.ratio, "--ratio")
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
         return 2
     comparators = args.comparator or ["Accelerate", "OpenBLAS"]
     relevant_libraries = set(comparators + [args.zynum])
@@ -121,7 +123,10 @@ def main(argv=None):
             try:
                 allowed = row_allowed(args, row)
             except KeyError:
-                print("latency CSV row is missing required parameters: {}".format(row), file=sys.stderr)
+                print(
+                    "latency CSV row is missing required parameters: {}".format(row),
+                    file=sys.stderr,
+                )
                 return 2
             if allowed and row.get("library") in relevant_libraries:
                 selected_rows.append(row)
@@ -131,20 +136,37 @@ def main(argv=None):
     for row in selected_rows:
         if row.get("library") == args.zynum and not row_eligible(row):
             print(
-                "unchecked ROTG/ROTMG row is not eligible for comparison: {}".format(row),
+                "unchecked ROTG/ROTMG row is not eligible for comparison: {}".format(
+                    row
+                ),
                 file=sys.stderr,
             )
             return 2
 
     groups = defaultdict(dict)
     for row in selected_rows:
+        status_eligible = (
+            row.get("status") == "ok" and row.get("check_status") in CHECKED_STATUSES
+        )
+        if status_eligible and not row_eligible(row):
+            print(
+                "bad latency metric or repeat evidence in row: {}".format(row),
+                file=sys.stderr,
+            )
+            return 2
         if not row_eligible(row):
             continue
         try:
+            validate_optional_metric_evidence(row)
             key = group_key(row)
-            row["median_latency"] = float(row["metric_median"])
+            row["median_latency"] = parse_positive_finite(
+                row["metric_median"], "metric_median"
+            )
         except (KeyError, TypeError, ValueError):
-            print("bad latency metric or parameter value in row: {}".format(row), file=sys.stderr)
+            print(
+                "bad latency metric or parameter value in row: {}".format(row),
+                file=sys.stderr,
+            )
             return 2
         if row["library"] in groups[key]:
             print(
@@ -159,7 +181,7 @@ def main(argv=None):
     failures = []
     missing = []
     checked_count = 0
-    for key, by_library in groups.items():
+    for key, by_library in sorted(groups.items()):
         zynum = by_library.get(args.zynum)
         if zynum is None:
             missing.append((key, args.zynum))
@@ -172,12 +194,24 @@ def main(argv=None):
                 missing.append((key, ",".join(comparators)))
             continue
         checked_count += 1
-        fastest = min(comparator_rows, key=lambda row: row["median_latency"])
-        ratio = zynum["median_latency"] / fastest["median_latency"]
+        fastest = best_lower_row(comparator_rows, "median_latency")
+        try:
+            ratio = positive_finite_ratio(
+                zynum["median_latency"], fastest["median_latency"]
+            )
+        except ValueError as exc:
+            print(
+                "bad latency comparison ratio for {}: {}".format(
+                    describe_key(key), exc
+                ),
+                file=sys.stderr,
+            )
+            return 2
         if ratio > args.ratio:
             failures.append((ratio, key, zynum, fastest))
 
-    failures.sort(key=lambda item: item[0], reverse=True)
+    failures.sort(key=lambda item: (-item[0], item[1]))
+    missing.sort(key=lambda item: (item[0], item[1]))
     print(
         "checked={} passed={} failed={} missing={} ratio={:.6g} stat=median".format(
             checked_count,

@@ -5,14 +5,29 @@
 import argparse
 import csv
 import ctypes
-import hashlib
-import json
+import io
 import os
 import subprocess
 import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
+
+import benchmark_artifacts
+import benchmark_metadata
+from report_comparison import (
+    parse_positive_finite,
+    positive_finite_median,
+    validate_optional_metric_evidence,
+    validate_performance_fields,
+)
+from report_publication import ReportOutput, publish_outputs
+from report_schedule import (
+    SCHEDULE_CHOICES,
+    library_repeat_schedule,
+    validate_schedule,
+    validate_unique_library_labels,
+)
 
 DEFAULT_ACCELERATE = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 DEFAULT_OPENBLAS = "/opt/homebrew/opt/openblas/lib/libopenblas.dylib"
@@ -46,6 +61,9 @@ RANK_UPDATE_OPERATIONS = (
     "cher2",
     "zher2",
 )
+COMPLEX_GER_OPERATIONS = ("cgeru", "zgeru", "cgerc", "zgerc")
+SYMMETRIC_MV_OPERATIONS = ("ssymv", "dsymv", "chemv", "zhemv")
+LEGACY_FILTER_OPERATIONS = COMPLEX_GER_OPERATIONS + SYMMETRIC_MV_OPERATIONS
 BANDED_OPERATIONS = (
     "sgbmv",
     "dgbmv",
@@ -92,6 +110,16 @@ PACKED_OPERATIONS = PACKED_MV_OPERATIONS + PACKED_RANK_OPERATIONS
 COMPACT_BANDED_OPERATIONS = BANDED_OPERATIONS + TRIANGULAR_BANDED_OPERATIONS
 OP_EXPANSIONS = {
     "legacy": ("legacy",),
+    "cgeru": ("cgeru",),
+    "zgeru": ("zgeru",),
+    "cgerc": ("cgerc",),
+    "zgerc": ("zgerc",),
+    "complex-ger": COMPLEX_GER_OPERATIONS,
+    "ssymv": ("ssymv",),
+    "dsymv": ("dsymv",),
+    "chemv": ("chemv",),
+    "zhemv": ("zhemv",),
+    "symmetric-mv": SYMMETRIC_MV_OPERATIONS,
     "trmv": ("strmv", "dtrmv", "ctrmv", "ztrmv"),
     "trsv": ("strsv", "dtrsv", "ctrsv", "ztrsv"),
     "strmv": ("strmv",),
@@ -127,10 +155,7 @@ OP_EXPANSIONS = {
     "triangular-banded": TRIANGULAR_BANDED_OPERATIONS,
     "compact": PACKED_OPERATIONS + TRIANGULAR_BANDED_OPERATIONS,
     "all": (
-        ("legacy",)
-        + TRIANGULAR_OPERATIONS
-        + RANK_UPDATE_OPERATIONS
-        + BANDED_OPERATIONS
+        ("legacy",) + TRIANGULAR_OPERATIONS + RANK_UPDATE_OPERATIONS + BANDED_OPERATIONS
     ),
 }
 
@@ -338,8 +363,7 @@ def parse_banded_profile_spec(spec):
         ) from exc
     if n < 1 or bandwidth < 0 or bandwidth >= n:
         raise argparse.ArgumentTypeError(
-            "band profile requires N >= 1 and 0 <= BANDWIDTH < N, "
-            f"got {spec!r}"
+            f"band profile requires N >= 1 and 0 <= BANDWIDTH < N, got {spec!r}"
         )
     return BandedProfile(name, n, bandwidth)
 
@@ -347,9 +371,7 @@ def parse_banded_profile_spec(spec):
 def parse_packed_profile_spec(spec):
     parts = spec.split(":")
     if len(parts) != 2:
-        raise argparse.ArgumentTypeError(
-            f"packed profile must be NAME:N, got {spec!r}"
-        )
+        raise argparse.ArgumentTypeError(f"packed profile must be NAME:N, got {spec!r}")
     name = parts[0].strip()
     if not name:
         raise argparse.ArgumentTypeError("packed profile name must not be empty")
@@ -370,7 +392,9 @@ def parse_op(value):
     op = value.strip().lower()
     if op not in OP_EXPANSIONS:
         choices = ", ".join(OP_EXPANSIONS)
-        raise argparse.ArgumentTypeError(f"unknown operation {value!r}; choose from {choices}")
+        raise argparse.ArgumentTypeError(
+            f"unknown operation {value!r}; choose from {choices}"
+        )
     return op
 
 
@@ -436,7 +460,9 @@ def parse_args(argv=None):
         help=(
             "Operation selection. Use trmv/trsv for all four scalar kinds, "
             "triangular for all 80 dense triangular cases, legacy for the "
-            "historical cases, rank-update for all 16 dense SYR/HER/SYR2/HER2 "
+            "historical cases, complex-ger for only CGERU/ZGERU/CGERC/ZGERC, "
+            "symmetric-mv for only SSYMV/DSYMV/CHEMV/ZHEMV, "
+            "rank-update for all 16 dense SYR/HER/SYR2/HER2 "
             "cases, banded for GBMV/SBMV/HBMV, packed-mv for SPMV/HPMV and "
             "TPMV/TPSV, packed-rank for SPR/HPR/SPR2/HPR2, "
             "triangular-banded for TBMV/TBSV, or all for the historical set. "
@@ -450,6 +476,16 @@ def parse_args(argv=None):
         type=int,
         default=1,
         help="Run each library/shape in this many independent worker processes.",
+    )
+    parser.add_argument(
+        "--process-schedule",
+        choices=SCHEDULE_CHOICES,
+        help="Fresh-process library schedule (default: library-major).",
+    )
+    parser.add_argument(
+        "--interleave-libraries",
+        action="store_true",
+        help="Compatibility alias for --process-schedule interleaved.",
     )
     parser.add_argument("--csv", required=True)
     parser.add_argument("--skip-missing", action="store_true")
@@ -468,11 +504,21 @@ def parse_args(argv=None):
         default=[],
         help=argparse.SUPPRESS,
     )
+    benchmark_metadata.add_identity_arguments(parser)
     args = parser.parse_args(argv)
     if args.reps_small < 1 or args.reps_large < 1:
         parser.error("repetition counts must be at least 1")
     if args.process_repeats < 1:
         parser.error("--process-repeats must be at least 1")
+    if args.process_schedule is None:
+        args.process_schedule = (
+            "interleaved" if args.interleave_libraries else "library-major"
+        )
+    elif args.interleave_libraries and args.process_schedule != "interleaved":
+        parser.error(
+            "--interleave-libraries conflicts with --process-schedule library-major"
+        )
+    args.interleave_libraries = args.process_schedule == "interleaved"
     if any(n < 1 for n in args.n):
         parser.error("--n values must be positive")
     return args
@@ -761,34 +807,34 @@ def triangular_banded_cases(operations, bandwidth):
 def operations_for_shape(operations, shape):
     if shape.m == shape.n:
         return operations
-    return [operation for operation in operations if operation == "legacy"]
+    return [
+        operation
+        for operation in operations
+        if operation == "legacy" or operation in COMPLEX_GER_OPERATIONS
+    ]
 
 
-def sha256_file(path):
-    candidate = Path(path)
-    if not candidate.is_file():
-        return None
-    digest = hashlib.sha256()
-    with candidate.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def filter_legacy_rows(rows, operations):
+    if "legacy" in operations:
+        return rows
+    selected_legacy = {
+        operation for operation in operations if operation in LEGACY_FILTER_OPERATIONS
+    }
+    if not selected_legacy:
+        return rows
+    selected_structured = {
+        operation
+        for operation in operations
+        if operation != "legacy" and operation not in LEGACY_FILTER_OPERATIONS
+    }
+    selected = selected_legacy | selected_structured
+    return [row for row in rows if row["case"] in selected]
 
 
 def zig_version():
     try:
         result = subprocess.run(
             ["zig", "version"], check=True, capture_output=True, text=True
-        )
-    except Exception:
-        return None
-    return result.stdout.strip()
-
-
-def git_revision():
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True
         )
     except Exception:
         return None
@@ -846,20 +892,22 @@ def libraries(args):
     return result
 
 
-def library_available(path):
-    if Path(path).exists():
-        return True
-    try:
-        ctypes.CDLL(path)
-        return True
-    except OSError:
-        return False
+def library_available(name, path):
+    return Path(path).is_file() or (
+        sys.platform == "darwin" and name == "Accelerate" and path == DEFAULT_ACCELERATE
+    )
+
+
+def library_artifact_request(name, path):
+    if Path(path).is_file():
+        return benchmark_artifacts.ArtifactRequest.library(name, path)
+    if sys.platform == "darwin" and name == "Accelerate" and path == DEFAULT_ACCELERATE:
+        return benchmark_artifacts.ArtifactRequest.platform_image(name, path)
+    return benchmark_artifacts.ArtifactRequest.library(name, path)
 
 
 def next_fill(seed):
-    seed[0] = (seed[0] * 6364136223846793005 + 1442695040888963407) & (
-        (1 << 64) - 1
-    )
+    seed[0] = (seed[0] * 6364136223846793005 + 1442695040888963407) & ((1 << 64) - 1)
     return ((seed[0] >> 32) % 1000) / 1000.0 - 0.5
 
 
@@ -899,11 +947,16 @@ def write_complex(target, value):
 
 
 def max_real_error(actual, expected):
-    return max((abs(float(actual[i]) - expected[i]) for i in range(len(expected))), default=0.0)
+    return max(
+        (abs(float(actual[i]) - expected[i]) for i in range(len(expected))), default=0.0
+    )
 
 
 def max_complex_error(actual, expected):
-    return max((abs(as_complex(actual[i]) - expected[i]) for i in range(len(expected))), default=0.0)
+    return max(
+        (abs(as_complex(actual[i]) - expected[i]) for i in range(len(expected))),
+        default=0.0,
+    )
 
 
 def check_result(status, error=0.0, raw=""):
@@ -960,7 +1013,9 @@ def real_triangular_mv_expected(matrix, x, n, lda, uplo, trans, diag):
             )
             if (uplo == "U" and row > col) or (uplo == "L" and row < col):
                 continue
-            value = 1.0 if diag == "U" and row == col else float(matrix[row + col * lda])
+            value = (
+                1.0 if diag == "U" and row == col else float(matrix[row + col * lda])
+            )
             total += value * float(x[input_index])
         out.append(total)
     return out
@@ -990,9 +1045,7 @@ def complex_triangular_mv_expected(matrix, x, n, lda, uplo, trans, diag):
     return out
 
 
-def safe_triangular_matrix(
-    value_type, n, uplo, seed_value, complex_values=False
-):
+def safe_triangular_matrix(value_type, n, uplo, seed_value, complex_values=False):
     if not complex_values:
         matrix = real_array(value_type, n * n, seed_value)
         off_diagonal_scale = 0.25 / max(1, n - 1)
@@ -1000,19 +1053,13 @@ def safe_triangular_matrix(
             for row in range(n):
                 index = row + col * n
                 if row == col:
-                    matrix[index] = value_type(
-                        1.5 + 0.25 * abs(float(matrix[index]))
-                    )
-                elif (uplo == "U" and row < col) or (
-                    uplo == "L" and row > col
-                ):
+                    matrix[index] = value_type(1.5 + 0.25 * abs(float(matrix[index])))
+                elif (uplo == "U" and row < col) or (uplo == "L" and row > col):
                     matrix[index] = value_type(
                         float(matrix[index]) * off_diagonal_scale
                     )
                 else:
-                    matrix[index] = value_type(
-                        2.0 + abs(float(matrix[index]))
-                    )
+                    matrix[index] = value_type(2.0 + abs(float(matrix[index])))
         return matrix
 
     matrix = complex_array(value_type, n * n, seed_value)
@@ -1029,9 +1076,7 @@ def safe_triangular_matrix(
                 scaled = value * off_diagonal_scale
                 matrix[index] = value_type(scaled.real, scaled.imag)
             else:
-                matrix[index] = value_type(
-                    2.0 + abs(value.real), 1.5 + abs(value.imag)
-                )
+                matrix[index] = value_type(2.0 + abs(value.real), 1.5 + abs(value.imag))
     return matrix
 
 
@@ -1051,8 +1096,7 @@ def real_rank_update_expected(matrix0, x, y, n, lda, alpha, uplo):
             update = float(alpha) * float(x[row]) * float(x[col])
             if y is not None:
                 update = float(alpha) * (
-                    float(x[row]) * float(y[col])
-                    + float(y[row]) * float(x[col])
+                    float(x[row]) * float(y[col]) + float(y[row]) * float(x[col])
                 )
             out[row + col * lda] += update
     return out
@@ -1114,13 +1158,13 @@ def complex_rank_update_expected(matrix0, x, y, n, lda, alpha, uplo):
         row_range = range(col + 1) if uplo == "U" else range(col, n)
         for row in row_range:
             if y is None:
-                update = float(alpha) * as_complex(x[row]) * as_complex(x[col]).conjugate()
+                update = (
+                    float(alpha) * as_complex(x[row]) * as_complex(x[col]).conjugate()
+                )
             else:
                 complex_alpha = as_complex(alpha)
                 update = (
-                    complex_alpha
-                    * as_complex(x[row])
-                    * as_complex(y[col]).conjugate()
+                    complex_alpha * as_complex(x[row]) * as_complex(y[col]).conjugate()
                     + complex_alpha.conjugate()
                     * as_complex(y[row])
                     * as_complex(x[col]).conjugate()
@@ -1169,9 +1213,7 @@ def packed_structured_value(matrix, n, uplo, row, col, hermitian):
     return value
 
 
-def packed_structured_mv_expected(
-    matrix, x, y0, n, alpha, beta, uplo, hermitian=False
-):
+def packed_structured_mv_expected(matrix, x, y0, n, alpha, beta, uplo, hermitian=False):
     alpha_value = scalar_value(alpha, hermitian)
     beta_value = scalar_value(beta, hermitian)
     out = []
@@ -1181,9 +1223,7 @@ def packed_structured_mv_expected(
             total += packed_structured_value(
                 matrix, n, uplo, row, col, hermitian
             ) * scalar_value(x[col], hermitian)
-        out.append(
-            alpha_value * total + beta_value * scalar_value(y0[row], hermitian)
-        )
+        out.append(alpha_value * total + beta_value * scalar_value(y0[row], hermitian))
     return out
 
 
@@ -1213,9 +1253,7 @@ def safe_packed_triangular_matrix(
     return matrix
 
 
-def triangular_packed_value(
-    matrix, n, uplo, row, col, diag, complex_values=False
-):
+def triangular_packed_value(matrix, n, uplo, row, col, diag, complex_values=False):
     zero = 0j if complex_values else 0.0
     if (uplo == "U" and row > col) or (uplo == "L" and row < col):
         return zero
@@ -1340,9 +1378,7 @@ def triangular_band_mv_expected(
     return out
 
 
-def packed_rank_expected(
-    matrix0, x, y, n, alpha, uplo, hermitian=False
-):
+def packed_rank_expected(matrix0, x, y, n, alpha, uplo, hermitian=False):
     out = [scalar_value(matrix0[index], hermitian) for index in range(len(matrix0))]
     if hermitian and y is not None:
         alpha_value = as_complex(alpha)
@@ -1372,11 +1408,7 @@ def packed_rank_expected(
                 )
             index = packed_index(n, uplo, row, col)
             value = out[index] + update
-            out[index] = (
-                complex(value.real, 0.0)
-                if hermitian and row == col
-                else value
-            )
+            out[index] = complex(value.real, 0.0) if hermitian and row == col else value
     return out
 
 
@@ -1458,13 +1490,9 @@ def structured_band_expected(
     for row in range(n):
         total = 0j if hermitian else 0.0
         for col in range(max(0, row - k), min(n, row + k + 1)):
-            value = structured_band_value(
-                matrix, n, lda, k, uplo, row, col, hermitian
-            )
+            value = structured_band_value(matrix, n, lda, k, uplo, row, col, hermitian)
             total += value * scalar_value(x[col], hermitian)
-        out.append(
-            alpha_value * total + beta_value * scalar_value(y0[row], hermitian)
-        )
+        out.append(alpha_value * total + beta_value * scalar_value(y0[row], hermitian))
     return out
 
 
@@ -1480,10 +1508,16 @@ def checked_vector(
 ):
     setup()
     call()
-    error = max_complex_error(actual, expected) if complex_values else max_real_error(actual, expected)
+    error = (
+        max_complex_error(actual, expected)
+        if complex_values
+        else max_real_error(actual, expected)
+    )
     limit = tolerance(kind, n) if tolerance_limit is None else tolerance_limit
     if error > limit:
-        return check_result("correctness_failed", error, f"max_abs_error={error} tolerance={limit}")
+        return check_result(
+            "correctness_failed", error, f"max_abs_error={error} tolerance={limit}"
+        )
     return check_result("sampled-ok", error)
 
 
@@ -1686,11 +1720,7 @@ def run_rank_update_cases(lib, library_name, shape, reps, operations):
                 if case.rank2
                 else None
             )
-            alpha = (
-                case.value_type(0.7, -0.125)
-                if case.rank2
-                else case.real_type(0.7)
-            )
+            alpha = case.value_type(0.7, -0.125) if case.rank2 else case.real_type(0.7)
             expected = complex_rank_update_expected(
                 matrix0,
                 x,
@@ -2065,10 +2095,7 @@ def banded_tolerance(kind, bandwidth):
 
 
 def general_band_element_count(m, n, kl, ku):
-    return sum(
-        max(0, min(m - 1, col + kl) - max(0, col - ku) + 1)
-        for col in range(n)
-    )
+    return sum(max(0, min(m - 1, col + kl) - max(0, col - ku) + 1) for col in range(n))
 
 
 def banded_work(case, n):
@@ -2218,9 +2245,7 @@ def run_triangular_banded_cases(lib, library_name, profile, reps, operations):
     solutions = {}
     reference_products = {}
 
-    for case_index, case in enumerate(
-        triangular_banded_cases(operations, bandwidth)
-    ):
+    for case_index, case in enumerate(triangular_banded_cases(operations, bandwidth)):
         complex_values = case.kind in ("c32", "c64")
         matrix_key = (case.kind, case.uplo)
         if matrix_key not in matrices:
@@ -2322,6 +2347,10 @@ def run_worker(args):
     reps = args.worker_reps or 1
     lib = ctypes.CDLL(args.library_path)
     operations = expand_operations(args.worker_op)
+    legacy_all = "legacy" in operations
+    focused_legacy = any(
+        operation in LEGACY_FILTER_OPERATIONS for operation in operations
+    )
     compact_banded_operations = [
         operation for operation in operations if operation in COMPACT_BANDED_OPERATIONS
     ]
@@ -2330,21 +2359,17 @@ def run_worker(args):
     if compact_banded_operations and (
         m != n or args.worker_bandwidth < 0 or args.worker_bandwidth >= n
     ):
-        raise SystemExit(
-            "banded worker operations require m=n and 0 <= bandwidth < n"
-        )
+        raise SystemExit("banded worker operations require m=n and 0 <= bandwidth < n")
     banded_profile = (
         BandedProfile(shape.name, n, args.worker_bandwidth)
         if compact_banded_operations
         else None
     )
-    if "legacy" not in operations:
+    if not legacy_all and not focused_legacy:
         rows = run_triangular_cases(lib, library_name, shape, reps, operations)
         rows.extend(run_rank_update_cases(lib, library_name, shape, reps, operations))
         rows.extend(
-            run_packed_structured_mv_cases(
-                lib, library_name, shape, reps, operations
-            )
+            run_packed_structured_mv_cases(lib, library_name, shape, reps, operations)
         )
         rows.extend(
             run_packed_triangular_cases(lib, library_name, shape, reps, operations)
@@ -2352,9 +2377,7 @@ def run_worker(args):
         rows.extend(run_packed_rank_cases(lib, library_name, shape, reps, operations))
         if banded_profile is not None:
             rows.extend(
-                run_banded_cases(
-                    lib, library_name, banded_profile, reps, operations
-                )
+                run_banded_cases(lib, library_name, banded_profile, reps, operations)
             )
             rows.extend(
                 run_triangular_banded_cases(
@@ -2391,7 +2414,6 @@ def run_worker(args):
         y_n = real_array(ctype, n, 0x1123581321345589)
         alpha = ctype(0.7)
         beta = ctype(0.3)
-        gemv = getattr(lib, prefix + "gemv_")
 
         def setup_y_m():
             copy_array(y_m, y_m0)
@@ -2399,81 +2421,84 @@ def run_worker(args):
         def setup_y_n():
             copy_array(y_n, y_n0)
 
-        def run_gemv_n():
-            gemv(
-                trans_n,
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(matrix),
-                ctypes.byref(ldai),
-                ptr(x_n),
-                ctypes.byref(one),
-                ctypes.byref(beta),
-                ptr(y_m),
-                ctypes.byref(one),
+        if legacy_all:
+            gemv = getattr(lib, prefix + "gemv_")
+
+            def run_gemv_n():
+                gemv(
+                    trans_n,
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(matrix),
+                    ctypes.byref(ldai),
+                    ptr(x_n),
+                    ctypes.byref(one),
+                    ctypes.byref(beta),
+                    ptr(y_m),
+                    ctypes.byref(one),
+                )
+
+            check = checked_vector(
+                run_gemv_n,
+                setup_y_m,
+                y_m,
+                real_gemv_expected(
+                    matrix, x_n, y_m0, m, n, lda, alpha.value, beta.value, "N"
+                ),
+                kind,
+                n,
+            )
+            elapsed = best_time(run_gemv_n, setup_y_m, reps)
+            emit(
+                rows,
+                prefix + "gemv_n",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                2 * m * n,
+                check,
             )
 
-        check = checked_vector(
-            run_gemv_n,
-            setup_y_m,
-            y_m,
-            real_gemv_expected(
-                matrix, x_n, y_m0, m, n, lda, alpha.value, beta.value, "N"
-            ),
-            kind,
-            n,
-        )
-        elapsed = best_time(run_gemv_n, setup_y_m, reps)
-        emit(
-            rows,
-            prefix + "gemv_n",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            2 * m * n,
-            check,
-        )
+            def run_gemv_t():
+                gemv(
+                    trans_t,
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(matrix),
+                    ctypes.byref(ldai),
+                    ptr(x_m),
+                    ctypes.byref(one),
+                    ctypes.byref(beta),
+                    ptr(y_n),
+                    ctypes.byref(one),
+                )
 
-        def run_gemv_t():
-            gemv(
-                trans_t,
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(matrix),
-                ctypes.byref(ldai),
-                ptr(x_m),
-                ctypes.byref(one),
-                ctypes.byref(beta),
-                ptr(y_n),
-                ctypes.byref(one),
+            check = checked_vector(
+                run_gemv_t,
+                setup_y_n,
+                y_n,
+                real_gemv_expected(
+                    matrix, x_m, y_n0, m, n, lda, alpha.value, beta.value, "T"
+                ),
+                kind,
+                m,
+            )
+            elapsed = best_time(run_gemv_t, setup_y_n, reps)
+            emit(
+                rows,
+                prefix + "gemv_t",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                2 * m * n,
+                check,
             )
 
-        check = checked_vector(
-            run_gemv_t,
-            setup_y_n,
-            y_n,
-            real_gemv_expected(
-                matrix, x_m, y_n0, m, n, lda, alpha.value, beta.value, "T"
-            ),
-            kind,
-            m,
-        )
-        elapsed = best_time(run_gemv_t, setup_y_n, reps)
-        emit(
-            rows,
-            prefix + "gemv_t",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            2 * m * n,
-            check,
-        )
-
-        if m == n:
+        if m == n and (legacy_all or prefix + "symv" in operations):
             symv = getattr(lib, prefix + "symv_")
 
             def run_symv():
@@ -2510,46 +2535,47 @@ def run_worker(args):
                 check,
             )
 
-        matrix0 = real_array(ctype, lda * n, 0x123456789abcdef0)
-        target = real_array(ctype, lda * n, 0xfeedfacecafebeef)
-        gy_n = real_array(ctype, n, 0x0102030405060708)
-        ger = getattr(lib, prefix + "ger_")
+        if legacy_all:
+            matrix0 = real_array(ctype, lda * n, 0x123456789ABCDEF0)
+            target = real_array(ctype, lda * n, 0xFEEDFACECAFEBEEF)
+            gy_n = real_array(ctype, n, 0x0102030405060708)
+            ger = getattr(lib, prefix + "ger_")
 
-        def setup_a():
-            copy_array(target, matrix0)
+            def setup_a():
+                copy_array(target, matrix0)
 
-        def run_ger():
-            ger(
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(x_m),
-                ctypes.byref(one),
-                ptr(gy_n),
-                ctypes.byref(one),
-                ptr(target),
-                ctypes.byref(ldai),
+            def run_ger():
+                ger(
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(x_m),
+                    ctypes.byref(one),
+                    ptr(gy_n),
+                    ctypes.byref(one),
+                    ptr(target),
+                    ctypes.byref(ldai),
+                )
+
+            check = checked_vector(
+                run_ger,
+                setup_a,
+                target,
+                real_ger_expected(matrix0, x_m, gy_n, m, n, lda, alpha.value),
+                kind,
+                max(m, n),
             )
-
-        check = checked_vector(
-            run_ger,
-            setup_a,
-            target,
-            real_ger_expected(matrix0, x_m, gy_n, m, n, lda, alpha.value),
-            kind,
-            max(m, n),
-        )
-        elapsed = best_time(run_ger, setup_a, reps)
-        emit(
-            rows,
-            prefix + "ger",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            2 * m * n,
-            check,
-        )
+            elapsed = best_time(run_ger, setup_a, reps)
+            emit(
+                rows,
+                prefix + "ger",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                2 * m * n,
+                check,
+            )
 
     for kind, complex_type, prefix in [
         ("c32", ComplexF32, "c"),
@@ -2564,7 +2590,6 @@ def run_worker(args):
         y_n = complex_array(complex_type, n, 0x1123581321345589)
         alpha = complex_type(0.7, 0.125)
         beta = complex_type(0.3, -0.0625)
-        gemv = getattr(lib, prefix + "gemv_")
 
         def setup_y_m():
             copy_array(y_m, y_m0)
@@ -2572,115 +2597,118 @@ def run_worker(args):
         def setup_y_n():
             copy_array(y_n, y_n0)
 
-        def run_gemv_n():
-            gemv(
-                trans_n,
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(matrix),
-                ctypes.byref(ldai),
-                ptr(x_n),
-                ctypes.byref(one),
-                ctypes.byref(beta),
-                ptr(y_m),
-                ctypes.byref(one),
+        if legacy_all:
+            gemv = getattr(lib, prefix + "gemv_")
+
+            def run_gemv_n():
+                gemv(
+                    trans_n,
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(matrix),
+                    ctypes.byref(ldai),
+                    ptr(x_n),
+                    ctypes.byref(one),
+                    ctypes.byref(beta),
+                    ptr(y_m),
+                    ctypes.byref(one),
+                )
+
+            check = checked_vector(
+                run_gemv_n,
+                setup_y_m,
+                y_m,
+                complex_gemv_expected(matrix, x_n, y_m0, m, n, lda, alpha, beta, "N"),
+                kind,
+                n,
+                complex_values=True,
+            )
+            elapsed = best_time(run_gemv_n, setup_y_m, reps)
+            emit(
+                rows,
+                prefix + "gemv_n",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                8 * m * n,
+                check,
             )
 
-        check = checked_vector(
-            run_gemv_n,
-            setup_y_m,
-            y_m,
-            complex_gemv_expected(matrix, x_n, y_m0, m, n, lda, alpha, beta, "N"),
-            kind,
-            n,
-            complex_values=True,
-        )
-        elapsed = best_time(run_gemv_n, setup_y_m, reps)
-        emit(
-            rows,
-            prefix + "gemv_n",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            8 * m * n,
-            check,
-        )
+            def run_gemv_t():
+                gemv(
+                    trans_t,
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(matrix),
+                    ctypes.byref(ldai),
+                    ptr(x_m),
+                    ctypes.byref(one),
+                    ctypes.byref(beta),
+                    ptr(y_n),
+                    ctypes.byref(one),
+                )
 
-        def run_gemv_t():
-            gemv(
-                trans_t,
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(matrix),
-                ctypes.byref(ldai),
-                ptr(x_m),
-                ctypes.byref(one),
-                ctypes.byref(beta),
-                ptr(y_n),
-                ctypes.byref(one),
+            check = checked_vector(
+                run_gemv_t,
+                setup_y_n,
+                y_n,
+                complex_gemv_expected(matrix, x_m, y_n0, m, n, lda, alpha, beta, "T"),
+                kind,
+                m,
+                complex_values=True,
+            )
+            elapsed = best_time(run_gemv_t, setup_y_n, reps)
+            emit(
+                rows,
+                prefix + "gemv_t",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                8 * m * n,
+                check,
             )
 
-        check = checked_vector(
-            run_gemv_t,
-            setup_y_n,
-            y_n,
-            complex_gemv_expected(matrix, x_m, y_n0, m, n, lda, alpha, beta, "T"),
-            kind,
-            m,
-            complex_values=True,
-        )
-        elapsed = best_time(run_gemv_t, setup_y_n, reps)
-        emit(
-            rows,
-            prefix + "gemv_t",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            8 * m * n,
-            check,
-        )
+            def run_gemv_c():
+                gemv(
+                    trans_c,
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(matrix),
+                    ctypes.byref(ldai),
+                    ptr(x_m),
+                    ctypes.byref(one),
+                    ctypes.byref(beta),
+                    ptr(y_n),
+                    ctypes.byref(one),
+                )
 
-        def run_gemv_c():
-            gemv(
-                trans_c,
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(matrix),
-                ctypes.byref(ldai),
-                ptr(x_m),
-                ctypes.byref(one),
-                ctypes.byref(beta),
-                ptr(y_n),
-                ctypes.byref(one),
+            check = checked_vector(
+                run_gemv_c,
+                setup_y_n,
+                y_n,
+                complex_gemv_expected(matrix, x_m, y_n0, m, n, lda, alpha, beta, "C"),
+                kind,
+                m,
+                complex_values=True,
+            )
+            elapsed = best_time(run_gemv_c, setup_y_n, reps)
+            emit(
+                rows,
+                prefix + "gemv_c",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                8 * m * n,
+                check,
             )
 
-        check = checked_vector(
-            run_gemv_c,
-            setup_y_n,
-            y_n,
-            complex_gemv_expected(matrix, x_m, y_n0, m, n, lda, alpha, beta, "C"),
-            kind,
-            m,
-            complex_values=True,
-        )
-        elapsed = best_time(run_gemv_c, setup_y_n, reps)
-        emit(
-            rows,
-            prefix + "gemv_c",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            8 * m * n,
-            check,
-        )
-
-        if m == n:
+        if m == n and (legacy_all or prefix + "hemv" in operations):
             hemv = getattr(lib, prefix + "hemv_")
 
             def run_hemv():
@@ -2718,88 +2746,92 @@ def run_worker(args):
                 check,
             )
 
-        matrix0 = complex_array(complex_type, lda * n, 0x123456789abcdef0)
-        target = complex_array(complex_type, lda * n, 0xfeedfacecafebeef)
+        matrix0 = complex_array(complex_type, lda * n, 0x123456789ABCDEF0)
+        target = complex_array(complex_type, lda * n, 0xFEEDFACECAFEBEEF)
         gy_n = complex_array(complex_type, n, 0x0102030405060708)
 
         def setup_a():
             copy_array(target, matrix0)
 
-        geru = getattr(lib, prefix + "geru_")
+        if legacy_all or prefix + "geru" in operations:
+            geru = getattr(lib, prefix + "geru_")
 
-        def run_geru():
-            geru(
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(x_m),
-                ctypes.byref(one),
-                ptr(gy_n),
-                ctypes.byref(one),
-                ptr(target),
-                ctypes.byref(ldai),
+            def run_geru():
+                geru(
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(x_m),
+                    ctypes.byref(one),
+                    ptr(gy_n),
+                    ctypes.byref(one),
+                    ptr(target),
+                    ctypes.byref(ldai),
+                )
+
+            check = checked_vector(
+                run_geru,
+                setup_a,
+                target,
+                complex_ger_expected(matrix0, x_m, gy_n, m, n, lda, alpha, False),
+                kind,
+                max(m, n),
+                complex_values=True,
+            )
+            elapsed = best_time(run_geru, setup_a, reps)
+            emit(
+                rows,
+                prefix + "geru",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                8 * m * n,
+                check,
             )
 
-        check = checked_vector(
-            run_geru,
-            setup_a,
-            target,
-            complex_ger_expected(matrix0, x_m, gy_n, m, n, lda, alpha, False),
-            kind,
-            max(m, n),
-            complex_values=True,
-        )
-        elapsed = best_time(run_geru, setup_a, reps)
-        emit(
-            rows,
-            prefix + "geru",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            8 * m * n,
-            check,
-        )
+        if legacy_all or prefix + "gerc" in operations:
+            gerc = getattr(lib, prefix + "gerc_")
 
-        gerc = getattr(lib, prefix + "gerc_")
+            def run_gerc():
+                gerc(
+                    ctypes.byref(mi),
+                    ctypes.byref(ni),
+                    ctypes.byref(alpha),
+                    ptr(x_m),
+                    ctypes.byref(one),
+                    ptr(gy_n),
+                    ctypes.byref(one),
+                    ptr(target),
+                    ctypes.byref(ldai),
+                )
 
-        def run_gerc():
-            gerc(
-                ctypes.byref(mi),
-                ctypes.byref(ni),
-                ctypes.byref(alpha),
-                ptr(x_m),
-                ctypes.byref(one),
-                ptr(gy_n),
-                ctypes.byref(one),
-                ptr(target),
-                ctypes.byref(ldai),
+            check = checked_vector(
+                run_gerc,
+                setup_a,
+                target,
+                complex_ger_expected(matrix0, x_m, gy_n, m, n, lda, alpha, True),
+                kind,
+                max(m, n),
+                complex_values=True,
             )
-
-        check = checked_vector(
-            run_gerc,
-            setup_a,
-            target,
-            complex_ger_expected(matrix0, x_m, gy_n, m, n, lda, alpha, True),
-            kind,
-            max(m, n),
-            complex_values=True,
-        )
-        elapsed = best_time(run_gerc, setup_a, reps)
-        emit(
-            rows,
-            prefix + "gerc",
-            kind,
-            library_name,
-            shape,
-            elapsed,
-            8 * m * n,
-            check,
-        )
+            elapsed = best_time(run_gerc, setup_a, reps)
+            emit(
+                rows,
+                prefix + "gerc",
+                kind,
+                library_name,
+                shape,
+                elapsed,
+                8 * m * n,
+                check,
+            )
 
     rows.extend(run_triangular_cases(lib, library_name, shape, reps, operations))
     rows.extend(run_rank_update_cases(lib, library_name, shape, reps, operations))
-    rows.extend(run_packed_structured_mv_cases(lib, library_name, shape, reps, operations))
+    rows.extend(
+        run_packed_structured_mv_cases(lib, library_name, shape, reps, operations)
+    )
     rows.extend(run_packed_triangular_cases(lib, library_name, shape, reps, operations))
     rows.extend(run_packed_rank_cases(lib, library_name, shape, reps, operations))
     if banded_profile is not None:
@@ -2811,6 +2843,7 @@ def run_worker(args):
                 lib, library_name, banded_profile, reps, operations
             )
         )
+    rows = filter_legacy_rows(rows, operations)
     writer = csv.DictWriter(
         sys.stdout,
         fieldnames=CSV_FIELDNAMES,
@@ -2878,17 +2911,10 @@ def repeat_row_eligible(row):
     if row.get("status") != "ok" or row.get("check_status") not in CHECKED_STATUSES:
         return False
     try:
-        return float(row["rate_gops"]) >= 0.0 and int(row["time_ns"]) > 0
+        parse_positive_finite(row["rate_gops"], "rate_gops")
+        return int(row["time_ns"]) > 0
     except (KeyError, ValueError):
         return False
-
-
-def median(values):
-    ordered = sorted(values)
-    middle = len(ordered) // 2
-    if len(ordered) % 2 == 1:
-        return ordered[middle]
-    return (ordered[middle - 1] + ordered[middle]) / 2
 
 
 def repeat_failure_status(rows):
@@ -2907,23 +2933,35 @@ def repeat_failure_status(rows):
 
 
 def aggregate_repeat_group(rows):
-    eligible_rows = [row for row in rows if repeat_row_eligible(row)]
     existing_rows = [row for row in rows if row is not None]
     if not existing_rows:
         raise ValueError("cannot aggregate an empty repeat group")
+    for repeat, row in enumerate(rows, 1):
+        if row is not None and row.get("status") == "ok":
+            try:
+                validate_performance_fields(
+                    row,
+                    required=("time_ns", "rate_gops"),
+                )
+            except ValueError as exc:
+                raise ValueError(
+                    f"invalid Level 2 performance evidence in repeat {repeat}: {exc}"
+                ) from exc
+    eligible_rows = [row for row in rows if repeat_row_eligible(row)]
 
     if eligible_rows:
         result = dict(max(eligible_rows, key=lambda row: float(row["rate_gops"])))
         values = [float(row["rate_gops"]) for row in eligible_rows]
-        result.update(
-            {
-                "successful_repeats": len(eligible_rows),
-                "metric_min": format(min(values), ".17g"),
-                "metric_median": format(median(values), ".17g"),
-                "metric_max": format(max(values), ".17g"),
-                "metric_samples": ",".join(format(value, ".17g") for value in values),
-            }
-        )
+        summary = {
+            "metric_min": format(min(values), ".17g"),
+            "metric_median": format(
+                positive_finite_median(values, "metric_median"), ".17g"
+            ),
+            "metric_max": format(max(values), ".17g"),
+            "metric_samples": ",".join(format(value, ".17g") for value in values),
+        }
+        validate_optional_metric_evidence(summary)
+        result.update({"successful_repeats": len(eligible_rows), **summary})
     else:
         result = dict(existing_rows[0])
         result.update(
@@ -2970,7 +3008,6 @@ def aggregate_worker_repeats(repeat_rows):
     if not repeat_rows:
         return []
     repeat_maps = []
-    key_order = []
     seen = set()
     for rows in repeat_rows:
         current = {}
@@ -2979,31 +3016,28 @@ def aggregate_worker_repeats(repeat_rows):
             if key in current:
                 raise ValueError(f"duplicate worker row for {key}")
             current[key] = row
-            if key not in seen:
-                seen.add(key)
-                key_order.append(key)
+            seen.add(key)
         repeat_maps.append(current)
     return [
         aggregate_repeat_group([current.get(key) for current in repeat_maps])
-        for key in key_order
+        for key in sorted(seen)
     ]
 
 
-def write_metadata(
+def serialize_metadata(
     args,
-    output_path,
-    selected_libraries,
+    library_records,
     shapes,
+    identity,
     packed_profiles=(),
     banded_profiles=(),
 ):
-    output = Path(output_path)
     metadata = {
         "generated_at_unix": time.time(),
         "argv": sys.argv,
         "cwd": os.getcwd(),
         "zig_version": zig_version(),
-        "git_revision": git_revision(),
+        "git_revision": benchmark_metadata.source_git_revision(identity["source"]),
         "detected_cpu_count": os.cpu_count(),
         "zynum_maximum_threads": zynum_maximum_threads_detected(),
         "sizes": unique_preserving_order(
@@ -3023,31 +3057,43 @@ def write_metadata(
             for profile in banded_profiles
         ],
         "packed_profiles": [
-            {"name": profile.name, "n": profile.n}
-            for profile in packed_profiles
+            {"name": profile.name, "n": profile.n} for profile in packed_profiles
         ],
         "operations": requested_operations(args),
         "reps_small": args.reps_small,
         "reps_large": args.reps_large,
         "process_repeats": args.process_repeats,
+        "interleave_libraries": args.interleave_libraries,
         "isolation": (
-            "fresh process per library/shape/repeat; best repeat kept as the "
-            "primary metric with min/median/max and ordered samples retained"
+            "fresh process per library/shape/repeat; "
+            + (
+                "libraries use balanced cyclic Latin rotations; "
+                if args.interleave_libraries
+                else "libraries grouped in command-line order; "
+            )
+            + "best repeat kept as the primary metric with min/median/max and "
+            "ordered samples retained"
         ),
         "correctness_check": "sampled per library/case/shape before timing",
         "environment": environment_snapshot(),
-        "libraries": [
-            {
-                "name": name,
-                "path": path,
-                "sha256": sha256_file(path),
-            }
-            for name, path in selected_libraries
-        ],
+        "libraries": library_records,
+        "benchmark_identity": identity,
     }
-    with output.with_suffix(output.suffix + ".meta.json").open("w") as f:
-        json.dump(metadata, f, indent=2, sort_keys=True)
-        f.write("\n")
+    return benchmark_metadata.serialize_public_metadata(
+        metadata,
+        controller="run_level2_report.py",
+        parameter_keys=(
+            "sizes",
+            "shapes",
+            "banded_profiles",
+            "packed_profiles",
+            "operations",
+            "reps_small",
+            "reps_large",
+            "process_repeats",
+            "interleave_libraries",
+        ),
+    )
 
 
 def run_controller(args):
@@ -3083,11 +3129,22 @@ def run_controller(args):
         banded_profiles.extend(requested_triangular_banded_profiles(args))
     banded_profiles = unique_preserving_order(banded_profiles)
     selected_libraries = libraries(args)
+    available_libraries = []
+    for library_name, library_path in selected_libraries:
+        if args.skip_missing and not library_available(library_name, library_path):
+            if library_name == "Zynum":
+                raise ValueError(
+                    f"--skip-missing cannot skip required Zynum library {library_path}"
+                )
+            continue
+        available_libraries.append((library_name, library_path))
+    validate_unique_library_labels(available_libraries)
+    validate_schedule(
+        len(available_libraries), args.process_repeats, args.process_schedule
+    )
     rows = []
-    script = Path(__file__)
     jobs = [
-        (shape, operations_for_shape(dense_operations, shape), None)
-        for shape in shapes
+        (shape, operations_for_shape(dense_operations, shape), None) for shape in shapes
     ]
     jobs.extend(
         (
@@ -3105,6 +3162,7 @@ def run_controller(args):
         )
         for profile in banded_profiles
     )
+    executable_jobs = []
     for shape, shape_operations, bandwidth in jobs:
         if not shape_operations:
             print(
@@ -3122,66 +3180,137 @@ def run_controller(args):
                 file=sys.stderr,
                 flush=True,
             )
-        for library_name, library_path in selected_libraries:
-            if args.skip_missing and not library_available(library_path):
-                continue
-            repeat_rows = []
-            for repeat in range(args.process_repeats):
-                print(
-                    f"[level2 {library_name}] shape={shape.name} "
-                    f"m={shape.m} n={shape.n} reps={reps} "
-                    f"bandwidth={bandwidth if bandwidth is not None else '-'} "
-                    f"process={repeat + 1}/{args.process_repeats} "
-                    f"path={library_path}",
-                    file=sys.stderr,
-                    flush=True,
-                )
+        executable_jobs.append((shape, shape_operations, bandwidth, reps))
+
+    execution_schedule = (
+        library_repeat_schedule(
+            len(available_libraries),
+            args.process_repeats,
+            args.process_schedule,
+            case_count=len(executable_jobs),
+        )
+        if executable_jobs
+        else []
+    )
+
+    requests = [
+        library_artifact_request(name, path) for name, path in available_libraries
+    ]
+    requests.append(
+        benchmark_artifacts.ArtifactRequest.interpreter_script(
+            "run_level2_report", Path(__file__)
+        )
+    )
+    artifacts = benchmark_artifacts.ArtifactSnapshotSet.capture(requests)
+    try:
+        frozen_libraries = artifacts.for_role("library")
+        frozen_scripts = artifacts.for_role("binary")
+        if (
+            len(frozen_libraries) != len(available_libraries)
+            or len(frozen_scripts) != 1
+        ):
+            raise ValueError("Level 2 artifact snapshot projection is inconsistent")
+        identity = benchmark_metadata.collect_benchmark_identity_from_frozen(
+            args,
+            libraries=frozen_libraries,
+            binaries=frozen_scripts,
+        )
+        repeat_rows = [
+            [[None] * args.process_repeats for _ in executable_jobs]
+            for _ in available_libraries
+        ]
+        for library_index, job_index, repeat in execution_schedule:
+            library_name, public_library_path = available_libraries[library_index]
+            shape, shape_operations, bandwidth, reps = executable_jobs[job_index]
+            print(
+                f"[level2 {library_name}] shape={shape.name} "
+                f"m={shape.m} n={shape.n} reps={reps} "
+                f"bandwidth={bandwidth if bandwidth is not None else '-'} "
+                f"process={repeat + 1}/{args.process_repeats} "
+                f"path={public_library_path}",
+                file=sys.stderr,
+                flush=True,
+            )
+            try:
                 result = run_one_process(
-                    script,
+                    frozen_scripts[0].execution_path,
                     library_name,
-                    library_path,
+                    frozen_libraries[library_index].execution_path,
                     shape,
                     reps,
                     shape_operations,
                     bandwidth=bandwidth,
                 )
-                if result.returncode != 0:
-                    sys.stderr.write(result.stdout)
-                    sys.stderr.write(result.stderr)
-                    raise SystemExit(result.returncode)
-                process_rows = list(csv.DictReader(result.stdout.splitlines()))
-                if not process_rows:
-                    sys.stderr.write(result.stderr)
-                    raise SystemExit(
-                        f"worker returned no rows for {library_name} {shape.name} "
-                        f"repeat {repeat + 1}"
+            except OSError as exc:
+                raise ValueError(
+                    artifacts.redact_private_paths(
+                        f"cannot start Level 2 worker for {library_name}: {exc}"
                     )
-                repeat_rows.append(process_rows)
-            rows.extend(aggregate_worker_repeats(repeat_rows))
+                ) from None
+            if result.returncode != 0:
+                sys.stderr.write(artifacts.redact_private_paths(result.stdout))
+                sys.stderr.write(artifacts.redact_private_paths(result.stderr))
+                raise SystemExit(result.returncode)
+            process_rows = artifacts.redact_private_paths(
+                list(csv.DictReader(result.stdout.splitlines()))
+            )
+            if not process_rows:
+                sys.stderr.write(artifacts.redact_private_paths(result.stderr))
+                raise SystemExit(
+                    f"worker returned no rows for {library_name} {shape.name} "
+                    f"repeat {repeat + 1}"
+                )
+            repeat_rows[library_index][job_index][repeat] = process_rows
 
-    output = Path(args.csv)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with output.open("w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=CSV_FIELDNAMES)
+        for library_index in range(len(available_libraries)):
+            for job_index in range(len(executable_jobs)):
+                rows.extend(
+                    aggregate_worker_repeats(repeat_rows[library_index][job_index])
+                )
+
+        csv_buffer = io.StringIO(newline="")
+        writer = csv.DictWriter(csv_buffer, fieldnames=CSV_FIELDNAMES)
         writer.writeheader()
         writer.writerows(rows)
-    write_metadata(
-        args,
-        output,
-        selected_libraries,
-        shapes,
-        packed_profiles=packed_profiles,
-        banded_profiles=banded_profiles,
+        csv_bytes = artifacts.redact_private_paths(
+            csv_buffer.getvalue().encode("utf-8")
+        )
+        metadata_bytes = artifacts.redact_private_paths(
+            serialize_metadata(
+                args,
+                artifacts.legacy_records("library"),
+                shapes,
+                identity,
+                packed_profiles=packed_profiles,
+                banded_profiles=banded_profiles,
+            )
+        )
+        artifacts.finalize()
+    finally:
+        artifacts.close()
+    output = Path(args.csv)
+    publish_outputs(
+        [
+            ReportOutput(output, csv_bytes),
+            ReportOutput(
+                output.with_suffix(output.suffix + ".meta.json"), metadata_bytes
+            ),
+        ]
     )
 
 
-def main():
-    args = parse_args()
-    if args.worker:
-        run_worker(args)
-    else:
-        run_controller(args)
+def main(argv=None):
+    args = parse_args(argv)
+    try:
+        if args.worker:
+            run_worker(args)
+        else:
+            run_controller(args)
+    except (ValueError, benchmark_artifacts.ArtifactSnapshotError) as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
