@@ -386,7 +386,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "0bb599f3a5f0e159b180666890213fb2dd8f5a51ccf939f425d67c00f083f0f0"
+    "23e56128a3bc8076f40bae938a547494bcf28486d622008e1d5089458a60ce54"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -12509,6 +12509,19 @@ def _validate(
                 )
     observations_by_id = {item["id"]: item for item in inventory["build_observations"]}
     launches_by_id = {item["id"]: item for item in inventory["python_launches"]}
+    for identifier in (
+        TEST_INVENTORY_RUNNER_COMPILE_PYTHON_LAUNCH_ID,
+        TEST_INVENTORY_RUNNER_EXECUTE_PYTHON_LAUNCH_ID,
+        TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID,
+    ):
+        reviewed_launch = _new_test_inventory_python_launch(identifier)
+        observed_launch = launches_by_id.get(identifier, {})
+        for field, value in reviewed_launch.items():
+            _require(
+                observed_launch.get(field) == value,
+                f"{identifier}: reviewed test-inventory runner {field} changed",
+                errors,
+            )
     payload_identity_fields = {"payload_bindings", "payload_artifact_id"}
     observed_controller_ids = {
         item["id"]
@@ -13158,6 +13171,12 @@ def validate(root: Path, inventory_path: Path) -> list[str]:
 
 
 def _reviewed_observation_refresh_fields(identifier: str) -> dict[str, Any]:
+    if identifier in {
+        TEST_INVENTORY_RUNNER_COMPILE_PYTHON_LAUNCH_ID,
+        TEST_INVENTORY_RUNNER_EXECUTE_PYTHON_LAUNCH_ID,
+        TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID,
+    }:
+        return _new_test_inventory_python_launch(identifier)
     install_reachability = WINDOWS_PYTHON_TOOLING_INSTALL_REACHABILITY.get(identifier)
     if install_reachability is not None:
         return {"condition": install_reachability}
@@ -13714,25 +13733,25 @@ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
             "detail_status": "process-lifecycle-out-of-scope",
             "compile_for": "host",
             "execute_on": "host",
-            "cwd_shape": "repository-root",
+            "cwd_shape": "temporary fixture repository",
             "owner": "test-infrastructure",
             "launch_class": "test-inventory-runner-fixture-compile",
             "argv_shape": [
                 "zig",
                 "test",
-                "<fixture-digest-vectors.zig>",
+                "<fixture>/digest_vectors.zig",
                 "--name",
                 "digest_vectors",
                 "-O",
                 "Debug",
                 "-target",
-                "aarch64-macos",
+                "<host-native-baseline-target>",
                 "-mcpu",
                 "baseline",
                 "--test-runner",
-                "<repository>/tools/test_inventory_runner.zig",
+                "<fixture>/tools/test_inventory_vector_runner.zig",
                 "--test-no-exec",
-                "-femit-bin=<repository>/.test-inventory-digest-vectors",
+                "-femit-bin=<fixture>/test-inventory-digest-vectors",
             ],
         }
     if identifier == TEST_INVENTORY_RUNNER_EXECUTE_PYTHON_LAUNCH_ID:
@@ -13740,20 +13759,20 @@ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
             "detail_status": "process-lifecycle-out-of-scope",
             "compile_for": "host",
             "execute_on": "host",
-            "cwd_shape": "repository-root",
+            "cwd_shape": "temporary fixture repository",
             "owner": "test-infrastructure",
             "launch_class": "test-inventory-runner-fixture-execute",
             "argv_shape": [
-                "./.test-inventory-digest-vectors",
+                "./test-inventory-digest-vectors",
                 "<fixture-inventory-path>",
                 "--inventory-environment",
-                "env:aarch64-macos-baseline",
+                "<host-native-inventory-environment>",
                 "--inventory-root",
                 "zig-root:header-smoke-tests",
                 "--inventory-mode",
                 "Debug",
                 "--inventory-class",
-                "enumeration-class:aarch64-macos-system-macho",
+                "<host-native-enumeration-class>",
             ],
         }
     if identifier == TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID:
@@ -13761,20 +13780,20 @@ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
             "detail_status": "process-lifecycle-out-of-scope",
             "compile_for": "host",
             "execute_on": "host",
-            "cwd_shape": "repository-root",
+            "cwd_shape": "temporary fixture repository",
             "owner": "test-infrastructure",
             "launch_class": "test-inventory-runner-fixture-execute",
             "argv_shape": [
                 "./test-inventory-digest-vectors",
                 "<fixture-inventory-path>",
                 "--inventory-environment",
-                "env:aarch64-macos-baseline",
+                "<host-native-inventory-environment>",
                 "--inventory-root",
                 "zig-root:header-smoke-tests",
                 "--inventory-mode",
                 "Debug",
                 "--inventory-class",
-                "enumeration-class:aarch64-macos-system-macho",
+                "<host-native-enumeration-class>",
             ],
         }
     capsule_argv = [

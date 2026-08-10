@@ -1280,12 +1280,13 @@ class BuildInventoryTests(unittest.TestCase):
         race_launch = CHECKER._new_test_inventory_python_launch(
             CHECKER.TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID
         )
-        self.assertEqual("repository-root", race_launch["cwd_shape"])
+        self.assertEqual("temporary fixture repository", race_launch["cwd_shape"])
         self.assertEqual(
             "test-inventory-runner-fixture-execute", race_launch["launch_class"]
         )
         self.assertEqual(
-            "./test-inventory-digest-vectors", race_launch["argv_shape"][0]
+            "./test-inventory-digest-vectors",
+            race_launch["argv_shape"][0],
         )
         workflow_ids = (
             "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory",
@@ -2851,31 +2852,78 @@ class BuildInventoryTests(unittest.TestCase):
         expected_test_inventory_runner_launches = {
             CHECKER.TEST_INVENTORY_RUNNER_COMPILE_PYTHON_LAUNCH_ID: (
                 "test_runner_protocol_and_isolated_object_mutations_fail",
+                "subprocess.run",
                 "test-inventory-runner-fixture-compile",
-                "zig",
+                [
+                    "zig",
+                    "test",
+                    "<fixture>/digest_vectors.zig",
+                    "--name",
+                    "digest_vectors",
+                    "-O",
+                    "Debug",
+                    "-target",
+                    "<host-native-baseline-target>",
+                    "-mcpu",
+                    "baseline",
+                    "--test-runner",
+                    "<fixture>/tools/test_inventory_vector_runner.zig",
+                    "--test-no-exec",
+                    "-femit-bin=<fixture>/test-inventory-digest-vectors",
+                ],
             ),
             CHECKER.TEST_INVENTORY_RUNNER_EXECUTE_PYTHON_LAUNCH_ID: (
                 "run_vector_inventory",
+                "subprocess.run",
                 "test-inventory-runner-fixture-execute",
-                "./.test-inventory-digest-vectors",
+                [
+                    "./test-inventory-digest-vectors",
+                    "<fixture-inventory-path>",
+                    "--inventory-environment",
+                    "<host-native-inventory-environment>",
+                    "--inventory-root",
+                    "zig-root:header-smoke-tests",
+                    "--inventory-mode",
+                    "Debug",
+                    "--inventory-class",
+                    "<host-native-enumeration-class>",
+                ],
+            ),
+            CHECKER.TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID: (
+                "test_runner_protocol_and_isolated_object_mutations_fail",
+                "subprocess.Popen",
+                "test-inventory-runner-fixture-execute",
+                [
+                    "./test-inventory-digest-vectors",
+                    "<fixture-inventory-path>",
+                    "--inventory-environment",
+                    "<host-native-inventory-environment>",
+                    "--inventory-root",
+                    "zig-root:header-smoke-tests",
+                    "--inventory-mode",
+                    "Debug",
+                    "--inventory-class",
+                    "<host-native-enumeration-class>",
+                ],
             ),
         }
         launches_by_id = {item["id"]: item for item in inventory_launches}
         for identifier, (
             source_function,
+            source_symbol,
             launch_class,
-            argv0,
+            argv_shape,
         ) in expected_test_inventory_runner_launches.items():
             with self.subTest(test_inventory_runner_launch=identifier):
                 launch = launches_by_id[identifier]
                 self.assertEqual(
                     source_function, launch["anchor"]["enclosing_function"]
                 )
-                self.assertEqual("subprocess.run", launch["anchor"]["symbol"])
+                self.assertEqual(source_symbol, launch["anchor"]["symbol"])
                 self.assertEqual(1, launch["anchor"]["ordinal"])
-                self.assertEqual("repository-root", launch["cwd_shape"])
+                self.assertEqual("temporary fixture repository", launch["cwd_shape"])
                 self.assertEqual(launch_class, launch["launch_class"])
-                self.assertEqual(argv0, launch["argv_shape"][0])
+                self.assertEqual(argv_shape, launch["argv_shape"])
 
         for path in sorted(runner_paths):
             tree = CHECKER.ast.parse(
