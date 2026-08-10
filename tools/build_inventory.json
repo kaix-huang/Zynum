@@ -8933,6 +8933,12 @@
       "owner": "workflow-maintainers"
     },
     {
+      "path": ".github/dependabot.yml",
+      "kind": "configuration-metadata",
+      "class": "non-generated-source",
+      "owner": "workflow-maintainers"
+    },
+    {
       "path": ".github/pull_request_template.md",
       "kind": "documentation",
       "class": "non-generated-source",
@@ -10595,7 +10601,7 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "7b8b68321e841249ea9c541296ee36353b08faa6726b75fdf4dc752f14159001",
+  "repository_file_classifications_digest": "a3852582e08e104b50a5cb969da73747c0ea2b990ed45ea83de161b2d0f94233",
   "derived_candidates": [
     {
       "id": "derived:include/zynum/blas/blas.h",

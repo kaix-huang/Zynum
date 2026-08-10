@@ -41,6 +41,7 @@ class BuildInventoryTests(unittest.TestCase):
             (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
         )
         files = {"tools/build_inventory.json"}
+        files.add(CHECKER.DEPENDABOT_CONFIG_PATH)
         files.add(CHECKER.LEVEL2_WIDTH_STUB_ROOT_PATH)
         files.update(item["path"] for item in cls.inventory.get("build_manifests", []))
         for section in (
@@ -3858,6 +3859,22 @@ class BuildInventoryTests(unittest.TestCase):
         release_source = (self.root / ".github/workflows/release.yml").read_text(
             encoding="utf-8"
         )
+        action_lines = [
+            line
+            for workflow_source in (ci_source, release_source)
+            for line in workflow_source.splitlines()
+            if line.lstrip().startswith("- uses:")
+        ]
+        self.assertEqual(24, len(action_lines))
+        for line in action_lines:
+            with self.subTest(action_pin=line):
+                self.assertRegex(
+                    line,
+                    (
+                        r"^\s+- uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@"
+                        r"[0-9a-f]{40} # v[0-9]+\.[0-9]+\.[0-9]+$"
+                    ),
+                )
         output_ref = "${{ steps.publication_workspace.outputs.path }}"
 
         def job_block(source: str, job: str) -> str:
@@ -12574,7 +12591,7 @@ class BuildInventoryTests(unittest.TestCase):
             "tools/test_inventory.json": "json-data",
             "tools/test_inventory_runner.zig": "zig-source",
         }
-        self.assertEqual(284, len(rows))
+        self.assertEqual(285, len(rows))
         for path, kind in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(kind, rows[path]["kind"])
@@ -12585,6 +12602,10 @@ class BuildInventoryTests(unittest.TestCase):
                 self.assertEqual("legal-governance", rows[path]["kind"])
                 self.assertEqual("non-generated-source", rows[path]["class"])
                 self.assertEqual("project-governance", rows[path]["owner"])
+        dependabot = rows[".github/dependabot.yml"]
+        self.assertEqual("configuration-metadata", dependabot["kind"])
+        self.assertEqual("non-generated-source", dependabot["class"])
+        self.assertEqual("workflow-maintainers", dependabot["owner"])
         section_policy = rows["src/blas/kernels/isolated/object_format_sections.zig"]
         self.assertEqual("zig-source", section_policy["kind"])
         self.assertEqual("non-generated-source", section_policy["class"])
@@ -12595,6 +12616,16 @@ class BuildInventoryTests(unittest.TestCase):
                 self.inventory["repository_file_classifications"]
             ),
         )
+        dependabot_path = self.root / CHECKER.DEPENDABOT_CONFIG_PATH
+        dependabot_bytes = dependabot_path.read_bytes()
+        self.assertEqual(
+            CHECKER.REVIEWED_DEPENDABOT_CONFIG_SHA256,
+            hashlib.sha256(dependabot_bytes).hexdigest(),
+        )
+        dependabot_path.write_bytes(
+            dependabot_bytes.replace(b'"github-actions"', b'"npm"', 1)
+        )
+        self._assert_error_contains("reviewed Dependabot configuration changed")
 
     def test_reviewed_classification_digest_class_owner_and_detail_bind(self) -> None:
         inventory = self._inventory()
