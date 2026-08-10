@@ -7435,20 +7435,20 @@
       "detail_status": "process-lifecycle-out-of-scope",
       "compile_for": "host",
       "execute_on": "host",
-      "cwd_shape": "repository-root",
+      "cwd_shape": "temporary fixture repository",
       "owner": "test-infrastructure",
       "launch_class": "test-inventory-runner-fixture-execute",
       "argv_shape": [
-        "./.test-inventory-digest-vectors",
+        "./test-inventory-digest-vectors",
         "<fixture-inventory-path>",
         "--inventory-environment",
-        "env:aarch64-macos-baseline",
+        "<host-native-inventory-environment>",
         "--inventory-root",
         "zig-root:header-smoke-tests",
         "--inventory-mode",
         "Debug",
         "--inventory-class",
-        "enumeration-class:aarch64-macos-system-macho"
+        "<host-native-enumeration-class>"
       ],
       "id": "python-launch:test/build/test_test_inventory.py:run_vector_inventory:subprocess.run:1",
       "category": "python-launch",
@@ -7459,7 +7459,7 @@
         "ordinal": 1
       },
       "call": "subprocess.run",
-      "call_semantics_digest": "5892d35b6bcaf7acae14642f46a2c0fa80ce99fadfc55baa6ff963ed5d0c8795"
+      "call_semantics_digest": "8c24a589cccb1772b87ba86ec87ad879c63cd963c331a68214f3910436274f95"
     },
     {
       "detail_status": "process-lifecycle-out-of-scope",
@@ -7501,20 +7501,20 @@
       "detail_status": "process-lifecycle-out-of-scope",
       "compile_for": "host",
       "execute_on": "host",
-      "cwd_shape": "repository-root",
+      "cwd_shape": "temporary fixture repository",
       "owner": "test-infrastructure",
       "launch_class": "test-inventory-runner-fixture-execute",
       "argv_shape": [
         "./test-inventory-digest-vectors",
         "<fixture-inventory-path>",
         "--inventory-environment",
-        "env:aarch64-macos-baseline",
+        "<host-native-inventory-environment>",
         "--inventory-root",
         "zig-root:header-smoke-tests",
         "--inventory-mode",
         "Debug",
         "--inventory-class",
-        "enumeration-class:aarch64-macos-system-macho"
+        "<host-native-enumeration-class>"
       ],
       "id": "python-launch:test/build/test_test_inventory.py:test_runner_protocol_and_isolated_object_mutations_fail:subprocess.Popen:1",
       "category": "python-launch",
@@ -7525,31 +7525,31 @@
         "ordinal": 1
       },
       "call": "subprocess.Popen",
-      "call_semantics_digest": "be68e37e4414dd7fe8ac57eb8d17cbedbd29953eb93adda58e468501a54af1ab"
+      "call_semantics_digest": "61248591f1877f0d04df61f2892ba8448b709eba324bf43c16ed996ad1d7b616"
     },
     {
       "detail_status": "process-lifecycle-out-of-scope",
       "compile_for": "host",
       "execute_on": "host",
-      "cwd_shape": "repository-root",
+      "cwd_shape": "temporary fixture repository",
       "owner": "test-infrastructure",
       "launch_class": "test-inventory-runner-fixture-compile",
       "argv_shape": [
         "zig",
         "test",
-        "<fixture-digest-vectors.zig>",
+        "<fixture>/digest_vectors.zig",
         "--name",
         "digest_vectors",
         "-O",
         "Debug",
         "-target",
-        "aarch64-macos",
+        "<host-native-baseline-target>",
         "-mcpu",
         "baseline",
         "--test-runner",
-        "<repository>/tools/test_inventory_runner.zig",
+        "<fixture>/tools/test_inventory_vector_runner.zig",
         "--test-no-exec",
-        "-femit-bin=<repository>/.test-inventory-digest-vectors"
+        "-femit-bin=<fixture>/test-inventory-digest-vectors"
       ],
       "id": "python-launch:test/build/test_test_inventory.py:test_runner_protocol_and_isolated_object_mutations_fail:subprocess.run:1",
       "category": "python-launch",
@@ -7560,7 +7560,7 @@
         "ordinal": 1
       },
       "call": "subprocess.run",
-      "call_semantics_digest": "78716abedae8638269f2d4753ea308e137492707dda87bc9941055a0a5f99f88"
+      "call_semantics_digest": "edb7ec371ee209dc1c4a836ce1bfdaf280558b0bf73ecdb2ee3b3427c6f04f55"
     },
     {
       "id": "python-launch:tools/check_abi_manifest.py:run_nm:subprocess.run:1",

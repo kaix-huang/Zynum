@@ -7343,19 +7343,45 @@ class TestInventoryTests(unittest.TestCase):
         )
         vector_name = 'digest_vectors.test.Ω "quote" \\ backslash\ncontrol\x01'
         vector_root_id = "zig-root:header-smoke-tests"
-        vector_row_id = (
-            "row:env-aarch64-macos-baseline:zig-root-header-smoke-tests:Debug"
+        vector_inventory = copy.deepcopy(self.inventory)
+        host_architecture = {
+            "aarch64": "aarch64",
+            "arm64": "aarch64",
+            "amd64": "x86_64",
+            "x86_64": "x86_64",
+        }.get(os.uname().machine.lower())
+        host_os = {"darwin": "macos", "linux": "linux"}.get(sys.platform)
+        self.assertIsNotNone(
+            host_architecture,
+            f"unsupported native test architecture: {os.uname().machine}",
         )
+        self.assertIsNotNone(host_os, f"unsupported native test OS: {sys.platform}")
+        vector_profiles = [
+            profile
+            for profile in vector_inventory["environment_profiles"]
+            if profile["architecture"] == host_architecture
+            and profile["os"] == host_os
+            and profile["cpu"] == "baseline"
+            and profile["host_tool_smoke"] is True
+        ]
+        self.assertEqual(1, len(vector_profiles), vector_profiles)
+        vector_profile = vector_profiles[0]
+        vector_environment_id = vector_profile["id"]
+        vector_rows = [
+            row
+            for row in vector_inventory["test_mode_rows"]
+            if row["environment_id"] == vector_environment_id
+            and row["root_id"] == vector_root_id
+            and row["optimize_mode_id"] == "mode:Debug"
+        ]
+        self.assertEqual(1, len(vector_rows), vector_rows)
+        vector_row = vector_rows[0]
+        vector_row_id = vector_row["id"]
+        vector_class_id = vector_row["enumeration_class_id"]
         vector_tests = CHECKER._expected_test_rows(vector_root_id, [vector_name])
         self.assertEqual(
             "92c72baecf7cfa3ef98ee5ee6afe86b7de8ac197f08766248c408028625be0a2",
             CHECKER._fact_digest(vector_tests),
-        )
-        vector_inventory = copy.deepcopy(self.inventory)
-        vector_row = next(
-            row
-            for row in vector_inventory["test_mode_rows"]
-            if row["id"] == vector_row_id
         )
         vector_set_id = CHECKER._content_set_id(vector_root_id, vector_tests)
         vector_set = {
@@ -7368,6 +7394,7 @@ class TestInventoryTests(unittest.TestCase):
         }
         vector_inventory["expected_test_sets"].append(vector_set)
         vector_inventory["expected_test_sets"].sort(key=lambda row: row["id"])
+        vector_row["expectation_state"] = CHECKER.FROZEN_STATE
         vector_row["expected_test_set_id"] = vector_set_id
         vector_inventory["native_observation_bindings"] = [
             binding
@@ -7378,6 +7405,7 @@ class TestInventoryTests(unittest.TestCase):
             CHECKER._native_observation_binding(vector_row, vector_set_id)
         )
         vector_inventory["native_observation_bindings"].sort(key=lambda row: row["id"])
+        vector_inventory["strict_summary"] = CHECKER._section_summary(vector_inventory)
         self._write(vector_inventory)
         vector_bytes = self.inventory_path.read_bytes()
         exact_limit_bytes = vector_bytes + b" " * (
@@ -7463,7 +7491,7 @@ class TestInventoryTests(unittest.TestCase):
                 "-O",
                 "Debug",
                 "-target",
-                "aarch64-macos",
+                vector_profile["target"],
                 "-mcpu",
                 "baseline",
                 "--test-runner",
@@ -7474,7 +7502,7 @@ class TestInventoryTests(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
-            cwd=REPOSITORY_ROOT,
+            cwd=self.root,
             timeout=120.0,
         )
         self.assertEqual(0, compile_vector.returncode, compile_vector.stderr)
@@ -7487,13 +7515,13 @@ class TestInventoryTests(unittest.TestCase):
                     "./test-inventory-digest-vectors",
                     str(inventory_path),
                     "--inventory-environment",
-                    "env:aarch64-macos-baseline",
+                    vector_environment_id,
                     "--inventory-root",
                     vector_root_id,
                     "--inventory-mode",
                     "Debug",
                     "--inventory-class",
-                    "enumeration-class:aarch64-macos-system-macho",
+                    vector_class_id,
                 ],
                 check=False,
                 capture_output=True,
@@ -7551,13 +7579,13 @@ class TestInventoryTests(unittest.TestCase):
                             "./test-inventory-digest-vectors",
                             str(race_inventory),
                             "--inventory-environment",
-                            "env:aarch64-macos-baseline",
+                            vector_environment_id,
                             "--inventory-root",
                             vector_root_id,
                             "--inventory-mode",
                             "Debug",
                             "--inventory-class",
-                            "enumeration-class:aarch64-macos-system-macho",
+                            vector_class_id,
                         ],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
