@@ -36,8 +36,9 @@ Release goals:
   views, workspace APIs, and explicit aliasing rules.
 - Support ARM and x86 CPU families with portable fallbacks plus feature-aware
   kernels for the important architecture tiers:
-  - AArch64 ASIMD, SVE/SVE2 where available, Apple AMX, and SME/SME2 paths on
-    Apple Silicon and other capable ARM systems.
+  - AArch64 ASIMD, SVE/SVE2 where available, SME/SME2, and experimental
+    explicitly enabled Apple AMX paths on independently validated AArch64
+    macOS deployments.
   - x86_64 baseline/SSE-family, AVX, AVX2/FMA, AVX512/FMA, and current Intel and
     AMD desktop/server CPUs.
 - Maintain representative native gates for supported AArch64 and x86_64
@@ -86,6 +87,9 @@ Non-goals for 0.1.x:
 - Keep non-default threading, SME, AMX, AVX2, and AVX512 experiments opt-in
   until native fresh-process evidence justifies a default rule. All retained
   parallel paths must use the shared core `std.Io.Threaded` helper lifecycle.
+- Keep private Apple AMX disabled by default. Its build-time opt-in requires a
+  deployment that independently confirms instruction execution because macOS
+  exposes no reliable public runtime capability signal for this ISA.
 - Record retained dispatch gates with target features, exact shape predicates,
   runtime controls, reproducible commands, curated evidence identities, and
   rollback criteria. Keep raw run artifacts outside the repository.

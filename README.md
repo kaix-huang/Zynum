@@ -55,7 +55,8 @@ The `0.1.x` line is scoped to Zynum BLAS:
   complex types, including CBLAS, Fortran ABI, generated C headers, and generated
   Fortran module declarations.
 - Support ARM and x86 CPUs through portable fallbacks and feature-aware kernels
-  for AArch64 ASIMD/SVE/SVE2/AMX/SME and x86_64 SSE/AVX/AVX2/AVX512 tiers.
+  for AArch64 ASIMD/SVE/SVE2/SME, experimental opt-in Apple AMX, and x86_64
+  SSE/AVX/AVX2/AVX512 tiers.
 - Maintain native performance gates for representative AArch64 and x86_64
   capability tiers, with the goal of matching or beating the best eligible
   comparator across the documented BLAS benchmark suite before 0.1 is complete.
@@ -338,8 +339,13 @@ first BLAS call in a process.
 | --- | --- | --- |
 | `ZYNUM_MAXIMUM_THREADS` | Positive integer | Caps the number of threads Zynum may use. Values above the runtime CPU count are capped to that count. When unset, the cap defaults to the runtime CPU count. GEMM may still choose fewer threads by internal heuristics. |
 
-Instruction-set selection, AMX/SME use, and `std.Io` worker strategy are handled
-internally and are not controlled by environment variables.
+Instruction-set selection, SME use, and the `std.Io` worker strategy are handled
+internally and are not controlled by environment variables. Apple AMX is a
+private, experimental ISA and is compiled out by default. A deployment owner
+may opt in with `-Dapple-amx=true` only for an AArch64 macOS target that has been
+independently validated to execute AMX instructions. macOS exposes no reliable
+public runtime capability signal for this private ISA, so CPU-family, ASIMD,
+SME, or successful compilation is not sufficient evidence.
 
 ## Tests And Validation
 
