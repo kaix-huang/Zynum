@@ -13617,7 +13617,7 @@
       "lifecycle": "experimental",
       "state": "apple_amx",
       "evidence": {"build": true, "native_correctness": true, "native_performance": true},
-      "evidence_note": "AMX execution-plan subkernel with focused correctness and performance-sweep evidence"
+      "evidence_note": "Private Apple ISA subkernel compiled out by default; -Dapple-amx=true requires a validated AArch64 macOS deployment, and retained native evidence applies only to that opt-in path"
     },
     {
       "level": "level3_gemm",
@@ -13631,7 +13631,7 @@
       "lifecycle": "experimental",
       "state": "apple_amx",
       "evidence": {"build": true, "native_correctness": true, "native_performance": true},
-      "evidence_note": "AMX execution-plan subkernel with focused correctness and performance-sweep evidence"
+      "evidence_note": "Private Apple ISA subkernel compiled out by default; -Dapple-amx=true requires a validated AArch64 macOS deployment, and retained native evidence applies only to that opt-in path"
     },
     {
       "level": "level3_gemm",
@@ -13645,7 +13645,7 @@
       "lifecycle": "experimental",
       "state": "apple_amx",
       "evidence": {"build": true, "native_correctness": true, "native_performance": true},
-      "evidence_note": "AMX execution-plan subkernel with focused correctness and performance-sweep evidence"
+      "evidence_note": "Private Apple ISA subkernel compiled out by default; -Dapple-amx=true requires a validated AArch64 macOS deployment, and retained native evidence applies only to that opt-in path"
     },
     {
       "level": "level3_gemm",
@@ -13659,7 +13659,7 @@
       "lifecycle": "experimental",
       "state": "apple_amx",
       "evidence": {"build": true, "native_correctness": true, "native_performance": true},
-      "evidence_note": "AMX execution-plan subkernel with focused correctness and performance-sweep evidence"
+      "evidence_note": "Private Apple ISA subkernel compiled out by default; -Dapple-amx=true requires a validated AArch64 macOS deployment, and retained native evidence applies only to that opt-in path"
     },
     {
       "level": "level3_gemm",
@@ -13673,7 +13673,7 @@
       "lifecycle": "experimental",
       "state": "apple_amx",
       "evidence": {"build": true, "native_correctness": true, "native_performance": true},
-      "evidence_note": "AMX execution-plan subkernel with focused correctness and performance-sweep evidence"
+      "evidence_note": "Private Apple ISA subkernel compiled out by default; -Dapple-amx=true requires a validated AArch64 macOS deployment, and retained native evidence applies only to that opt-in path"
     },
     {
       "level": "level3_gemm",

@@ -73,6 +73,15 @@ nonzero while applicable rows remain pending. Inventory checkers use bounded,
 fail-closed file admission and reviewed code pins. These establish repository
 consistency, not cryptographic authenticity or proof of remote execution.
 
+GitHub Actions assigns the same-SHA Linux source, build-inventory-security, and
+test-inventory-security jobs as the authority for inventory and repository
+security evidence. The Windows `x86_64 build-link-native-smoke` job checks the
+cross-target build, all three inventory-link modes, installed library layout,
+the canonical DLL's 311 manifest exports, and native Python tooling behavior.
+It is compatibility evidence, not inventory evidence or attestation. Windows
+native-enumeration observations remain explicitly pending, and the structure
+checker is the authoritative source for the current incomplete native matrix.
+
 Inventory refresh is a dedicated maintenance operation. Validate the full
 candidate, inspect the inventory and checker/runner changes together, and keep
 local evidence outside the repository. Do not hand-edit content-addressed IDs
@@ -348,9 +357,14 @@ capacity and may choose fewer threads internally.
 unset ZYNUM_MAXIMUM_THREADS
 ```
 
-Instruction-set selection, Apple AMX/SME use, and worker strategy are internal
-dispatch decisions. See `common/benchmarking.md` for comparator variables and
-reproducibility rules.
+Instruction-set selection, SME use, and worker strategy are internal dispatch
+decisions. Apple AMX is disabled by default because macOS exposes no public
+runtime capability signal for the private instruction set. An explicitly
+validated `aarch64-macos` deployment may authorize the route at build time with
+`-Dapple-amx=true`; CPU family, ASIMD, and SME feature selections are not AMX
+execution proof. Without that authorization, Zynum uses its ordinary fallback
+and does not issue an AMX raw opcode. See `common/benchmarking.md` for
+comparator variables and reproducibility rules.
 
 ## Dynamic BLAS Library Cleanup
 

@@ -168,7 +168,7 @@ fn amxEntry(stable_id: []const u8, scalar: catalog.ScalarKind, register_m: usize
             .native_performance = true,
         },
         .contract = amxContract(scalar, register_m, register_n),
-        .evidence_note = "AMX execution-plan subkernel with focused correctness and performance-sweep evidence",
+        .evidence_note = "Private Apple ISA subkernel compiled out by default; -Dapple-amx=true requires a validated AArch64 macOS deployment, and retained native evidence applies only to that opt-in path",
     };
 }
 

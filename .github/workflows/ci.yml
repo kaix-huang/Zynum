@@ -143,7 +143,7 @@ jobs:
             install: true
             dynlib: zig-out/lib/libzynum_blas.so
             full_smoke: false
-          - name: Windows / x86_64 baseline
+          - name: Windows / x86_64 build-link-native-smoke
             os: windows-2025
             cache_target: windows-x86_64-baseline
             zig_gate: link-only
@@ -242,7 +242,7 @@ jobs:
             }
           }
 
-      - name: Run Windows Python tooling inventory gate
+      - name: Run Windows native Python tooling compatibility smoke (not inventory evidence)
         if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
         shell: pwsh
         timeout-minutes: 15
@@ -254,7 +254,261 @@ jobs:
           $env:GIT_PAGER = $null
           $env:PAGER = $null
           $env:LESS = $null
-          zig build test-python-tooling ${{ matrix.target_args }} --release=fast --summary failures
+
+          $preflightScript = @'
+          import ctypes
+          import json
+          import os
+          import re
+          import stat
+          from pathlib import Path
+
+          repository_root = Path.cwd().resolve(strict=True)
+          requested_dll = repository_root / "zig-out/bin/zynum_blas.dll"
+          requested_stat = os.stat(requested_dll, follow_symlinks=False)
+          if (
+              getattr(requested_stat, "st_file_attributes", 0)
+              & stat.FILE_ATTRIBUTE_REPARSE_POINT
+          ):
+              raise SystemExit("canonical Windows DLL must not be a reparse point")
+          if (
+              not stat.S_ISREG(requested_stat.st_mode)
+              or requested_stat.st_size <= 0
+              or requested_stat.st_nlink != 1
+          ):
+              raise SystemExit(
+                  "canonical Windows DLL must be a nonempty regular file with one hardlink"
+              )
+          canonical_dll = requested_dll.resolve(strict=True)
+          if os.path.normcase(str(canonical_dll)) != os.path.normcase(str(requested_dll)):
+              raise SystemExit("canonical Windows DLL path resolves through an alias")
+
+          library = ctypes.CDLL(str(canonical_dll), winmode=0x00000900)
+          kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+          get_module_filename = kernel32.GetModuleFileNameW
+          get_module_filename.argtypes = [
+              ctypes.c_void_p,
+              ctypes.POINTER(ctypes.c_wchar),
+              ctypes.c_uint32,
+          ]
+          get_module_filename.restype = ctypes.c_uint32
+          module_path_buffer = ctypes.create_unicode_buffer(32768)
+          module_path_length = get_module_filename(
+              library._handle, module_path_buffer, len(module_path_buffer)
+          )
+          if module_path_length == 0 or module_path_length >= len(module_path_buffer):
+              raise OSError(ctypes.get_last_error(), "cannot resolve loaded Windows DLL path")
+          loaded_dll = Path(module_path_buffer.value).resolve(strict=True)
+          if os.path.normcase(str(loaded_dll)) != os.path.normcase(str(canonical_dll)):
+              raise SystemExit("loaded Windows DLL differs from the canonical build artifact")
+
+          manifest_path = repository_root / "include/zynum/blas/abi_manifest.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          export_names = []
+          symbol_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$", flags=re.ASCII)
+          for section_name in ("fortran", "cblas"):
+              section = manifest[section_name]
+              section_exports = section["exports"]
+              if section["export_count"] != len(section_exports):
+                  raise SystemExit(f"{section_name} ABI export count is inconsistent")
+              for item in section_exports:
+                  name = item.get("name") if isinstance(item, dict) else None
+                  if (
+                      not isinstance(name, str)
+                      or "\x00" in name
+                      or any(ord(character) < 0x20 or ord(character) == 0x7F for character in name)
+                      or symbol_pattern.fullmatch(name) is None
+                  ):
+                      raise SystemExit(f"Windows DLL manifest export name is invalid: {name!r}")
+                  export_names.append(name)
+          if len(export_names) != 311 or len(set(export_names)) != 311:
+              raise SystemExit("Windows DLL preflight requires exactly 311 unique ABI exports")
+          encoded_export_names = [name.encode("ascii") for name in export_names]
+          if len(set(encoded_export_names)) != 311:
+              raise SystemExit("Windows DLL preflight requires unique ASCII export encodings")
+
+          get_proc_address = kernel32.GetProcAddress
+          get_proc_address.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+          get_proc_address.restype = ctypes.c_void_p
+          missing_exports = [
+              name
+              for name, encoded_name in zip(export_names, encoded_export_names)
+              if not get_proc_address(library._handle, encoded_name)
+          ]
+          if missing_exports:
+              raise SystemExit(f"Windows DLL is missing ABI exports: {missing_exports}")
+          print(f"Windows DLL preflight passed for {canonical_dll} ({len(export_names)} exports)")
+          '@
+          python -I -B -c $preflightScript
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $testScript = @'
+          import hashlib
+          import json
+          import unittest
+          from pathlib import Path, PurePosixPath
+
+          expected = {
+              "discovered": 465,
+              "executed": 465,
+              "skipped": 98,
+              "failures": 0,
+              "errors": 0,
+              "expected_failures": 0,
+              "unexpected_successes": 0,
+              "skip_identity_sha256": "03b2b268a475647b80323c39a290d2ad17c7a26cabcd9c94f18a2fa7d4d22d8b",
+          }
+          inventory = json.loads(Path("tools/test_inventory.json").read_text(encoding="utf-8"))
+          skip_contracts = [
+              item
+              for item in inventory["python_skip_contracts"]
+              if item["root_id"] == "python-root:benchmark-tools-discovery"
+          ]
+          if len(skip_contracts) != 1:
+              raise SystemExit("Windows native tooling skip contract is not unique")
+          skip_entries = skip_contracts[0]["entries"]
+          platform_predicates = frozenset({
+              "python-skip-predicate:artifact-snapshot-platform-unavailable",
+              "python-skip-predicate:report-publication-platform-unavailable",
+          })
+          windows_active_predicates = platform_predicates | {
+              "python-skip-predicate:accelerate-unavailable",
+              "python-skip-predicate:rank-k-artifacts-unavailable",
+              "python-skip-predicate:rotg-latency-artifacts-unavailable",
+              "python-skip-predicate:symm-artifacts-unavailable",
+              "python-skip-predicate:triangular-matrix-artifacts-unavailable",
+              "python-skip-predicate:not-darwin",
+          }
+
+          def runtime_id(inventory_name):
+              path, separator, declaration = inventory_name.partition("::")
+              if not separator or PurePosixPath(path).suffix != ".py" or not declaration:
+                  raise SystemExit(
+                      f"Windows native tooling test identity is invalid: {inventory_name!r}"
+                  )
+              return f"{PurePosixPath(path).stem}.{declaration}"
+
+          platform_test_ids = {
+              runtime_id(entry["test"])
+              for entry in skip_entries
+              if entry["predicate_id"] in platform_predicates
+          }
+          expected_skip_identities = sorted(
+              (runtime_id(entry["test"]), entry["reason"])
+              for entry in skip_entries
+              if entry["predicate_id"] in windows_active_predicates
+              and not (
+                  entry["predicate_id"] not in platform_predicates
+                  and runtime_id(entry["test"]) in platform_test_ids
+              )
+          )
+          expected_skip_payload = json.dumps(
+              expected_skip_identities, separators=(",", ":"), ensure_ascii=True
+          ).encode("ascii")
+          expected_skip_digest = hashlib.sha256(expected_skip_payload).hexdigest()
+          if (
+              len(expected_skip_identities) != expected["skipped"]
+              or expected_skip_digest != expected["skip_identity_sha256"]
+          ):
+              raise SystemExit(
+                  "Windows reviewed skip identities differ from the frozen compatibility contract"
+              )
+          suite = unittest.defaultTestLoader.discover("bench/tools", pattern="test_*.py")
+          discovered = suite.countTestCases()
+          if discovered != expected["discovered"] or discovered == 0:
+              raise SystemExit(
+                  f"Windows native tooling discovery count differs: {discovered} != "
+                  f"{expected['discovered']}"
+              )
+          required_dll_backed_tests = frozenset({
+              "test_level2_report.Level2RunnerTests.test_banded_controller_keeps_fresh_process_statistics",
+              "test_level2_report.Level2RunnerTests.test_banded_worker_correctness",
+              "test_level2_report.Level2RunnerTests.test_compact_controller_routes_profiles_and_metadata",
+              "test_level2_report.Level2RunnerTests.test_compact_worker_correctness",
+              "test_level2_report.Level2RunnerTests.test_controller_aggregates_independent_worker_processes",
+              "test_level2_report.Level2RunnerTests.test_rank_update_controller_keeps_fresh_process_statistics",
+              "test_level2_report.Level2RunnerTests.test_rank_update_worker_correctness",
+              "test_level2_report.Level2RunnerTests.test_rectangular_worker_correctness_and_operation_counts",
+              "test_level2_report.Level2RunnerTests.test_triangular_worker_correctness",
+          })
+
+          def flatten_tests(test_suite):
+              for test in test_suite:
+                  if isinstance(test, unittest.TestSuite):
+                      yield from flatten_tests(test)
+                  else:
+                      yield test
+
+          discovered_tests = tuple(flatten_tests(suite))
+          tests_by_id = {test.id(): test for test in discovered_tests}
+          if len(tests_by_id) != discovered:
+              raise SystemExit("Windows native tooling discovered duplicate test identities")
+          discovered_ids = frozenset(tests_by_id)
+          missing_dll_backed_tests = sorted(required_dll_backed_tests - discovered_ids)
+          if missing_dll_backed_tests:
+              raise SystemExit(
+                  f"Windows DLL-backed tests were not discovered: {missing_dll_backed_tests!r}"
+              )
+          reviewed_dll_backed_tests = {
+              runtime_id(entry["test"])
+              for entry in skip_entries
+              if entry["predicate_id"] in {
+                  "python-skip-predicate:drop-in-blas-unavailable",
+                  "python-skip-predicate:file-backed-blas-unavailable",
+              }
+          }
+          if reviewed_dll_backed_tests != required_dll_backed_tests:
+              raise SystemExit("Windows DLL-backed test contract differs from the reviewed set")
+          platform_skip_identities = [
+              pair for pair in expected_skip_identities if pair[0] in platform_test_ids
+          ]
+          if len(platform_skip_identities) != 93:
+              raise SystemExit("Windows platform skip marker set must contain exactly 93 tests")
+          for test_id, reason in platform_skip_identities:
+              test = tests_by_id.get(test_id)
+              if test is None:
+                  raise SystemExit(f"Windows reviewed skip test was not discovered: {test_id}")
+              method_name = getattr(test, "_testMethodName", None)
+              if not isinstance(method_name, str) or not method_name:
+                  raise SystemExit(f"Windows reviewed skip test is malformed: {test_id}")
+              setattr(test, method_name, unittest.skip(reason)(lambda: None))
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          skip_identities = sorted((test.id(), reason) for test, reason in result.skipped)
+          if any(
+              not isinstance(test_id, str) or not isinstance(reason, str)
+              for test_id, reason in skip_identities
+          ):
+              raise SystemExit("Windows native tooling skip identities are malformed")
+          unexpected_dll_skips = sorted(
+              required_dll_backed_tests & {test_id for test_id, _ in skip_identities}
+          )
+          if unexpected_dll_skips:
+              raise SystemExit(
+                  f"Windows DLL-backed tests must not be skipped: {unexpected_dll_skips!r}"
+              )
+          skip_identity_payload = json.dumps(
+              skip_identities, separators=(",", ":"), ensure_ascii=True
+          ).encode("ascii")
+          observed = {
+              "discovered": discovered,
+              "executed": result.testsRun,
+              "skipped": len(result.skipped),
+              "failures": len(result.failures),
+              "errors": len(result.errors),
+              "expected_failures": len(result.expectedFailures),
+              "unexpected_successes": len(result.unexpectedSuccesses),
+              "skip_identity_sha256": hashlib.sha256(skip_identity_payload).hexdigest(),
+          }
+          if observed != expected or not result.wasSuccessful():
+              raise SystemExit(
+                  f"Windows native tooling compatibility contract differs: "
+                  f"observed={observed!r}; expected={expected!r}"
+              )
+          print(f"Windows native tooling compatibility smoke passed: {observed!r}")
+          '@
+          python -I -B -c $testScript
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }

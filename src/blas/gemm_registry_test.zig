@@ -7,6 +7,7 @@ const builtin = @import("builtin");
 const aarch64_features = @import("kernels/arch/aarch64/features.zig");
 const apple_amx = @import("kernels/arch/aarch64/matrix_matrix/amx.zig");
 const apple_amx_ops = @import("kernels/arch/aarch64/matrix_matrix/amx_ops.zig");
+const aarch64_matrix_vector = @import("kernels/arch/aarch64/matrix_vector.zig");
 const complex_gemm = @import("core/matrix_matrix/gemm.zig");
 const scalar = @import("core/shared/scalar.zig");
 const catalog = @import("kernels/shared/matrix_matrix/catalog.zig");
@@ -376,6 +377,22 @@ test "Apple AMX success and rejection exits balance state before return" {
         .cache_bytes = 8 * 1024 * 1024,
     };
     defer apple_amx.freeCurrentThreadCaches();
+
+    if (comptime !apple_amx.enabled) {
+        const before_disabled = c;
+        const entries_before_disabled = apple_amx_ops.testStateEntries();
+        try std.testing.expectEqual(@as(c_int, 0), apple_amx.sgemmN16(16, 16, 1, &a, 16, &b, 1, &c, 16, workspace));
+        try std.testing.expectEqualSlices(f32, &before_disabled, &c);
+        try std.testing.expectEqual(entries_before_disabled, apple_amx_ops.testStateEntries());
+        try std.testing.expectEqual(@as(usize, 0), apple_amx_ops.testStateDepth());
+
+        const x = [_]f64{2};
+        var pack: [8]f64 = @splat(17);
+        const pack_before_disabled = pack;
+        try std.testing.expect(!aarch64_matrix_vector.gemvNoTransPackUnitReal(f64, 1, 1, &x, &pack));
+        try std.testing.expectEqualSlices(f64, &pack_before_disabled, &pack);
+        return;
+    }
 
     const before_success = apple_amx_ops.testStateEntries();
     try std.testing.expectEqual(@as(c_int, 1), apple_amx.sgemmN16(16, 16, 1, &a, 16, &b, 1, &c, 16, workspace));

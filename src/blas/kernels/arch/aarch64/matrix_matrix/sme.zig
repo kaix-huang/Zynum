@@ -131,6 +131,7 @@ pub fn preferredColumnBlock(comptime T: type) usize {
 }
 
 pub fn tryNoTransRealF32Fast(m_: gemm_task.BlasInt, n_: gemm_task.BlasInt, k_: gemm_task.BlasInt, alpha: f32, a: [*]const f32, lda_: gemm_task.BlasInt, b: [*]const f32, ldb_: gemm_task.BlasInt, beta: f32, c: [*]f32, ldc_: gemm_task.BlasInt) bool {
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (alpha != 1 or beta != 0) return false;
     if (m_ != 128 or n_ != 128 or k_ != 128) return false;
@@ -443,6 +444,7 @@ fn noTransRealF32SmeDirectWithPack(task: gemm_task.Task(f32), tile: usize, b_pac
 }
 
 fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;
@@ -478,6 +480,7 @@ fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
 }
 
 fn noTransRealF32AmxInterior(task: gemm_task.Task(f32)) bool {
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;
@@ -543,6 +546,7 @@ fn noTransRealF32AmxInterior(task: gemm_task.Task(f32)) bool {
 }
 
 fn noTransRealF32AmxFullPanels(task: gemm_task.Task(f32)) bool {
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (!task.execution.amx_partial_n16) return false;
@@ -661,6 +665,7 @@ fn noTransRealF64SmeDirectWithPack(task: gemm_task.Task(f64), tile: usize, b_pac
 }
 
 fn noTransRealF64Amx(task: gemm_task.Task(f64)) bool {
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;
@@ -686,6 +691,7 @@ fn noTransRealF64Amx(task: gemm_task.Task(f64)) bool {
 }
 
 fn noTransRealF64AmxInterior(task: gemm_task.Task(f64)) bool {
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!task.allow_sme) return false;
     if (task.alpha != 1 or task.beta != 0) return false;

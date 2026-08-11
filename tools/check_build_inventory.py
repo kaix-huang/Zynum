@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "b844b6c75c0f83feeb714bdb883655a60ed21b7d4596fc086e7737d2537816d7"
+    "b089936c9c4af1029cf7d6e078e8a417f54b3b595754b91c0f0ebd657247b688"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -499,7 +499,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5",
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
-    "option_surfaces": "c4047e8167df65133a70d2e096e8e8617dc26e2207210d4d5dc816a810ff811f",
+    "option_surfaces": "53eb3653a01519c448864ccf6e3357421631353ac889924e6e97833b2d6be739",
     "repository_file_classifications": "1f590bfdc466c53aa8d19f2ce386549158576cd414e38845bc2fb896f37cf228",
     "derived_candidates": "ce431613bae70ff88c1b6a7b2c7862fc94a4be4f9f24d1f0c5c592a135108ef9",
     "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
@@ -2275,6 +2275,14 @@ LEVEL2_WIDTH_ARTIFACT_CONTRACT_PATH = (
 )
 LEVEL2_WIDTH_STUB_ROOT_PATH = "src/blas/level2_width_stub_root.zig"
 REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-native-python-tooling-compatibility-smoke-not-inventory-evidence": {
+        "condition": "runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'",
+        "argv_shape": [
+            "python -I -B -c <canonical-Windows-DLL-ABI-preflight>",
+            "python -I -B -c <465-case-native-tooling-compatibility-suite-with-frozen-skip-identities>",
+        ],
+        "evidence_role": "Windows native DLL ABI, mandatory DLL-backed tests, and frozen-skip Python tooling compatibility smoke; not build or test inventory evidence",
+    },
     "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": {
         "condition": "always",
         "argv_shape": [
@@ -2393,24 +2401,24 @@ WINDOWS_PYTHON_TOOLING_INSTALL_IDS = (
 )
 WINDOWS_PYTHON_TOOLING_INSTALL_REACHABILITY = {
     INSTALL_DYNAMIC_LIBRARY_ID: (
-        "install or install-libraries step is reached, or the canonical native "
-        "Windows x86_64 baseline test-python-tooling gate is reached"
+        "install or install-libraries step is reached, including the canonical "
+        "Windows x86_64 native compatibility build step"
     ),
     "install:build.zig:build:install_rank_k_probe": (
-        "the build-rank-k-probe named step or the canonical native Windows "
-        "x86_64 baseline test-python-tooling gate is reached"
+        "the build-rank-k-probe named step is reached, including from the "
+        "canonical Windows x86_64 native compatibility build step"
     ),
     "install:build.zig:build:install_rotg_latency_probe": (
-        "the build-rotg-latency-probe named step or the canonical native Windows "
-        "x86_64 baseline test-python-tooling gate is reached"
+        "the build-rotg-latency-probe named step is reached, including from the "
+        "canonical Windows x86_64 native compatibility build step"
     ),
     "install:build.zig:build:install_symm_probe": (
-        "the build-symm-probe named step or the canonical native Windows x86_64 "
-        "baseline test-python-tooling gate is reached"
+        "the build-symm-probe named step is reached, including from the canonical "
+        "Windows x86_64 native compatibility build step"
     ),
     "install:build.zig:build:install_triangular_matrix_probe": (
-        "the build-triangular-matrix-probe named step or the canonical native "
-        "Windows x86_64 baseline test-python-tooling gate is reached"
+        "the build-triangular-matrix-probe named step is reached, including from "
+        "the canonical Windows x86_64 native compatibility build step"
     ),
 }
 INSTALL_STATIC_LIBRARY_ID = "install:build.zig:build:install_static_lib"
@@ -11991,6 +11999,7 @@ def _validate(
     root_standard_names = {"target", "cpu", "ofmt", "dynamic-linker", "release"}
     example_standard_names = {"target", "cpu", "ofmt", "dynamic-linker", "optimize"}
     project_names = {
+        "apple-amx",
         "test-optimize",
         "host-tool-smoke",
         "level1-fixed-candidates",
@@ -12016,7 +12025,7 @@ def _validate(
     }
     _require(
         surfaces_by_root.get("build.zig") == root_standard_names | project_names,
-        "build.zig option surfaces must contain exactly 19 standard/project surfaces",
+        "build.zig option surfaces must contain exactly 20 standard/project surfaces",
         errors,
     )
     _require(
@@ -13611,7 +13620,10 @@ def _new_test_inventory_observation(
             "orphan_reason": "valid standalone entry point; aggregate test membership is not intended",
             "step_role": "focused-validation",
         }
-    if identifier == "option:build.zig:build:target":
+    if identifier in {
+        "option:build.zig:build:apple-amx",
+        "option:build.zig:build:target",
+    }:
         return {
             "owner": "build-composition",
             "observation_role": "source declaration for option surfaces",
@@ -13876,7 +13888,7 @@ def _new_test_inventory_workflow_launch(identifier: str) -> dict[str, Any]:
         "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite",
         "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries",
         "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
-        "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-python-tooling-inventory-gate",
+        "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-native-python-tooling-compatibility-smoke-not-inventory-evidence",
         "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
         "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
         "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",

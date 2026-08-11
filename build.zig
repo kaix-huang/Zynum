@@ -54,6 +54,16 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
     const test_optimize = b.option(std.builtin.OptimizeMode, "test-optimize", "Optimize mode for correctness tests") orelse .ReleaseSafe;
     const host_tool_smoke = b.option(bool, "host-tool-smoke", "Run host Python/C/C++/Fortran smoke checks as part of the test step") orelse true;
+    const apple_amx = b.option(
+        bool,
+        "apple-amx",
+        "Enable the experimental private Apple AMX ISA on a validated AArch64 macOS deployment",
+    ) orelse false;
+    if (apple_amx and (target.result.cpu.arch != .aarch64 or target.result.os.tag != .macos)) {
+        @panic("-Dapple-amx=true requires an aarch64-macos target");
+    }
+    const zynum_build_options = b.addOptions();
+    zynum_build_options.addOption(bool, "apple_amx", apple_amx);
     const exact_baseline_request = target_query.cpu_model == .baseline and
         target_query.cpu_features_add.isEmpty() and target_query.cpu_features_sub.isEmpty();
     const expected_baseline_cpu = std.Target.Cpu.baseline(target.result.cpu.arch, target.result.os);
@@ -221,6 +231,15 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
+    zynum_mod.addOptions("zynum-build-options", zynum_build_options);
+    zynum_blas_mod.addOptions("zynum-build-options", zynum_build_options);
+    blas_compat_mod.addOptions("zynum-build-options", zynum_build_options);
+    fortran_compat_mod.addOptions("zynum-build-options", zynum_build_options);
+    cblas_compat_mod.addOptions("zynum-build-options", zynum_build_options);
+    zynum_test_mod.addOptions("zynum-build-options", zynum_build_options);
+    zynum_blas_test_mod.addOptions("zynum-build-options", zynum_build_options);
+    fortran_compat_test_mod.addOptions("zynum-build-options", zynum_build_options);
+    cblas_compat_test_mod.addOptions("zynum-build-options", zynum_build_options);
     const stride2_isolated_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
         .name = "zynum-level1-x86-stride2-isolated",
         .linkage = .static,
@@ -343,8 +362,6 @@ pub fn build(b: *std.Build) void {
     if (structured_isolated_library) |library| {
         blas_compat_mod.linkLibrary(library);
     }
-    _ = fortran_compat_mod;
-    _ = cblas_compat_mod;
     const lib = b.addLibrary(.{
         .name = "zynum_blas",
         .linkage = .dynamic,
@@ -924,6 +941,10 @@ pub fn build(b: *std.Build) void {
         .{ .root_id = "zig-root:vector-stride2-parallel-tests", .logical_tests = vector_stride2_parallel_tests },
         .{ .root_id = "zig-root:zynum-public-surface-contract-tests", .logical_tests = zynum_public_surface_contract_tests },
     };
+    for (inventory_cases) |inventory_case| {
+        const official_tests = inventory_case.logical_tests orelse continue;
+        official_tests.root_module.addOptions("zynum-build-options", zynum_build_options);
+    }
     const test_inventory_link_step = b.step(
         "test-inventory-link",
         "Compile every applicable test-inventory enumerator without running it",

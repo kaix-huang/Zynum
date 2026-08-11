@@ -11,7 +11,8 @@ Zynum may build several independent AArch64 kernel families:
 - portable scalar and compiler-vectorized fallbacks;
 - ASIMD fixed-width kernels;
 - non-streaming SVE or SVE2 kernels where the target and host support them;
-- Apple AMX kernels reached through a private, documented ABI boundary; and
+- explicitly enabled Apple AMX kernels reached through a private, documented
+  ABI boundary; and
 - SME or SME2 streaming kernels with explicit SM/ZA ownership.
 
 These are distinct capabilities. SME availability does not prove that ordinary
@@ -78,10 +79,19 @@ BLAS calls correct.
 
 ## Apple AMX
 
-AMX is an implementation-specific backend, not a public API promise. Keep its
-instruction interface behind a small private ABI with explicit register, stack,
-alignment, and clobber contracts. Public and core modules select only a stable
-kernel descriptor; they do not import low-level opcode details.
+AMX is an implementation-specific backend, not a public API promise. It is
+compiled out by default and can be enabled only for an AArch64 macOS target with
+`-Dapple-amx=true`. Keep its instruction interface behind a small private ABI
+with explicit register, stack, alignment, and clobber contracts. Public and core
+modules select only a stable kernel descriptor; they do not import low-level
+opcode details.
+
+macOS provides no reliable public runtime capability signal for this private
+ISA. CPU family, ASIMD, SME, and successful compilation must not enable it.
+Before opting in, the deployment owner must validate that the exact target and
+runtime—including any virtualization layer—can execute these instructions. A
+disabled or rejected route returns before allocation, output mutation, or AMX
+state entry and continues through the ordinary fallback path.
 
 An AMX route must state:
 

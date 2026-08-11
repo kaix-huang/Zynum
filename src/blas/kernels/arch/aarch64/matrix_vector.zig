@@ -14,8 +14,6 @@ const fixed_simd = @import("../../shared/matrix_vector/fixed_simd.zig");
 const matrix_vector_asm = @import("asm/matrix_vector.zig");
 
 const BlasInt = scalar.BlasInt;
-const enable_amx_gemv_n = true;
-const enable_amx_gemv_t = true;
 const enable_sm_gemv_n = false;
 const enable_sme2_gemv_n = true;
 const enable_sme2_gemv_t = true;
@@ -145,7 +143,7 @@ fn scaleUnitF64(n: usize, beta: f64, y: [*]f64) void {
 }
 
 fn canUseAmxGemvNoTransF32(m: usize, n: usize, lda: BlasInt) bool {
-    if (comptime !enable_amx_gemv_n) return false;
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (!features.has_asimd) return false;
     if (m *| n < 128 * 128 or m *| n >= 1536 * 1536) return false;
@@ -226,7 +224,7 @@ fn gemvNoTransAsimdF32M128(
 }
 
 fn canUseAmxGemvNoTransF64(m: usize, n: usize, lda: BlasInt) bool {
-    if (comptime !enable_amx_gemv_n) return false;
+    if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (m *| n < 256 * 256 or m *| n >= 1536 * 1536) return false;
     if (n < 256) return false;
@@ -1136,7 +1134,7 @@ fn gemvTransF64(
     x: [*]const f64,
     y: [*]f64,
 ) bool {
-    if (comptime enable_amx_gemv_t and builtin.target.os.tag == .macos and features.has_asimd) {
+    if (comptime amx.enabled and builtin.target.os.tag == .macos and features.has_asimd) {
         if (m == 1024 and n == 1024) {
             if (amx.dgemvTransN8(@intCast(m), @intCast(n), alpha, a, @intCast(lda), x, y) != 0) return true;
         }
@@ -1208,7 +1206,7 @@ noinline fn gemvTransSme2F64Bits(
 }
 
 fn canUseGemvTransF64(m: usize, n: usize, lda: BlasInt) bool {
-    if (comptime enable_amx_gemv_t and builtin.target.os.tag == .macos and features.has_asimd) {
+    if (comptime amx.enabled and builtin.target.os.tag == .macos and features.has_asimd) {
         if (m == 1024 and n == 1024) return true;
     }
     if (m == 0 or n == 0 or lda <= 0) return false;
@@ -1323,9 +1321,10 @@ pub fn gemvTransAmxUnitReal(
     x: [*]const T,
     y: [*]T,
 ) bool {
+    if (comptime !amx.enabled) return false;
     if (T != f64) return false;
     if (m == 0 or n == 0 or lda <= 0) return false;
-    if (comptime !enable_amx_gemv_t or builtin.target.os.tag != .macos or !features.has_asimd) return false;
+    if (comptime builtin.target.os.tag != .macos or !features.has_asimd) return false;
     if (m != 1024 or n != 1024) return false;
     return amx.dgemvTransN8(@intCast(m), @intCast(n), alpha, a, @intCast(lda), x, y) != 0;
 }
@@ -1617,6 +1616,7 @@ pub fn supportsGemvTransUnitComplex(comptime T: type) bool {
 }
 
 pub fn gemvNoTransPackLenUnitReal(comptime T: type, m: usize, n: usize, lda: BlasInt) ?usize {
+    if (comptime !amx.enabled) return null;
     if (T == f64) return gemvNoTransPackLenF64(m, n, lda);
     return null;
 }
@@ -1628,6 +1628,7 @@ pub fn gemvNoTransPackUnitReal(
     x: [*]const T,
     pack: []T,
 ) bool {
+    if (comptime !amx.enabled) return false;
     if (T == f64) return gemvNoTransPackF64(n, alpha, x, pack);
     return false;
 }
@@ -1642,6 +1643,7 @@ pub fn gemvNoTransPackedRowsUnitReal(
     scratch: [*]T,
     y: [*]T,
 ) bool {
+    if (comptime !amx.enabled) return false;
     if (T == f64) return gemvNoTransPackedRowsF64(row_count, n, a, lda, pack, scratch, y);
     return false;
 }

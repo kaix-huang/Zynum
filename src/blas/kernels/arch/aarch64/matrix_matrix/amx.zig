@@ -5,6 +5,8 @@ const std = @import("std");
 const amx_ops = @import("amx_ops.zig");
 const gemm_task = @import("../../../shared/matrix_matrix/task.zig");
 
+pub const enabled = @import("zynum-build-options").apple_amx;
+
 const Vec4f = @Vector(4, f32);
 const Vec2d = @Vector(2, f64);
 const max_stack_pack_elems: usize = 32768;
@@ -473,6 +475,7 @@ fn amxSgemmN32TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda:
 }
 
 pub fn sgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 15) != 0 or (n_ & 15) != 0) return 0;
 
@@ -488,10 +491,12 @@ pub fn sgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b
 }
 
 pub export fn zynum_blas_amx_sgemm_nn_f32_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return sgemmN16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
 pub fn sgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 31) != 0 or (n_ & 31) != 0) return 0;
 
@@ -507,6 +512,7 @@ pub fn sgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b
 }
 
 pub fn sgemmN16TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 15) != 0 or (n_ & 15) != 0) return 0;
 
@@ -522,6 +528,7 @@ pub fn sgemmN16TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_
 }
 
 pub fn sgemmN32TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 31) != 0 or (n_ & 31) != 0) return 0;
 
@@ -537,14 +544,17 @@ pub fn sgemmN32TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_
 }
 
 pub export fn zynum_blas_amx_sgemm_nn_f32_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return sgemmN32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
 pub export fn zynum_blas_amx_sgemm_nn_f32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return zynum_blas_amx_sgemm_nn_f32_n16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
 }
 
 pub fn sgemvN16PackedB(m_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b_pack: [*]const f32, c: [*]f32) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 15) != 0) return 0;
 
@@ -712,6 +722,7 @@ fn amxDgemmN8Loop(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: 
 }
 
 pub fn dgemmN8PackedB(m_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b_pack: [*]const f64, c: [*]f64, ldc_: c_int) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 7) != 0) return 0;
 
@@ -733,6 +744,7 @@ pub fn dgemmN8PackedB(m_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b_pack
 }
 
 pub fn dgemvN8PackedB(m_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b_pack: [*]const f64, c: [*]f64) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 7) != 0) return 0;
 
@@ -785,6 +797,7 @@ fn packDgemvTransA8(k: usize, a: [*]const f64, lda: usize, j: usize, a_pack: [*]
 }
 
 pub fn dgemvTransN8(m_: c_int, n_: c_int, alpha: f64, a: [*]const f64, lda_: c_int, x: [*]const f64, y: [*]f64) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0) return 1;
     if ((n_ & 7) != 0) return 0;
 
@@ -832,6 +845,7 @@ fn amxDgemmN8WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize,
 }
 
 pub fn dgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 31) != 0 or (n_ & 15) != 0) return 0;
 
@@ -847,10 +861,12 @@ pub fn dgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b
 }
 
 pub export fn zynum_blas_amx_dgemm_nn_f64_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return dgemmN16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
 pub fn dgemmN8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 7) != 0 or (n_ & 7) != 0) return 0;
 
@@ -866,10 +882,12 @@ pub fn dgemmN8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b:
 }
 
 pub export fn zynum_blas_amx_dgemm_nn_f64_n8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return dgemmN8(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
 pub export fn zynum_blas_amx_dgemm_nn_f64(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return zynum_blas_amx_dgemm_nn_f64_n8(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
 }
 
@@ -925,6 +943,7 @@ fn amxDgemmN32WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize
 }
 
 pub fn dgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
 
     const m: usize = @intCast(m_);
@@ -941,10 +960,12 @@ pub fn dgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b
 }
 
 pub export fn zynum_blas_amx_dgemm_nn_f64_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return dgemmN32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
 // Legacy exported symbol kept as an ABI alias; shape policy lives in tuning.zig.
 pub export fn zynum_blas_amx_dgemm_nn_f64_n32_square(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+    if (comptime !enabled) return 0;
     return zynum_blas_amx_dgemm_nn_f64_n32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
 }

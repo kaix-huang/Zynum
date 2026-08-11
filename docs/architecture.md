@@ -153,8 +153,13 @@ entry/exit behavior. Architecture wrappers preserve ABI-visible state, and
 transition cost is part of route selection.
 
 Apple AMX encoding stays in a narrow architecture module; algorithm structure
-and hard gates remain in its matrix-matrix wrapper. AMX and SME are internal
-implementation details, not public API modes.
+and hard gates remain in its architecture wrappers. The AMX route is disabled
+by default and may be compiled only for an explicitly validated
+`aarch64-macos` deployment with `-Dapple-amx=true`. CPU family, ASIMD, and SME
+features do not prove that the private AMX instruction set is executable. An
+unauthorized build takes the ordinary fallback without issuing an AMX raw
+opcode. AMX and SME remain internal implementation details rather than public
+BLAS API modes.
 
 ## Shared Task Runtime
 
@@ -226,6 +231,16 @@ publication validate complete candidates before replacement and preserve
 uncertain recovery material. The authoritative schema, resource bounds, and
 exit statuses live in `tools/check_build_inventory.py`,
 `tools/check_test_inventory.py`, and the runner sources.
+
+In GitHub Actions, the same-SHA Linux source, build-inventory-security, and
+test-inventory-security jobs own inventory and repository-security evidence.
+The Windows `x86_64 build-link-native-smoke` job instead proves cross-target
+builds, Debug/ReleaseSafe/ReleaseFast inventory linking, library layout, the
+canonical DLL's complete manifest export surface, and native Python tooling
+compatibility. It is not inventory certification or attestation. At this
+revision, Windows native-enumeration observations remain explicitly pending,
+and the complete native matrix remains incomplete. The structure checker is
+the authoritative source for the current pending set.
 
 Run these security and consistency gates in a process with no inherited
 `GIT_*` variables:
