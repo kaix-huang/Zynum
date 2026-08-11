@@ -120,13 +120,16 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
                 contents=b"print('frozen')\n",
                 mode=0o644,
             )
-            with benchmark_artifacts.ArtifactSnapshotSet(
-                [
-                    benchmark_artifacts.ArtifactRequest.interpreter_script(
-                        "worker", source
-                    )
-                ]
-            ) as snapshot:
+            with (
+                mock.patch.object(benchmark_artifacts, "_FROZEN_SOURCE_RESOLVER", None),
+                benchmark_artifacts.ArtifactSnapshotSet(
+                    [
+                        benchmark_artifacts.ArtifactRequest.interpreter_script(
+                            "worker", source
+                        )
+                    ]
+                ) as snapshot,
+            ):
                 artifact = snapshot.artifacts[0]
                 execution_path = Path(artifact.execution_path)
                 self.assertEqual(artifact.role, "binary")
@@ -139,33 +142,37 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
 
             frozen_bytes = b"print('capsule')\n"
             frozen_digest = hashlib.sha256(frozen_bytes).hexdigest()
-            benchmark_artifacts._set_frozen_source_resolver(
-                lambda path: (os.path.realpath(path), frozen_bytes, frozen_digest)
+            frozen_resolver = lambda path: (
+                os.path.realpath(path),
+                frozen_bytes,
+                frozen_digest,
             )
-            try:
-                with (
-                    mock.patch.object(
-                        benchmark_artifacts,
-                        "_open_resolved_regular",
-                        side_effect=AssertionError("live interpreter path opened"),
-                    ),
-                    benchmark_artifacts.ArtifactSnapshotSet(
-                        [
-                            benchmark_artifacts.ArtifactRequest.interpreter_script(
-                                "worker", source
-                            )
-                        ]
-                    ) as snapshot,
-                ):
-                    artifact = snapshot.artifacts[0]
-                    self.assertEqual(str(source), artifact.path)
-                    self.assertEqual(frozen_digest, artifact.sha256)
-                    self.assertEqual(
-                        frozen_bytes, Path(artifact.execution_path).read_bytes()
-                    )
-                    snapshot.finalize()
-            finally:
-                benchmark_artifacts._set_frozen_source_resolver(None)
+            with (
+                mock.patch.object(
+                    benchmark_artifacts,
+                    "_FROZEN_SOURCE_RESOLVER",
+                    frozen_resolver,
+                ),
+                mock.patch.object(
+                    benchmark_artifacts,
+                    "_open_resolved_regular",
+                    side_effect=AssertionError("live interpreter path opened"),
+                ),
+                benchmark_artifacts.ArtifactSnapshotSet(
+                    [
+                        benchmark_artifacts.ArtifactRequest.interpreter_script(
+                            "worker", source
+                        )
+                    ]
+                ) as snapshot,
+            ):
+                artifact = snapshot.artifacts[0]
+                self.assertEqual(str(source), artifact.path)
+                self.assertEqual(frozen_digest, artifact.sha256)
+                self.assertEqual(
+                    frozen_bytes, Path(artifact.execution_path).read_bytes()
+                )
+                snapshot.finalize()
 
     def test_explicit_platform_image_is_the_only_null_hash_exception(self):
         request = benchmark_artifacts.ArtifactRequest.platform_image(

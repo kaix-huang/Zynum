@@ -73,14 +73,24 @@ nonzero while applicable rows remain pending. Inventory checkers use bounded,
 fail-closed file admission and reviewed code pins. These establish repository
 consistency, not cryptographic authenticity or proof of remote execution.
 
-GitHub Actions assigns the same-SHA Linux source, build-inventory-security, and
-test-inventory-security jobs as the authority for inventory and repository
-security evidence. The Windows `x86_64 build-link-native-smoke` job checks the
+GitHub Actions assigns the same-SHA Linux source and test-inventory-security
+jobs, together with the Linux/macOS build-inventory-security matrix, as the
+authority for inventory and repository-security evidence. Each
+inventory-certified target row runs the dedicated
+`test-host-tool-smoke` aggregate once before its three optimize-mode tests;
+those mode tests explicitly disable host-tool smoke, and link-only rows do not
+request it. The Windows `x86_64 build-link-native-smoke` job checks the
 cross-target build, all three inventory-link modes, installed library layout,
-the canonical DLL's 311 manifest exports, and native Python tooling behavior.
-It is compatibility evidence, not inventory evidence or attestation. Windows
-native-enumeration observations remain explicitly pending, and the structure
-checker is the authoritative source for the current incomplete native matrix.
+the canonical DLL's 311 manifest export names, and exact deterministic results
+for representative CBLAS Level 1 `daxpy`, Level 2 `dgemv`, and Level 3 `dgemm`
+calls through that same loaded DLL. This smoke does not prove the semantics of
+all 311 exports, Fortran compatibility, inventory evidence, attestation, or
+performance. Its nonce-bound completion record only detects an accidental early
+exit; a malicious DLL running on the same runner with the same permissions
+could still forge process state, and adversarial attestation would require an
+isolated execution boundary. Windows native-enumeration observations remain
+explicitly pending, and the structure checker is the authoritative source for
+the current incomplete native matrix.
 
 Inventory refresh is a dedicated maintenance operation. Validate the full
 candidate, inspect the inventory and checker/runner changes together, and keep

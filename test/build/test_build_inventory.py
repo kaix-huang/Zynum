@@ -751,9 +751,47 @@ class BuildInventoryTests(unittest.TestCase):
                 "named step must close over exactly its launch",
             ),
             (
-                "test_step.dependOn(python_tooling_test_step);",
-                "test_step.dependOn(&python_tooling_tests.step);",
-                "canonical test aggregate must depend directly on the Python tooling named step",
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "if (!host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "must conditionally depend exactly once on the host-tool smoke aggregate",
+            ),
+            (
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "if (host_tool_smoke) test_step.dependOn(python_tooling_test_step);",
+                "must conditionally depend exactly once on the host-tool smoke aggregate",
+            ),
+            (
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);\n"
+                "    test_step.dependOn(python_tooling_test_step);",
+                "must not bypass the host-tool aggregate or include build inventory",
+            ),
+            (
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);\n"
+                "    test_step.dependOn(&build_inventory_tests.step);",
+                "must not bypass the host-tool aggregate or include build inventory",
+            ),
+            *(
+                (
+                    dependency,
+                    "// removed reviewed host-tool dependency",
+                    "must preserve its exact six direct dependencies",
+                )
+                for dependency in (
+                    "host_tool_smoke_test_step.dependOn(python_tooling_test_step);",
+                    "host_tool_smoke_test_step.dependOn(&abi_manifest_smoke_test.step);",
+                    "host_tool_smoke_test_step.dependOn(&c_header_smoke_test.step);",
+                    "host_tool_smoke_test_step.dependOn(&cpp_header_smoke_test.step);",
+                    "host_tool_smoke_test_step.dependOn(&fortran_module_smoke_test.step);",
+                    "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);",
+                )
+            ),
+            (
+                "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);",
+                "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);\n"
+                "    host_tool_smoke_test_step.dependOn(&build_inventory_tests.step);",
+                "must preserve its exact six direct dependencies",
             ),
         )
         baseline_build = (self.root / "build.zig").read_text(encoding="utf-8")
@@ -950,11 +988,19 @@ class BuildInventoryTests(unittest.TestCase):
                 **CHECKER._python_tooling_step_template(),
             },
             {
+                "id": CHECKER.HOST_TOOL_SMOKE_STEP_ID,
+                **CHECKER._host_tool_smoke_step_template(),
+            },
+            {
+                "id": CHECKER.BUILD_INVENTORY_STEP_ID,
+                **CHECKER._build_inventory_step_template(),
+            },
+            {
                 "id": CHECKER.TEST_INVENTORY_AGGREGATE_STEP_ID,
                 "direct_dependencies": [
                     {
-                        "id": CHECKER.PYTHON_TOOLING_STEP_ID,
-                        "condition": "always",
+                        "id": CHECKER.HOST_TOOL_SMOKE_STEP_ID,
+                        "condition": "host-tool-smoke is true",
                     }
                 ],
             },
@@ -1036,10 +1082,22 @@ class BuildInventoryTests(unittest.TestCase):
                 "recorded closure_contract changed",
             ),
             (
+                CHECKER.HOST_TOOL_SMOKE_STEP_ID,
+                "direct_dependencies",
+                [],
+                "reviewed host-tool aggregate contract",
+            ),
+            (
+                CHECKER.BUILD_INVENTORY_STEP_ID,
+                "aggregate_test_membership",
+                "member",
+                "reviewed standalone inventory contract",
+            ),
+            (
                 CHECKER.TEST_INVENTORY_AGGREGATE_STEP_ID,
                 "direct_dependencies",
                 [],
-                "must record exactly one direct Python tooling step dependency",
+                "must record exactly one conditional host-tool smoke dependency",
             ),
         )
         for identifier, field, value, expected in python_tooling_mutations:
@@ -1200,6 +1258,14 @@ class BuildInventoryTests(unittest.TestCase):
             CHECKER.PYTHON_TOOLING_STEP_ID,
             original_inventory,
         )
+        host_tool_smoke_step = CHECKER._new_test_inventory_observation(
+            CHECKER.HOST_TOOL_SMOKE_STEP_ID,
+            original_inventory,
+        )
+        build_inventory_step = CHECKER._new_test_inventory_observation(
+            CHECKER.BUILD_INVENTORY_STEP_ID,
+            original_inventory,
+        )
         self.assertEqual("focused-validation", security_step["step_role"])
         self.assertEqual("not-member", security_step["aggregate_test_membership"])
         self.assertFalse(security_step["intentional_orphan"])
@@ -1222,6 +1288,20 @@ class BuildInventoryTests(unittest.TestCase):
             python_tooling_step["direct_dependencies"],
         )
         self.assertEqual(1, python_tooling_step["closure_contract"]["launch_count"])
+        self.assertEqual(
+            list(CHECKER.HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES),
+            host_tool_smoke_step["direct_dependencies"],
+        )
+        self.assertEqual(
+            "conditional-member",
+            host_tool_smoke_step["aggregate_test_membership"],
+        )
+        self.assertEqual(
+            "not-member", build_inventory_step["aggregate_test_membership"]
+        )
+        self.assertEqual(
+            "explicit named step only", build_inventory_step["aggregate_condition"]
+        )
         probe_compile = CHECKER._new_test_inventory_observation(
             CHECKER.LEVEL2_WIDTH_DEFAULT_ARTIFACT_COMPILE_ID,
             original_inventory,
@@ -1351,7 +1431,8 @@ class BuildInventoryTests(unittest.TestCase):
             "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite",
             "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries",
             "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
-            "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-native-python-tooling-compatibility-smoke-not-inventory-evidence",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once",
             "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",
@@ -1362,6 +1443,8 @@ class BuildInventoryTests(unittest.TestCase):
             "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-test-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:artifacts:provision-fresh-publication-workspace",
             "workflow-launch:.github/workflows/release.yml:artifacts:verify-publication-workspace",
+            "workflow-launch:.github/workflows/release.yml:artifacts:run-host-tool-smoke-once",
+            "workflow-launch:.github/workflows/release.yml:artifacts:test",
         )
         expected_workflow_template = {
             "owner": "release-validation",
@@ -3955,10 +4038,27 @@ class BuildInventoryTests(unittest.TestCase):
         assert_job_timeout(ci_source, "source-checks", 120)
         assert_job_timeout(ci_source, "build-inventory-security", 240)
         assert_job_timeout(ci_source, "test-inventory-security", 120)
+        assert_job_timeout(ci_source, "target-tests", 180)
         assert_job_timeout(ci_source, "ci-gate", 5)
         assert_job_timeout(release_source, "build-inventory-security", 240)
         assert_job_timeout(release_source, "test-inventory-security", 120)
         assert_job_timeout(release_source, "artifacts", 180)
+
+        def assert_ci_build_security_matrix(source: str) -> None:
+            block = job_block(source, "build-inventory-security")
+            self.assertIn(
+                "    name: Build inventory security / ${{ matrix.os }}\n", block
+            )
+            self.assertIn("    runs-on: ${{ matrix.os }}\n", block)
+            self.assertIn(
+                "    strategy:\n"
+                "      fail-fast: false\n"
+                "      matrix:\n"
+                "        os: [macos-15, ubuntu-24.04]\n",
+                block,
+            )
+
+        assert_ci_build_security_matrix(ci_source)
 
         def mutate_job(source: str, job: str, before: str, after: str) -> str:
             original = job_block(source, job)
@@ -3969,6 +4069,7 @@ class BuildInventoryTests(unittest.TestCase):
         for source, job, expected, legacy in (
             (ci_source, "build-inventory-security", 240, 30),
             (ci_source, "test-inventory-security", 120, 90),
+            (ci_source, "target-tests", 180, 90),
             (ci_source, "ci-gate", 5, 1),
             (release_source, "build-inventory-security", 240, 30),
             (release_source, "test-inventory-security", 120, 90),
@@ -3982,12 +4083,132 @@ class BuildInventoryTests(unittest.TestCase):
                 )
                 with self.assertRaises(AssertionError):
                     assert_job_timeout(mutant, job, expected)
+        for before, after in (
+            ("Build inventory security / ${{ matrix.os }}", "Build inventory security"),
+            ("runs-on: ${{ matrix.os }}", "runs-on: ubuntu-24.04"),
+            ("fail-fast: false", "fail-fast: true"),
+            ("os: [macos-15, ubuntu-24.04]", "os: [ubuntu-24.04]"),
+        ):
+            with self.subTest(ci_build_security_matrix_mutant=before):
+                mutant = mutate_job(
+                    ci_source, "build-inventory-security", before, after
+                )
+                with self.assertRaises(AssertionError):
+                    assert_ci_build_security_matrix(mutant)
 
         def named_step(source: str, name: str) -> str:
             marker = f"      - name: {name}\n"
             start = source.index(marker)
             end = source.find("\n      - ", start + len(marker))
             return (source[start:] if end < 0 else source[start:end]).rstrip()
+
+        target_test_commands = {
+            "Test Debug target": (
+                "zig build test ${{ matrix.target_args }} "
+                "-Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures"
+            ),
+            "Test ReleaseSafe target": (
+                "zig build --release=safe test ${{ matrix.target_args }} "
+                "-Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false "
+                "--summary failures"
+            ),
+            "Test ReleaseFast target": (
+                "zig build --release=fast test ${{ matrix.target_args }} "
+                "-Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false "
+                "--summary failures"
+            ),
+        }
+        host_tool_step = (
+            "      - name: Run host tool smoke once\n"
+            "        if: matrix.zig_gate == 'inventory-certified'\n"
+            "        timeout-minutes: 60\n"
+            "        run: zig build test-host-tool-smoke "
+            "${{ matrix.target_args }} --summary failures"
+        )
+        target_link_commands = {
+            "Link test inventory for Debug target": (
+                "zig build test-inventory-link ${{ matrix.target_args }} "
+                "-Dtest-optimize=Debug --summary failures"
+            ),
+            "Link test inventory for ReleaseSafe target": (
+                "zig build --release=safe test-inventory-link "
+                "${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe "
+                "--summary failures"
+            ),
+            "Link test inventory for ReleaseFast target": (
+                "zig build --release=fast test-inventory-link "
+                "${{ matrix.target_args }} -Dtest-optimize=ReleaseFast "
+                "--summary failures"
+            ),
+        }
+
+        def assert_target_test_watchdogs(source: str) -> None:
+            target_gate = job_block(source, "target-tests")
+            self.assertNotIn("host_tool_smoke:", target_gate)
+            self.assertNotIn("matrix.host_tool_smoke", target_gate)
+            self.assertNotIn("continue-on-error", target_gate)
+            self.assertEqual(
+                1, target_gate.count("      - name: Run host tool smoke once")
+            )
+            self.assertEqual(1, target_gate.count("zig build test-host-tool-smoke"))
+            self.assertEqual(
+                host_tool_step, named_step(target_gate, "Run host tool smoke once")
+            )
+            for step_name, command in target_test_commands.items():
+                step = named_step(target_gate, step_name)
+                self.assertEqual(
+                    f"      - name: {step_name}\n"
+                    "        if: matrix.zig_gate == 'inventory-certified'\n"
+                    "        timeout-minutes: 60\n"
+                    f"        run: {command}",
+                    step,
+                )
+            for step_name, command in target_link_commands.items():
+                step = named_step(target_gate, step_name)
+                self.assertEqual(
+                    f"      - name: {step_name}\n"
+                    "        if: matrix.zig_gate == 'link-only'\n"
+                    f"        run: {command}",
+                    step,
+                )
+                self.assertNotIn("host-tool-smoke", step)
+
+        assert_target_test_watchdogs(ci_source)
+        target_test_mutants = (
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "            install: true\n",
+                "            host_tool_smoke: true\n            install: true\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "        timeout-minutes: 60\n",
+                "        timeout-minutes: 59\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "-Dhost-tool-smoke=false --summary failures\n",
+                "-Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                host_tool_step + "\n",
+                host_tool_step + "\n\n" + host_tool_step + "\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "-Dtest-optimize=Debug --summary failures\n",
+                "-Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures\n",
+            ),
+        )
+        for mutant in target_test_mutants:
+            with self.assertRaises(AssertionError):
+                assert_target_test_watchdogs(mutant)
 
         build_suite_command = "python3 -B test/build/test_build_inventory.py"
         test_suite_command = "python3 -B test/build/test_test_inventory.py"
@@ -7049,277 +7270,21 @@ class BuildInventoryTests(unittest.TestCase):
         windows_layout_name = (
             "      - name: Check Windows library layout and tooling fixture boundary\n"
         )
-        windows_gate = (
-            "      - name: Run Windows native Python tooling compatibility smoke (not inventory evidence)\n"
-            "        if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'\n"
-            "        shell: pwsh\n"
-            "        timeout-minutes: 15\n"
-            "        run: |\n"
-            "          $env:PYTHONHOME = $null\n"
-            "          $env:PYTHONPATH = $null\n"
-            "          $env:PYTHONINSPECT = $null\n"
-            "          $env:PYTHONSTARTUP = $null\n"
-            "          $env:GIT_PAGER = $null\n"
-            "          $env:PAGER = $null\n"
-            "          $env:LESS = $null\n"
-            "\n"
-            "          $preflightScript = @'\n"
-            "          import ctypes\n"
-            "          import json\n"
-            "          import os\n"
-            "          import re\n"
-            "          import stat\n"
-            "          from pathlib import Path\n"
-            "\n"
-            "          repository_root = Path.cwd().resolve(strict=True)\n"
-            '          requested_dll = repository_root / "zig-out/bin/zynum_blas.dll"\n'
-            "          requested_stat = os.stat(requested_dll, follow_symlinks=False)\n"
-            "          if (\n"
-            '              getattr(requested_stat, "st_file_attributes", 0)\n'
-            "              & stat.FILE_ATTRIBUTE_REPARSE_POINT\n"
-            "          ):\n"
-            '              raise SystemExit("canonical Windows DLL must not be a reparse point")\n'
-            "          if (\n"
-            "              not stat.S_ISREG(requested_stat.st_mode)\n"
-            "              or requested_stat.st_size <= 0\n"
-            "              or requested_stat.st_nlink != 1\n"
-            "          ):\n"
-            "              raise SystemExit(\n"
-            '                  "canonical Windows DLL must be a nonempty regular file with one hardlink"\n'
-            "              )\n"
-            "          canonical_dll = requested_dll.resolve(strict=True)\n"
-            "          if os.path.normcase(str(canonical_dll)) != os.path.normcase(str(requested_dll)):\n"
-            '              raise SystemExit("canonical Windows DLL path resolves through an alias")\n'
-            "\n"
-            "          library = ctypes.CDLL(str(canonical_dll), winmode=0x00000900)\n"
-            '          kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)\n'
-            "          get_module_filename = kernel32.GetModuleFileNameW\n"
-            "          get_module_filename.argtypes = [\n"
-            "              ctypes.c_void_p,\n"
-            "              ctypes.POINTER(ctypes.c_wchar),\n"
-            "              ctypes.c_uint32,\n"
-            "          ]\n"
-            "          get_module_filename.restype = ctypes.c_uint32\n"
-            "          module_path_buffer = ctypes.create_unicode_buffer(32768)\n"
-            "          module_path_length = get_module_filename(\n"
-            "              library._handle, module_path_buffer, len(module_path_buffer)\n"
-            "          )\n"
-            "          if module_path_length == 0 or module_path_length >= len(module_path_buffer):\n"
-            '              raise OSError(ctypes.get_last_error(), "cannot resolve loaded Windows DLL path")\n'
-            "          loaded_dll = Path(module_path_buffer.value).resolve(strict=True)\n"
-            "          if os.path.normcase(str(loaded_dll)) != os.path.normcase(str(canonical_dll)):\n"
-            '              raise SystemExit("loaded Windows DLL differs from the canonical build artifact")\n'
-            "\n"
-            '          manifest_path = repository_root / "include/zynum/blas/abi_manifest.json"\n'
-            '          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))\n'
-            "          export_names = []\n"
-            '          symbol_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$", flags=re.ASCII)\n'
-            '          for section_name in ("fortran", "cblas"):\n'
-            "              section = manifest[section_name]\n"
-            '              section_exports = section["exports"]\n'
-            '              if section["export_count"] != len(section_exports):\n'
-            '                  raise SystemExit(f"{section_name} ABI export count is inconsistent")\n'
-            "              for item in section_exports:\n"
-            '                  name = item.get("name") if isinstance(item, dict) else None\n'
-            "                  if (\n"
-            "                      not isinstance(name, str)\n"
-            '                      or "\\x00" in name\n'
-            "                      or any(ord(character) < 0x20 or ord(character) == 0x7F for character in name)\n"
-            "                      or symbol_pattern.fullmatch(name) is None\n"
-            "                  ):\n"
-            '                      raise SystemExit(f"Windows DLL manifest export name is invalid: {name!r}")\n'
-            "                  export_names.append(name)\n"
-            "          if len(export_names) != 311 or len(set(export_names)) != 311:\n"
-            '              raise SystemExit("Windows DLL preflight requires exactly 311 unique ABI exports")\n'
-            '          encoded_export_names = [name.encode("ascii") for name in export_names]\n'
-            "          if len(set(encoded_export_names)) != 311:\n"
-            '              raise SystemExit("Windows DLL preflight requires unique ASCII export encodings")\n'
-            "\n"
-            "          get_proc_address = kernel32.GetProcAddress\n"
-            "          get_proc_address.argtypes = [ctypes.c_void_p, ctypes.c_char_p]\n"
-            "          get_proc_address.restype = ctypes.c_void_p\n"
-            "          missing_exports = [\n"
-            "              name\n"
-            "              for name, encoded_name in zip(export_names, encoded_export_names)\n"
-            "              if not get_proc_address(library._handle, encoded_name)\n"
-            "          ]\n"
-            "          if missing_exports:\n"
-            '              raise SystemExit(f"Windows DLL is missing ABI exports: {missing_exports}")\n'
-            '          print(f"Windows DLL preflight passed for {canonical_dll} ({len(export_names)} exports)")\n'
-            "          '@\n"
-            "          python -I -B -c $preflightScript\n"
-            "          if ($LASTEXITCODE -ne 0) {\n"
-            "            exit $LASTEXITCODE\n"
-            "          }\n"
-            "\n"
-            "          $testScript = @'\n"
-            "          import hashlib\n"
-            "          import json\n"
-            "          import unittest\n"
-            "          from pathlib import Path, PurePosixPath\n"
-            "\n"
-            "          expected = {\n"
-            '              "discovered": 465,\n'
-            '              "executed": 465,\n'
-            '              "skipped": 98,\n'
-            '              "failures": 0,\n'
-            '              "errors": 0,\n'
-            '              "expected_failures": 0,\n'
-            '              "unexpected_successes": 0,\n'
-            '              "skip_identity_sha256": "03b2b268a475647b80323c39a290d2ad17c7a26cabcd9c94f18a2fa7d4d22d8b",\n'
-            "          }\n"
-            '          inventory = json.loads(Path("tools/test_inventory.json").read_text(encoding="utf-8"))\n'
-            "          skip_contracts = [\n"
-            "              item\n"
-            '              for item in inventory["python_skip_contracts"]\n'
-            '              if item["root_id"] == "python-root:benchmark-tools-discovery"\n'
-            "          ]\n"
-            "          if len(skip_contracts) != 1:\n"
-            '              raise SystemExit("Windows native tooling skip contract is not unique")\n'
-            '          skip_entries = skip_contracts[0]["entries"]\n'
-            "          platform_predicates = frozenset({\n"
-            '              "python-skip-predicate:artifact-snapshot-platform-unavailable",\n'
-            '              "python-skip-predicate:report-publication-platform-unavailable",\n'
-            "          })\n"
-            "          windows_active_predicates = platform_predicates | {\n"
-            '              "python-skip-predicate:accelerate-unavailable",\n'
-            '              "python-skip-predicate:rank-k-artifacts-unavailable",\n'
-            '              "python-skip-predicate:rotg-latency-artifacts-unavailable",\n'
-            '              "python-skip-predicate:symm-artifacts-unavailable",\n'
-            '              "python-skip-predicate:triangular-matrix-artifacts-unavailable",\n'
-            '              "python-skip-predicate:not-darwin",\n'
-            "          }\n"
-            "\n"
-            "          def runtime_id(inventory_name):\n"
-            '              path, separator, declaration = inventory_name.partition("::")\n'
-            '              if not separator or PurePosixPath(path).suffix != ".py" or not declaration:\n'
-            "                  raise SystemExit(\n"
-            '                      f"Windows native tooling test identity is invalid: {inventory_name!r}"\n'
-            "                  )\n"
-            '              return f"{PurePosixPath(path).stem}.{declaration}"\n'
-            "\n"
-            "          platform_test_ids = {\n"
-            '              runtime_id(entry["test"])\n'
-            "              for entry in skip_entries\n"
-            '              if entry["predicate_id"] in platform_predicates\n'
-            "          }\n"
-            "          expected_skip_identities = sorted(\n"
-            '              (runtime_id(entry["test"]), entry["reason"])\n'
-            "              for entry in skip_entries\n"
-            '              if entry["predicate_id"] in windows_active_predicates\n'
-            "              and not (\n"
-            '                  entry["predicate_id"] not in platform_predicates\n'
-            '                  and runtime_id(entry["test"]) in platform_test_ids\n'
-            "              )\n"
-            "          )\n"
-            "          expected_skip_payload = json.dumps(\n"
-            '              expected_skip_identities, separators=(",", ":"), ensure_ascii=True\n'
-            '          ).encode("ascii")\n'
-            "          expected_skip_digest = hashlib.sha256(expected_skip_payload).hexdigest()\n"
-            "          if (\n"
-            '              len(expected_skip_identities) != expected["skipped"]\n'
-            '              or expected_skip_digest != expected["skip_identity_sha256"]\n'
-            "          ):\n"
-            "              raise SystemExit(\n"
-            '                  "Windows reviewed skip identities differ from the frozen compatibility contract"\n'
-            "              )\n"
-            '          suite = unittest.defaultTestLoader.discover("bench/tools", pattern="test_*.py")\n'
-            "          discovered = suite.countTestCases()\n"
-            '          if discovered != expected["discovered"] or discovered == 0:\n'
-            "              raise SystemExit(\n"
-            '                  f"Windows native tooling discovery count differs: {discovered} != "\n'
-            "                  f\"{expected['discovered']}\"\n"
-            "              )\n"
-            "          required_dll_backed_tests = frozenset({\n"
-            '              "test_level2_report.Level2RunnerTests.test_banded_controller_keeps_fresh_process_statistics",\n'
-            '              "test_level2_report.Level2RunnerTests.test_banded_worker_correctness",\n'
-            '              "test_level2_report.Level2RunnerTests.test_compact_controller_routes_profiles_and_metadata",\n'
-            '              "test_level2_report.Level2RunnerTests.test_compact_worker_correctness",\n'
-            '              "test_level2_report.Level2RunnerTests.test_controller_aggregates_independent_worker_processes",\n'
-            '              "test_level2_report.Level2RunnerTests.test_rank_update_controller_keeps_fresh_process_statistics",\n'
-            '              "test_level2_report.Level2RunnerTests.test_rank_update_worker_correctness",\n'
-            '              "test_level2_report.Level2RunnerTests.test_rectangular_worker_correctness_and_operation_counts",\n'
-            '              "test_level2_report.Level2RunnerTests.test_triangular_worker_correctness",\n'
-            "          })\n"
-            "\n"
-            "          def flatten_tests(test_suite):\n"
-            "              for test in test_suite:\n"
-            "                  if isinstance(test, unittest.TestSuite):\n"
-            "                      yield from flatten_tests(test)\n"
-            "                  else:\n"
-            "                      yield test\n"
-            "\n"
-            "          discovered_tests = tuple(flatten_tests(suite))\n"
-            "          tests_by_id = {test.id(): test for test in discovered_tests}\n"
-            "          if len(tests_by_id) != discovered:\n"
-            '              raise SystemExit("Windows native tooling discovered duplicate test identities")\n'
-            "          discovered_ids = frozenset(tests_by_id)\n"
-            "          missing_dll_backed_tests = sorted(required_dll_backed_tests - discovered_ids)\n"
-            "          if missing_dll_backed_tests:\n"
-            "              raise SystemExit(\n"
-            '                  f"Windows DLL-backed tests were not discovered: {missing_dll_backed_tests!r}"\n'
-            "              )\n"
-            "          reviewed_dll_backed_tests = {\n"
-            '              runtime_id(entry["test"])\n'
-            "              for entry in skip_entries\n"
-            '              if entry["predicate_id"] in {\n'
-            '                  "python-skip-predicate:drop-in-blas-unavailable",\n'
-            '                  "python-skip-predicate:file-backed-blas-unavailable",\n'
-            "              }\n"
-            "          }\n"
-            "          if reviewed_dll_backed_tests != required_dll_backed_tests:\n"
-            '              raise SystemExit("Windows DLL-backed test contract differs from the reviewed set")\n'
-            "          platform_skip_identities = [\n"
-            "              pair for pair in expected_skip_identities if pair[0] in platform_test_ids\n"
-            "          ]\n"
-            "          if len(platform_skip_identities) != 93:\n"
-            '              raise SystemExit("Windows platform skip marker set must contain exactly 93 tests")\n'
-            "          for test_id, reason in platform_skip_identities:\n"
-            "              test = tests_by_id.get(test_id)\n"
-            "              if test is None:\n"
-            '                  raise SystemExit(f"Windows reviewed skip test was not discovered: {test_id}")\n'
-            '              method_name = getattr(test, "_testMethodName", None)\n'
-            "              if not isinstance(method_name, str) or not method_name:\n"
-            '                  raise SystemExit(f"Windows reviewed skip test is malformed: {test_id}")\n'
-            "              setattr(test, method_name, unittest.skip(reason)(lambda: None))\n"
-            "          result = unittest.TextTestRunner(verbosity=2).run(suite)\n"
-            "          skip_identities = sorted((test.id(), reason) for test, reason in result.skipped)\n"
-            "          if any(\n"
-            "              not isinstance(test_id, str) or not isinstance(reason, str)\n"
-            "              for test_id, reason in skip_identities\n"
-            "          ):\n"
-            '              raise SystemExit("Windows native tooling skip identities are malformed")\n'
-            "          unexpected_dll_skips = sorted(\n"
-            "              required_dll_backed_tests & {test_id for test_id, _ in skip_identities}\n"
-            "          )\n"
-            "          if unexpected_dll_skips:\n"
-            "              raise SystemExit(\n"
-            '                  f"Windows DLL-backed tests must not be skipped: {unexpected_dll_skips!r}"\n'
-            "              )\n"
-            "          skip_identity_payload = json.dumps(\n"
-            '              skip_identities, separators=(",", ":"), ensure_ascii=True\n'
-            '          ).encode("ascii")\n'
-            "          observed = {\n"
-            '              "discovered": discovered,\n'
-            '              "executed": result.testsRun,\n'
-            '              "skipped": len(result.skipped),\n'
-            '              "failures": len(result.failures),\n'
-            '              "errors": len(result.errors),\n'
-            '              "expected_failures": len(result.expectedFailures),\n'
-            '              "unexpected_successes": len(result.unexpectedSuccesses),\n'
-            '              "skip_identity_sha256": hashlib.sha256(skip_identity_payload).hexdigest(),\n'
-            "          }\n"
-            "          if observed != expected or not result.wasSuccessful():\n"
-            "              raise SystemExit(\n"
-            '                  f"Windows native tooling compatibility contract differs: "\n'
-            '                  f"observed={observed!r}; expected={expected!r}"\n'
-            "              )\n"
-            '          print(f"Windows native tooling compatibility smoke passed: {observed!r}")\n'
-            "          '@\n"
-            "          python -I -B -c $testScript\n"
-            "          if ($LASTEXITCODE -ne 0) {\n"
-            "            exit $LASTEXITCODE\n"
-            "          }\n"
+        windows_gate_name = (
+            "Run Windows DLL ABI and CBLAS L1-L3 compatibility smoke "
+            "(not inventory evidence)"
+        )
+        windows_gate_marker = f"      - name: {windows_gate_name}\n"
+        windows_gate_start = text.index(windows_gate_marker)
+        windows_gate_end = text.find("\n      - ", windows_gate_start + 1)
+        self.assertGreater(windows_gate_end, windows_gate_start)
+        windows_gate = text[windows_gate_start:windows_gate_end].rstrip()
+        host_tool_step = (
+            "      - name: Run host tool smoke once\n"
+            "        if: matrix.zig_gate == 'inventory-certified'\n"
+            "        timeout-minutes: 60\n"
+            "        run: zig build test-host-tool-smoke "
+            "${{ matrix.target_args }} --summary failures"
         )
         checkout_index = text.index(checkout, text.index("  target-tests:\n"))
         setup_index = text.index(setup_zig, checkout_index + len(checkout))
@@ -7327,14 +7292,87 @@ class BuildInventoryTests(unittest.TestCase):
         build_index = text.index(windows_build, cache_index + len(cache))
         layout_index = text.index(windows_layout_name, build_index + len(windows_build))
         gate_index = text.index(windows_gate, layout_index + len(windows_layout_name))
+        host_tool_index = text.index(host_tool_step, gate_index + len(windows_gate))
         self.assertEqual(checkout_index + len(checkout) + 1, setup_index)
         self.assertEqual(setup_index + len(setup_zig) + 1, cache_index)
         self.assertEqual(cache_index + len(cache) + 1, build_index)
         self.assertEqual(build_index + len(windows_build) + 1, layout_index)
         self.assertLess(layout_index, gate_index)
+        self.assertLess(gate_index, host_tool_index)
+        self.assertTrue(
+            windows_gate.startswith(
+                windows_gate_marker + "        if: runner.os == 'Windows' && "
+                "matrix.cache_target == 'windows-x86_64-baseline'\n"
+                "        shell: pwsh\n"
+                "        timeout-minutes: 15\n"
+                "        run: |\n"
+            )
+        )
         self.assertNotIn("tools/check_test_inventory.py", windows_gate)
+        self.assertNotIn("tools/test_inventory.json", windows_gate)
         self.assertNotIn("test-python-tooling", windows_gate)
         self.assertNotIn("--run-python-tooling-root", windows_gate)
+        self.assertNotIn("unittest.defaultTestLoader.discover", windows_gate)
+        self.assertNotIn('"discovered": 465', windows_gate)
+        self.assertNotIn('"skipped": 98', windows_gate)
+        self.assertNotIn("$testScript", windows_gate)
+        self.assertNotIn("$preflightScript", windows_gate)
+        for exact_completion_contract in (
+            "Set-StrictMode -Version Latest",
+            "$ErrorActionPreference = 'Stop'",
+            "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop",
+            "$completionNonce = [guid]::NewGuid().ToString('N')",
+            "$smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)",
+            "$smokeExitCode = $LASTEXITCODE",
+            "if ($null -eq $smokeExitCode -or $smokeExitCode -ne 0)",
+            "if ($smokeOutput.Count -ne 1)",
+            "if ($smokeOutput[0] -cne $expectedCompletion)",
+            "if len(sys.argv) != 2:",
+            "completion_nonce = sys.argv[1]",
+            're.fullmatch(r"[0-9a-f]{32}", completion_nonce, flags=re.ASCII)',
+            '"contract": "zynum-windows-dll-cblas-smoke"',
+            '"version": 1',
+            '"nonce": completion_nonce',
+            "json.dumps(",
+            "sort_keys=True",
+            'separators=(",", ":")',
+            "ensure_ascii=True",
+        ):
+            self.assertEqual(1, windows_gate.count(exact_completion_contract))
+        self.assertEqual(2, windows_gate.count("flush=True"))
+        self.assertEqual(1, windows_gate.count('$expectedCompletion = \'{"case_ids"'))
+        self.assertNotIn("python -B -c", windows_gate)
+        for ffi_contract in (
+            "cblas_daxpy.argtypes = [",
+            "cblas_daxpy.restype = None",
+            "cblas_dgemv.argtypes = [",
+            "cblas_dgemv.restype = None",
+            "cblas_dgemm.argtypes = [",
+            "cblas_dgemm.restype = None",
+        ):
+            self.assertEqual(1, windows_gate.count(ffi_contract))
+        for case_id in (
+            "cblas-daxpy-l1",
+            "cblas-dgemv-l2",
+            "cblas-dgemm-l3",
+        ):
+            self.assertEqual(3, windows_gate.count(f'"{case_id}"'))
+        for exact_result in (
+            "return list(y), [6.0, 1.0, 0.0]",
+            "return list(y), [5.0, 11.0]",
+            "return list(matrix_c), [58.0, 64.0, 139.0, 154.0]",
+            "all(math.isfinite(value) for value in observed)",
+            "and observed == expected",
+            '"executed": 3',
+            '"passed": 3',
+            '"failed": 0',
+            '"skipped": 0',
+            "for case_id, runner in cases:",
+            "observed_case_ids != expected_case_ids",
+            "len(case_results) != len(expected_case_ids)",
+            "summary != expected_summary",
+        ):
+            self.assertIn(exact_result, windows_gate)
         source_checker_index = text.index(
             source_checker, text.index("  source-checks:\n")
         )
@@ -7351,6 +7389,7 @@ class BuildInventoryTests(unittest.TestCase):
             "'vector-matrix-sweep.exe'",
             "'level1-probe.exe'",
             "'dcopy-probe.exe'",
+            "Get-ChildItem -LiteralPath (Split-Path -Parent $dynamicLibrary) -Filter '*.dll' -File -Force",
         ):
             self.assertIn(exact_layout_contract, text)
         capability_command = (
@@ -7373,12 +7412,17 @@ class BuildInventoryTests(unittest.TestCase):
         )
         gate_id = (
             "workflow-launch:.github/workflows/ci.yml:target-tests:"
-            "run-windows-native-python-tooling-compatibility-smoke-not-inventory-evidence"
+            "run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence"
+        )
+        host_tool_id = (
+            "workflow-launch:.github/workflows/ci.yml:target-tests:"
+            "run-host-tool-smoke-once"
         )
         launches = CHECKER._discover_workflow_launches(self.root)
         build = next(item for item in launches if item["id"] == build_id)
         layout = next(item for item in launches if item["id"] == layout_id)
         gate = next(item for item in launches if item["id"] == gate_id)
+        host_tool = next(item for item in launches if item["id"] == host_tool_id)
         self.assertEqual("workflow-launch", build["category"])
         self.assertEqual("run", build["call"])
         self.assertEqual(
@@ -7407,10 +7451,21 @@ class BuildInventoryTests(unittest.TestCase):
             {
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
-                "symbol": "Run Windows native Python tooling compatibility smoke (not inventory evidence)",
+                "symbol": windows_gate_name,
                 "ordinal": 6,
             },
             gate["anchor"],
+        )
+        self.assertEqual("workflow-launch", host_tool["category"])
+        self.assertEqual("run", host_tool["call"])
+        self.assertEqual(
+            {
+                "file": ".github/workflows/ci.yml",
+                "enclosing_function": "target-tests",
+                "symbol": "Run host tool smoke once",
+                "ordinal": 8,
+            },
+            host_tool["anchor"],
         )
         source_checker_id = "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory"
         capability_id = (
@@ -7424,6 +7479,7 @@ class BuildInventoryTests(unittest.TestCase):
                 build_id,
                 layout_id,
                 gate_id,
+                host_tool_id,
                 capability_id,
             }
             <= discovered_ids
@@ -7433,6 +7489,7 @@ class BuildInventoryTests(unittest.TestCase):
             build_id,
             layout_id,
             gate_id,
+            host_tool_id,
             capability_id,
         ):
             self.assertEqual(
@@ -7469,7 +7526,26 @@ class BuildInventoryTests(unittest.TestCase):
                 layout_id,
             ),
             ("zig ar t $importLibrary", "zig ar t $staticLibrary", layout_id),
+            ("-Filter '*.dll' -File -Force", "-Filter '*.dll' -File", layout_id),
             ("          $env:PYTHONHOME = $null\n", "", gate_id),
+            ("          Set-StrictMode -Version Latest\n", "", gate_id),
+            ("          $ErrorActionPreference = 'Stop'\n", "", gate_id),
+            (
+                "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop",
+                "$pythonCommand = Get-Command python",
+                gate_id,
+            ),
+            (
+                "$completionNonce = [guid]::NewGuid().ToString('N')",
+                "$completionNonce = '00000000000000000000000000000000'",
+                gate_id,
+            ),
+            ("if len(sys.argv) != 2:", "if len(sys.argv) < 2:", gate_id),
+            (
+                're.fullmatch(r"[0-9a-f]{32}", completion_nonce, flags=re.ASCII)',
+                're.fullmatch(r".*", completion_nonce)',
+                gate_id,
+            ),
             (
                 "repository_root = Path.cwd().resolve(strict=True)",
                 "repository_root = Path.cwd().resolve()",
@@ -7513,60 +7589,89 @@ class BuildInventoryTests(unittest.TestCase):
                 "if len(encoded_export_names) != 311:",
                 gate_id,
             ),
-            ('"discovered": 465', '"discovered": 464', gate_id),
-            ('"skipped": 98', '"skipped": 99', gate_id),
             (
-                "03b2b268a475647b80323c39a290d2ad17c7a26cabcd9c94f18a2fa7d4d22d8b",
-                "13b2b268a475647b80323c39a290d2ad17c7a26cabcd9c94f18a2fa7d4d22d8b",
+                '              "cblas-daxpy-l1",\n              "cblas-dgemv-l2",\n',
+                '              "cblas-dgemv-l2",\n              "cblas-daxpy-l1",\n',
                 gate_id,
             ),
             (
-                "required_dll_backed_tests & {test_id for test_id, _ in skip_identities}",
-                "frozenset()",
+                '              ("cblas-dgemm-l3", run_cblas_dgemm),',
+                '              ("cblas-dgemm-l4", run_cblas_dgemm),',
                 gate_id,
             ),
             (
-                "for test_id, reason in platform_skip_identities:",
-                "for test_id, reason in expected_skip_identities:",
+                "return list(y), [6.0, 1.0, 0.0]",
+                "return list(y), [6.0, 1.0, 1.0]",
                 gate_id,
             ),
             (
-                "if len(platform_skip_identities) != 93:",
-                "if len(platform_skip_identities) != 98:",
+                "return list(y), [5.0, 11.0]",
+                "return list(y), [5.0, 10.0]",
                 gate_id,
             ),
             (
-                "if observed != expected or not result.wasSuccessful():",
-                "if not result.wasSuccessful():",
+                "return list(matrix_c), [58.0, 64.0, 139.0, 154.0]",
+                "return list(matrix_c), [58.0, 64.0, 139.0, 153.0]",
                 gate_id,
             ),
             (
-                "          python -I -B -c $preflightScript\n"
-                + "          if ($LASTEXITCODE -ne 0) {\n",
-                "          python -I -B -c $preflightScript\n"
-                + "          if ($LASTEXITCODE -eq 0) {\n",
+                "all(math.isfinite(value) for value in observed)",
+                "all(True for value in observed)",
                 gate_id,
             ),
             (
-                "          python -I -B -c $testScript\n"
-                + "          if ($LASTEXITCODE -ne 0) {\n",
-                "          python -I -B -c $testScript\n"
-                + "          if ($LASTEXITCODE -eq 0) {\n",
+                "and observed == expected",
+                "and True",
                 gate_id,
             ),
             (
-                "python -I -B -c $preflightScript",
-                "python -B -c $preflightScript",
+                "for case_id, runner in cases:",
+                "for case_id, runner in cases[:2]:",
                 gate_id,
             ),
-            ("python -I -B -c $testScript", "python -B -c $testScript", gate_id),
+            ('"executed": 3', '"executed": 2', gate_id),
+            (
+                "$smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)",
+                "$smokeOutput = @(& $pythonCommand.Path -B -c $smokeScript $completionNonce)",
+                gate_id,
+            ),
+            ("$smokeExitCode = $LASTEXITCODE", "$smokeExitCode = 0", gate_id),
+            (
+                "$null -eq $smokeExitCode -or $smokeExitCode -ne 0",
+                "$smokeExitCode -ne 0",
+                gate_id,
+            ),
+            ("$smokeOutput.Count -ne 1", "$smokeOutput.Count -lt 1", gate_id),
+            (
+                "$smokeOutput[0] -cne $expectedCompletion",
+                "$smokeOutput[0] -notlike '*passed*'",
+                gate_id,
+            ),
+            ("sort_keys=True", "sort_keys=False", gate_id),
+            ('separators=(",", ":")', 'separators=(", ", ": ")', gate_id),
+            ("ensure_ascii=True", "ensure_ascii=False", gate_id),
+            (
+                '"nonce": completion_nonce',
+                '"nonce": "accepted-without-binding"',
+                gate_id,
+            ),
+            (
+                "              flush=True,\n          )\n          '@",
+                "          )\n          '@",
+                gate_id,
+            ),
+            (
+                "zig build test-host-tool-smoke ${{ matrix.target_args }}",
+                "zig build test ${{ matrix.target_args }}",
+                host_tool_id,
+            ),
             (
                 "          -Dlevel2-width-candidates=true\n",
                 "",
                 capability_id,
             ),
         )
-        baselines = {item["id"]: item for item in (build, layout, gate)}
+        baselines = {item["id"]: item for item in (build, layout, gate, host_tool)}
         baselines[capability_id] = next(
             item for item in launches if item["id"] == capability_id
         )
@@ -8429,10 +8534,15 @@ class BuildInventoryTests(unittest.TestCase):
     def test_aggregate_guard_mutation_survives_rehashed_root_digest(self) -> None:
         path = self.root / "build.zig"
         text = path.read_text(encoding="utf-8")
-        original = "if (host_tool_smoke) {"
+        original = "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);"
         self.assertIn(original, text)
         path.write_text(
-            text.replace(original, "if (!host_tool_smoke) {", 1), encoding="utf-8"
+            text.replace(
+                original,
+                "if (!host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                1,
+            ),
+            encoding="utf-8",
         )
         inventory = self._inventory()
         inventory["build_root_digests"]["build.zig"] = hashlib.sha256(
@@ -8440,7 +8550,7 @@ class BuildInventoryTests(unittest.TestCase):
         ).hexdigest()
         self._write_inventory(inventory)
         self._assert_error_contains(
-            "source field source_digest changed for step:build.zig:build:test"
+            "canonical test aggregate must conditionally depend exactly once on the host-tool smoke aggregate"
         )
 
     def test_compat_install_guard_mutation_hits_root_digest(self) -> None:
@@ -8465,7 +8575,10 @@ class BuildInventoryTests(unittest.TestCase):
                 "src/blas/structured_object_stub_root.zig",
                 "src/blas/structured_object_root.zig",
             ),
-            ("if (host_tool_smoke) {", "if (!host_tool_smoke) {"),
+            (
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "if (!host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+            ),
             ("if (run_structured_object_tests) |run|", "if (null) |run|"),
         )
         for original, replacement in mutations:

@@ -53,7 +53,7 @@ pub fn build(b: *std.Build) void {
     const target = b.resolveTargetQuery(target_query);
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
     const test_optimize = b.option(std.builtin.OptimizeMode, "test-optimize", "Optimize mode for correctness tests") orelse .ReleaseSafe;
-    const host_tool_smoke = b.option(bool, "host-tool-smoke", "Run host Python/C/C++/Fortran smoke checks as part of the test step") orelse true;
+    const host_tool_smoke = b.option(bool, "host-tool-smoke", "Include the test-host-tool-smoke aggregate in the default test step") orelse true;
     const apple_amx = b.option(
         bool,
         "apple-amx",
@@ -913,6 +913,16 @@ pub fn build(b: *std.Build) void {
         "Run inventory-declared Python benchmark tooling unit tests",
     );
     python_tooling_test_step.dependOn(&python_tooling_tests.step);
+    const host_tool_smoke_test_step = b.step(
+        "test-host-tool-smoke",
+        "Run host Python, C/C++, available Fortran, and ABI observer smoke checks",
+    );
+    host_tool_smoke_test_step.dependOn(python_tooling_test_step);
+    host_tool_smoke_test_step.dependOn(&abi_manifest_smoke_test.step);
+    host_tool_smoke_test_step.dependOn(&c_header_smoke_test.step);
+    host_tool_smoke_test_step.dependOn(&cpp_header_smoke_test.step);
+    host_tool_smoke_test_step.dependOn(&fortran_module_smoke_test.step);
+    host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);
 
     const InventoryCase = struct {
         root_id: []const u8,
@@ -1048,7 +1058,6 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run correctness tests");
     test_step.dependOn(&test_inventory_structure_check.step);
     test_step.dependOn(test_inventory_step);
-    test_step.dependOn(python_tooling_test_step);
     test_step.dependOn(&run_modern_tests.step);
     test_step.dependOn(&run_blas_module_tests.step);
     test_step.dependOn(&run_zynum_public_surface_contract_tests.step);
@@ -1071,14 +1080,7 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_vector_stride2_parallel_tests.step);
     if (run_level2_width_default_artifact_probe != null) test_step.dependOn(level2_width_default_artifact_probe_step);
     test_step.dependOn(&run_header_smoke_tests.step);
-    if (host_tool_smoke) {
-        test_step.dependOn(&abi_manifest_smoke_test.step);
-        test_step.dependOn(&c_header_smoke_test.step);
-        test_step.dependOn(&cpp_header_smoke_test.step);
-        test_step.dependOn(&fortran_module_smoke_test.step);
-        test_step.dependOn(&abi_baseline_observer_tests.step);
-        test_step.dependOn(&build_inventory_tests.step);
-    }
+    if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);
 
     const bench = b.addExecutable(.{
         .name = "bench-zynum-blas",

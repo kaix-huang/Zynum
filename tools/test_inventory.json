@@ -218,7 +218,7 @@
       "launch_observation_ids": [
         "launch:build.zig:build:build_inventory_tests"
       ],
-      "aggregate_step_observation_id": "step:build.zig:build:test",
+      "aggregate_step_observation_id": null,
       "matrix_applicable": true
     },
     {
@@ -25972,25 +25972,25 @@
       "id": "binding:workflow-launch-github-workflows-ci-yml-target-tests-test-debug-target",
       "workflow_observation_id": "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target",
       "optimize_mode_id": "mode:Debug",
-      "command_template": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures"
+      "command_template": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures"
     },
     {
       "id": "binding:workflow-launch-github-workflows-ci-yml-target-tests-test-releasesafe-target",
       "workflow_observation_id": "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target",
       "optimize_mode_id": "mode:ReleaseSafe",
-      "command_template": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures"
+      "command_template": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures"
     },
     {
       "id": "binding:workflow-launch-github-workflows-ci-yml-target-tests-test-releasefast-target",
       "workflow_observation_id": "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target",
       "optimize_mode_id": "mode:ReleaseFast",
-      "command_template": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures"
+      "command_template": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false --summary failures"
     },
     {
       "id": "binding:workflow-launch-github-workflows-release-yml-artifacts-test",
       "workflow_observation_id": "workflow-launch:.github/workflows/release.yml:artifacts:test",
       "optimize_mode_id": "mode:ReleaseSafe",
-      "command_template": "zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures"
+      "command_template": "zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures"
     }
   ],
   "known_gaps": [
@@ -26491,7 +26491,7 @@
     },
     "test_roots": {
       "count": 26,
-      "digest": "2ab9584781f9570f68406ab54f3e5a197fda6520033f0d1bab0de03e5fbb44f4"
+      "digest": "38c803913436538e6dc4696edeb6a37bf4393e89e80f3214313e1671c9288340"
     },
     "zig_test_files": {
       "count": 51,
@@ -26515,7 +26515,7 @@
     },
     "workflow_mode_bindings": {
       "count": 4,
-      "digest": "ec4ea5e7406b3e480024ef8c0504afa1f059af038fde35a5708c19b5e9bf5073"
+      "digest": "457f85cd9911986cc21813ac6f27abd47a26c4675566ea0f7eba3340ca9107e8"
     },
     "known_gaps": {
       "count": 7,

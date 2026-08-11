@@ -128,8 +128,13 @@ jobs:
       - name: Require current-only test inventory policy
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
+      - name: Run host tool smoke once
+        timeout-minutes: 60
+        run: zig build test-host-tool-smoke ${{ matrix.target_args }} --summary failures
+
       - name: Test
-        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
+        timeout-minutes: 60
+        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures
 
       - name: Build install tree
         run: zig build ${{ matrix.target_args }} --release=fast --summary failures

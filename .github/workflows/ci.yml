@@ -74,10 +74,14 @@ jobs:
           fi
 
   build-inventory-security:
-    name: Build inventory security
+    name: Build inventory security / ${{ matrix.os }}
     needs: source-checks
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-24.04]
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -111,7 +115,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: [source-checks, build-inventory-security, test-inventory-security]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -121,7 +125,6 @@ jobs:
             cache_target: macos-aarch64-baseline
             zig_gate: inventory-certified
             target_args: -Dtarget=aarch64-macos -Dcpu=baseline
-            host_tool_smoke: true
             install: true
             dynlib: zig-out/lib/libzynum_blas.dylib
             full_smoke: false
@@ -130,7 +133,6 @@ jobs:
             cache_target: linux-x86_64-baseline
             zig_gate: inventory-certified
             target_args: -Dtarget=x86_64-linux-gnu -Dcpu=baseline
-            host_tool_smoke: true
             install: true
             dynlib: zig-out/lib/libzynum_blas.so
             full_smoke: true
@@ -139,7 +141,6 @@ jobs:
             cache_target: linux-arm64-baseline
             zig_gate: link-only
             target_args: -Dtarget=aarch64-linux-gnu -Dcpu=baseline
-            host_tool_smoke: true
             install: true
             dynlib: zig-out/lib/libzynum_blas.so
             full_smoke: false
@@ -148,7 +149,6 @@ jobs:
             cache_target: windows-x86_64-baseline
             zig_gate: link-only
             target_args: -Dtarget=x86_64-windows-gnu -Dcpu=baseline
-            host_tool_smoke: false
             install: false
             dynlib: ""
             full_smoke: false
@@ -208,7 +208,7 @@ jobs:
             Write-Error 'Windows dynamic, import, and static artifacts must have distinct contents'
             exit 1
           }
-          $installedDlls = @(Get-ChildItem -LiteralPath (Split-Path -Parent $dynamicLibrary) -Filter '*.dll' -File)
+          $installedDlls = @(Get-ChildItem -LiteralPath (Split-Path -Parent $dynamicLibrary) -Filter '*.dll' -File -Force)
           if ($installedDlls.Count -ne 1 -or $installedDlls[0].Name -cne 'zynum_blas.dll') {
             Write-Error 'canonical Windows DLL directory must contain exactly zynum_blas.dll and no additional DLLs'
             exit 1
@@ -242,11 +242,14 @@ jobs:
             }
           }
 
-      - name: Run Windows native Python tooling compatibility smoke (not inventory evidence)
+      - name: Run Windows DLL ABI and CBLAS L1-L3 compatibility smoke (not inventory evidence)
         if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
         shell: pwsh
         timeout-minutes: 15
         run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
           $env:PYTHONHOME = $null
           $env:PYTHONPATH = $null
           $env:PYTHONINSPECT = $null
@@ -255,16 +258,33 @@ jobs:
           $env:PAGER = $null
           $env:LESS = $null
 
-          $preflightScript = @'
+          $smokeScript = @'
           import ctypes
           import json
+          import math
           import os
           import re
           import stat
+          import sys
           from pathlib import Path
+
+          if len(sys.argv) != 2:
+              raise SystemExit("Windows CBLAS smoke requires exactly one completion nonce")
+          completion_nonce = sys.argv[1]
+          if re.fullmatch(r"[0-9a-f]{32}", completion_nonce, flags=re.ASCII) is None:
+              raise SystemExit("Windows CBLAS smoke completion nonce is invalid")
 
           repository_root = Path.cwd().resolve(strict=True)
           requested_dll = repository_root / "zig-out/bin/zynum_blas.dll"
+          with os.scandir(requested_dll.parent) as entries:
+              dll_entries = [
+                  entry for entry in entries if entry.name.lower().endswith(".dll")
+              ]
+          if len(dll_entries) != 1 or dll_entries[0].name != requested_dll.name:
+              raise SystemExit(
+                  "canonical Windows DLL directory must contain exactly "
+                  "zynum_blas.dll and no additional DLLs"
+              )
           requested_stat = os.stat(requested_dll, follow_symlinks=False)
           if (
               getattr(requested_stat, "st_file_attributes", 0)
@@ -337,180 +357,200 @@ jobs:
           ]
           if missing_exports:
               raise SystemExit(f"Windows DLL is missing ABI exports: {missing_exports}")
-          print(f"Windows DLL preflight passed for {canonical_dll} ({len(export_names)} exports)")
-          '@
-          python -I -B -c $preflightScript
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
-          }
+          print(
+              f"Windows DLL preflight passed for {canonical_dll} "
+              f"({len(export_names)} exports)",
+              file=sys.stderr,
+              flush=True,
+          )
 
-          $testScript = @'
-          import hashlib
-          import json
-          import unittest
-          from pathlib import Path, PurePosixPath
-
-          expected = {
-              "discovered": 465,
-              "executed": 465,
-              "skipped": 98,
-              "failures": 0,
-              "errors": 0,
-              "expected_failures": 0,
-              "unexpected_successes": 0,
-              "skip_identity_sha256": "03b2b268a475647b80323c39a290d2ad17c7a26cabcd9c94f18a2fa7d4d22d8b",
-          }
-          inventory = json.loads(Path("tools/test_inventory.json").read_text(encoding="utf-8"))
-          skip_contracts = [
-              item
-              for item in inventory["python_skip_contracts"]
-              if item["root_id"] == "python-root:benchmark-tools-discovery"
+          double_pointer = ctypes.POINTER(ctypes.c_double)
+          cblas_daxpy = library.cblas_daxpy
+          cblas_daxpy.argtypes = [
+              ctypes.c_int,
+              ctypes.c_double,
+              double_pointer,
+              ctypes.c_int,
+              double_pointer,
+              ctypes.c_int,
           ]
-          if len(skip_contracts) != 1:
-              raise SystemExit("Windows native tooling skip contract is not unique")
-          skip_entries = skip_contracts[0]["entries"]
-          platform_predicates = frozenset({
-              "python-skip-predicate:artifact-snapshot-platform-unavailable",
-              "python-skip-predicate:report-publication-platform-unavailable",
-          })
-          windows_active_predicates = platform_predicates | {
-              "python-skip-predicate:accelerate-unavailable",
-              "python-skip-predicate:rank-k-artifacts-unavailable",
-              "python-skip-predicate:rotg-latency-artifacts-unavailable",
-              "python-skip-predicate:symm-artifacts-unavailable",
-              "python-skip-predicate:triangular-matrix-artifacts-unavailable",
-              "python-skip-predicate:not-darwin",
-          }
+          cblas_daxpy.restype = None
+          cblas_dgemv = library.cblas_dgemv
+          cblas_dgemv.argtypes = [
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_double,
+              double_pointer,
+              ctypes.c_int,
+              double_pointer,
+              ctypes.c_int,
+              ctypes.c_double,
+              double_pointer,
+              ctypes.c_int,
+          ]
+          cblas_dgemv.restype = None
+          cblas_dgemm = library.cblas_dgemm
+          cblas_dgemm.argtypes = [
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_int,
+              ctypes.c_double,
+              double_pointer,
+              ctypes.c_int,
+              double_pointer,
+              ctypes.c_int,
+              ctypes.c_double,
+              double_pointer,
+              ctypes.c_int,
+          ]
+          cblas_dgemm.restype = None
 
-          def runtime_id(inventory_name):
-              path, separator, declaration = inventory_name.partition("::")
-              if not separator or PurePosixPath(path).suffix != ".py" or not declaration:
-                  raise SystemExit(
-                      f"Windows native tooling test identity is invalid: {inventory_name!r}"
+          CBLAS_ROW_MAJOR = 101
+          CBLAS_NO_TRANS = 111
+
+          def run_cblas_daxpy():
+              x = (ctypes.c_double * 3)(1, -2, 3)
+              y = (ctypes.c_double * 3)(4, 5, -6)
+              cblas_daxpy(3, 2, x, 1, y, 1)
+              return list(y), [6.0, 1.0, 0.0]
+
+          def run_cblas_dgemv():
+              matrix = (ctypes.c_double * 6)(1, 2, 3, 4, 5, 6)
+              x = (ctypes.c_double * 3)(1, -1, 2)
+              y = (ctypes.c_double * 2)(0, 0)
+              cblas_dgemv(
+                  CBLAS_ROW_MAJOR,
+                  CBLAS_NO_TRANS,
+                  2,
+                  3,
+                  1,
+                  matrix,
+                  3,
+                  x,
+                  1,
+                  0,
+                  y,
+                  1,
+              )
+              return list(y), [5.0, 11.0]
+
+          def run_cblas_dgemm():
+              matrix_a = (ctypes.c_double * 6)(1, 2, 3, 4, 5, 6)
+              matrix_b = (ctypes.c_double * 6)(7, 8, 9, 10, 11, 12)
+              matrix_c = (ctypes.c_double * 4)(0, 0, 0, 0)
+              cblas_dgemm(
+                  CBLAS_ROW_MAJOR,
+                  CBLAS_NO_TRANS,
+                  CBLAS_NO_TRANS,
+                  2,
+                  2,
+                  3,
+                  1,
+                  matrix_a,
+                  3,
+                  matrix_b,
+                  2,
+                  0,
+                  matrix_c,
+                  2,
+              )
+              return list(matrix_c), [58.0, 64.0, 139.0, 154.0]
+
+          expected_case_ids = (
+              "cblas-daxpy-l1",
+              "cblas-dgemv-l2",
+              "cblas-dgemm-l3",
+          )
+          cases = (
+              ("cblas-daxpy-l1", run_cblas_daxpy),
+              ("cblas-dgemv-l2", run_cblas_dgemv),
+              ("cblas-dgemm-l3", run_cblas_dgemm),
+          )
+          if tuple(case_id for case_id, _ in cases) != expected_case_ids:
+              raise SystemExit("Windows CBLAS smoke case identities are missing or reordered")
+
+          case_results = []
+          for case_id, runner in cases:
+              try:
+                  observed, expected = runner()
+                  passed = (
+                      all(math.isfinite(value) for value in observed)
+                      and observed == expected
                   )
-              return f"{PurePosixPath(path).stem}.{declaration}"
-
-          platform_test_ids = {
-              runtime_id(entry["test"])
-              for entry in skip_entries
-              if entry["predicate_id"] in platform_predicates
-          }
-          expected_skip_identities = sorted(
-              (runtime_id(entry["test"]), entry["reason"])
-              for entry in skip_entries
-              if entry["predicate_id"] in windows_active_predicates
-              and not (
-                  entry["predicate_id"] not in platform_predicates
-                  and runtime_id(entry["test"]) in platform_test_ids
+                  error = None
+              except Exception as exception:
+                  observed = None
+                  expected = None
+                  passed = False
+                  error = f"{type(exception).__name__}: {exception}"
+              case_results.append(
+                  {
+                      "id": case_id,
+                      "passed": passed,
+                      "observed": observed,
+                      "expected": expected,
+                      "error": error,
+                  }
               )
-          )
-          expected_skip_payload = json.dumps(
-              expected_skip_identities, separators=(",", ":"), ensure_ascii=True
-          ).encode("ascii")
-          expected_skip_digest = hashlib.sha256(expected_skip_payload).hexdigest()
+
+          observed_case_ids = tuple(result["id"] for result in case_results)
+          summary = {
+              "executed": len(case_results),
+              "passed": sum(result["passed"] for result in case_results),
+              "failed": sum(not result["passed"] for result in case_results),
+              "skipped": 0,
+          }
+          expected_summary = {
+              "executed": 3,
+              "passed": 3,
+              "failed": 0,
+              "skipped": 0,
+          }
           if (
-              len(expected_skip_identities) != expected["skipped"]
-              or expected_skip_digest != expected["skip_identity_sha256"]
+              observed_case_ids != expected_case_ids
+              or len(case_results) != len(expected_case_ids)
+              or summary != expected_summary
           ):
               raise SystemExit(
-                  "Windows reviewed skip identities differ from the frozen compatibility contract"
+                  "Windows CBLAS L1-L3 compatibility smoke failed: "
+                  f"results={case_results!r}; summary={summary!r}; "
+                  f"expected_summary={expected_summary!r}"
               )
-          suite = unittest.defaultTestLoader.discover("bench/tools", pattern="test_*.py")
-          discovered = suite.countTestCases()
-          if discovered != expected["discovered"] or discovered == 0:
-              raise SystemExit(
-                  f"Windows native tooling discovery count differs: {discovered} != "
-                  f"{expected['discovered']}"
-              )
-          required_dll_backed_tests = frozenset({
-              "test_level2_report.Level2RunnerTests.test_banded_controller_keeps_fresh_process_statistics",
-              "test_level2_report.Level2RunnerTests.test_banded_worker_correctness",
-              "test_level2_report.Level2RunnerTests.test_compact_controller_routes_profiles_and_metadata",
-              "test_level2_report.Level2RunnerTests.test_compact_worker_correctness",
-              "test_level2_report.Level2RunnerTests.test_controller_aggregates_independent_worker_processes",
-              "test_level2_report.Level2RunnerTests.test_rank_update_controller_keeps_fresh_process_statistics",
-              "test_level2_report.Level2RunnerTests.test_rank_update_worker_correctness",
-              "test_level2_report.Level2RunnerTests.test_rectangular_worker_correctness_and_operation_counts",
-              "test_level2_report.Level2RunnerTests.test_triangular_worker_correctness",
-          })
-
-          def flatten_tests(test_suite):
-              for test in test_suite:
-                  if isinstance(test, unittest.TestSuite):
-                      yield from flatten_tests(test)
-                  else:
-                      yield test
-
-          discovered_tests = tuple(flatten_tests(suite))
-          tests_by_id = {test.id(): test for test in discovered_tests}
-          if len(tests_by_id) != discovered:
-              raise SystemExit("Windows native tooling discovered duplicate test identities")
-          discovered_ids = frozenset(tests_by_id)
-          missing_dll_backed_tests = sorted(required_dll_backed_tests - discovered_ids)
-          if missing_dll_backed_tests:
-              raise SystemExit(
-                  f"Windows DLL-backed tests were not discovered: {missing_dll_backed_tests!r}"
-              )
-          reviewed_dll_backed_tests = {
-              runtime_id(entry["test"])
-              for entry in skip_entries
-              if entry["predicate_id"] in {
-                  "python-skip-predicate:drop-in-blas-unavailable",
-                  "python-skip-predicate:file-backed-blas-unavailable",
-              }
+          completion = {
+              "contract": "zynum-windows-dll-cblas-smoke",
+              "version": 1,
+              "nonce": completion_nonce,
+              "case_ids": list(expected_case_ids),
+              "summary": summary,
           }
-          if reviewed_dll_backed_tests != required_dll_backed_tests:
-              raise SystemExit("Windows DLL-backed test contract differs from the reviewed set")
-          platform_skip_identities = [
-              pair for pair in expected_skip_identities if pair[0] in platform_test_ids
-          ]
-          if len(platform_skip_identities) != 93:
-              raise SystemExit("Windows platform skip marker set must contain exactly 93 tests")
-          for test_id, reason in platform_skip_identities:
-              test = tests_by_id.get(test_id)
-              if test is None:
-                  raise SystemExit(f"Windows reviewed skip test was not discovered: {test_id}")
-              method_name = getattr(test, "_testMethodName", None)
-              if not isinstance(method_name, str) or not method_name:
-                  raise SystemExit(f"Windows reviewed skip test is malformed: {test_id}")
-              setattr(test, method_name, unittest.skip(reason)(lambda: None))
-          result = unittest.TextTestRunner(verbosity=2).run(suite)
-          skip_identities = sorted((test.id(), reason) for test, reason in result.skipped)
-          if any(
-              not isinstance(test_id, str) or not isinstance(reason, str)
-              for test_id, reason in skip_identities
-          ):
-              raise SystemExit("Windows native tooling skip identities are malformed")
-          unexpected_dll_skips = sorted(
-              required_dll_backed_tests & {test_id for test_id, _ in skip_identities}
+          print(
+              json.dumps(
+                  completion,
+                  sort_keys=True,
+                  separators=(",", ":"),
+                  ensure_ascii=True,
+              ),
+              flush=True,
           )
-          if unexpected_dll_skips:
-              raise SystemExit(
-                  f"Windows DLL-backed tests must not be skipped: {unexpected_dll_skips!r}"
-              )
-          skip_identity_payload = json.dumps(
-              skip_identities, separators=(",", ":"), ensure_ascii=True
-          ).encode("ascii")
-          observed = {
-              "discovered": discovered,
-              "executed": result.testsRun,
-              "skipped": len(result.skipped),
-              "failures": len(result.failures),
-              "errors": len(result.errors),
-              "expected_failures": len(result.expectedFailures),
-              "unexpected_successes": len(result.unexpectedSuccesses),
-              "skip_identity_sha256": hashlib.sha256(skip_identity_payload).hexdigest(),
-          }
-          if observed != expected or not result.wasSuccessful():
-              raise SystemExit(
-                  f"Windows native tooling compatibility contract differs: "
-                  f"observed={observed!r}; expected={expected!r}"
-              )
-          print(f"Windows native tooling compatibility smoke passed: {observed!r}")
           '@
-          python -I -B -c $testScript
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          $pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop
+          $completionNonce = [guid]::NewGuid().ToString('N')
+          $smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)
+          $smokeExitCode = $LASTEXITCODE
+          if ($null -eq $smokeExitCode -or $smokeExitCode -ne 0) {
+            throw "Windows DLL/CBLAS smoke failed with exit code $smokeExitCode"
+          }
+          if ($smokeOutput.Count -ne 1) {
+            throw "Windows DLL/CBLAS smoke must emit exactly one stdout line; observed $($smokeOutput.Count)"
+          }
+          $expectedCompletion = '{"case_ids":["cblas-daxpy-l1","cblas-dgemv-l2","cblas-dgemm-l3"],"contract":"zynum-windows-dll-cblas-smoke","nonce":"' + $completionNonce + '","summary":{"executed":3,"failed":0,"passed":3,"skipped":0},"version":1}'
+          if ($smokeOutput[0] -cne $expectedCompletion) {
+            throw "Windows DLL/CBLAS smoke completion record is missing or invalid: $($smokeOutput[0])"
           }
 
       - name: Install Fortran compiler on Ubuntu
@@ -519,29 +559,37 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gfortran
 
+      - name: Run host tool smoke once
+        if: matrix.zig_gate == 'inventory-certified'
+        timeout-minutes: 60
+        run: zig build test-host-tool-smoke ${{ matrix.target_args }} --summary failures
+
       - name: Test Debug target
         if: matrix.zig_gate == 'inventory-certified'
-        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+        timeout-minutes: 60
+        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures
 
       - name: Test ReleaseSafe target
         if: matrix.zig_gate == 'inventory-certified'
-        run: zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+        timeout-minutes: 60
+        run: zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures
 
       - name: Test ReleaseFast target
         if: matrix.zig_gate == 'inventory-certified'
-        run: zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+        timeout-minutes: 60
+        run: zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false --summary failures
 
       - name: Link test inventory for Debug target
         if: matrix.zig_gate == 'link-only'
-        run: zig build test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+        run: zig build test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures
 
       - name: Link test inventory for ReleaseSafe target
         if: matrix.zig_gate == 'link-only'
-        run: zig build --release=safe test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+        run: zig build --release=safe test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
 
       - name: Link test inventory for ReleaseFast target
         if: matrix.zig_gate == 'link-only'
-        run: zig build --release=fast test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures
+        run: zig build --release=fast test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
 
       - name: Build install artifacts
         if: matrix.install

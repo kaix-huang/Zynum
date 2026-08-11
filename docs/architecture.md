@@ -232,15 +232,27 @@ uncertain recovery material. The authoritative schema, resource bounds, and
 exit statuses live in `tools/check_build_inventory.py`,
 `tools/check_test_inventory.py`, and the runner sources.
 
-In GitHub Actions, the same-SHA Linux source, build-inventory-security, and
-test-inventory-security jobs own inventory and repository-security evidence.
+In GitHub Actions, the same-SHA Linux source and test-inventory-security jobs,
+together with the Linux/macOS build-inventory-security matrix, own inventory
+and repository-security evidence.
+Each inventory-certified target row invokes `test-host-tool-smoke` once in a
+dedicated step; its Debug, ReleaseSafe, and ReleaseFast test steps explicitly
+disable host-tool smoke, while link-only steps do not request it. This keeps
+the independent build-inventory suite and the ABI-baseline/Python-tooling host
+aggregate out of the three per-mode target invocations.
 The Windows `x86_64 build-link-native-smoke` job instead proves cross-target
 builds, Debug/ReleaseSafe/ReleaseFast inventory linking, library layout, the
-canonical DLL's complete manifest export surface, and native Python tooling
-compatibility. It is not inventory certification or attestation. At this
-revision, Windows native-enumeration observations remain explicitly pending,
-and the complete native matrix remains incomplete. The structure checker is
-the authoritative source for the current pending set.
+canonical DLL's complete 311-name manifest export surface, and deterministic
+representative CBLAS Level 1, Level 2, and Level 3 calls (`daxpy`, `dgemv`, and
+`dgemm`) through that exact loaded DLL. The three calls do not establish the
+semantics of all 311 exports, Fortran compatibility, inventory evidence,
+attestation, or performance. The nonce-bound completion record only detects an
+accidental early exit; a malicious DLL running on the same runner with the same
+permissions could still forge process state, and adversarial attestation would
+require an isolated execution boundary. At this revision, Windows
+native-enumeration observations remain explicitly pending, and the complete
+native matrix remains incomplete. The structure checker is the authoritative
+source for the current pending set.
 
 Run these security and consistency gates in a process with no inherited
 `GIT_*` variables:

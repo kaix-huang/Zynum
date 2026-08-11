@@ -39,6 +39,7 @@ INVENTORY_PATH = "tools/test_inventory.json"
 BUILD_INVENTORY_PATH = "tools/build_inventory.json"
 SELF_TEST_PATH = "test/build/test_test_inventory.py"
 AGGREGATE_STEP_ID = "step:build.zig:build:test"
+HOST_TOOL_SMOKE_STEP_ID = "step:build.zig:build:test-host-tool-smoke"
 MODES = ("Debug", "ReleaseSafe", "ReleaseFast")
 ZIG_ENUMERATION_SOURCE = "zig-0.16-builtin-test-functions"
 PYTHON_ENUMERATION_SOURCE = "static"
@@ -50,10 +51,30 @@ FACTORY_LAUNCH_ID = "launch:build.zig:build:run_inventory_tests"
 PYTHON_TOOLING_ROOT_ID = "python-root:benchmark-tools-discovery"
 PYTHON_TOOLING_LAUNCH_ID = "launch:build.zig:build:python_tooling_tests"
 PYTHON_TOOLING_STEP_ID = "step:build.zig:build:test-python-tooling"
+HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES = (
+    {"id": PYTHON_TOOLING_STEP_ID, "condition": "always"},
+    {"id": "launch:build.zig:build:abi_manifest_smoke_test", "condition": "always"},
+    {"id": "launch:build.zig:build:c_header_smoke_test", "condition": "always"},
+    {"id": "launch:build.zig:build:cpp_header_smoke_test", "condition": "always"},
+    {
+        "id": "launch:build.zig:build:fortran_module_smoke_test",
+        "condition": "always",
+    },
+    {
+        "id": "step:build.zig:build:test-abi-baseline-observer",
+        "condition": "always",
+    },
+)
+LEGACY_WORKFLOW_MODE_COMMANDS = {
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
+    "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures",
+}
 _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     (
         "bench/tools/test_benchmark_artifact_snapshot.py",
-        "79cc99feea598795d86da7e663eef723fd2b31593cb875f3081d2612836854fc",
+        "c69eea0209c5e8d715c759c7f10c1e8d05fad1cf4097f8b517cf264d73351408",
     ),
     (
         "bench/tools/test_benchmark_metadata.py",
@@ -111,7 +132,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
 _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     (
         "bench/tools/test_benchmark_artifact_snapshot.py",
-        "79cc99feea598795d86da7e663eef723fd2b31593cb875f3081d2612836854fc",
+        "c69eea0209c5e8d715c759c7f10c1e8d05fad1cf4097f8b517cf264d73351408",
     ),
     (
         "bench/tools/test_benchmark_metadata.py",
@@ -322,7 +343,7 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (
     ("_zynum_report_repository_snapshot", "tools/repository_snapshot.py"),
 )
 _PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
-    "83ebae36344e6063cd8e3200a5cc6b1308c91baae55104580b1db534cfd80cdd"
+    "b8979259892b9c99202260185e4ffde3b66abee6337caaa530524f8d42a98c6d"
 )
 _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
     "fe47ceff1b1520d52339b694168560d4eafa6754b71349365a355ecaf1d6f5a6"
@@ -936,7 +957,7 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "a3d5e31a6c1b6cc0845f06cc15f54b0a8c3cf2b1cf2e5e926ee6aa94852700d4"
+    "95873919040e797481897d9711b4dfb11a2277d88e8cc6499de50f65323a7470"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
@@ -1145,7 +1166,7 @@ PYTHON_ROOTS = (
         "kind": "direct",
         "module_paths": ("test/build/test_build_inventory.py",),
         "launch_ids": ("launch:build.zig:build:build_inventory_tests",),
-        "aggregate": True,
+        "aggregate": False,
         "matrix": True,
     },
     {
@@ -2361,24 +2382,56 @@ def discover(
         not isinstance(python_tooling_step, dict)
         or python_tooling_step.get("category") != "step"
         or python_tooling_step.get("step_role") != "focused-validation"
-        or python_tooling_step.get("aggregate_test_membership") != "member"
-        or python_tooling_step.get("aggregate_condition") != "always"
+        or python_tooling_step.get("aggregate_test_membership")
+        != "host-tool-smoke-member"
+        or python_tooling_step.get("aggregate_condition")
+        != "always within test-host-tool-smoke"
         or python_tooling_step.get("direct_dependencies")
         != expected_python_tooling_dependencies
         or python_tooling_step.get("closure_contract")
         != expected_python_tooling_closure
     ):
         raise InventoryError("Python tooling focused-step closure drifted")
+    host_tool_step = by_id.get(HOST_TOOL_SMOKE_STEP_ID)
+    if (
+        not isinstance(host_tool_step, dict)
+        or host_tool_step.get("category") != "step"
+        or host_tool_step.get("step_role") != "aggregate-validation"
+        or host_tool_step.get("aggregate_test_membership") != "conditional-member"
+        or host_tool_step.get("aggregate_condition") != "host-tool-smoke is true"
+        or host_tool_step.get("direct_dependencies")
+        != list(HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES)
+        or host_tool_step.get("closure_contract")
+        != {
+            "direct_dependency_count": len(HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES),
+            "relation": "exact-six-direct-host-tool-dependencies",
+        }
+    ):
+        raise InventoryError("host-tool smoke aggregate closure drifted")
     if (
         sum(
             isinstance(edge, dict)
-            and edge.get("id") == PYTHON_TOOLING_STEP_ID
-            and edge.get("condition") == "always"
+            and edge.get("id") == HOST_TOOL_SMOKE_STEP_ID
+            and edge.get("condition") == "host-tool-smoke is true"
             for edge in aggregate.get("direct_dependencies", [])
         )
         != 1
     ):
-        raise InventoryError("Python tooling canonical aggregate edge is missing")
+        raise InventoryError("host-tool smoke canonical aggregate edge is missing")
+    forbidden_aggregate_ids = {
+        PYTHON_TOOLING_STEP_ID,
+        PYTHON_TOOLING_LAUNCH_ID,
+        "step:build.zig:build:test-build-inventory",
+        "launch:build.zig:build:build_inventory_tests",
+        *(dependency["id"] for dependency in HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES[1:]),
+    }
+    if any(
+        isinstance(edge, dict) and edge.get("id") in forbidden_aggregate_ids
+        for edge in aggregate.get("direct_dependencies", [])
+    ):
+        raise InventoryError(
+            "canonical test aggregate bypasses the unique host-tool smoke path"
+        )
 
     root_rows: list[dict[str, Any]] = []
     root_reach: dict[str, list[str]] = defaultdict(list)
@@ -2540,6 +2593,9 @@ def discover(
             f"expected exactly 14 benchmark Python test candidates, found {len(benchmark_paths)}"
         )
     python_root_specs: list[dict[str, Any]] = []
+    host_tool_dependency_ids = {
+        dependency["id"] for dependency in HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES
+    }
     for spec in PYTHON_ROOTS:
         row = dict(spec)
         if spec["id"] == PYTHON_TOOLING_ROOT_ID:
@@ -2554,6 +2610,7 @@ def discover(
                 launch_id in aggregate_dependencies
                 or any(
                     step_id in aggregate_dependencies
+                    or step_id in host_tool_dependency_ids
                     for step_id in focused_by_launch[launch_id]
                 )
             ):
@@ -2744,6 +2801,13 @@ def discover(
         if optimize_flags != [f"-Dtest-optimize={mode}"]:
             raise InventoryError(
                 f"{identifier}: workflow command must contain one explicit test optimize mode"
+            )
+        host_tool_flags = [
+            token for token in tokens if token.startswith("-Dhost-tool-smoke=")
+        ]
+        if host_tool_flags != ["-Dhost-tool-smoke=false"]:
+            raise InventoryError(
+                f"{identifier}: workflow correctness command must disable the separately executed host-tool aggregate exactly"
             )
         workflow_bindings.append(
             {
@@ -4034,14 +4098,26 @@ def _refresh_base_compatible_discovery(
             continue
         legacy = dict(current)
         legacy["launch_observation_ids"] = []
-        legacy["aggregate_step_observation_id"] = None
-        if (
+        tooling_migration = (
             current.get("id") != PYTHON_TOOLING_ROOT_ID
             or recorded != legacy
             or current.get("launch_observation_ids") != [PYTHON_TOOLING_LAUNCH_ID]
             or current.get("aggregate_step_observation_id") != AGGREGATE_STEP_ID
             or current.get("matrix_applicable") is not False
-        ):
+        )
+        build_inventory_legacy = dict(current)
+        build_inventory_legacy["matrix_applicable"] = False
+        build_inventory_older_legacy = dict(current)
+        build_inventory_older_legacy["aggregate_step_observation_id"] = (
+            AGGREGATE_STEP_ID
+        )
+        build_inventory_migration = (
+            current.get("id") != "python-root:build-inventory-direct"
+            or recorded not in (build_inventory_legacy, build_inventory_older_legacy)
+            or current.get("aggregate_step_observation_id") is not None
+            or current.get("matrix_applicable") is not True
+        )
+        if tooling_migration and build_inventory_migration:
             raise InventoryError("refresh base Python root immutable facts changed")
 
     recorded_modules = inventory.get("python_test_modules")
@@ -4198,6 +4274,8 @@ def _refresh_base_compatible_discovery(
         current = current_rows.get(row.get("id"))
         if current is None or current.get("root_id") != root_id:
             raise InventoryError("refresh base Python row identity is noncanonical")
+        if root_id == "python-root:build-inventory-direct":
+            continue
         expected_set_id = (
             derived_set_ids[root_id] if current["disposition"] == "execute" else None
         )
@@ -4210,6 +4288,38 @@ def _refresh_base_compatible_discovery(
     compatible["test_roots"] = recorded_roots
     compatible["python_test_modules"] = recorded_modules
     compatible["expected_test_sets"] = derived_sets
+    compatible["test_mode_rows"] = inventory["test_mode_rows"]
+    recorded_workflow_bindings = inventory.get("workflow_mode_bindings")
+    current_workflow_bindings = discovered["workflow_mode_bindings"]
+    if not isinstance(recorded_workflow_bindings, list) or len(
+        recorded_workflow_bindings
+    ) != len(current_workflow_bindings):
+        raise InventoryError(
+            "refresh base workflow mode bindings must match current identities"
+        )
+    workflow_keys = {
+        "id",
+        "workflow_observation_id",
+        "optimize_mode_id",
+        "command_template",
+    }
+    for recorded, current in zip(
+        recorded_workflow_bindings, current_workflow_bindings, strict=True
+    ):
+        if recorded == current:
+            continue
+        if (
+            not isinstance(recorded, dict)
+            or set(recorded) != workflow_keys
+            or {key: recorded[key] for key in workflow_keys - {"command_template"}}
+            != {key: current[key] for key in workflow_keys - {"command_template"}}
+            or recorded["command_template"]
+            != LEGACY_WORKFLOW_MODE_COMMANDS.get(recorded["workflow_observation_id"])
+        ):
+            raise InventoryError(
+                "refresh base workflow mode binding identities or reviewed legacy command changed"
+            )
+    compatible["workflow_mode_bindings"] = recorded_workflow_bindings
     return compatible
 
 

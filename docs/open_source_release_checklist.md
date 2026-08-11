@@ -38,12 +38,24 @@ python3 -B tools/check_build_inventory.py --root . --require-current-only
 python3 -B tools/check_test_inventory.py --structure-only --require-current-only
 zig build test-build-inventory --summary failures
 zig build test-test-inventory --summary failures
-zig build test -Dcpu=baseline --summary failures
+zig build test-host-tool-smoke -Dcpu=baseline --summary failures
+zig build test -Dcpu=baseline -Dhost-tool-smoke=false --summary failures
 zig build generate-headers --summary failures
 zig build generate-kernel-coverage --summary failures
 zig build --summary failures
 ZYNUM_RELEASE_VALIDATION
 ```
+
+The default `test` step includes the test-inventory gate, all applicable Zig
+correctness tests, and `test-host-tool-smoke`. The
+`-Dhost-tool-smoke=false` option only omits that aggregate from the default
+step; an explicit `zig build test-host-tool-smoke` command always runs the
+inventory-declared Python tooling tests, ABI manifest and C/C++ header smoke
+checks, the Fortran module smoke when `gfortran` is available, and ABI baseline
+observer tests. The aggregate does not
+include build-inventory security, test-inventory security, or ABI artifact
+parity. Keep the independent `test-build-inventory` and `test-test-inventory`
+commands in the release gate.
 
 The strict inventory flags require reviewed repository state and reject a
 maintenance transition that has not been finalized. Inventory-dependent tests

@@ -2378,9 +2378,12 @@ class PackageArchiveTests(unittest.TestCase):
                     root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
                 )
                 real_open = os.open
+                real_close = os.close
                 real_rmdir = os.rmdir
                 real_mkdir = os.mkdir
                 replaced = False
+                held_quarantine_descriptor: int | None = None
+                identities: list[tuple[int, int]] = []
 
                 def replace_before_open(
                     path: object,
@@ -2388,16 +2391,29 @@ class PackageArchiveTests(unittest.TestCase):
                     *args: object,
                     **kwargs: object,
                 ) -> int:
-                    nonlocal replaced
+                    nonlocal held_quarantine_descriptor, replaced
                     if not replaced and os.fspath(path).endswith(".cleanup"):
                         replaced = True
                         quarantine_parent = typing.cast(int, kwargs.get("dir_fd"))
+                        held_quarantine_descriptor = real_open(
+                            path,
+                            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                            dir_fd=quarantine_parent,
+                        )
+                        before = os.fstat(held_quarantine_descriptor)
+                        identities.append((before.st_dev, before.st_ino))
                         real_rmdir(path, dir_fd=quarantine_parent)  # type: ignore[arg-type]
                         real_mkdir(
                             path,
                             0o700,
                             dir_fd=quarantine_parent,  # type: ignore[arg-type]
                         )
+                        after = os.stat(
+                            path,
+                            dir_fd=quarantine_parent,  # type: ignore[arg-type]
+                            follow_symlinks=False,
+                        )
+                        identities.append((after.st_dev, after.st_ino))
                     return real_open(path, flags, *args, **kwargs)  # type: ignore[arg-type]
 
                 try:
@@ -2412,11 +2428,17 @@ class PackageArchiveTests(unittest.TestCase):
                         (cleanup_arena(root)).glob(".artifact.*.cleanup")
                     )
                     self.assertTrue(replaced)
+                    self.assertEqual(2, len(identities))
+                    self.assertNotEqual(identities[0], identities[1])
                     self.assertEqual(1, len(quarantines))
                     self.assertEqual([], list(quarantines[0].iterdir()))
                     quarantines[0].rmdir()
                 finally:
-                    os.close(parent_descriptor)
+                    try:
+                        if held_quarantine_descriptor is not None:
+                            real_close(held_quarantine_descriptor)
+                    finally:
+                        real_close(parent_descriptor)
 
         with self.subTest(cleanup_failure="normal-final-identity-replacement"):
             with tempfile.TemporaryDirectory() as name:
@@ -3674,6 +3696,9 @@ class PackageArchiveTests(unittest.TestCase):
                 run_git(root, "init", "-q")
                 snapshot = checker.package_files(root, ["payload"])
                 real_cleanup_backup = checker._cleanup_backup_after_transaction
+                real_open = os.open
+                real_close = os.close
+                held_arena_descriptor: int | None = None
                 identities: list[tuple[int, int]] = []
 
                 def replace_arena_after_backup_cleanup(
@@ -3682,6 +3707,7 @@ class PackageArchiveTests(unittest.TestCase):
                     backup_name: str,
                     original: object,
                 ) -> None:
+                    nonlocal held_arena_descriptor
                     real_cleanup_backup(
                         directory_descriptor,
                         directory_path,
@@ -3689,7 +3715,12 @@ class PackageArchiveTests(unittest.TestCase):
                         original,
                     )
                     arena = cleanup_arena(root)
-                    before = arena.stat()
+                    if held_arena_descriptor is not None:
+                        raise AssertionError("cleanup arena was rebound more than once")
+                    held_arena_descriptor = real_open(
+                        arena, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+                    )
+                    before = os.fstat(held_arena_descriptor)
                     identities.append((before.st_dev, before.st_ino))
                     arena.rmdir()
                     (root / "arena-rebind-displacer").mkdir()
@@ -3697,31 +3728,35 @@ class PackageArchiveTests(unittest.TestCase):
                     after = arena.stat()
                     identities.append((after.st_dev, after.st_ino))
 
-                with (
-                    mock.patch.object(
-                        checker,
-                        "_cleanup_backup_after_transaction",
-                        side_effect=replace_arena_after_backup_cleanup,
-                    ),
-                    self.assertRaisesRegex(
-                        RuntimeError, "cleanup arena validation failed"
-                    ) as raised,
-                ):
-                    checker._test_only_materialize_archive_transaction(
-                        root, snapshot, destination
-                    )
+                try:
+                    with (
+                        mock.patch.object(
+                            checker,
+                            "_cleanup_backup_after_transaction",
+                            side_effect=replace_arena_after_backup_cleanup,
+                        ),
+                        self.assertRaisesRegex(
+                            RuntimeError, "cleanup arena validation failed"
+                        ) as raised,
+                    ):
+                        checker._test_only_materialize_archive_transaction(
+                            root, snapshot, destination
+                        )
 
-                self.assertEqual(2, len(identities))
-                self.assertNotEqual(identities[0], identities[1])
-                arena = cleanup_arena(root)
-                self.assertEqual([], list(arena.iterdir()))
-                diagnostic = str(raised.exception)
-                self.assertIn(os.fspath(arena), diagnostic)
-                self.assertIn("arena binding is rebound", diagnostic)
-                self.assertNotIn("recovery material", diagnostic.lower())
-                self.assertEqual([], list(root.glob(".source.tar.gz.*")))
-                with tarfile.open(destination, "r:gz") as archive:
-                    self.assertEqual(["payload/data.txt"], archive.getnames())
+                    self.assertEqual(2, len(identities))
+                    self.assertNotEqual(identities[0], identities[1])
+                    arena = cleanup_arena(root)
+                    self.assertEqual([], list(arena.iterdir()))
+                    diagnostic = str(raised.exception)
+                    self.assertIn(os.fspath(arena), diagnostic)
+                    self.assertIn("arena binding is rebound", diagnostic)
+                    self.assertNotIn("recovery material", diagnostic.lower())
+                    self.assertEqual([], list(root.glob(".source.tar.gz.*")))
+                    with tarfile.open(destination, "r:gz") as archive:
+                        self.assertEqual(["payload/data.txt"], archive.getnames())
+                finally:
+                    if held_arena_descriptor is not None:
+                        real_close(held_arena_descriptor)
 
     def test_archive_parent_swap_fails_closed_at_every_publication_boundary(
         self,

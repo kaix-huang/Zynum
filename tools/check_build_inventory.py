@@ -390,11 +390,11 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "b089936c9c4af1029cf7d6e078e8a417f54b3b595754b91c0f0ebd657247b688"
+    "b7bc6cddbc52b1a1c85b5571517908f1510ef3b5c1db9311834895d4c19124a8"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
-    "13271a04270843b905f50070b8848f4a6ddc06fdec5b83981ab586f892a7f75f"
+    "be25d0362cef07a01d8908d4137569c49b1161c3794fa6ec60d6c3af2f5ec9f5"
 )
 REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = (
     "83b807444228d772b60a7b1c4b140d356d8b580fb7842fc01cf99490573b033e"
@@ -499,7 +499,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5",
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
-    "option_surfaces": "53eb3653a01519c448864ccf6e3357421631353ac889924e6e97833b2d6be739",
+    "option_surfaces": "541971c010ac504f13251a97f0305669d460cbba4ccbd6224c9e8915fd9a8bc1",
     "repository_file_classifications": "1f590bfdc466c53aa8d19f2ce386549158576cd414e38845bc2fb896f37cf228",
     "derived_candidates": "ce431613bae70ff88c1b6a7b2c7862fc94a4be4f9f24d1f0c5c592a135108ef9",
     "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
@@ -1974,6 +1974,8 @@ TEST_INVENTORY_FACTORY_LAUNCH_ID = "launch:build.zig:build:run_inventory_tests"
 TEST_INVENTORY_LINK_STEP_ID = "step:build.zig:build:test-inventory-link"
 TEST_INVENTORY_RUN_STEP_ID = "step:build.zig:build:test-inventory"
 TEST_INVENTORY_AGGREGATE_STEP_ID = "step:build.zig:build:test"
+HOST_TOOL_SMOKE_STEP_ID = "step:build.zig:build:test-host-tool-smoke"
+BUILD_INVENTORY_STEP_ID = "step:build.zig:build:test-build-inventory"
 NATIVE_FEATURE_STEP_ID = "step:build.zig:build:test-native-feature"
 NATIVE_FEATURE_LAUNCH_ID = "launch:build.zig:build:run_native_feature_tests"
 NATIVE_FEATURE_GUARDS = (
@@ -2237,6 +2239,20 @@ TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID = (
 )
 PYTHON_TOOLING_LAUNCH_ID = "launch:build.zig:build:python_tooling_tests"
 PYTHON_TOOLING_STEP_ID = "step:build.zig:build:test-python-tooling"
+HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES = (
+    {"id": PYTHON_TOOLING_STEP_ID, "condition": "always"},
+    {"id": "launch:build.zig:build:abi_manifest_smoke_test", "condition": "always"},
+    {"id": "launch:build.zig:build:c_header_smoke_test", "condition": "always"},
+    {"id": "launch:build.zig:build:cpp_header_smoke_test", "condition": "always"},
+    {
+        "id": "launch:build.zig:build:fortran_module_smoke_test",
+        "condition": "always",
+    },
+    {
+        "id": "step:build.zig:build:test-abi-baseline-observer",
+        "condition": "always",
+    },
+)
 PYTHON_TOOLING_STRUCTURE_BARRIER_ID = (
     "launch:build.zig:build:test_inventory_structure_check"
 )
@@ -2275,13 +2291,78 @@ LEVEL2_WIDTH_ARTIFACT_CONTRACT_PATH = (
 )
 LEVEL2_WIDTH_STUB_ROOT_PATH = "src/blas/level2_width_stub_root.zig"
 REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-native-python-tooling-compatibility-smoke-not-inventory-evidence": {
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": {
         "condition": "runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'",
         "argv_shape": [
-            "python -I -B -c <canonical-Windows-DLL-ABI-preflight>",
-            "python -I -B -c <465-case-native-tooling-compatibility-suite-with-frozen-skip-identities>",
+            "pwsh -StrictMode Latest -ErrorAction Stop: resolve python application; generate one 32-lowercase-hex completion nonce; capture exactly one stdout line and an immediate non-null zero exit code from python -I -B -c <canonical-Windows-DLL-load-311-export-preflight-and-3-case-CBLAS-L1-L2-L3-functional-smoke-with-canonical-JSON-completion> <nonce>",
         ],
-        "evidence_role": "Windows native DLL ABI, mandatory DLL-backed tests, and frozen-skip Python tooling compatibility smoke; not build or test inventory evidence",
+        "evidence_role": "Windows canonical DLL identity after forced directory enumeration and pre-load re-enumeration, exact 311-export ABI surface, three ordered deterministic CBLAS L1-L3 functional cases, and one nonce-bound canonical JSON completion sentinel; compatibility smoke only, not inventory, complete ABI semantics, Fortran semantics, attestation, or performance evidence",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 15,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once": {
+        "condition": "matrix.zig_gate == 'inventory-certified'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "test-host-tool-smoke",
+            "<matrix.target_args>",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "one host-tool aggregate execution per inventory-certified target row",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": {
+        "condition": "matrix.zig_gate == 'inventory-certified'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "test",
+            "<matrix.target_args>",
+            "-Dtest-optimize=Debug",
+            "-Dhost-tool-smoke=false",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "Debug target correctness with host-tool aggregate excluded after its single explicit execution",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": {
+        "condition": "matrix.zig_gate == 'inventory-certified'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "--release=safe",
+            "test",
+            "<matrix.target_args>",
+            "-Dtest-optimize=ReleaseSafe",
+            "-Dhost-tool-smoke=false",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "ReleaseSafe target correctness with host-tool aggregate excluded after its single explicit execution",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": {
+        "condition": "matrix.zig_gate == 'inventory-certified'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "--release=fast",
+            "test",
+            "<matrix.target_args>",
+            "-Dtest-optimize=ReleaseFast",
+            "-Dhost-tool-smoke=false",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "ReleaseFast target correctness with host-tool aggregate excluded after its single explicit execution",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": {
         "condition": "always",
@@ -2307,11 +2388,11 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "test-inventory-link",
             "<matrix.target_args>",
             "-Dtest-optimize=Debug",
-            "-Dhost-tool-smoke=<matrix.host_tool_smoke>",
             "--summary",
             "failures",
         ],
         "evidence_role": "pending-platform-compile-link-only",
+        "job_timeout_minutes": 180,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target": {
         "condition": "matrix.zig_gate == 'link-only'",
@@ -2322,11 +2403,11 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "test-inventory-link",
             "<matrix.target_args>",
             "-Dtest-optimize=ReleaseSafe",
-            "-Dhost-tool-smoke=<matrix.host_tool_smoke>",
             "--summary",
             "failures",
         ],
         "evidence_role": "pending-platform-compile-link-only",
+        "job_timeout_minutes": 180,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target": {
         "condition": "matrix.zig_gate == 'link-only'",
@@ -2337,11 +2418,41 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "test-inventory-link",
             "<matrix.target_args>",
             "-Dtest-optimize=ReleaseFast",
-            "-Dhost-tool-smoke=<matrix.host_tool_smoke>",
             "--summary",
             "failures",
         ],
         "evidence_role": "pending-platform-compile-link-only",
+        "job_timeout_minutes": 180,
+    },
+    "workflow-launch:.github/workflows/release.yml:artifacts:run-host-tool-smoke-once": {
+        "condition": "always",
+        "argv_shape": [
+            "zig",
+            "build",
+            "test-host-tool-smoke",
+            "<matrix.target_args>",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "one release host-tool aggregate execution per artifact target row",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/release.yml:artifacts:test": {
+        "condition": "always",
+        "argv_shape": [
+            "zig",
+            "build",
+            "test",
+            "<matrix.target_args>",
+            "-Dtest-optimize=ReleaseSafe",
+            "-Dhost-tool-smoke=false",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "ReleaseSafe target correctness with host-tool aggregate excluded after its single explicit execution",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": {
         "condition": "always",
@@ -2592,16 +2703,53 @@ def _python_tooling_step_template() -> dict[str, Any]:
                 "condition": "always",
             }
         ],
-        "aggregate_test_membership": "member",
-        "aggregate_condition": "always",
+        "aggregate_test_membership": "host-tool-smoke-member",
+        "aggregate_condition": "always within test-host-tool-smoke",
         "intentional_orphan": False,
-        "orphan_reason": "direct dependency of the canonical correctness aggregate",
+        "orphan_reason": "direct dependency of the host-tool smoke aggregate",
         "step_role": "focused-validation",
         "closure_contract": {
             "launch_observation_id": PYTHON_TOOLING_LAUNCH_ID,
             "launch_count": 1,
             "relation": "only-direct-dependency",
         },
+    }
+
+
+def _host_tool_smoke_step_template() -> dict[str, Any]:
+    return {
+        "owner": "build-composition",
+        "description": "Run host Python, C/C++, available Fortran, and ABI observer smoke checks",
+        "direct_dependencies": [
+            dict(dependency) for dependency in HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES
+        ],
+        "aggregate_test_membership": "conditional-member",
+        "aggregate_condition": "host-tool-smoke is true",
+        "intentional_orphan": False,
+        "orphan_reason": "conditionally reachable from the canonical correctness aggregate and explicitly invokable",
+        "step_role": "aggregate-validation",
+        "closure_contract": {
+            "direct_dependency_count": len(HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES),
+            "relation": "exact-six-direct-host-tool-dependencies",
+        },
+    }
+
+
+def _build_inventory_step_template() -> dict[str, Any]:
+    return {
+        "owner": "build-composition",
+        "description": "Validate the repository build and launch inventory",
+        "direct_dependencies": [
+            {
+                "id": "launch:build.zig:build:build_inventory_tests",
+                "condition": "always",
+            }
+        ],
+        "aggregate_test_membership": "not-member",
+        "aggregate_condition": "explicit named step only",
+        "intentional_orphan": False,
+        "orphan_reason": "valid standalone build-inventory security entry point",
+        "step_role": "standalone-build",
     }
 
 
@@ -2624,6 +2772,8 @@ def _annotate_python_tooling_tests(
         *tooling_ids,
         PYTHON_TOOLING_STRUCTURE_BARRIER_ID,
         TEST_INVENTORY_AGGREGATE_STEP_ID,
+        HOST_TOOL_SMOKE_STEP_ID,
+        BUILD_INVENTORY_STEP_ID,
     }
     missing = required_ids - set(by_id)
     if missing:
@@ -2723,18 +2873,56 @@ def _annotate_python_tooling_tests(
         calls = [_compact_zig_contract(call) + ";" for _, call in _calls(text, token)]
         if calls != [relation]:
             raise InventoryError(message)
-    aggregate_calls = [
+    host_dependency_calls = [
+        _compact_zig_contract(call) + ";"
+        for _, call in _calls(text, "host_tool_smoke_test_step.dependOn")
+    ]
+    expected_host_dependency_calls = [
+        "host_tool_smoke_test_step.dependOn(python_tooling_test_step);",
+        "host_tool_smoke_test_step.dependOn(&abi_manifest_smoke_test.step);",
+        "host_tool_smoke_test_step.dependOn(&c_header_smoke_test.step);",
+        "host_tool_smoke_test_step.dependOn(&cpp_header_smoke_test.step);",
+        "host_tool_smoke_test_step.dependOn(&fortran_module_smoke_test.step);",
+        "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);",
+    ]
+    if host_dependency_calls != expected_host_dependency_calls:
+        raise InventoryError(
+            "host-tool smoke aggregate must preserve its exact six direct dependencies"
+        )
+    default_host_edge = (
+        "if(host_tool_smoke)test_step.dependOn(host_tool_smoke_test_step);"
+    )
+    if _compact_zig_contract(text).count(default_host_edge) != 1:
+        raise InventoryError(
+            "canonical test aggregate must conditionally depend exactly once on the host-tool smoke aggregate"
+        )
+    forbidden_direct_dependencies = (
+        "test_step.dependOn(python_tooling_test_step);",
+        "test_step.dependOn(&python_tooling_tests.step);",
+        "test_step.dependOn(&abi_manifest_smoke_test.step);",
+        "test_step.dependOn(&c_header_smoke_test.step);",
+        "test_step.dependOn(&cpp_header_smoke_test.step);",
+        "test_step.dependOn(&fortran_module_smoke_test.step);",
+        "test_step.dependOn(&abi_baseline_observer_tests.step);",
+        "test_step.dependOn(&build_inventory_tests.step);",
+        "test_step.dependOn(build_inventory_test_step);",
+    )
+    default_dependency_calls = {
         _compact_zig_contract(call) + ";"
         for _, call in _calls(text, "test_step.dependOn")
-        if "python_tooling" in call
-    ]
-    if aggregate_calls != ["test_step.dependOn(python_tooling_test_step);"]:
+    }
+    if any(
+        dependency in default_dependency_calls
+        for dependency in forbidden_direct_dependencies
+    ):
         raise InventoryError(
-            "canonical test aggregate must depend directly on the Python tooling named step"
+            "canonical test aggregate must not bypass the host-tool aggregate or include build inventory"
         )
 
     by_id[PYTHON_TOOLING_LAUNCH_ID].update(_python_tooling_launch_template())
     by_id[PYTHON_TOOLING_STEP_ID].update(_python_tooling_step_template())
+    by_id[HOST_TOOL_SMOKE_STEP_ID].update(_host_tool_smoke_step_template())
+    by_id[BUILD_INVENTORY_STEP_ID].update(_build_inventory_step_template())
 
 
 def _test_inventory_enumeration_projection(text: str) -> dict[str, Any]:
@@ -3669,20 +3857,59 @@ def _validate_python_tooling_test_contract(
             errors,
         )
 
+    host_step = by_id.get(HOST_TOOL_SMOKE_STEP_ID, {})
+    for field, expected in _host_tool_smoke_step_template().items():
+        _require(
+            host_step.get(field) == expected,
+            f"{HOST_TOOL_SMOKE_STEP_ID}: recorded {field} changed from the reviewed host-tool aggregate contract",
+            errors,
+        )
+
+    build_inventory_step = by_id.get(BUILD_INVENTORY_STEP_ID, {})
+    for field, expected in _build_inventory_step_template().items():
+        _require(
+            build_inventory_step.get(field) == expected,
+            f"{BUILD_INVENTORY_STEP_ID}: recorded {field} changed from the reviewed standalone inventory contract",
+            errors,
+        )
+
     aggregate_dependencies = by_id.get(TEST_INVENTORY_AGGREGATE_STEP_ID, {}).get(
         "direct_dependencies", []
     )
-    expected_dependency = {"id": PYTHON_TOOLING_STEP_ID, "condition": "always"}
+    expected_dependency = {
+        "id": HOST_TOOL_SMOKE_STEP_ID,
+        "condition": "host-tool-smoke is true",
+    }
     _require(
         isinstance(aggregate_dependencies, list)
         and [
             dependency
             for dependency in aggregate_dependencies
             if isinstance(dependency, dict)
-            and dependency.get("id") == PYTHON_TOOLING_STEP_ID
+            and dependency.get("id") == HOST_TOOL_SMOKE_STEP_ID
         ]
         == [expected_dependency],
-        "canonical test aggregate must record exactly one direct Python tooling step dependency",
+        "canonical test aggregate must record exactly one conditional host-tool smoke dependency",
+        errors,
+    )
+    forbidden_direct_ids = {
+        PYTHON_TOOLING_STEP_ID,
+        PYTHON_TOOLING_LAUNCH_ID,
+        "launch:build.zig:build:abi_manifest_smoke_test",
+        "launch:build.zig:build:c_header_smoke_test",
+        "launch:build.zig:build:cpp_header_smoke_test",
+        "launch:build.zig:build:fortran_module_smoke_test",
+        "launch:build.zig:build:abi_baseline_observer_tests",
+        "launch:build.zig:build:build_inventory_tests",
+        BUILD_INVENTORY_STEP_ID,
+    }
+    _require(
+        not any(
+            isinstance(dependency, dict)
+            and dependency.get("id") in forbidden_direct_ids
+            for dependency in aggregate_dependencies
+        ),
+        "canonical test aggregate must not record a host-tool or build-inventory bypass",
         errors,
     )
 
@@ -13189,6 +13416,12 @@ def validate(root: Path, inventory_path: Path) -> list[str]:
 
 
 def _reviewed_observation_refresh_fields(identifier: str) -> dict[str, Any]:
+    if identifier == HOST_TOOL_SMOKE_STEP_ID:
+        return _host_tool_smoke_step_template()
+    if identifier == PYTHON_TOOLING_STEP_ID:
+        return _python_tooling_step_template()
+    if identifier == BUILD_INVENTORY_STEP_ID:
+        return _build_inventory_step_template()
     if identifier in {
         TEST_INVENTORY_RUNNER_COMPILE_PYTHON_LAUNCH_ID,
         TEST_INVENTORY_RUNNER_EXECUTE_PYTHON_LAUNCH_ID,
@@ -13313,6 +13546,47 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
     inventory["repository_file_classifications_digest"] = _json_fact_digest(
         inventory["repository_file_classifications"]
     )
+    option_surfaces = {item["id"]: item for item in inventory["option_surfaces"]}
+    option_surfaces["option-surface:build.zig:host-tool-smoke"].update(
+        {
+            "description": "Include the test-host-tool-smoke aggregate in the default test step",
+            "consumers": ["canonical test aggregate via test-host-tool-smoke"],
+            "role": "conditional host validation aggregate membership",
+            "precedence": "false removes test-host-tool-smoke from the default test step; the explicit named step remains available",
+        }
+    )
+    inventory["option_surfaces"] = [
+        option_surfaces[item["id"]] for item in inventory["option_surfaces"]
+    ]
+
+    observations = {item["id"]: item for item in inventory["build_observations"]}
+    observations[PYTHON_TOOLING_STEP_ID].update(_python_tooling_step_template())
+    observations[HOST_TOOL_SMOKE_STEP_ID].update(_host_tool_smoke_step_template())
+    observations[BUILD_INVENTORY_STEP_ID].update(_build_inventory_step_template())
+    aggregate = observations[TEST_INVENTORY_AGGREGATE_STEP_ID]
+    removed_aggregate_ids = {
+        PYTHON_TOOLING_STEP_ID,
+        PYTHON_TOOLING_LAUNCH_ID,
+        HOST_TOOL_SMOKE_STEP_ID,
+        BUILD_INVENTORY_STEP_ID,
+        "launch:build.zig:build:abi_manifest_smoke_test",
+        "launch:build.zig:build:c_header_smoke_test",
+        "launch:build.zig:build:cpp_header_smoke_test",
+        "launch:build.zig:build:fortran_module_smoke_test",
+        "launch:build.zig:build:abi_baseline_observer_tests",
+        "launch:build.zig:build:build_inventory_tests",
+    }
+    aggregate["direct_dependencies"] = [
+        dependency
+        for dependency in aggregate["direct_dependencies"]
+        if dependency.get("id") not in removed_aggregate_ids
+    ]
+    aggregate["direct_dependencies"].append(
+        {
+            "id": HOST_TOOL_SMOKE_STEP_ID,
+            "condition": "host-tool-smoke is true",
+        }
+    )
     drift_gate_ids = [
         "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
         "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date",
@@ -13397,6 +13671,10 @@ def _new_test_inventory_observation(
         return _python_tooling_launch_template()
     if identifier == PYTHON_TOOLING_STEP_ID:
         return _python_tooling_step_template()
+    if identifier == HOST_TOOL_SMOKE_STEP_ID:
+        return _host_tool_smoke_step_template()
+    if identifier == BUILD_INVENTORY_STEP_ID:
+        return _build_inventory_step_template()
     if identifier == LEVEL2_WIDTH_DEFAULT_ARTIFACT_COMPILE_ID:
         return {
             "owner": "test-infrastructure",
@@ -13888,7 +14166,6 @@ def _new_test_inventory_workflow_launch(identifier: str) -> dict[str, Any]:
         "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite",
         "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries",
         "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
-        "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-native-python-tooling-compatibility-smoke-not-inventory-evidence",
         "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
         "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
         "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",
@@ -14098,19 +14375,12 @@ def _prepare_refreshed_source_candidate(
     inventory["build_manifests"] = [dict(row) for row in context.build_manifests]
     observations = {item["id"]: item for item in inventory["build_observations"]}
     aggregate = observations[TEST_INVENTORY_AGGREGATE_STEP_ID]
-    aggregate_dependencies = (
-        {"id": TEST_INVENTORY_RUN_STEP_ID, "condition": "always"},
-        {"id": PYTHON_TOOLING_STEP_ID, "condition": "always"},
-    )
-    migrated_dependency_ids = {
-        dependency["id"] for dependency in aggregate_dependencies
-    }
     aggregate["direct_dependencies"] = [
-        *aggregate_dependencies,
+        {"id": TEST_INVENTORY_RUN_STEP_ID, "condition": "always"},
         *[
             dependency
             for dependency in aggregate["direct_dependencies"]
-            if dependency.get("id") not in migrated_dependency_ids
+            if dependency.get("id") != TEST_INVENTORY_RUN_STEP_ID
         ],
     ]
     inventory["build_root_digests"] = {

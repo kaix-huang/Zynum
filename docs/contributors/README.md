@@ -22,9 +22,10 @@ python3 -B tools/check_build_inventory.py --root .
 python3 -B tools/check_test_inventory.py --root . --structure-only
 zig build test-build-inventory --summary failures
 zig build test-test-inventory --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures
-zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures
-zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures
+zig build test-host-tool-smoke -Dcpu=baseline --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=Debug -Dhost-tool-smoke=false test --summary failures
+zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false test --summary failures
+zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false test --summary failures
 zig build generate-headers --summary failures
 zig build generate-kernel-coverage --summary failures
 if ! git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json; then
@@ -41,6 +42,17 @@ fi
 zig build --summary failures
 ZYNUM_VALIDATION
 ```
+
+By default, `zig build test` runs the test-inventory gate, all applicable Zig
+correctness tests, and the `test-host-tool-smoke` aggregate. Set
+`-Dhost-tool-smoke=false` when that aggregate has already run; invoking
+`zig build test-host-tool-smoke` explicitly always runs it. The aggregate
+includes the inventory-declared Python tooling tests, ABI manifest, C/C++ header
+smoke checks, the Fortran module smoke when `gfortran` is available, and ABI
+baseline observer tests. It does not
+include build-inventory security, test-inventory security, or ABI artifact parity.
+Run the independent `test-build-inventory` and `test-test-inventory` steps
+separately, as shown above.
 
 The canonical Python tooling gate reports and rejects unexpected skips, expected
 failures, and unexpected successes. An allowed skip is bound to exact

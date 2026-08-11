@@ -565,6 +565,74 @@ class TestInventoryTests(unittest.TestCase):
             [],
             CHECKER.validate(self.root, self.inventory_path, structure_only=True),
         )
+        workflow_commands = {
+            row["workflow_observation_id"]: row["command_template"]
+            for row in self.inventory["workflow_mode_bindings"]
+        }
+        self.assertEqual(
+            {
+                "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures",
+            },
+            workflow_commands,
+        )
+        build_inventory_root = next(
+            row
+            for row in self.inventory["test_roots"]
+            if row["id"] == "python-root:build-inventory-direct"
+        )
+        self.assertIsNone(build_inventory_root["aggregate_step_observation_id"])
+        self.assertIs(build_inventory_root["matrix_applicable"], True)
+        windows_build_inventory_rows = [
+            row
+            for row in self.inventory["test_mode_rows"]
+            if row["root_id"] == "python-root:build-inventory-direct"
+            and row["environment_id"] == "env:x86-64-windows-gnu-baseline"
+        ]
+        self.assertEqual(3, len(windows_build_inventory_rows))
+        self.assertEqual(
+            {"mode:Debug", "mode:ReleaseSafe", "mode:ReleaseFast"},
+            {row["optimize_mode_id"] for row in windows_build_inventory_rows},
+        )
+        for row in windows_build_inventory_rows:
+            self.assertEqual("inapplicable", row["disposition"])
+            self.assertEqual("predicate:host-tool-smoke-disabled", row["predicate_id"])
+            self.assertIsNone(row["command_template"])
+            self.assertIsNone(row["expected_test_set_id"])
+        weakened_windows = copy.deepcopy(self.inventory)
+        weakened_row = next(
+            row
+            for row in weakened_windows["test_mode_rows"]
+            if row["id"] == windows_build_inventory_rows[0]["id"]
+        )
+        weakened_row.update(
+            {
+                "disposition": "execute",
+                "predicate_id": "predicate:always",
+                "command_template": "python3 -B test/build/test_build_inventory.py",
+                "expected_test_set_id": next(
+                    row["id"]
+                    for row in weakened_windows["expected_test_sets"]
+                    if row["root_id"] == "python-root:build-inventory-direct"
+                ),
+            }
+        )
+        weakened_windows["strict_summary"] = CHECKER._section_summary(weakened_windows)
+        self._write(weakened_windows)
+        self.assertIn("immutable matrix fields changed", self._errors())
+        self._write(copy.deepcopy(self.inventory))
+        for weakened_flag in ("true", "${{ matrix.host_tool_smoke }}"):
+            with self.subTest(workflow_host_tool_flag=weakened_flag):
+                inventory = copy.deepcopy(self.inventory)
+                inventory["workflow_mode_bindings"][0]["command_template"] = inventory[
+                    "workflow_mode_bindings"
+                ][0]["command_template"].replace("false", weakened_flag)
+                inventory["strict_summary"] = CHECKER._section_summary(inventory)
+                self._write(inventory)
+                self.assertIn("workflow_mode_bindings", self._errors())
+        self._write(copy.deepcopy(self.inventory))
         original = self.inventory_path.read_bytes()
         whitespace = original + b" "
         self.inventory_path.write_bytes(whitespace)
@@ -719,6 +787,62 @@ class TestInventoryTests(unittest.TestCase):
             json.dumps(build_inventory, indent=2) + "\n", encoding="utf-8"
         )
         self.assertIn("aggregate edge", self._errors())
+
+        baseline_build_inventory = json.loads(
+            (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
+        )
+        for dependency in CHECKER.HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES:
+            with self.subTest(host_tool_dependency_removed=dependency["id"]):
+                build_inventory = copy.deepcopy(baseline_build_inventory)
+                observations = {
+                    row["id"]: row for row in build_inventory["build_observations"]
+                }
+                host_step = observations[CHECKER.HOST_TOOL_SMOKE_STEP_ID]
+                host_step["direct_dependencies"] = [
+                    edge
+                    for edge in host_step["direct_dependencies"]
+                    if edge["id"] != dependency["id"]
+                ]
+                build_path.write_text(
+                    json.dumps(build_inventory, indent=2) + "\n", encoding="utf-8"
+                )
+                self.assertIn("host-tool smoke aggregate closure", self._errors())
+
+        for mutation in ("extra-host-dependency", "inverted-condition", "bypass"):
+            with self.subTest(host_tool_path_mutation=mutation):
+                build_inventory = copy.deepcopy(baseline_build_inventory)
+                observations = {
+                    row["id"]: row for row in build_inventory["build_observations"]
+                }
+                host_step = observations[CHECKER.HOST_TOOL_SMOKE_STEP_ID]
+                aggregate = observations[CHECKER.AGGREGATE_STEP_ID]
+                if mutation == "extra-host-dependency":
+                    host_step["direct_dependencies"].append(
+                        {
+                            "id": "launch:build.zig:build:build_inventory_tests",
+                            "condition": "always",
+                        }
+                    )
+                    expected = "host-tool smoke aggregate closure"
+                elif mutation == "inverted-condition":
+                    next(
+                        edge
+                        for edge in aggregate["direct_dependencies"]
+                        if edge["id"] == CHECKER.HOST_TOOL_SMOKE_STEP_ID
+                    )["condition"] = "host-tool-smoke is false"
+                    expected = "host-tool smoke canonical aggregate edge"
+                else:
+                    aggregate["direct_dependencies"].append(
+                        {
+                            "id": CHECKER.PYTHON_TOOLING_STEP_ID,
+                            "condition": "always",
+                        }
+                    )
+                    expected = "bypasses the unique host-tool smoke path"
+                build_path.write_text(
+                    json.dumps(build_inventory, indent=2) + "\n", encoding="utf-8"
+                )
+                self.assertIn(expected, self._errors())
 
         build_inventory = json.loads(
             (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
