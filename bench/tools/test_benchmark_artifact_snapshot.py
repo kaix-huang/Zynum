@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import stat
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -39,6 +40,21 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
             artifact = snapshot.artifacts[0]
             execution_path = Path(artifact.execution_path)
             private_root = execution_path.parent
+            private_copy = next(iter(snapshot._copies.values()))
+            pending_copy = next(iter(snapshot._pending_copies.values()))
+            import fcntl
+
+            owned_descriptors = {private_copy.descriptor, pending_copy.descriptor}
+            live_owned_descriptors = set(owned_descriptors)
+            ownership_close_calls = []
+            real_close = benchmark_artifacts.os.close
+
+            def record_owned_close(descriptor):
+                if descriptor in live_owned_descriptors:
+                    ownership_close_calls.append(descriptor)
+                    live_owned_descriptors.remove(descriptor)
+                return real_close(descriptor)
+
             try:
                 self.assertEqual(
                     artifact.metadata_record(),
@@ -57,15 +73,83 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
                     (execution_path.stat().st_dev, execution_path.stat().st_ino),
                     source_identity,
                 )
+                self.assertEqual(len(snapshot._pending_copies), 1)
+                self.assertNotEqual(private_copy.descriptor, pending_copy.descriptor)
+                self.assertEqual(
+                    benchmark_artifacts._stat_identity(
+                        os.fstat(pending_copy.descriptor)
+                    ),
+                    private_copy.identity,
+                )
+                self.assertEqual(
+                    fcntl.fcntl(pending_copy.descriptor, fcntl.F_GETFL) & os.O_ACCMODE,
+                    os.O_RDONLY,
+                )
+                self.assertFalse(os.get_inheritable(pending_copy.descriptor))
+                same_descriptor_pending = benchmark_artifacts._PendingPrivateCopy(
+                    artifact_id=pending_copy.artifact_id,
+                    public_path=pending_copy.public_path,
+                    leaf=pending_copy.leaf,
+                    descriptor=private_copy.descriptor,
+                    identity=private_copy.identity,
+                )
+                with (
+                    mock.patch.object(benchmark_artifacts.os, "dup2") as duplicate,
+                    self.assertRaises(
+                        benchmark_artifacts.ArtifactCaptureError
+                    ) as raised,
+                ):
+                    snapshot._seal_pending_descriptor(
+                        same_descriptor_pending,
+                        private_copy,
+                    )
+                self.assertEqual(
+                    raised.exception.code,
+                    "private_artifact_finalize_failed",
+                )
+                duplicate.assert_not_called()
                 snapshot.finalize()
                 self.assertTrue(snapshot.finalized)
             finally:
-                snapshot.close()
+                with mock.patch.object(
+                    benchmark_artifacts.os,
+                    "close",
+                    side_effect=record_owned_close,
+                ):
+                    snapshot.close()
+            self.assertEqual(live_owned_descriptors, set())
+            self.assertEqual(set(ownership_close_calls), owned_descriptors)
+            self.assertEqual(len(ownership_close_calls), 2)
+            for descriptor in owned_descriptors:
+                with self.assertRaises(OSError):
+                    os.fstat(descriptor)
             self.assertFalse(private_root.exists())
             arena = private_root.parent
             self.assertEqual(arena.name, f".zynum-cleanup-v2-{os.geteuid()}")
             self.assertEqual(list(arena.iterdir()), [])
             self.assertEqual(snapshot.cleanup_status, "complete")
+
+        if sys.platform.startswith("linux"):
+            with (
+                self.subTest(linux_exec="frozen_inode_has_no_writable_owner"),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                true_path = shutil.which("true")
+                self.assertIsNotNone(true_path)
+                assert true_path is not None
+                with benchmark_artifacts.ArtifactSnapshotSet.capture(
+                    [benchmark_artifacts.ArtifactRequest.binary("true", true_path)],
+                    private_parent=directory,
+                ) as snapshot:
+                    execution_path = snapshot.artifacts[0].execution_path
+                    process_id = os.posix_spawn(
+                        execution_path,
+                        [execution_path],
+                        {},
+                    )
+                    waited_id, wait_status = os.waitpid(process_id, 0)
+                    self.assertEqual(waited_id, process_id)
+                    self.assertEqual(os.waitstatus_to_exitcode(wait_status), 0)
 
     def test_private_root_mode_is_set_through_held_descriptor(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -652,6 +736,8 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
                 snapshot.close()
 
     def test_private_stage_mode_digest_and_finalize_mutations_fail(self):
+        import errno
+
         mutations = ("mode", "digest")
         for mutation in mutations:
             with (
@@ -742,6 +828,7 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
 
                     owner = object.__new__(benchmark_artifacts.ArtifactSnapshotSet)
                     owner._root_fd = root_fd
+                    owner._copies = {}
                     outputs = {"library": writer}
                     try:
                         with (
@@ -788,6 +875,412 @@ class BenchmarkArtifactSnapshotTest(unittest.TestCase):
                                 real_fstat(descriptor)
                     finally:
                         os.close(root_fd)
+
+        import fcntl
+
+        real_close = benchmark_artifacts.os.close
+        real_dup2 = benchmark_artifacts.os.dup2
+        real_cleanup = benchmark_artifacts.ArtifactSnapshotSet._cleanup
+        handoff_failures = (
+            (
+                "pre_mutation_oserror",
+                benchmark_artifacts.ArtifactCaptureError,
+                os.O_RDWR,
+                False,
+            ),
+            (
+                "post_dup2_eintr",
+                benchmark_artifacts.ArtifactCaptureError,
+                os.O_RDONLY,
+                True,
+            ),
+            (
+                "pre_mutation_keyboard_interrupt",
+                KeyboardInterrupt,
+                os.O_RDWR,
+                False,
+            ),
+            (
+                "post_dup2_keyboard_interrupt",
+                KeyboardInterrupt,
+                os.O_RDONLY,
+                True,
+            ),
+        )
+        for (
+            handoff_failure,
+            expected_error,
+            expected_access,
+            syscall_succeeds,
+        ) in handoff_failures:
+            with (
+                self.subTest(fd_ownership=handoff_failure),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                source = self.make_file(directory, contents=b"A", mode=0o644)
+                leaf = "artifact-0000-library"
+                handoff_descriptor = None
+                source_identity = None
+                pending_identity = None
+                foreign_descriptor = None
+                foreign_close_baseline = None
+                close_calls = []
+                close_observations = []
+                dup2_calls = []
+                cleanup_observations = []
+                cleanup_close_events = []
+                cleanup_results = []
+
+                def capture_handoff_open(path, flags, mode=0o777, *, dir_fd=None):
+                    nonlocal handoff_descriptor, pending_identity
+                    descriptor = real_open(path, flags, mode, dir_fd=dir_fd)
+                    if flags & os.O_ACCMODE == os.O_RDWR:
+                        handoff_descriptor = descriptor
+                        pending_identity = benchmark_artifacts._stat_identity(
+                            real_fstat(descriptor)
+                        )
+                    return descriptor
+
+                def record_close(descriptor):
+                    close_calls.append(descriptor)
+                    try:
+                        identity = benchmark_artifacts._stat_identity(
+                            real_fstat(descriptor)
+                        )
+                    except OSError:
+                        identity = None
+                    close_observations.append((descriptor, identity))
+                    return real_close(descriptor)
+
+                def injected_dup2(descriptor, replacement, *, inheritable=True):
+                    nonlocal foreign_close_baseline, foreign_descriptor
+                    nonlocal source_identity
+                    self.assertEqual(replacement, handoff_descriptor)
+                    self.assertFalse(inheritable)
+                    dup2_calls.append((descriptor, replacement, inheritable))
+                    source_identity = benchmark_artifacts._stat_identity(
+                        real_fstat(descriptor)
+                    )
+                    if handoff_failure == "pre_mutation_oserror":
+                        raise OSError("injected dup2 failure")
+                    if handoff_failure == "pre_mutation_keyboard_interrupt":
+                        raise KeyboardInterrupt("injected before dup2")
+                    sealed = real_dup2(
+                        descriptor,
+                        replacement,
+                        inheritable=inheritable,
+                    )
+                    self.assertEqual(sealed, replacement)
+                    foreign_descriptor = real_open(
+                        os.devnull,
+                        os.O_RDONLY | os.O_CLOEXEC,
+                    )
+                    self.assertNotEqual(foreign_descriptor, replacement)
+                    foreign_close_baseline = close_calls.count(foreign_descriptor)
+                    if handoff_failure == "post_dup2_eintr":
+                        raise OSError(errno.EINTR, "injected after successful dup2")
+                    raise KeyboardInterrupt("injected after successful dup2")
+
+                def observe_cleanup(snapshot):
+                    pending = snapshot._pending_copies.get(leaf)
+                    if pending is None:
+                        cleanup_observations.append(None)
+                    else:
+                        cleanup_observations.append(
+                            (
+                                pending.descriptor,
+                                benchmark_artifacts._stat_identity(
+                                    real_fstat(pending.descriptor)
+                                ),
+                                fcntl.fcntl(pending.descriptor, fcntl.F_GETFL)
+                                & os.O_ACCMODE,
+                                os.get_inheritable(pending.descriptor),
+                            )
+                        )
+                    close_baseline = len(close_observations)
+                    issues = real_cleanup(snapshot)
+                    cleanup_close_events.append(
+                        tuple(close_observations[close_baseline:])
+                    )
+                    cleanup_results.append(
+                        (tuple(issue.code for issue in issues), snapshot.cleanup_status)
+                    )
+                    return issues
+
+                try:
+                    with (
+                        mock.patch.object(
+                            benchmark_artifacts.os,
+                            "open",
+                            side_effect=capture_handoff_open,
+                        ),
+                        mock.patch.object(
+                            benchmark_artifacts.os,
+                            "close",
+                            side_effect=record_close,
+                        ),
+                        mock.patch.object(
+                            benchmark_artifacts.os,
+                            "dup2",
+                            side_effect=injected_dup2,
+                        ),
+                        mock.patch.object(
+                            benchmark_artifacts.ArtifactSnapshotSet,
+                            "_cleanup",
+                            new=observe_cleanup,
+                        ),
+                        self.assertRaises(expected_error) as raised,
+                    ):
+                        benchmark_artifacts.ArtifactSnapshotSet(
+                            [
+                                benchmark_artifacts.ArtifactRequest.library(
+                                    "library", source
+                                )
+                            ],
+                            private_parent=directory,
+                        )
+                    self.assertIsNotNone(handoff_descriptor)
+                    self.assertIsNotNone(pending_identity)
+                    self.assertIsNotNone(source_identity)
+                    assert handoff_descriptor is not None
+                    assert pending_identity is not None
+                    assert source_identity is not None
+                    self.assertEqual(len(dup2_calls), 1)
+                    self.assertEqual(
+                        cleanup_observations,
+                        [
+                            (
+                                handoff_descriptor,
+                                pending_identity,
+                                expected_access,
+                                False,
+                            )
+                        ],
+                    )
+                    self.assertEqual(cleanup_results, [((), "complete")])
+                    self.assertEqual(
+                        [
+                            event
+                            for event in cleanup_close_events[0]
+                            if event == (handoff_descriptor, pending_identity)
+                        ],
+                        [(handoff_descriptor, pending_identity)],
+                    )
+                    self.assertEqual(source_identity, pending_identity)
+                    with self.assertRaises(OSError):
+                        real_fstat(handoff_descriptor)
+                    if expected_error is benchmark_artifacts.ArtifactCaptureError:
+                        self.assertEqual(
+                            raised.exception.code,
+                            "private_artifact_finalize_failed",
+                        )
+                    if not syscall_succeeds:
+                        self.assertIsNone(foreign_descriptor)
+                    else:
+                        self.assertIsNotNone(foreign_descriptor)
+                        self.assertIsNotNone(foreign_close_baseline)
+                        assert foreign_descriptor is not None
+                        assert foreign_close_baseline is not None
+                        real_fstat(foreign_descriptor)
+                        self.assertEqual(
+                            close_calls.count(foreign_descriptor)
+                            - foreign_close_baseline,
+                            0,
+                        )
+                    self.assertEqual(
+                        list(Path(directory).glob(".zynum-benchmark-artifacts-*")),
+                        [],
+                    )
+                finally:
+                    if foreign_descriptor is not None:
+                        real_close(foreign_descriptor)
+
+        real_create_private_root = (
+            benchmark_artifacts.ArtifactSnapshotSet._create_private_root
+        )
+        with (
+            self.subTest(fd_ownership="interrupt_immediately_after_registry_store"),
+            tempfile.TemporaryDirectory() as directory,
+        ):
+            source = self.make_file(directory, contents=b"A", mode=0o644)
+            owner = None
+            private_root = None
+            registered_copy = None
+            foreign_descriptor = None
+            reuse_fillers = []
+            foreign_close_attempts = 0
+            artifact_close_events = []
+
+            class InterruptAfterStore(dict):
+                def __setitem__(self, key, value):
+                    nonlocal registered_copy
+                    super().__setitem__(key, value)
+                    registered_copy = value
+                    raise KeyboardInterrupt("injected after authoritative store")
+
+            def install_interrupting_registry(snapshot, private_parent):
+                nonlocal owner, private_root
+                real_create_private_root(snapshot, private_parent)
+                owner = snapshot
+                private_root = snapshot._root_path
+                snapshot._copies = InterruptAfterStore(snapshot._copies)
+
+            def close_registered_then_reuse(descriptor):
+                nonlocal foreign_close_attempts, foreign_descriptor
+                if (
+                    registered_copy is not None
+                    and descriptor == registered_copy.descriptor
+                    and foreign_descriptor is None
+                ):
+                    artifact_close_events.append(
+                        benchmark_artifacts._stat_identity(real_fstat(descriptor))
+                    )
+                    real_close(descriptor)
+                    while foreign_descriptor is None:
+                        replacement = real_open(
+                            os.devnull,
+                            os.O_RDONLY | os.O_CLOEXEC,
+                        )
+                        self.assertLessEqual(replacement, descriptor)
+                        if replacement == descriptor:
+                            foreign_descriptor = replacement
+                        else:
+                            reuse_fillers.append(replacement)
+                    return None
+                if foreign_descriptor is not None and descriptor == foreign_descriptor:
+                    foreign_close_attempts += 1
+                return real_close(descriptor)
+
+            try:
+                with (
+                    mock.patch.object(
+                        benchmark_artifacts.ArtifactSnapshotSet,
+                        "_create_private_root",
+                        new=install_interrupting_registry,
+                    ),
+                    mock.patch.object(
+                        benchmark_artifacts.os,
+                        "close",
+                        side_effect=close_registered_then_reuse,
+                    ),
+                    self.assertRaises(KeyboardInterrupt),
+                ):
+                    benchmark_artifacts.ArtifactSnapshotSet(
+                        [
+                            benchmark_artifacts.ArtifactRequest.library(
+                                "library", source
+                            )
+                        ],
+                        private_parent=directory,
+                    )
+                self.assertIsNotNone(owner)
+                self.assertIsNotNone(private_root)
+                self.assertIsNotNone(registered_copy)
+                self.assertIsNotNone(foreign_descriptor)
+                assert owner is not None
+                assert private_root is not None
+                assert registered_copy is not None
+                assert foreign_descriptor is not None
+                self.assertEqual(artifact_close_events, [registered_copy.identity])
+                self.assertEqual(foreign_close_attempts, 0)
+                real_fstat(foreign_descriptor)
+                self.assertEqual(owner._copies, {})
+                self.assertEqual(owner._pending_copies, {})
+                self.assertEqual(owner.cleanup_status, "complete")
+                self.assertFalse(Path(private_root).exists())
+            finally:
+                if foreign_descriptor is not None:
+                    real_close(foreign_descriptor)
+                for descriptor in reuse_fillers:
+                    real_close(descriptor)
+
+        real_capture_file_group = (
+            benchmark_artifacts.ArtifactSnapshotSet._capture_file_group
+        )
+        with (
+            self.subTest(fd_ownership="interrupt_after_group_return"),
+            tempfile.TemporaryDirectory() as directory,
+        ):
+            source = self.make_file(directory, contents=b"A", mode=0o644)
+            owner = None
+            private_root = None
+            returned_copies = ()
+            returned_access_modes = ()
+            live_registered_descriptors = set()
+            registered_close_events = []
+            descriptor_count = len(os.listdir("/dev/fd"))
+
+            def interrupt_after_group_return(snapshot, *args, **kwargs):
+                nonlocal owner, private_root, returned_access_modes, returned_copies
+                owner = snapshot
+                result = real_capture_file_group(snapshot, *args, **kwargs)
+                copies, _source_size = result
+                returned_copies = tuple(copies.values())
+                returned_access_modes = tuple(
+                    fcntl.fcntl(copy.descriptor, fcntl.F_GETFL) & os.O_ACCMODE
+                    for copy in returned_copies
+                )
+                live_registered_descriptors.update(
+                    copy.descriptor for copy in returned_copies
+                )
+                private_root = snapshot._root_path
+                for copy in returned_copies:
+                    self.assertIs(
+                        snapshot._copies[(args[1], copy.role)],
+                        copy,
+                    )
+                raise KeyboardInterrupt("injected after group return")
+
+            def record_registered_close(descriptor):
+                if descriptor in live_registered_descriptors:
+                    try:
+                        identity = benchmark_artifacts._stat_identity(
+                            real_fstat(descriptor)
+                        )
+                    except OSError:
+                        identity = None
+                    for copy in returned_copies:
+                        if descriptor == copy.descriptor and identity == copy.identity:
+                            registered_close_events.append((descriptor, identity))
+                            live_registered_descriptors.remove(descriptor)
+                return real_close(descriptor)
+
+            with (
+                mock.patch.object(
+                    benchmark_artifacts.ArtifactSnapshotSet,
+                    "_capture_file_group",
+                    new=interrupt_after_group_return,
+                ),
+                mock.patch.object(
+                    benchmark_artifacts.os,
+                    "close",
+                    side_effect=record_registered_close,
+                ),
+                self.assertRaises(KeyboardInterrupt),
+            ):
+                benchmark_artifacts.ArtifactSnapshotSet(
+                    [benchmark_artifacts.ArtifactRequest.library("library", source)],
+                    private_parent=directory,
+                )
+            self.assertIsNotNone(owner)
+            self.assertIsNotNone(private_root)
+            self.assertEqual(len(returned_copies), 1)
+            self.assertEqual(returned_access_modes, (os.O_RDONLY,))
+            assert owner is not None
+            assert private_root is not None
+            copy = returned_copies[0]
+            self.assertEqual(
+                registered_close_events,
+                [(copy.descriptor, copy.identity)],
+            )
+            self.assertEqual(live_registered_descriptors, set())
+            with self.assertRaises(OSError):
+                real_fstat(copy.descriptor)
+            self.assertEqual(owner._copies, {})
+            self.assertEqual(owner._pending_copies, {})
+            self.assertEqual(owner.cleanup_status, "complete")
+            self.assertFalse(Path(private_root).exists())
+            self.assertEqual(len(os.listdir("/dev/fd")), descriptor_count)
 
         with tempfile.TemporaryDirectory() as directory:
             source = self.make_file(directory, contents=b"A", mode=0o644)

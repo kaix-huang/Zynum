@@ -2971,7 +2971,7 @@ class BuildInventoryTests(unittest.TestCase):
         }
         runner_paths = set(runner_functions)
         inventory_launches = self.inventory["python_launches"]
-        self.assertEqual(70, len(inventory_launches))
+        self.assertEqual(71, len(inventory_launches))
         self.assertNotIn("python_launches", CHECKER.REQUIRED_SECTION_FACT_DIGESTS)
         self.assertEqual(
             inventory_launches,
@@ -7320,7 +7320,7 @@ class BuildInventoryTests(unittest.TestCase):
         for exact_completion_contract in (
             "Set-StrictMode -Version Latest",
             "$ErrorActionPreference = 'Stop'",
-            "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop",
+            "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1",
             "$completionNonce = [guid]::NewGuid().ToString('N')",
             "$smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)",
             "$smokeExitCode = $LASTEXITCODE",
@@ -7531,8 +7531,8 @@ class BuildInventoryTests(unittest.TestCase):
             ("          Set-StrictMode -Version Latest\n", "", gate_id),
             ("          $ErrorActionPreference = 'Stop'\n", "", gate_id),
             (
+                "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1",
                 "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop",
-                "$pythonCommand = Get-Command python",
                 gate_id,
             ),
             (

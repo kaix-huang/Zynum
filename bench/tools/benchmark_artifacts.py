@@ -26,7 +26,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 _REPOSITORY_SNAPSHOT_PATH = _REPOSITORY_ROOT / "tools" / "repository_snapshot.py"
 _REPOSITORY_SNAPSHOT_SPEC = importlib.util.spec_from_file_location(
@@ -882,9 +881,13 @@ class ArtifactSnapshotSet:
                     resolved,
                 )
             total_bytes += source_size
-            for role, copy in copies.items():
+            for role in roles:
+                copy = copies[role]
                 key = group_key, role
-                self._copies[key] = copy
+                if self._copies.get(key) is not copy:
+                    raise AssertionError(
+                        "finished artifact copy is not owned by its snapshot set"
+                    )
                 copies_by_group[key] = copy
 
         artifacts: list[FrozenArtifact] = []
@@ -1340,95 +1343,155 @@ class ArtifactSnapshotSet:
                 public_path=public_path,
             )
         finished: dict[ArtifactRole, _PrivateCopy] = {}
-        try:
-            for role in roles:
-                writer = outputs.pop(role)
-                mode = _PRIVATE_MODES[role]
-                leaf = self._leaf(group_index, role)
-                artifact_id = "artifact-{:04d}-{}".format(group_index, role)
-                writer_failed = False
-                try:
-                    os.fchmod(writer, mode)
-                    os.fsync(writer)
-                    staged = os.fstat(writer)
-                except OSError:
+        for role in roles:
+            writer = outputs.pop(role)
+            mode = _PRIVATE_MODES[role]
+            leaf = self._leaf(group_index, role)
+            artifact_id = "artifact-{:04d}-{}".format(group_index, role)
+            writer_failed = False
+            try:
+                os.fchmod(writer, mode)
+                os.fsync(writer)
+                staged = os.fstat(writer)
+            except OSError:
+                writer_failed = True
+            finally:
+                descriptor_to_close = writer
+                writer = -1
+                if not self._close_private_descriptor_once(
+                    descriptor_to_close,
+                    leaf,
+                    artifact_id,
+                ):
                     writer_failed = True
-                finally:
-                    descriptor_to_close = writer
-                    writer = -1
-                    if not self._close_private_descriptor_once(
-                        descriptor_to_close,
+            if writer_failed:
+                raise ArtifactCaptureError(
+                    "private_artifact_finalize_failed",
+                    "private benchmark artifact finalization failed",
+                    public_path=public_path,
+                ) from None
+
+            copy_key = group_key, role
+            copy: _PrivateCopy | None = None
+            descriptor: int | None = None
+            try:
+                try:
+                    descriptor = os.open(
                         leaf,
-                        artifact_id,
-                    ):
-                        writer_failed = True
-                if writer_failed:
+                        os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                        dir_fd=self._root_fd,
+                    )
+                    opened = os.fstat(descriptor)
+                except OSError:
                     raise ArtifactCaptureError(
                         "private_artifact_finalize_failed",
                         "private benchmark artifact finalization failed",
                         public_path=public_path,
                     ) from None
-
-                descriptor: int | None = None
-                try:
-                    try:
-                        descriptor = os.open(
-                            leaf,
-                            os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
-                            dir_fd=self._root_fd,
-                        )
-                        opened = os.fstat(descriptor)
-                    except OSError:
-                        raise ArtifactCaptureError(
-                            "private_artifact_finalize_failed",
-                            "private benchmark artifact finalization failed",
-                            public_path=public_path,
-                        ) from None
-                    copy = _PrivateCopy(
-                        artifact_id=artifact_id,
-                        role=role,
-                        public_path=public_path,
-                        leaf=leaf,
-                        descriptor=descriptor,
-                        identity=_stat_identity(opened),
-                        source_identity=_stat_identity(source),
-                        size=source.st_size,
-                        mode=mode,
-                        sha256=hexdigest,
-                    )
-                    if (
-                        _stat_identity(staged) != copy.identity
-                        or copy.identity == copy.source_identity
-                    ):
-                        raise ArtifactCaptureError(
-                            "private_artifact_identity_invalid",
-                            "private artifact is not one independent stable inode",
-                            public_path=public_path,
-                            artifact_id=artifact_id,
-                        )
-                    self._verify_copy(copy, capture=True)
-                    finished[role] = copy
-                    # Ownership moves to ``finished`` only after verification.
-                    descriptor = None
-                finally:
-                    if descriptor is not None:
-                        descriptor_to_close = descriptor
-                        descriptor = None
-                        self._close_private_descriptor_once(
-                            descriptor_to_close,
-                            leaf,
-                            artifact_id,
-                        )
-        except BaseException:
-            while finished:
-                _finished_role, copy = finished.popitem()
-                self._close_private_descriptor_once(
-                    copy.descriptor,
-                    copy.leaf,
-                    copy.artifact_id,
+                copy = _PrivateCopy(
+                    artifact_id=artifact_id,
+                    role=role,
+                    public_path=public_path,
+                    leaf=leaf,
+                    descriptor=descriptor,
+                    identity=_stat_identity(opened),
+                    source_identity=_stat_identity(source),
+                    size=source.st_size,
+                    mode=mode,
+                    sha256=hexdigest,
                 )
-            raise
+                if (
+                    _stat_identity(staged) != copy.identity
+                    or copy.identity == copy.source_identity
+                ):
+                    raise ArtifactCaptureError(
+                        "private_artifact_identity_invalid",
+                        "private artifact is not one independent stable inode",
+                        public_path=public_path,
+                        artifact_id=artifact_id,
+                    )
+                self._verify_copy(copy, capture=True)
+                if copy_key in self._copies:
+                    raise ArtifactCaptureError(
+                        "private_artifact_finalize_failed",
+                        "private benchmark artifact finalization failed",
+                        public_path=public_path,
+                    )
+                self._copies[copy_key] = copy
+                finished[role] = copy
+                pending = self._pending_copies.get(leaf)
+                if (
+                    pending is None
+                    or pending.artifact_id != artifact_id
+                    or pending.public_path != public_path
+                    or pending.identity != copy.identity
+                ):
+                    raise ArtifactCaptureError(
+                        "private_artifact_finalize_failed",
+                        "private benchmark artifact finalization failed",
+                        public_path=public_path,
+                    )
+                self._seal_pending_descriptor(pending, copy)
+            finally:
+                if descriptor is not None and (
+                    copy is None or self._copies.get(copy_key) is not copy
+                ):
+                    descriptor_to_close = descriptor
+                    descriptor = None
+                    self._close_private_descriptor_once(
+                        descriptor_to_close,
+                        leaf,
+                        artifact_id,
+                    )
         return finished
+
+    @staticmethod
+    def _seal_pending_descriptor(
+        pending: _PendingPrivateCopy,
+        copy: _PrivateCopy,
+    ) -> None:
+        if os.name != "posix":
+            raise ArtifactCaptureError(
+                "artifact_platform_unsupported",
+                "direct benchmark artifact snapshots require POSIX descriptor APIs",
+                public_path=pending.public_path,
+            )
+        import fcntl
+
+        if pending.descriptor == copy.descriptor:
+            raise ArtifactCaptureError(
+                "private_artifact_finalize_failed",
+                "private benchmark artifact finalization failed",
+                public_path=pending.public_path,
+            )
+        try:
+            sealed_descriptor = os.dup2(
+                copy.descriptor,
+                pending.descriptor,
+                inheritable=False,
+            )
+            sealed_metadata = os.fstat(pending.descriptor)
+            sealed_access = (
+                fcntl.fcntl(pending.descriptor, fcntl.F_GETFL) & os.O_ACCMODE
+            )
+            sealed_inheritable = os.get_inheritable(pending.descriptor)
+        except OSError:
+            raise ArtifactCaptureError(
+                "private_artifact_finalize_failed",
+                "private benchmark artifact finalization failed",
+                public_path=pending.public_path,
+            ) from None
+        if (
+            sealed_descriptor != pending.descriptor
+            or _stat_identity(sealed_metadata) != copy.identity
+            or sealed_access != os.O_RDONLY
+            or sealed_inheritable
+        ):
+            raise ArtifactCaptureError(
+                "private_artifact_finalize_failed",
+                "private benchmark artifact finalization failed",
+                public_path=pending.public_path,
+            )
 
     @staticmethod
     def _leaf(group_index: int, role: ArtifactRole) -> str:

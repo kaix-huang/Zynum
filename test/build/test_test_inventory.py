@@ -1805,6 +1805,113 @@ class TestInventoryTests(unittest.TestCase):
             ):
                 self.assertTrue(CHECKER._artifact_snapshot_platform_unavailable())
 
+        real_temporary_directory = tempfile.TemporaryDirectory
+        with real_temporary_directory(
+            prefix="test-inventory-provenance-probe-self-test-"
+        ) as raw_probe_parent:
+            probe_parent = Path(raw_probe_parent)
+            default_root = probe_parent / "default-temp"
+            probe_root = probe_parent / "reviewed-source-parent"
+            default_root.mkdir()
+            probe_root.mkdir()
+            temporary_directory_roots: list[Path | None] = []
+
+            def tracked_temporary_directory(*args: Any, **kwargs: Any) -> Any:
+                directory = kwargs.get("dir")
+                temporary_directory_roots.append(
+                    None if directory is None else Path(directory)
+                )
+                return real_temporary_directory(*args, **kwargs)
+
+            class DarwinFlistxattr:
+                def __init__(self, names: tuple[bytes, ...], *, error: bool = False):
+                    self.names = names
+                    self.error = error
+                    self.calls: list[tuple[Any, ...]] = []
+                    self.restype: Any = None
+                    self.argtypes: Any = None
+
+                def __call__(self, *args: Any) -> int:
+                    self.calls.append(args)
+                    if self.error:
+                        return -1
+                    encoded = b"".join(name + b"\0" for name in self.names)
+                    if args[1] is None:
+                        return len(encoded)
+                    ctypes.memmove(args[1], encoded, len(encoded))
+                    return len(encoded)
+
+            class DarwinLibrary:
+                def __init__(self, flistxattr: DarwinFlistxattr) -> None:
+                    self.flistxattr = flistxattr
+
+            darwin_os = types.SimpleNamespace(
+                O_CLOEXEC=os.O_CLOEXEC,
+                O_CREAT=os.O_CREAT,
+                O_EXCL=os.O_EXCL,
+                O_NOFOLLOW=os.O_NOFOLLOW,
+                O_RDONLY=os.O_RDONLY,
+                O_WRONLY=os.O_WRONLY,
+                chown=lambda *_args: None,
+                close=os.close,
+                getegid=os.getegid,
+                getgroups=lambda: [os.getegid() + 1],
+                open=os.open,
+                strerror=os.strerror,
+            )
+            self.assertFalse(hasattr(darwin_os, "listxattr"))
+
+            provenance_predicate_id = (
+                "python-skip-predicate:no-automatic-provenance-xattr"
+            )
+            predicate_cases = (
+                ((), False, True),
+                ((b"com.apple.provenance",), False, False),
+                ((), True, None),
+            )
+            for names, probe_error, expected in predicate_cases:
+                flistxattr = DarwinFlistxattr(names, error=probe_error)
+                temporary_directory_roots.clear()
+                with (
+                    self.subTest(
+                        darwin_descriptor_xattrs=names,
+                        darwin_descriptor_error=probe_error,
+                    ),
+                    mock.patch.object(CHECKER, "os", darwin_os),
+                    mock.patch.object(CHECKER.sys, "platform", "darwin"),
+                    mock.patch.object(
+                        CHECKER.tempfile,
+                        "TemporaryDirectory",
+                        side_effect=tracked_temporary_directory,
+                    ),
+                    mock.patch.object(CHECKER.tempfile, "tempdir", str(default_root)),
+                    mock.patch.object(
+                        CHECKER.ctypes,
+                        "CDLL",
+                        return_value=DarwinLibrary(flistxattr),
+                    ),
+                    mock.patch.object(CHECKER.ctypes, "get_errno", return_value=5),
+                ):
+                    if probe_error:
+                        with self.assertRaisesRegex(
+                            CHECKER.InventoryError,
+                            "cannot inspect descriptor xattrs",
+                        ):
+                            CHECKER._dynamic_python_skip_predicates(probe_root)
+                    else:
+                        predicates = CHECKER._dynamic_python_skip_predicates(probe_root)
+                        self.assertIs(predicates[provenance_predicate_id], expected)
+                self.assertEqual(
+                    2 if probe_error else 4,
+                    len(temporary_directory_roots),
+                )
+                self.assertEqual({probe_root}, set(temporary_directory_roots))
+                self.assertEqual([], list(default_root.iterdir()))
+                self.assertTrue(flistxattr.calls)
+                self.assertTrue(
+                    all(isinstance(call[0], int) for call in flistxattr.calls)
+                )
+
         available_runner = mock.Mock(DEFAULT_ACCELERATE=object())
         available_runner.library_available.return_value = True
         available_runner.default_zynum_blas.return_value = "zig-out/lib/libzynum.so"
@@ -1831,6 +1938,48 @@ class TestInventoryTests(unittest.TestCase):
                 "integration_blas": lambda: self.root / "zig-out/lib/libzynum.so",
             },
         }
+        reviewed_publication_source = (
+            self.root / "bench/tools/test_report_publication.py"
+        )
+        publication_binding = types.SimpleNamespace(
+            reviewed=types.SimpleNamespace(
+                inventory_path="bench/tools/test_report_publication.py",
+                source_path=reviewed_publication_source,
+            )
+        )
+        dynamic_predicates = {
+            predicate_id: False
+            for predicate_id in CHECKER.REPORT_PUBLICATION_DYNAMIC_SKIP_PREDICATE_IDS
+        }
+        with (
+            mock.patch.object(CHECKER.sys, "platform", "darwin"),
+            mock.patch.object(
+                CHECKER,
+                "_report_publication_platform_unavailable",
+                return_value=False,
+            ),
+            mock.patch.object(
+                CHECKER,
+                "_artifact_snapshot_platform_unavailable",
+                return_value=False,
+            ),
+            mock.patch.object(CHECKER, "_verify_python_source_module_registry"),
+            mock.patch.object(CHECKER, "_verify_python_source_module_binding"),
+            mock.patch.object(
+                CHECKER,
+                "_dynamic_python_skip_predicates",
+                return_value=dynamic_predicates,
+            ) as dynamic_probe,
+            mock.patch.object(
+                CHECKER,
+                "_required_python_tooling_module",
+                side_effect=lambda modules, name: available_modules[name],
+            ),
+            mock.patch.object(Path, "is_file", autospec=True, return_value=True),
+        ):
+            CHECKER._python_skip_predicates((publication_binding,))
+        dynamic_probe.assert_called_once_with(reviewed_publication_source.parent)
+
         windows_os = mock.Mock(spec_set=["name"])
         windows_os.name = "nt"
         self.assertFalse(hasattr(windows_os, "O_NOFOLLOW"))

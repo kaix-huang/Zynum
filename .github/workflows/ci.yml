@@ -538,7 +538,7 @@ jobs:
               flush=True,
           )
           '@
-          $pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop
+          $pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1
           $completionNonce = [guid]::NewGuid().ToString('N')
           $smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)
           $smokeExitCode = $LASTEXITCODE

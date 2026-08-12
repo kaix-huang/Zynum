@@ -74,7 +74,7 @@ LEGACY_WORKFLOW_MODE_COMMANDS = {
 _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     (
         "bench/tools/test_benchmark_artifact_snapshot.py",
-        "c69eea0209c5e8d715c759c7f10c1e8d05fad1cf4097f8b517cf264d73351408",
+        "eef6fb1aaf709f4720b2c16bb7bb9d932cccf95d93970d544c105c06113c8cc9",
     ),
     (
         "bench/tools/test_benchmark_metadata.py",
@@ -132,7 +132,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
 _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     (
         "bench/tools/test_benchmark_artifact_snapshot.py",
-        "c69eea0209c5e8d715c759c7f10c1e8d05fad1cf4097f8b517cf264d73351408",
+        "eef6fb1aaf709f4720b2c16bb7bb9d932cccf95d93970d544c105c06113c8cc9",
     ),
     (
         "bench/tools/test_benchmark_metadata.py",
@@ -188,7 +188,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/benchmark_artifacts.py",
-        "4d39b43442caeb8f68c531dfe458b6cc4539ce085b111c73355458c22b7081b5",
+        "9d0cdbd974c97564e549582ddf540d07968f66ddf9abe34273daa618426d287b",
     ),
     (
         "bench/tools/benchmark_metadata.py",
@@ -343,7 +343,7 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (
     ("_zynum_report_repository_snapshot", "tools/repository_snapshot.py"),
 )
 _PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
-    "b8979259892b9c99202260185e4ffde3b66abee6337caaa530524f8d42a98c6d"
+    "21c39d3d89a73953a9d25ec9db95635c88a4a6ffb6e2a866a93a40b8ad887f04"
 )
 _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
     "fe47ceff1b1520d52339b694168560d4eafa6754b71349365a355ecaf1d6f5a6"
@@ -6836,6 +6836,11 @@ _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES = frozenset(
 )
 _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
     {
+        (
+            "bench/tools/test_benchmark_artifact_snapshot.py",
+            145,
+            "os.posix_spawn",
+        ),
         ("bench/tools/test_benchmark_metadata.py", 29, "subprocess.run"),
         ("bench/tools/test_rank_k_report.py", 1341, "subprocess.run"),
         ("bench/tools/test_rotg_latency_report.py", 1295, "subprocess.run"),
@@ -7411,6 +7416,7 @@ def _python_windows_blas_source_audit(
         ("import", (("ctypes.util", None),)),
         ("import", (("dataclasses", None),)),
         ("import", (("errno", None),)),
+        ("import", (("fcntl", None),)),
         ("import", (("hashlib", None),)),
         ("import", (("importlib.util", None),)),
         ("import", (("io", None),)),
@@ -7993,7 +7999,7 @@ def _python_windows_blas_source_audit(
         if bindings is not None:
             bindings[function].setdefault(receiver.arg, set()).add(owner_class)
 
-    trusted_external_bases = {"object", "unittest.TestCase"}
+    trusted_external_bases = {"dict", "object", "unittest.TestCase"}
 
     def resolve_class_reference(
         node: ast.AST, owner: ScopeOwner
@@ -10575,8 +10581,10 @@ def _flatten_unittest_suite(
     return tuple(tests)
 
 
-def _filesystem_names_alias(first: str, second: str) -> bool:
-    with tempfile.TemporaryDirectory(prefix="test-inventory-skip-capability-") as raw:
+def _filesystem_names_alias(first: str, second: str, probe_root: Path) -> bool:
+    with tempfile.TemporaryDirectory(
+        prefix="test-inventory-skip-capability-", dir=probe_root
+    ) as raw:
         directory = Path(raw)
         first_path = directory / first
         second_path = directory / second
@@ -10592,6 +10600,66 @@ def _filesystem_names_alias(first: str, second: str) -> bool:
         else:
             os.close(descriptor)
             return False
+
+
+def _darwin_descriptor_xattr_names(path: Path) -> frozenset[bytes]:
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except (AttributeError, OSError, TypeError, ValueError) as exc:
+        raise InventoryError(
+            "Darwin provenance probe descriptor cannot be opened"
+        ) from exc
+    try:
+        try:
+            library = ctypes.CDLL(None, use_errno=True)
+            flistxattr = library.flistxattr
+            flistxattr.restype = ctypes.c_ssize_t
+            flistxattr.argtypes = [
+                ctypes.c_int,
+                ctypes.c_void_p,
+                ctypes.c_size_t,
+                ctypes.c_int,
+            ]
+            size = flistxattr(descriptor, None, 0, 0)
+            if size < 0:
+                error = ctypes.get_errno()
+                raise OSError(error or 5, os.strerror(error or 5))
+            if size == 0:
+                return frozenset()
+            if size > 1024 * 1024:
+                raise InventoryError(
+                    "Darwin provenance probe xattr name list is too large"
+                )
+            names_buffer = ctypes.create_string_buffer(size)
+            observed_size = flistxattr(descriptor, names_buffer, size, 0)
+            if observed_size != size:
+                raise InventoryError(
+                    "Darwin provenance probe xattrs changed while inspected"
+                )
+            raw_names = names_buffer.raw[:observed_size]
+            names = tuple(filter(None, raw_names.split(b"\0")))
+            if not names or sum(len(name) + 1 for name in names) != observed_size:
+                raise InventoryError(
+                    "Darwin provenance probe xattr name list is malformed"
+                )
+            return frozenset(names)
+        except (
+            AttributeError,
+            OSError,
+            TypeError,
+            ValueError,
+            ctypes.ArgumentError,
+        ) as exc:
+            raise InventoryError(
+                "Darwin provenance probe cannot inspect descriptor xattrs"
+            ) from exc
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError as exc:
+            raise InventoryError(
+                "Darwin provenance probe descriptor cannot be closed"
+            ) from exc
 
 
 def _report_publication_platform_unavailable() -> bool:
@@ -10668,7 +10736,7 @@ def _apply_report_publication_platform_predicate(
         predicates[predicate_id] = False
 
 
-def _dynamic_python_skip_predicates() -> dict[str, bool]:
+def _dynamic_python_skip_predicates(probe_root: Path) -> dict[str, bool]:
     alternate_groups: list[int] = []
     if hasattr(os, "getgroups") and hasattr(os, "getegid"):
         for group in os.getgroups():
@@ -10678,7 +10746,7 @@ def _dynamic_python_skip_predicates() -> dict[str, bool]:
     if alternate_groups and hasattr(os, "chown"):
         try:
             with tempfile.TemporaryDirectory(
-                prefix="test-inventory-setgid-capability-"
+                prefix="test-inventory-setgid-capability-", dir=probe_root
             ) as raw:
                 parent = Path(raw) / "setgid-parent"
                 parent.mkdir()
@@ -10691,23 +10759,26 @@ def _dynamic_python_skip_predicates() -> dict[str, bool]:
             no_setgid_inheritance = False
 
     no_automatic_provenance = False
-    if sys.platform == "darwin" and hasattr(os, "listxattr"):
+    if sys.platform == "darwin":
         try:
             with tempfile.TemporaryDirectory(
-                prefix="test-inventory-xattr-capability-"
+                prefix="test-inventory-xattr-capability-", dir=probe_root
             ) as raw:
                 probe = Path(raw) / "probe"
                 probe.write_bytes(b"probe")
-                no_automatic_provenance = "com.apple.provenance" not in os.listxattr(
-                    probe
+                no_automatic_provenance = b"com.apple.provenance" not in (
+                    _darwin_descriptor_xattr_names(probe)
                 )
-        except OSError:
-            no_automatic_provenance = False
+        except (AttributeError, OSError, TypeError, ValueError) as exc:
+            raise InventoryError(
+                "Darwin provenance probe filesystem operation failed"
+            ) from exc
 
-    aliases_case = _filesystem_names_alias("Report.svg", "report.svg")
+    aliases_case = _filesystem_names_alias("Report.svg", "report.svg", probe_root)
     aliases_normalization = _filesystem_names_alias(
         "\N{LATIN SMALL LETTER E WITH ACUTE}.svg",
         "e\N{COMBINING ACUTE ACCENT}.svg",
+        probe_root,
     )
     return {
         "python-skip-predicate:no-alternate-supplementary-group": not alternate_groups,
@@ -10734,15 +10805,6 @@ def _required_python_tooling_module(
 def _python_skip_predicates(
     module_registry: tuple[_PythonSourceModuleBinding, ...],
 ) -> dict[str, bool]:
-    platform_unavailable = _report_publication_platform_unavailable()
-    predicates = (
-        {
-            predicate_id: False
-            for predicate_id in REPORT_PUBLICATION_DYNAMIC_SKIP_PREDICATE_IDS
-        }
-        if platform_unavailable
-        else _dynamic_python_skip_predicates()
-    )
     _verify_python_source_module_registry(module_registry)
     modules = {
         PurePosixPath(binding.reviewed.inventory_path).name: binding
@@ -10750,6 +10812,24 @@ def _python_skip_predicates(
     }
     if len(modules) != len(module_registry):
         raise InventoryError("Python tooling source module basenames are duplicated")
+
+    platform_unavailable = _report_publication_platform_unavailable()
+    if platform_unavailable:
+        predicates = {
+            predicate_id: False
+            for predicate_id in REPORT_PUBLICATION_DYNAMIC_SKIP_PREDICATE_IDS
+        }
+    else:
+        publication = modules.get("test_report_publication.py")
+        if publication is None:
+            raise InventoryError(
+                "Python skip predicate capability module is unavailable: "
+                "test_report_publication.py"
+            )
+        _verify_python_source_module_binding(publication)
+        predicates = _dynamic_python_skip_predicates(
+            publication.reviewed.source_path.parent
+        )
 
     level1 = _required_python_tooling_module(modules, "test_level1_report.py")
     level1_runner = level1.get("runner")

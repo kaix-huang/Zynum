@@ -390,11 +390,11 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "b7bc6cddbc52b1a1c85b5571517908f1510ef3b5c1db9311834895d4c19124a8"
+    "399e1ad7186891c6037d7c43f351d1ca7669d08588767f1f2a51f0311ee14672"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
-    "be25d0362cef07a01d8908d4137569c49b1161c3794fa6ec60d6c3af2f5ec9f5"
+    "6508636069ecc5885588bc8863e166e0fd376f59c4a102a805a235c14fcf01e8"
 )
 REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = (
     "83b807444228d772b60a7b1c4b140d356d8b580fb7842fc01cf99490573b033e"
@@ -2177,6 +2177,11 @@ PYTHON_TOOLING_CAPSULE_PROCESS_LAUNCH_IDS = (
     "python-launch:tools/check_test_inventory.py:_run:subprocess.run:3",
 )
 REVIEWED_ARCHIVE_AND_NATIVE_FEATURE_PYTHON_LAUNCHES = {
+    "python-launch:bench/tools/test_benchmark_artifact_snapshot.py:test_file_capture_has_public_metadata_and_private_execution_projection:os.posix_spawn:1": {
+        "launch_class": "artifact-snapshot-frozen-executable-smoke",
+        "cwd_shape": "repository-root",
+        "argv_shape": ["<private-frozen-executable-copy>"],
+    },
     "python-launch:test/abi/baseline/test_package_archive.py:test_archive_cli_rejects_tracked_bytes_hidden_from_status:subprocess.check_output:1": {
         "launch_class": "archive-git-fixture-observation",
         "argv_shape": ["git", "status", "--porcelain=v1", "--", "payload"],
@@ -2294,7 +2299,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": {
         "condition": "runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'",
         "argv_shape": [
-            "pwsh -StrictMode Latest -ErrorAction Stop: resolve python application; generate one 32-lowercase-hex completion nonce; capture exactly one stdout line and an immediate non-null zero exit code from python -I -B -c <canonical-Windows-DLL-load-311-export-preflight-and-3-case-CBLAS-L1-L2-L3-functional-smoke-with-canonical-JSON-completion> <nonce>",
+            "pwsh -StrictMode Latest -ErrorAction Stop: resolve the first python Application by PATH precedence; generate one 32-lowercase-hex completion nonce; capture exactly one stdout line and an immediate non-null zero exit code from python -I -B -c <canonical-Windows-DLL-load-311-export-preflight-and-3-case-CBLAS-L1-L2-L3-functional-smoke-with-canonical-JSON-completion> <nonce>",
         ],
         "evidence_role": "Windows canonical DLL identity after forced directory enumeration and pre-load re-enumeration, exact 311-export ABI surface, three ordered deterministic CBLAS L1-L3 functional cases, and one nonce-bound canonical JSON completion sentinel; compatibility smoke only, not inventory, complete ABI semantics, Fortran semantics, attestation, or performance evidence",
         "job_timeout_minutes": 180,
