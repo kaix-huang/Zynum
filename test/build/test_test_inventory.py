@@ -8692,6 +8692,11 @@ class TestInventoryTests(unittest.TestCase):
             ("projection", "optional enumeration projection"),
             ("system-abi-null", "optional enumeration projection"),
             ("closure", "factory step wiring"),
+            ("compile-checker", "must not inherit the POSIX structure checker"),
+            ("ordinary-checker", "factory step wiring"),
+            ("run-checker", "factory step wiring"),
+            ("windows-checker", "Windows native compatibility field"),
+            ("windows-run", "Windows native compatibility field"),
         )
         for mutation, expected in mutations:
             with self.subTest(mutation=mutation):
@@ -8713,9 +8718,32 @@ class TestInventoryTests(unittest.TestCase):
                         == "enumeration-class:aarch64-macos-system-macho"
                     )
                     system_mapping["abi"] = None
-                else:
+                elif mutation == "closure":
                     step = observations["step:build.zig:build:test-inventory-link"]
                     step["direct_dependencies"].pop()
+                elif mutation == "compile-checker":
+                    factory = observations[CHECKER.FACTORY_COMPILE_ID]
+                    factory["structure_checker_dependency"] = (
+                        CHECKER.BUILD_CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID
+                    )
+                elif mutation == "ordinary-checker":
+                    step = observations["step:build.zig:build:test-inventory-link"]
+                    step["direct_dependencies"].pop(0)
+                elif mutation == "run-checker":
+                    step = observations["step:build.zig:build:test-inventory"]
+                    step["direct_dependencies"].pop(0)
+                elif mutation == "windows-checker":
+                    step = observations[
+                        CHECKER.BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID
+                    ]
+                    step["structure_checker_dependency"] = (
+                        CHECKER.BUILD_CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID
+                    )
+                else:
+                    step = observations[
+                        CHECKER.BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID
+                    ]
+                    step["test_body_execution"] = True
                 build_path.write_text(
                     json.dumps(build_inventory, indent=2) + "\n", encoding="utf-8"
                 )

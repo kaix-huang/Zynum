@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "399e1ad7186891c6037d7c43f351d1ca7669d08588767f1f2a51f0311ee14672"
+    "0fad0134ea6cbc43ba2df57b474969bd0daae4664490ca0871ba07fc4bfd9c17"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -1972,6 +1972,9 @@ def _discover_build_root(
 TEST_INVENTORY_FACTORY_COMPILE_ID = "compile:build.zig:build:inventory_tests"
 TEST_INVENTORY_FACTORY_LAUNCH_ID = "launch:build.zig:build:run_inventory_tests"
 TEST_INVENTORY_LINK_STEP_ID = "step:build.zig:build:test-inventory-link"
+TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID = (
+    "step:build.zig:build:test-inventory-link-windows-native-smoke"
+)
 TEST_INVENTORY_RUN_STEP_ID = "step:build.zig:build:test-inventory"
 TEST_INVENTORY_AGGREGATE_STEP_ID = "step:build.zig:build:test"
 HOST_TOOL_SMOKE_STEP_ID = "step:build.zig:build:test-host-tool-smoke"
@@ -2005,6 +2008,21 @@ TEST_INVENTORY_UNSUPPORTED_TARGET_STEP_ID = (
 )
 TEST_INVENTORY_UNSUPPORTED_TARGET_MESSAGE = (
     "test inventory enumeration is unavailable for the requested target CPU profile"
+)
+TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID = (
+    "step:build.zig:build:unsupported_windows_native_inventory_link"
+)
+TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_MESSAGE = (
+    "test-inventory-link-windows-native-smoke requires an x86_64 Windows host and "
+    "the exact x86_64-windows-gnu COFF target requested with -Dcpu=baseline and no "
+    "CPU feature modifiers"
+)
+TEST_INVENTORY_STRUCTURE_CHECK_ID = (
+    "launch:build.zig:build:test_inventory_structure_check"
+)
+TEST_INVENTORY_WINDOWS_NATIVE_CONDITION = (
+    "native x86_64 Windows host and exact canonical x86_64-windows-gnu COFF "
+    "baseline target"
 )
 REQUIRED_TEST_INVENTORY_ENUMERATION_MAPPINGS = (
     {
@@ -2385,7 +2403,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         ],
         "evidence_role": "tracked generated-reference drift gate",
     },
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target": {
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated": {
         "condition": "matrix.zig_gate == 'link-only'",
         "argv_shape": [
             "zig",
@@ -2398,8 +2416,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         ],
         "evidence_role": "pending-platform-compile-link-only",
         "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
     },
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target": {
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated": {
         "condition": "matrix.zig_gate == 'link-only'",
         "argv_shape": [
             "zig",
@@ -2413,8 +2432,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         ],
         "evidence_role": "pending-platform-compile-link-only",
         "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
     },
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target": {
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated": {
         "condition": "matrix.zig_gate == 'link-only'",
         "argv_shape": [
             "zig",
@@ -2428,6 +2448,54 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         ],
         "evidence_role": "pending-platform-compile-link-only",
         "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": {
+        "condition": "matrix.zig_gate == 'windows-native-compile-link-smoke'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "test-inventory-link-windows-native-smoke",
+            "<matrix.target_args>",
+            "-Dtest-optimize=Debug",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "Windows-native compatibility compile/link smoke only; not inventory evidence",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": {
+        "condition": "matrix.zig_gate == 'windows-native-compile-link-smoke'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "--release=safe",
+            "test-inventory-link-windows-native-smoke",
+            "<matrix.target_args>",
+            "-Dtest-optimize=ReleaseSafe",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "Windows-native compatibility compile/link smoke only; not inventory evidence",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": {
+        "condition": "matrix.zig_gate == 'windows-native-compile-link-smoke'",
+        "argv_shape": [
+            "zig",
+            "build",
+            "--release=fast",
+            "test-inventory-link-windows-native-smoke",
+            "<matrix.target_args>",
+            "-Dtest-optimize=ReleaseFast",
+            "--summary",
+            "failures",
+        ],
+        "evidence_role": "Windows-native compatibility compile/link smoke only; not inventory evidence",
+        "job_timeout_minutes": 180,
+        "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/release.yml:artifacts:run-host-tool-smoke-once": {
         "condition": "always",
@@ -3122,9 +3190,11 @@ def _annotate_test_inventory_factory(
         TEST_INVENTORY_FACTORY_COMPILE_ID,
         TEST_INVENTORY_FACTORY_LAUNCH_ID,
         TEST_INVENTORY_LINK_STEP_ID,
+        TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID,
         TEST_INVENTORY_RUN_STEP_ID,
         TEST_INVENTORY_AGGREGATE_STEP_ID,
         TEST_INVENTORY_UNSUPPORTED_TARGET_STEP_ID,
+        TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID,
     }
     missing = required_ids - set(by_id)
     if missing:
@@ -3285,6 +3355,60 @@ def _annotate_test_inventory_factory(
             raise InventoryError(
                 f"test inventory factory loop is missing required relation: {fragment}"
             )
+    forbidden_compile_checker = re.search(
+        r"(?<![A-Za-z0-9_])inventory_tests\.step\.dependOn\s*\(\s*"
+        r"&test_inventory_structure_check\.step\s*\)\s*;",
+        normalized_loop,
+    )
+    if forbidden_compile_checker is not None:
+        raise InventoryError(
+            "test inventory shared Compile node must not inherit the POSIX structure checker"
+        )
+    windows_guard_matches = list(
+        re.finditer(
+            r"\bif\s*\(\s*native_canonical_windows_inventory_link\s*\)\s*\{",
+            _code_mask(loop_text),
+        )
+    )
+    if len(windows_guard_matches) != 1:
+        raise InventoryError(
+            "Windows native inventory link smoke must have exactly one canonical guard per inventory case"
+        )
+    windows_guard_open = _code_mask(loop_text).find(
+        "{", windows_guard_matches[0].start(), windows_guard_matches[0].end()
+    )
+    windows_guard_close = _matching_brace(_code_mask(loop_text), windows_guard_open)
+    windows_guard_text = loop_text[windows_guard_open + 1 : windows_guard_close]
+    windows_compile_edge = (
+        "test_inventory_link_windows_native_smoke_step.dependOn(&inventory_tests.step);"
+    )
+    if " ".join(_code_mask(windows_guard_text).split()) != windows_compile_edge:
+        raise InventoryError(
+            "Windows native inventory link smoke exact guard must depend only on each inventory case Compile node"
+        )
+    required_checker_edges = (
+        "test_inventory_link_step.dependOn(&test_inventory_structure_check.step);",
+        "test_inventory_step.dependOn(&test_inventory_structure_check.step);",
+        "run_inventory_tests.step.dependOn(&test_inventory_structure_check.step);",
+    )
+    normalized_build = " ".join(_code_mask(text).split())
+    for checker_edge in required_checker_edges:
+        if normalized_build.count(checker_edge) != 1:
+            raise InventoryError(
+                f"test inventory POSIX structure checker relation changed: {checker_edge}"
+            )
+    windows_guard_contract = (
+        "const native_canonical_windows_inventory_link = exact_baseline_request and "
+        "resolved_cpu_matches_canonical_baseline and target.result.cpu.arch == .x86_64 "
+        "and target.result.cpu.model == &std.Target.x86.cpu.x86_64 and "
+        "target.result.os.tag == .windows and target.result.abi == .gnu and "
+        "target.result.ofmt == .coff and b.graph.host.result.cpu.arch == "
+        "target.result.cpu.arch and b.graph.host.result.os.tag == target.result.os.tag;"
+    )
+    if normalized_build.count(windows_guard_contract) != 1:
+        raise InventoryError(
+            "Windows native inventory link smoke guard must preserve the exact host and canonical target contract"
+        )
     if "test_step.dependOn(test_inventory_step);" not in " ".join(
         _code_mask(text).split()
     ):
@@ -3353,6 +3477,46 @@ def _annotate_test_inventory_factory(
             "test inventory unknown target branch must bind one shared failure dependency to both inventory steps"
         )
 
+    windows_unknown_match = re.search(
+        r"\bif\s*\(\s*!\s*native_canonical_windows_inventory_link\s*\)\s*\{",
+        masked[unknown_branch_close:],
+    )
+    if windows_unknown_match is None:
+        raise InventoryError("Windows native inventory link failure branch is missing")
+    windows_unknown_open = unknown_branch_close + masked[unknown_branch_close:].find(
+        "{", windows_unknown_match.start(), windows_unknown_match.end()
+    )
+    windows_unknown_close = _matching_brace(masked, windows_unknown_open)
+    windows_unknown_text = text[windows_unknown_open + 1 : windows_unknown_close]
+    windows_fail_call = _single_zig_call(
+        windows_unknown_text, "b.addFail", "Windows native inventory link failure step"
+    )
+    if not re.fullmatch(
+        r'b\.addFail\s*\(\s*"'
+        + re.escape(TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_MESSAGE)
+        + r'"\s*,?\s*\)',
+        windows_fail_call,
+    ):
+        raise InventoryError(
+            "Windows native inventory link failure message must be exact"
+        )
+    normalized_windows_unknown = " ".join(_code_mask(windows_unknown_text).split())
+    windows_failure_edge = "test_inventory_link_windows_native_smoke_step.dependOn(&unsupported_windows_native_inventory_link.step);"
+    if normalized_windows_unknown.count(windows_failure_edge) != 1:
+        raise InventoryError(
+            "Windows native inventory link smoke must fail closed outside its exact guard"
+        )
+    windows_dependency_calls = [
+        _compact_zig_contract(call) + ";"
+        for _, call in _calls(
+            text, "test_inventory_link_windows_native_smoke_step.dependOn"
+        )
+    ]
+    if windows_dependency_calls != [windows_compile_edge, windows_failure_edge]:
+        raise InventoryError(
+            "Windows native inventory link smoke must preserve its exact direct dependency closure"
+        )
+
     compile_observation = by_id[TEST_INVENTORY_FACTORY_COMPILE_ID]
     compile_observation.update(
         {
@@ -3369,6 +3533,7 @@ def _annotate_test_inventory_factory(
             "enumeration_class_projection": _test_inventory_enumeration_projection(
                 text
             ),
+            "structure_checker_dependency": None,
         }
     )
     argument_contract = _test_inventory_argument_contract(loop_text)
@@ -3384,6 +3549,7 @@ def _annotate_test_inventory_factory(
         {
             "step_role": "test-inventory-enumerator-link",
             "direct_dependencies": [
+                {"id": TEST_INVENTORY_STRUCTURE_CHECK_ID, "condition": "always"},
                 {
                     "id": TEST_INVENTORY_FACTORY_COMPILE_ID,
                     "condition": "per applicable expansion case for an exact baseline target CPU profile",
@@ -3399,6 +3565,7 @@ def _annotate_test_inventory_factory(
         {
             "step_role": "test-inventory-enumerator-run",
             "direct_dependencies": [
+                {"id": TEST_INVENTORY_STRUCTURE_CHECK_ID, "condition": "always"},
                 {
                     "id": TEST_INVENTORY_FACTORY_LAUNCH_ID,
                     "condition": "per applicable expansion case for an exact baseline target CPU profile",
@@ -3416,11 +3583,41 @@ def _annotate_test_inventory_factory(
             },
         }
     )
+    by_id[TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID].update(
+        {
+            "step_role": "windows-native-test-inventory-compile-link-smoke",
+            "direct_dependencies": [
+                {
+                    "id": TEST_INVENTORY_FACTORY_COMPILE_ID,
+                    "condition": TEST_INVENTORY_WINDOWS_NATIVE_CONDITION
+                    + " per applicable expansion case",
+                },
+                {
+                    "id": TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID,
+                    "condition": "outside the exact native Windows canonical baseline guard",
+                },
+            ],
+            "compile_node_relation": "same-21-applicable-factory-Compile-nodes",
+            "structure_checker_dependency": None,
+            "run_artifact": None,
+            "test_body_execution": False,
+            "evidence_role": "compatibility-only-not-inventory-evidence",
+            "inventory_evidence": False,
+        }
+    )
     by_id[TEST_INVENTORY_UNSUPPORTED_TARGET_STEP_ID].update(
         {
             "step_role": "unsupported-test-inventory-target-failure",
             "direct_dependencies": [],
             "error_message": TEST_INVENTORY_UNSUPPORTED_TARGET_MESSAGE,
+        }
+    )
+    by_id[TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID].update(
+        {
+            "step_role": "unsupported-windows-native-inventory-link-failure",
+            "direct_dependencies": [],
+            "error_message": TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_MESSAGE,
+            "inventory_evidence": False,
         }
     )
 
@@ -3655,6 +3852,11 @@ def _validate_test_inventory_factory_contract(
         "test inventory compile observation has the wrong optional enumeration class projection",
         errors,
     )
+    _require(
+        factory.get("structure_checker_dependency") is None,
+        "test inventory shared Compile node must not inherit the POSIX structure checker",
+        errors,
+    )
     for case in factory.get("expansion_cases", []):
         _require(
             isinstance(case, dict)
@@ -3743,6 +3945,7 @@ def _validate_test_inventory_factory_contract(
         _require(
             step.get("direct_dependencies")
             == [
+                {"id": TEST_INVENTORY_STRUCTURE_CHECK_ID, "condition": "always"},
                 {
                     "id": dependency_id,
                     "condition": "per applicable expansion case for an exact baseline target CPU profile",
@@ -3753,6 +3956,33 @@ def _validate_test_inventory_factory_contract(
                 },
             ],
             f"{step_id}: test inventory factory dependency closure is incomplete",
+            errors,
+        )
+    windows_step = by_id.get(TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID, {})
+    expected_windows_step = {
+        "step_role": "windows-native-test-inventory-compile-link-smoke",
+        "direct_dependencies": [
+            {
+                "id": TEST_INVENTORY_FACTORY_COMPILE_ID,
+                "condition": TEST_INVENTORY_WINDOWS_NATIVE_CONDITION
+                + " per applicable expansion case",
+            },
+            {
+                "id": TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID,
+                "condition": "outside the exact native Windows canonical baseline guard",
+            },
+        ],
+        "compile_node_relation": "same-21-applicable-factory-Compile-nodes",
+        "structure_checker_dependency": None,
+        "run_artifact": None,
+        "test_body_execution": False,
+        "evidence_role": "compatibility-only-not-inventory-evidence",
+        "inventory_evidence": False,
+    }
+    for field, expected in expected_windows_step.items():
+        _require(
+            windows_step.get(field) == expected,
+            f"{TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID}: recorded {field} changed from the reviewed compatibility-only contract",
             errors,
         )
     run_step = by_id.get(TEST_INVENTORY_RUN_STEP_ID, {})
@@ -3774,6 +4004,19 @@ def _validate_test_inventory_factory_contract(
         and unsupported.get("error_message")
         == TEST_INVENTORY_UNSUPPORTED_TARGET_MESSAGE,
         "test inventory unsupported-target failure step contract is incomplete",
+        errors,
+    )
+    windows_unsupported = by_id.get(
+        TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID, {}
+    )
+    _require(
+        windows_unsupported.get("step_role")
+        == "unsupported-windows-native-inventory-link-failure"
+        and windows_unsupported.get("direct_dependencies") == []
+        and windows_unsupported.get("error_message")
+        == TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_MESSAGE
+        and windows_unsupported.get("inventory_evidence") is False,
+        "test inventory Windows native unsupported-target failure step contract is incomplete",
         errors,
     )
     native_launch = by_id.get(NATIVE_FEATURE_LAUNCH_ID, {})
@@ -13967,6 +14210,15 @@ def _new_test_inventory_observation(
             "intentional_orphan": False,
             "orphan_reason": "explicit compile-only closure for every applicable enumerator expansion",
         }
+    if identifier == TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID:
+        return {
+            "owner": "build-composition",
+            "description": "Compile/link the 21 canonical native Windows GNU inventory artifacts as compatibility-only evidence",
+            "aggregate_test_membership": "supporting-entry-point",
+            "aggregate_condition": "explicit named Windows compatibility step only",
+            "intentional_orphan": False,
+            "orphan_reason": "explicit native Windows compatibility-only compile/link closure",
+        }
     if identifier == TEST_INVENTORY_RUN_STEP_ID:
         return {
             "owner": "build-composition",
@@ -14019,6 +14271,15 @@ def _new_test_inventory_observation(
             "aggregate_condition": "unknown or nonbaseline target CPU profile",
             "intentional_orphan": False,
             "orphan_reason": "shared failure dependency of both inventory entry points for unsupported targets",
+        }
+    if identifier == TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID:
+        return {
+            "owner": "build-composition",
+            "description": TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_MESSAGE,
+            "aggregate_test_membership": "conditional-named-step-guard",
+            "aggregate_condition": "outside the exact native Windows canonical baseline guard",
+            "intentional_orphan": False,
+            "orphan_reason": "fail-closed dependency of the Windows compatibility-only inventory link step",
         }
     raise InventoryError(f"no reviewed template for new observation {identifier}")
 

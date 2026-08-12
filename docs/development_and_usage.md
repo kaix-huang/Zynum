@@ -68,6 +68,13 @@ python3 -B tools/check_test_inventory.py --structure-only
 ZYNUM_FOREIGN_LINK
 ```
 
+This ordinary `test-inventory-link` step is POSIX structure-gated. The exact
+native x86_64 Windows GNU baseline instead uses
+`test-inventory-link-windows-native-smoke`, a compatibility-only compile/link
+step that omits the POSIX structure checker and executes no inventory runner or
+test body. It does not provide inventory certification, native enumeration, or
+correctness evidence; all 63 Windows rows remain pending.
+
 The checker without `--structure-only` is the full native-matrix gate. It exits
 nonzero while applicable rows remain pending. Inventory checkers use bounded,
 fail-closed file admission and reviewed code pins. These establish repository
@@ -79,18 +86,19 @@ authority for inventory and repository-security evidence. Each
 inventory-certified target row runs the dedicated
 `test-host-tool-smoke` aggregate once before its three optimize-mode tests;
 those mode tests explicitly disable host-tool smoke, and link-only rows do not
-request it. The Windows `x86_64 build-link-native-smoke` job checks the
-cross-target build, all three inventory-link modes, installed library layout,
-the canonical DLL's 311 manifest export names, and exact deterministic results
-for representative CBLAS Level 1 `daxpy`, Level 2 `dgemv`, and Level 3 `dgemm`
-calls through that same loaded DLL. This smoke does not prove the semantics of
-all 311 exports, Fortran compatibility, inventory evidence, attestation, or
-performance. Its nonce-bound completion record only detects an accidental early
-exit; a malicious DLL running on the same runner with the same permissions
-could still forge process state, and adversarial attestation would require an
-isolated execution boundary. Windows native-enumeration observations remain
-explicitly pending, and the structure checker is the authoritative source for
-the current incomplete native matrix.
+request it. The Windows x86_64 job first builds the library and tooling fixtures,
+checks installed library layout, and verifies the canonical DLL's 311 manifest
+export names plus exact deterministic results for representative CBLAS Level 1
+`daxpy`, Level 2 `dgemv`, and Level 3 `dgemm` calls through that same loaded DLL.
+It then runs the explicit native compile/link smoke in all three optimize modes.
+These compatibility smokes do not prove the
+semantics of all 311 exports, Fortran compatibility, inventory evidence, native
+enumeration, attestation, or performance. The nonce-bound completion record
+only detects an accidental early exit; a malicious DLL running on the same
+runner with the same permissions could still forge process state, and
+adversarial attestation would require an isolated execution boundary. All 63
+Windows native-enumeration rows remain explicitly pending, and the structure
+checker is the authoritative source for the current incomplete native matrix.
 
 Inventory refresh is a dedicated maintenance operation. Validate the full
 candidate, inspect the inventory and checker/runner changes together, and keep

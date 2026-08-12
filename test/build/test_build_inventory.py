@@ -617,6 +617,48 @@ class BuildInventoryTests(unittest.TestCase):
                 "test inventory factory loop is missing required relation",
             ),
             (
+                "run_inventory_tests.step.dependOn(&test_inventory_structure_check.step);",
+                "inventory_tests.step.dependOn(&test_inventory_structure_check.step);",
+                "shared Compile node must not inherit the POSIX structure checker",
+            ),
+            (
+                "test_inventory_link_step.dependOn(&test_inventory_structure_check.step);",
+                "// ordinary link checker removed",
+                "POSIX structure checker relation changed",
+            ),
+            (
+                "test_inventory_step.dependOn(&test_inventory_structure_check.step);",
+                "// run-step checker removed",
+                "POSIX structure checker relation changed",
+            ),
+            (
+                "run_inventory_tests.step.dependOn(&test_inventory_structure_check.step);",
+                "// run-artifact checker removed",
+                "POSIX structure checker relation changed",
+            ),
+            (
+                "if (native_canonical_windows_inventory_link) {",
+                "if (target.result.os.tag == .windows) {",
+                "exactly one canonical guard per inventory case",
+            ),
+            (
+                "test_inventory_link_windows_native_smoke_step.dependOn(&inventory_tests.step);",
+                "test_inventory_link_windows_native_smoke_step.dependOn(&inventory_tests.step);\n"
+                "                test_inventory_link_windows_native_smoke_step.dependOn(&test_inventory_structure_check.step);",
+                "exact guard must depend only on each inventory case Compile node",
+            ),
+            (
+                "test_inventory_link_windows_native_smoke_step.dependOn(&inventory_tests.step);",
+                "test_inventory_link_windows_native_smoke_step.dependOn(&inventory_tests.step);\n"
+                "                test_inventory_link_windows_native_smoke_step.dependOn(&run_inventory_tests.step);",
+                "exact guard must depend only on each inventory case Compile node",
+            ),
+            (
+                "b.graph.host.result.os.tag == target.result.os.tag;",
+                "b.graph.host.result.os.tag == .windows or target.result.os.tag == .windows;",
+                "Windows native inventory link smoke guard must preserve the exact host and canonical target contract",
+            ),
+            (
                 "test_inventory_step.dependOn(&run_inventory_tests.step);",
                 "test_inventory_step.dependOn(&inventory_tests.step);",
                 "test inventory factory loop is missing required relation",
@@ -928,6 +970,12 @@ class BuildInventoryTests(unittest.TestCase):
                 "optional enumeration class projection",
             ),
             (
+                CHECKER.TEST_INVENTORY_FACTORY_COMPILE_ID,
+                "structure_checker_dependency",
+                CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID,
+                "must not inherit the POSIX structure checker",
+            ),
+            (
                 CHECKER.TEST_INVENTORY_FACTORY_LAUNCH_ID,
                 "source_factory",
                 "compile:build.zig:build:modern_tests",
@@ -962,6 +1010,18 @@ class BuildInventoryTests(unittest.TestCase):
                 "official_body_launch_barrier",
                 {},
                 "official body launch barrier contract is incomplete",
+            ),
+            (
+                CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID,
+                "structure_checker_dependency",
+                CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID,
+                "compatibility-only contract",
+            ),
+            (
+                CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID,
+                "test_body_execution",
+                True,
+                "compatibility-only contract",
             ),
         )
         baseline_inventory = self.inventory_path.read_text(encoding="utf-8")
@@ -1433,6 +1493,12 @@ class BuildInventoryTests(unittest.TestCase):
             "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
             "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence",
             "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence",
             "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",
@@ -4126,19 +4192,33 @@ class BuildInventoryTests(unittest.TestCase):
             "${{ matrix.target_args }} --summary failures"
         )
         target_link_commands = {
-            "Link test inventory for Debug target": (
+            "Link test inventory for Debug target (POSIX structure-gated)": (
                 "zig build test-inventory-link ${{ matrix.target_args }} "
                 "-Dtest-optimize=Debug --summary failures"
             ),
-            "Link test inventory for ReleaseSafe target": (
+            "Link test inventory for ReleaseSafe target (POSIX structure-gated)": (
                 "zig build --release=safe test-inventory-link "
                 "${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe "
                 "--summary failures"
             ),
-            "Link test inventory for ReleaseFast target": (
+            "Link test inventory for ReleaseFast target (POSIX structure-gated)": (
                 "zig build --release=fast test-inventory-link "
                 "${{ matrix.target_args }} -Dtest-optimize=ReleaseFast "
                 "--summary failures"
+            ),
+        }
+        windows_link_commands = {
+            "Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)": (
+                "zig build test-inventory-link-windows-native-smoke "
+                "${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures"
+            ),
+            "Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)": (
+                "zig build --release=safe test-inventory-link-windows-native-smoke "
+                "${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures"
+            ),
+            "Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)": (
+                "zig build --release=fast test-inventory-link-windows-native-smoke "
+                "${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures"
             ),
         }
 
@@ -4147,6 +4227,23 @@ class BuildInventoryTests(unittest.TestCase):
             self.assertNotIn("host_tool_smoke:", target_gate)
             self.assertNotIn("matrix.host_tool_smoke", target_gate)
             self.assertNotIn("continue-on-error", target_gate)
+            self.assertIn(
+                "          - name: Linux / ARM64 baseline\n"
+                "            os: ubuntu-24.04-arm\n"
+                "            cache_target: linux-arm64-baseline\n"
+                "            zig_gate: link-only\n"
+                "            target_args: -Dtarget=aarch64-linux-gnu -Dcpu=baseline\n",
+                target_gate,
+            )
+            self.assertIn(
+                "          - name: Windows / x86_64 native compile/link compatibility smoke\n"
+                "            os: windows-2025\n"
+                "            cache_target: windows-x86_64-baseline\n"
+                "            zig_gate: windows-native-compile-link-smoke\n"
+                "            target_args: -Dtarget=x86_64-windows-gnu -Dcpu=baseline\n"
+                "            install: false\n",
+                target_gate,
+            )
             self.assertEqual(
                 1, target_gate.count("      - name: Run host tool smoke once")
             )
@@ -4168,12 +4265,32 @@ class BuildInventoryTests(unittest.TestCase):
                 self.assertEqual(
                     f"      - name: {step_name}\n"
                     "        if: matrix.zig_gate == 'link-only'\n"
+                    "        timeout-minutes: 60\n"
                     f"        run: {command}",
                     step,
                 )
                 self.assertNotIn("host-tool-smoke", step)
+            for step_name, command in windows_link_commands.items():
+                step = named_step(target_gate, step_name)
+                self.assertEqual(
+                    f"      - name: {step_name}\n"
+                    "        if: matrix.zig_gate == 'windows-native-compile-link-smoke'\n"
+                    "        timeout-minutes: 60\n"
+                    f"        run: {command}",
+                    step,
+                )
+                self.assertNotIn("test-inventory-link ${{", step)
 
         assert_target_test_watchdogs(ci_source)
+        windows_debug_step = named_step(
+            job_block(ci_source, "target-tests"), next(iter(windows_link_commands))
+        )
+        windows_debug_timeout_mutant = windows_debug_step.replace(
+            "        timeout-minutes: 60\n",
+            "        timeout-minutes: 61\n",
+            1,
+        )
+        self.assertNotEqual(windows_debug_step, windows_debug_timeout_mutant)
         target_test_mutants = (
             mutate_job(
                 ci_source,
@@ -4204,6 +4321,37 @@ class BuildInventoryTests(unittest.TestCase):
                 "target-tests",
                 "-Dtest-optimize=Debug --summary failures\n",
                 "-Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "            zig_gate: windows-native-compile-link-smoke\n",
+                "            zig_gate: link-only\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "        if: matrix.zig_gate == 'windows-native-compile-link-smoke'\n",
+                "        if: matrix.zig_gate == 'link-only'\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "test-inventory-link-windows-native-smoke ${{ matrix.target_args }}",
+                "test-inventory-link ${{ matrix.target_args }}",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                windows_debug_step,
+                windows_debug_timeout_mutant,
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "      - name: Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)\n",
+                "      - name: Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)\n"
+                "        continue-on-error: true\n",
             ),
         )
         for mutant in target_test_mutants:

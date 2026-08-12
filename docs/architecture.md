@@ -240,19 +240,24 @@ dedicated step; its Debug, ReleaseSafe, and ReleaseFast test steps explicitly
 disable host-tool smoke, while link-only steps do not request it. This keeps
 the independent build-inventory suite and the ABI-baseline/Python-tooling host
 aggregate out of the three per-mode target invocations.
-The Windows `x86_64 build-link-native-smoke` job instead proves cross-target
-builds, Debug/ReleaseSafe/ReleaseFast inventory linking, library layout, the
-canonical DLL's complete 311-name manifest export surface, and deterministic
-representative CBLAS Level 1, Level 2, and Level 3 calls (`daxpy`, `dgemv`, and
-`dgemm`) through that exact loaded DLL. The three calls do not establish the
-semantics of all 311 exports, Fortran compatibility, inventory evidence,
-attestation, or performance. The nonce-bound completion record only detects an
-accidental early exit; a malicious DLL running on the same runner with the same
-permissions could still forge process state, and adversarial attestation would
-require an isolated execution boundary. At this revision, Windows
-native-enumeration observations remain explicitly pending, and the complete
-native matrix remains incomplete. The structure checker is the authoritative
-source for the current pending set.
+The Linux ARM link-only row keeps ordinary POSIX structure-gated
+`test-inventory-link`. The exact native x86_64 Windows GNU row instead invokes
+`test-inventory-link-windows-native-smoke` for Debug, ReleaseSafe, and
+ReleaseFast. That compatibility-only step omits the POSIX structure checker and
+executes no inventory runner or test body. It does not provide inventory
+certification, native enumeration, or correctness evidence.
+
+The Windows job separately checks library layout, the canonical DLL's complete
+311-name manifest export surface, and deterministic representative CBLAS Level
+1, Level 2, and Level 3 calls (`daxpy`, `dgemv`, and `dgemm`) through that exact
+loaded DLL. The three calls do not establish the semantics of all 311 exports,
+Fortran compatibility, inventory evidence, attestation, or performance. The
+nonce-bound completion record only detects an accidental early exit; a
+malicious DLL running on the same runner with the same permissions could still
+forge process state, and adversarial attestation would require an isolated
+execution boundary. At this revision, all 63 Windows native-enumeration rows
+remain explicitly pending, and the complete native matrix remains incomplete.
+The structure checker is the authoritative source for the current pending set.
 
 Run these security and consistency gates in a process with no inherited
 `GIT_*` variables:

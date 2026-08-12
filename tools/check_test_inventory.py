@@ -3569,6 +3569,10 @@ def _validate_factory_projection(
     expected_step_edges = {
         "step:build.zig:build:test-inventory-link": [
             {
+                "id": BUILD_CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID,
+                "condition": "always",
+            },
+            {
                 "id": FACTORY_COMPILE_ID,
                 "condition": "per applicable expansion case for an exact baseline target CPU profile",
             },
@@ -3578,6 +3582,10 @@ def _validate_factory_projection(
             },
         ],
         "step:build.zig:build:test-inventory": [
+            {
+                "id": BUILD_CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID,
+                "condition": "always",
+            },
             {
                 "id": FACTORY_LAUNCH_ID,
                 "condition": "per applicable expansion case for an exact baseline target CPU profile",
@@ -3591,6 +3599,51 @@ def _validate_factory_projection(
     for step_id, dependencies in expected_step_edges.items():
         if by_id.get(step_id, {}).get("direct_dependencies") != dependencies:
             errors.append(f"{step_id}: test inventory factory step wiring is incorrect")
+    if factory.get("structure_checker_dependency") is not None:
+        errors.append(
+            "test inventory shared Compile node must not inherit the POSIX structure checker"
+        )
+    windows_step = by_id.get(
+        BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID, {}
+    )
+    expected_windows_step = {
+        "step_role": "windows-native-test-inventory-compile-link-smoke",
+        "direct_dependencies": [
+            {
+                "id": FACTORY_COMPILE_ID,
+                "condition": BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_CONDITION
+                + " per applicable expansion case",
+            },
+            {
+                "id": BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID,
+                "condition": "outside the exact native Windows canonical baseline guard",
+            },
+        ],
+        "compile_node_relation": "same-21-applicable-factory-Compile-nodes",
+        "structure_checker_dependency": None,
+        "run_artifact": None,
+        "test_body_execution": False,
+        "evidence_role": "compatibility-only-not-inventory-evidence",
+        "inventory_evidence": False,
+    }
+    for field, expected in expected_windows_step.items():
+        if windows_step.get(field) != expected:
+            errors.append(
+                f"{BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID}: "
+                f"Windows native compatibility field {field} is incorrect"
+            )
+    windows_unsupported = by_id.get(
+        BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_STEP_ID, {}
+    )
+    if not (
+        windows_unsupported.get("step_role")
+        == "unsupported-windows-native-inventory-link-failure"
+        and windows_unsupported.get("direct_dependencies") == []
+        and windows_unsupported.get("error_message")
+        == BUILD_CHECKER.TEST_INVENTORY_WINDOWS_NATIVE_UNSUPPORTED_MESSAGE
+        and windows_unsupported.get("inventory_evidence") is False
+    ):
+        errors.append("Windows native inventory link failure contract is incorrect")
     aggregate_dependencies = by_id.get(AGGREGATE_STEP_ID, {}).get(
         "direct_dependencies", []
     )

@@ -104,9 +104,13 @@ ordinary `zig build` command remains host-native and unrestricted by the test
 inventory; use an explicit target and CPU tier there when doing compile-only
 feature coverage. The frozen AArch64 macOS and x86_64 Linux environments can
 validate native test enumeration today. AArch64 Linux and x86_64 Windows
-remain fail-closed for native tests until their enumeration gaps are frozen;
-their declared exact-baseline graphs remain available through the link-only
-inventory step.
+remain fail-closed for native tests until their enumeration gaps are frozen.
+Ordinary `test-inventory-link` is the POSIX structure-gated link-only step used
+for the AArch64 Linux graph. On the exact native x86_64 Windows GNU baseline,
+`test-inventory-link-windows-native-smoke` provides compile/link compatibility
+only and omits the POSIX structure checker, inventory runner, and test bodies.
+It does not certify inventory or native correctness; all 63 Windows rows remain
+pending.
 
 Build artifacts are installed under `zig-out/` by default. On ELF and Mach-O
 targets, the library layout remains:

@@ -105,6 +105,12 @@ pub fn build(b: *std.Build) void {
         target.result.os.tag == .windows and
         b.graph.host.result.cpu.arch == .x86_64 and
         b.graph.host.result.os.tag == .windows;
+    const native_canonical_windows_inventory_link = exact_baseline_request and
+        resolved_cpu_matches_canonical_baseline and
+        target.result.cpu.arch == .x86_64 and target.result.cpu.model == &std.Target.x86.cpu.x86_64 and
+        target.result.os.tag == .windows and target.result.abi == .gnu and target.result.ofmt == .coff and
+        b.graph.host.result.cpu.arch == target.result.cpu.arch and
+        b.graph.host.result.os.tag == target.result.os.tag;
     const level1_fixed_candidates = b.option(
         bool,
         "level1-fixed-candidates",
@@ -959,6 +965,10 @@ pub fn build(b: *std.Build) void {
         "test-inventory-link",
         "Compile every applicable test-inventory enumerator without running it",
     );
+    const test_inventory_link_windows_native_smoke_step = b.step(
+        "test-inventory-link-windows-native-smoke",
+        "Compile/link the 21 canonical native Windows GNU inventory artifacts as compatibility-only evidence",
+    );
     const test_inventory_step = b.step(
         "test-inventory",
         "Run and verify the exact native test inventory without executing test bodies",
@@ -977,7 +987,6 @@ pub fn build(b: *std.Build) void {
                 },
             });
             const run_inventory_tests = b.addRunArtifact(inventory_tests);
-            inventory_tests.step.dependOn(&test_inventory_structure_check.step);
             run_inventory_tests.step.dependOn(&test_inventory_structure_check.step);
             run_inventory_tests.addFileArg(b.path("tools/test_inventory.json"));
             run_inventory_tests.addArgs(&.{
@@ -991,6 +1000,9 @@ pub fn build(b: *std.Build) void {
                 resolved_inventory_profile.enumeration_class_id,
             });
             test_inventory_link_step.dependOn(&inventory_tests.step);
+            if (native_canonical_windows_inventory_link) {
+                test_inventory_link_windows_native_smoke_step.dependOn(&inventory_tests.step);
+            }
             test_inventory_step.dependOn(&run_inventory_tests.step);
         }
     } else {
@@ -999,6 +1011,12 @@ pub fn build(b: *std.Build) void {
         );
         test_inventory_link_step.dependOn(&unsupported_test_inventory_target.step);
         test_inventory_step.dependOn(&unsupported_test_inventory_target.step);
+    }
+    if (!native_canonical_windows_inventory_link) {
+        const unsupported_windows_native_inventory_link = b.addFail(
+            "test-inventory-link-windows-native-smoke requires an x86_64 Windows host and the exact x86_64-windows-gnu COFF target requested with -Dcpu=baseline and no CPU feature modifiers",
+        );
+        test_inventory_link_windows_native_smoke_step.dependOn(&unsupported_windows_native_inventory_link.step);
     }
 
     const test_native_feature_step = b.step(

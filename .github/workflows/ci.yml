@@ -144,10 +144,10 @@ jobs:
             install: true
             dynlib: zig-out/lib/libzynum_blas.so
             full_smoke: false
-          - name: Windows / x86_64 build-link-native-smoke
+          - name: Windows / x86_64 native compile/link compatibility smoke
             os: windows-2025
             cache_target: windows-x86_64-baseline
-            zig_gate: link-only
+            zig_gate: windows-native-compile-link-smoke
             target_args: -Dtarget=x86_64-windows-gnu -Dcpu=baseline
             install: false
             dynlib: ""
@@ -579,17 +579,35 @@ jobs:
         timeout-minutes: 60
         run: zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false --summary failures
 
-      - name: Link test inventory for Debug target
+      - name: Link test inventory for Debug target (POSIX structure-gated)
         if: matrix.zig_gate == 'link-only'
+        timeout-minutes: 60
         run: zig build test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures
 
-      - name: Link test inventory for ReleaseSafe target
+      - name: Link test inventory for ReleaseSafe target (POSIX structure-gated)
         if: matrix.zig_gate == 'link-only'
+        timeout-minutes: 60
         run: zig build --release=safe test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
 
-      - name: Link test inventory for ReleaseFast target
+      - name: Link test inventory for ReleaseFast target (POSIX structure-gated)
         if: matrix.zig_gate == 'link-only'
+        timeout-minutes: 60
         run: zig build --release=fast test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
+
+      - name: Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)
+        if: matrix.zig_gate == 'windows-native-compile-link-smoke'
+        timeout-minutes: 60
+        run: zig build test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures
+
+      - name: Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)
+        if: matrix.zig_gate == 'windows-native-compile-link-smoke'
+        timeout-minutes: 60
+        run: zig build --release=safe test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
+
+      - name: Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)
+        if: matrix.zig_gate == 'windows-native-compile-link-smoke'
+        timeout-minutes: 60
+        run: zig build --release=fast test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
 
       - name: Build install artifacts
         if: matrix.install

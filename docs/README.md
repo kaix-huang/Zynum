@@ -53,8 +53,9 @@ generators and their drift check, formatting, and the default build.
 
 Inventory-dependent test steps require the exact `-Dcpu=baseline` query.
 Ordinary `zig build` remains host-native and unrestricted by the inventory.
-Use `test-inventory-link` to compile a declared foreign test graph without
-claiming native execution evidence:
+On POSIX hosts, use the ordinary structure-gated `test-inventory-link` step to
+compile a declared foreign test graph without claiming native execution
+evidence:
 
 ```sh
 zig build test-inventory-link \
@@ -63,6 +64,12 @@ zig build test-inventory-link \
   -Dtest-optimize=Debug \
   --summary failures
 ```
+
+The exact native x86_64 Windows GNU baseline instead has the explicit
+`test-inventory-link-windows-native-smoke` compatibility-only compile/link
+step. It omits the POSIX structure checker and executes no inventory runner or
+test body. It supplies no inventory certification, enumeration, or correctness
+evidence; all 63 Windows rows remain pending.
 
 The public test inventory records logical roots, ordered compiler-enumerated
 sets, target applicability, modes, and native-evidence joins. Pending rows stay
