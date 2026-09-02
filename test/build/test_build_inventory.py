@@ -4312,13 +4312,13 @@ class BuildInventoryTests(unittest.TestCase):
             return "\n".join(step_lines).rstrip()
 
         trusted_posix_shell = (
-            "/bin/bash --noprofile --norc -p -eo pipefail -c "
-            '\'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null '
-            'GITHUB_PATH=/dev/null; source "$1"\' _ {0}'
+            "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null "
+            "GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null "
+            "/bin/bash --noprofile --norc -p -eo pipefail {0}"
         )
         trusted_posix_env = (
             "        env:\n"
-            "          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n"
+            "          PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n"
             "          BASH_ENV: /dev/null\n"
             "          ENV: /dev/null\n"
         )
@@ -4330,8 +4330,9 @@ class BuildInventoryTests(unittest.TestCase):
             "          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}\n"
         )
         terminal_singleton_shell = (
-            "/bin/bash --noprofile --norc -p -eo pipefail -c "
-            "'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}"
+            "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null "
+            "GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null "
+            "/bin/bash --noprofile --norc -p -eo pipefail {0}"
         )
         terminal_singleton_env = (
             "        env:\n          BASH_ENV: /dev/null\n          ENV: /dev/null\n"
@@ -4612,10 +4613,10 @@ class BuildInventoryTests(unittest.TestCase):
                     self.assertEqual(1, step.count("GITHUB_ENV=/dev/null"))
                     self.assertEqual(1, step.count("GITHUB_PATH=/dev/null"))
                     self.assertLess(
-                        step.index("GITHUB_ENV=/dev/null"), step.index('source "$1"')
+                        step.index("GITHUB_ENV=/dev/null"), step.index("/bin/bash")
                     )
                     self.assertLess(
-                        step.index("GITHUB_PATH=/dev/null"), step.index('source "$1"')
+                        step.index("GITHUB_PATH=/dev/null"), step.index("/bin/bash")
                     )
 
             trusted_windows_steps = (
@@ -4724,10 +4725,10 @@ class BuildInventoryTests(unittest.TestCase):
                 self.assertEqual(1, step.count("GITHUB_ENV=/dev/null"))
                 self.assertEqual(1, step.count("GITHUB_PATH=/dev/null"))
                 self.assertLess(
-                    step.index("GITHUB_ENV=/dev/null"), step.index('source "$1"')
+                    step.index("GITHUB_ENV=/dev/null"), step.index("/bin/bash")
                 )
                 self.assertLess(
-                    step.index("GITHUB_PATH=/dev/null"), step.index('source "$1"')
+                    step.index("GITHUB_PATH=/dev/null"), step.index("/bin/bash")
                 )
                 launch_id = (
                     f"workflow-launch:.github/workflows/ci.yml:{job}:"
@@ -4744,8 +4745,7 @@ class BuildInventoryTests(unittest.TestCase):
         self.assertEqual(
             46,
             ci_source.count(f"        shell: {trusted_posix_shell}\n")
-            + release_source.count(f"        shell: {trusted_posix_shell}\n")
-            + ci_source.count(f"        shell: {terminal_singleton_shell}\n"),
+            + release_source.count(f"        shell: {trusted_posix_shell}\n"),
         )
 
         target_test_commands = {
@@ -5009,14 +5009,14 @@ class BuildInventoryTests(unittest.TestCase):
             mutate_job(
                 ci_source,
                 "source-checks",
-                "          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n",
+                "          PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n",
                 "",
             ),
             mutate_job(
                 ci_source,
                 "source-checks",
-                'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"',
-                'source "$1"',
+                "          PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n",
+                "          PATH: ${{ env.PATH }}\n",
             ),
             mutate_job(
                 ci_source,
@@ -5027,20 +5027,14 @@ class BuildInventoryTests(unittest.TestCase):
             mutate_job(
                 ci_source,
                 "source-checks",
-                " GITHUB_PATH=/dev/null",
-                "",
+                "GITHUB_PATH=/dev/null",
+                "GITHUB_PATH=/tmp/zynum-path",
             ),
             mutate_job(
                 ci_source,
                 "source-checks",
                 "GITHUB_ENV=/dev/null",
                 "GITHUB_ENV=/tmp/zynum-env",
-            ),
-            mutate_job(
-                ci_source,
-                "source-checks",
-                'GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"',
-                'source "$1"; export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null',
             ),
             mutate_job(
                 ci_source,
@@ -5165,8 +5159,8 @@ class BuildInventoryTests(unittest.TestCase):
             mutate_job(
                 ci_source,
                 "feature-compile",
-                'GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"',
-                'source "$1"; export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null',
+                "GITHUB_PATH=/dev/null",
+                "GITHUB_PATH=/tmp/zynum-path",
             ),
             mutate_job(
                 ci_source,
@@ -8239,13 +8233,13 @@ class BuildInventoryTests(unittest.TestCase):
             "          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}\n"
         )
         trusted_posix_shell = (
-            "/bin/bash --noprofile --norc -p -eo pipefail -c "
-            '\'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null '
-            'GITHUB_PATH=/dev/null; source "$1"\' _ {0}'
+            "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null "
+            "GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null "
+            "/bin/bash --noprofile --norc -p -eo pipefail {0}"
         )
         trusted_posix_env = (
             "        env:\n"
-            "          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n"
+            "          PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n"
             "          BASH_ENV: /dev/null\n"
             "          ENV: /dev/null\n"
         )

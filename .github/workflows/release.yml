@@ -98,25 +98,25 @@ jobs:
           printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
 
       - name: Require current-only build inventory policy
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B tools/check_build_inventory.py --root . --require-current-only
 
       - name: Require current-only test inventory policy
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
       - name: Run build inventory security suite
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B test/build/test_build_inventory.py
@@ -202,17 +202,17 @@ jobs:
           printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
 
       - name: Require current-only test inventory policy
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
       - name: Run test inventory security suite
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B test/build/test_test_inventory.py
@@ -321,9 +321,9 @@ jobs:
           printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate compatibility files
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -331,9 +331,9 @@ jobs:
           zig build generate-kernel-coverage --summary failures
 
       - name: Check generated files are up to date
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -347,51 +347,51 @@ jobs:
           fi
 
       - name: Require current-only build inventory policy
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B tools/check_build_inventory.py --root . --require-current-only
 
       - name: Require current-only test inventory policy
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
       - name: Run host tool smoke once
         timeout-minutes: 60
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: zig build test-host-tool-smoke ${{ matrix.target_args }} --summary failures
 
       - name: Test
         timeout-minutes: 60
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures
 
       - name: Build install tree
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: zig build ${{ matrix.target_args }} --release=fast --summary failures
 
       - name: Check ABI manifest
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -401,9 +401,9 @@ jobs:
             --static zig-out/lib/libzynum_blas.a
 
       - name: Require clean committed checkout before archiving
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -420,9 +420,9 @@ jobs:
 
       - name: Provision fresh publication workspace
         id: publication_workspace
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -435,9 +435,9 @@ jobs:
           printf 'path=%s\n' "$workspace" >> "$GITHUB_OUTPUT"
 
       - name: Pack source archive
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -445,9 +445,9 @@ jobs:
             --archive "${{ steps.publication_workspace.outputs.path }}/zynum-source-${{ matrix.artifact }}.tar.gz"
 
       - name: Pack artifact
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |
@@ -472,9 +472,9 @@ jobs:
           )
 
       - name: Verify publication workspace
-        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
-          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: |

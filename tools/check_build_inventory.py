@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "c2f5914c7c4b45622140c193448f8fc14c66b2c03c0b4da84413d8ddbdb77fc2"
+    "51c0546c47f4f8384451c25455c6162223f5e4570531dde2797a557215756c1a"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -2316,14 +2316,14 @@ LEVEL2_WIDTH_STUB_ROOT_PATH = "src/blas/level2_width_stub_root.zig"
 REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": {
         "condition": "always",
-        "shell": "/bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}",
+        "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": ["python3", "-B", "test/build/test_build_inventory.py"],
         "evidence_role": "terminal singleton build-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
         "job_timeout_minutes": 240,
     },
     "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": {
         "condition": "always",
-        "shell": "/bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}",
+        "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": ["python3", "-B", "test/build/test_test_inventory.py"],
         "evidence_role": "terminal singleton test-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
         "job_timeout_minutes": 120,
@@ -2609,7 +2609,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     },
     "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": {
         "condition": "always",
-        "shell": "/bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}",
+        "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": ["<matrix.command>"],
         "evidence_role": "terminal singleton native-feature correctness or explicit build-only matrix run with GitHub command-file channels masked before repository execution and action post hooks",
         "matrix_contract": {
