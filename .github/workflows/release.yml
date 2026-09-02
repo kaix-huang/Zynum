@@ -34,13 +34,91 @@ jobs:
         with:
           version: 0.16.0
 
+      - name: Bind trusted POSIX toolchain paths
+        id: trusted-posix-tools
+        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          set -euo pipefail
+
+          reject_line_breaks() {
+            local name="$1"
+            local value="$2"
+            if [[ -z "$value" || "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+              printf '%s is empty or contains a line break\n' "$name" >&2
+              exit 1
+            fi
+          }
+
+          trusted_path="$PATH"
+          reject_line_breaks PATH "$trusted_path"
+          workspace="${GITHUB_WORKSPACE%/}"
+          reject_line_breaks GITHUB_WORKSPACE "$workspace"
+          if [[ "$workspace" != /* || ! -d "$workspace" ]]; then
+            echo 'GITHUB_WORKSPACE must be an existing absolute directory' >&2
+            exit 1
+          fi
+
+          resolve_trusted_tool() {
+            local name="$1"
+            local candidate
+            candidate="$(PATH="$trusted_path" command -v "$name")"
+            reject_line_breaks "$name" "$candidate"
+            if [[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]; then
+              printf '%s did not resolve to an absolute executable regular file: %s\n' "$name" "$candidate" >&2
+              exit 1
+            fi
+            case "$candidate" in
+              "$workspace"|"$workspace"/*)
+                printf '%s resolved inside GITHUB_WORKSPACE: %s\n' "$name" "$candidate" >&2
+                exit 1
+                ;;
+            esac
+            printf '%s\n' "$candidate"
+          }
+
+          trusted_zig="$(resolve_trusted_tool zig)"
+          trusted_python="$(resolve_trusted_tool python3)"
+          zig_version="$("$trusted_zig" version)"
+          if [[ "$zig_version" != 0.16.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.16.0' >&2
+            exit 1
+          fi
+          python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+          if [[ ! "$python_version" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'trusted Python isolation/version smoke failed: %s\n' "$python_version" >&2
+            exit 1
+          fi
+
+          printf 'zig=%s\n' "$trusted_zig" >> "$GITHUB_OUTPUT"
+          printf 'python=%s\n' "$trusted_python" >> "$GITHUB_OUTPUT"
+          printf 'gfortran=\n' >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
+
       - name: Require current-only build inventory policy
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_build_inventory.py --root . --require-current-only
 
       - name: Require current-only test inventory policy
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
       - name: Run build inventory security suite
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B test/build/test_build_inventory.py
 
   test-inventory-security:
@@ -60,10 +138,83 @@ jobs:
         with:
           version: 0.16.0
 
+      - name: Bind trusted POSIX toolchain paths
+        id: trusted-posix-tools
+        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          set -euo pipefail
+
+          reject_line_breaks() {
+            local name="$1"
+            local value="$2"
+            if [[ -z "$value" || "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+              printf '%s is empty or contains a line break\n' "$name" >&2
+              exit 1
+            fi
+          }
+
+          trusted_path="$PATH"
+          reject_line_breaks PATH "$trusted_path"
+          workspace="${GITHUB_WORKSPACE%/}"
+          reject_line_breaks GITHUB_WORKSPACE "$workspace"
+          if [[ "$workspace" != /* || ! -d "$workspace" ]]; then
+            echo 'GITHUB_WORKSPACE must be an existing absolute directory' >&2
+            exit 1
+          fi
+
+          resolve_trusted_tool() {
+            local name="$1"
+            local candidate
+            candidate="$(PATH="$trusted_path" command -v "$name")"
+            reject_line_breaks "$name" "$candidate"
+            if [[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]; then
+              printf '%s did not resolve to an absolute executable regular file: %s\n' "$name" "$candidate" >&2
+              exit 1
+            fi
+            case "$candidate" in
+              "$workspace"|"$workspace"/*)
+                printf '%s resolved inside GITHUB_WORKSPACE: %s\n' "$name" "$candidate" >&2
+                exit 1
+                ;;
+            esac
+            printf '%s\n' "$candidate"
+          }
+
+          trusted_zig="$(resolve_trusted_tool zig)"
+          trusted_python="$(resolve_trusted_tool python3)"
+          zig_version="$("$trusted_zig" version)"
+          if [[ "$zig_version" != 0.16.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.16.0' >&2
+            exit 1
+          fi
+          python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+          if [[ ! "$python_version" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'trusted Python isolation/version smoke failed: %s\n' "$python_version" >&2
+            exit 1
+          fi
+
+          printf 'zig=%s\n' "$trusted_zig" >> "$GITHUB_OUTPUT"
+          printf 'python=%s\n' "$trusted_python" >> "$GITHUB_OUTPUT"
+          printf 'gfortran=\n' >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
+
       - name: Require current-only test inventory policy
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
       - name: Run test inventory security suite
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B test/build/test_test_inventory.py
 
   artifacts:
@@ -99,19 +250,92 @@ jobs:
           restore-keys: |
             zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-
 
-      - name: Install Fortran compiler on Ubuntu
-        if: runner.os == 'Linux'
+      - name: Bind trusted POSIX toolchain paths and require Fortran on Linux
+        id: trusted-posix-tools
+        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+          REQUIRE_FORTRAN: ${{ runner.os == 'Linux' }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gfortran
+          set -euo pipefail
+
+          reject_line_breaks() {
+            local name="$1"
+            local value="$2"
+            if [[ -z "$value" || "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+              printf '%s is empty or contains a line break\n' "$name" >&2
+              exit 1
+            fi
+          }
+
+          trusted_path="$PATH"
+          reject_line_breaks PATH "$trusted_path"
+          workspace="${GITHUB_WORKSPACE%/}"
+          reject_line_breaks GITHUB_WORKSPACE "$workspace"
+          if [[ "$workspace" != /* || ! -d "$workspace" ]]; then
+            echo 'GITHUB_WORKSPACE must be an existing absolute directory' >&2
+            exit 1
+          fi
+
+          resolve_trusted_tool() {
+            local name="$1"
+            local candidate
+            candidate="$(PATH="$trusted_path" command -v "$name")"
+            reject_line_breaks "$name" "$candidate"
+            if [[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]; then
+              printf '%s did not resolve to an absolute executable regular file: %s\n' "$name" "$candidate" >&2
+              exit 1
+            fi
+            case "$candidate" in
+              "$workspace"|"$workspace"/*)
+                printf '%s resolved inside GITHUB_WORKSPACE: %s\n' "$name" "$candidate" >&2
+                exit 1
+                ;;
+            esac
+            printf '%s\n' "$candidate"
+          }
+
+          trusted_zig="$(resolve_trusted_tool zig)"
+          trusted_python="$(resolve_trusted_tool python3)"
+          zig_version="$("$trusted_zig" version)"
+          if [[ "$zig_version" != 0.16.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.16.0' >&2
+            exit 1
+          fi
+          python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+          if [[ ! "$python_version" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'trusted Python isolation/version smoke failed: %s\n' "$python_version" >&2
+            exit 1
+          fi
+
+          trusted_gfortran=''
+          if [[ "$REQUIRE_FORTRAN" == true ]]; then
+            trusted_gfortran="$(resolve_trusted_tool gfortran)"
+            "$trusted_gfortran" --version >/dev/null
+          fi
+
+          printf 'zig=%s\n' "$trusted_zig" >> "$GITHUB_OUTPUT"
+          printf 'python=%s\n' "$trusted_python" >> "$GITHUB_OUTPUT"
+          printf 'gfortran=%s\n' "$trusted_gfortran" >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
 
       - name: Regenerate compatibility files
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           zig build generate-headers --summary failures
           zig build generate-kernel-coverage --summary failures
 
       - name: Check generated files are up to date
-        shell: bash
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           set -euo pipefail
           git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json
@@ -123,23 +347,53 @@ jobs:
           fi
 
       - name: Require current-only build inventory policy
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_build_inventory.py --root . --require-current-only
 
       - name: Require current-only test inventory policy
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only --require-current-only
 
       - name: Run host tool smoke once
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build test-host-tool-smoke ${{ matrix.target_args }} --summary failures
 
       - name: Test
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures
 
       - name: Build install tree
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build ${{ matrix.target_args }} --release=fast --summary failures
 
       - name: Check ABI manifest
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           python3 tools/check_abi_manifest.py \
             --manifest include/zynum/blas/abi_manifest.json \
@@ -147,7 +401,11 @@ jobs:
             --static zig-out/lib/libzynum_blas.a
 
       - name: Require clean committed checkout before archiving
-        shell: bash
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           set -euo pipefail
           git rev-parse --verify 'HEAD^{commit}' >/dev/null
@@ -162,7 +420,11 @@ jobs:
 
       - name: Provision fresh publication workspace
         id: publication_workspace
-        shell: bash
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           set -euo pipefail
           workspace="$(mktemp -d "${RUNNER_TEMP}/zynum-publication.XXXXXXXX")"
@@ -173,12 +435,21 @@ jobs:
           printf 'path=%s\n' "$workspace" >> "$GITHUB_OUTPUT"
 
       - name: Pack source archive
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           python3 tools/check_package_paths.py \
             --archive "${{ steps.publication_workspace.outputs.path }}/zynum-source-${{ matrix.artifact }}.tar.gz"
 
       - name: Pack artifact
-        shell: bash
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           set -euo pipefail
           workspace="${{ steps.publication_workspace.outputs.path }}"
@@ -201,7 +472,11 @@ jobs:
           )
 
       - name: Verify publication workspace
-        shell: bash
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           set -euo pipefail
           workspace="${{ steps.publication_workspace.outputs.path }}"

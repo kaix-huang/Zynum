@@ -41,28 +41,125 @@ jobs:
           restore-keys: |
             zig-source-${{ runner.os }}-${{ runner.arch }}-0.16.0-
 
+      - name: Bind trusted POSIX toolchain paths
+        id: trusted-posix-tools
+        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          set -euo pipefail
+
+          reject_line_breaks() {
+            local name="$1"
+            local value="$2"
+            if [[ -z "$value" || "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+              printf '%s is empty or contains a line break\n' "$name" >&2
+              exit 1
+            fi
+          }
+
+          trusted_path="$PATH"
+          reject_line_breaks PATH "$trusted_path"
+          workspace="${GITHUB_WORKSPACE%/}"
+          reject_line_breaks GITHUB_WORKSPACE "$workspace"
+          if [[ "$workspace" != /* || ! -d "$workspace" ]]; then
+            echo 'GITHUB_WORKSPACE must be an existing absolute directory' >&2
+            exit 1
+          fi
+
+          resolve_trusted_tool() {
+            local name="$1"
+            local candidate
+            candidate="$(PATH="$trusted_path" command -v "$name")"
+            reject_line_breaks "$name" "$candidate"
+            if [[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]; then
+              printf '%s did not resolve to an absolute executable regular file: %s\n' "$name" "$candidate" >&2
+              exit 1
+            fi
+            case "$candidate" in
+              "$workspace"|"$workspace"/*)
+                printf '%s resolved inside GITHUB_WORKSPACE: %s\n' "$name" "$candidate" >&2
+                exit 1
+                ;;
+            esac
+            printf '%s\n' "$candidate"
+          }
+
+          trusted_zig="$(resolve_trusted_tool zig)"
+          trusted_python="$(resolve_trusted_tool python3)"
+          zig_version="$("$trusted_zig" version)"
+          if [[ "$zig_version" != 0.16.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.16.0' >&2
+            exit 1
+          fi
+          python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+          if [[ ! "$python_version" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'trusted Python isolation/version smoke failed: %s\n' "$python_version" >&2
+            exit 1
+          fi
+
+          printf 'zig=%s\n' "$trusted_zig" >> "$GITHUB_OUTPUT"
+          printf 'python=%s\n' "$trusted_python" >> "$GITHUB_OUTPUT"
+          printf 'gfortran=\n' >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
+
       - name: Check formatting
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig fmt --check build.zig build.zig.zon src test bench examples tools
 
       - name: Check Python tools compile
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py tools/*.py
 
       - name: Check build inventory
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_build_inventory.py --root .
 
       - name: Check test inventory structure
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B tools/check_test_inventory.py --root . --structure-only
 
       - name: Check package paths
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 tools/check_package_paths.py --archive zig-out/ci/zynum-source.tar.gz
 
       - name: Regenerate compatibility headers and kernel coverage
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           zig build generate-headers --summary failures
           zig build generate-kernel-coverage --summary failures
 
       - name: Check generated files are up to date
-        shell: bash
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           set -euo pipefail
           git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json
@@ -92,6 +189,10 @@ jobs:
           version: 0.16.0
 
       - name: Run build inventory security suite
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B test/build/test_build_inventory.py
 
   test-inventory-security:
@@ -109,6 +210,10 @@ jobs:
           version: 0.16.0
 
       - name: Run test inventory security suite
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: python3 -B test/build/test_test_inventory.py
 
   target-tests:
@@ -169,24 +274,176 @@ jobs:
             zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-
             zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-
 
+      - name: Bind trusted Windows toolchain paths
+        id: trusted-windows-tools
+        if: runner.os == 'Windows'
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = 'Stop'
+
+          function Assert-SafeScalar([string] $name, [string] $value) {
+            if ([string]::IsNullOrEmpty($value) -or $value.Contains("`r") -or $value.Contains("`n")) {
+              throw "$name is empty or contains a line break"
+            }
+          }
+
+          function Test-DriveRootedAbsolute([string] $path) {
+            return [IO.Path]::IsPathRooted($path) -and $path -match '^[A-Za-z]:[\\/]'
+          }
+
+          $trustedPath = [Environment]::GetEnvironmentVariable('PATH', 'Process')
+          Assert-SafeScalar 'PATH' $trustedPath
+          $workspaceInput = $env:GITHUB_WORKSPACE
+          Assert-SafeScalar 'GITHUB_WORKSPACE' $workspaceInput
+          if (-not (Test-DriveRootedAbsolute $workspaceInput) -or -not [IO.Directory]::Exists($workspaceInput)) {
+            throw 'GITHUB_WORKSPACE must be an existing absolute directory'
+          }
+          $workspace = [IO.Path]::GetFullPath($workspaceInput).TrimEnd([char[]]@('\', '/'))
+          $workspacePrefix = $workspace + [IO.Path]::DirectorySeparatorChar
+
+          function Resolve-TrustedApplication([string] $name) {
+            $commands = @(Get-Command -Name $name -CommandType Application -All -ErrorAction Stop)
+            if ($commands.Count -eq 0) {
+              throw "$name is not available as an application"
+            }
+            $candidate = $commands[0].Path
+            Assert-SafeScalar $name $candidate
+            if (-not (Test-DriveRootedAbsolute $candidate)) {
+              throw "$name did not resolve to an absolute path: $candidate"
+            }
+            $candidate = [IO.Path]::GetFullPath($candidate)
+            $item = Get-Item -LiteralPath $candidate -Force -ErrorAction Stop
+            if ($item -isnot [IO.FileInfo] -or -not [IO.File]::Exists($candidate) -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+              throw "$name did not resolve to an existing regular file: $candidate"
+            }
+            if ($candidate.Equals($workspace, [StringComparison]::OrdinalIgnoreCase) -or $candidate.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase)) {
+              throw "$name resolved inside GITHUB_WORKSPACE: $candidate"
+            }
+            return $candidate
+          }
+
+          $trustedZig = Resolve-TrustedApplication 'zig'
+          $trustedPython = Resolve-TrustedApplication 'python'
+          $zigVersion = @(& $trustedZig version)
+          if ($LASTEXITCODE -ne 0 -or $zigVersion.Count -ne 1 -or $zigVersion[0] -cne '0.16.0') {
+            throw "trusted Zig must report exactly version 0.16.0; observed: $($zigVersion -join ', ')"
+          }
+          $pythonVersion = @(& $trustedPython -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
+          if ($LASTEXITCODE -ne 0 -or $pythonVersion.Count -ne 1 -or $pythonVersion[0] -notmatch '^3\.[0-9]+\.[0-9]+$') {
+            throw "trusted Python isolation/version smoke failed; observed: $($pythonVersion -join ', ')"
+          }
+
+          $utf8NoBom = New-Object Text.UTF8Encoding($false)
+          [IO.File]::AppendAllLines($env:GITHUB_OUTPUT, [string[]] @(
+            "zig=$trustedZig"
+            "python=$trustedPython"
+            "path=$trustedPath"
+          ), $utf8NoBom)
+
+      - name: Bind trusted POSIX toolchain paths and require Fortran for full smoke
+        id: trusted-posix-tools
+        if: runner.os != 'Windows'
+        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+          REQUIRE_FORTRAN: ${{ matrix.full_smoke && runner.os == 'Linux' }}
+        run: |
+          set -euo pipefail
+
+          reject_line_breaks() {
+            local name="$1"
+            local value="$2"
+            if [[ -z "$value" || "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+              printf '%s is empty or contains a line break\n' "$name" >&2
+              exit 1
+            fi
+          }
+
+          trusted_path="$PATH"
+          reject_line_breaks PATH "$trusted_path"
+          workspace="${GITHUB_WORKSPACE%/}"
+          reject_line_breaks GITHUB_WORKSPACE "$workspace"
+          if [[ "$workspace" != /* || ! -d "$workspace" ]]; then
+            echo 'GITHUB_WORKSPACE must be an existing absolute directory' >&2
+            exit 1
+          fi
+
+          resolve_trusted_tool() {
+            local name="$1"
+            local candidate
+            candidate="$(PATH="$trusted_path" command -v "$name")"
+            reject_line_breaks "$name" "$candidate"
+            if [[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]; then
+              printf '%s did not resolve to an absolute executable regular file: %s\n' "$name" "$candidate" >&2
+              exit 1
+            fi
+            case "$candidate" in
+              "$workspace"|"$workspace"/*)
+                printf '%s resolved inside GITHUB_WORKSPACE: %s\n' "$name" "$candidate" >&2
+                exit 1
+                ;;
+            esac
+            printf '%s\n' "$candidate"
+          }
+
+          trusted_zig="$(resolve_trusted_tool zig)"
+          trusted_python="$(resolve_trusted_tool python3)"
+          zig_version="$("$trusted_zig" version)"
+          if [[ "$zig_version" != 0.16.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.16.0' >&2
+            exit 1
+          fi
+          python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+          if [[ ! "$python_version" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'trusted Python isolation/version smoke failed: %s\n' "$python_version" >&2
+            exit 1
+          fi
+
+          trusted_gfortran=''
+          if [[ "$REQUIRE_FORTRAN" == true ]]; then
+            trusted_gfortran="$(resolve_trusted_tool gfortran)"
+            "$trusted_gfortran" --version >/dev/null
+          fi
+
+          printf 'zig=%s\n' "$trusted_zig" >> "$GITHUB_OUTPUT"
+          printf 'python=%s\n' "$trusted_python" >> "$GITHUB_OUTPUT"
+          printf 'gfortran=%s\n' "$trusted_gfortran" >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
+
       - name: Build Windows Python tooling executable fixtures and libraries
         if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
-        shell: pwsh
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}
+          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}
+          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}
         run: |
+          Set-StrictMode -Version Latest
+          $env:PATH = $env:TRUSTED_PATH
+          $ErrorActionPreference = 'Stop'
           $dynamicLibrary = 'zig-out/bin/zynum_blas.dll'
           if (Test-Path -LiteralPath $dynamicLibrary) {
             Write-Error "canonical Windows DLL already exists before the reviewed build: $dynamicLibrary"
             exit 1
           }
-          zig build install-libraries build-rank-k-probe build-rotg-latency-probe build-symm-probe build-triangular-matrix-probe ${{ matrix.target_args }} --release=fast --summary failures
+          & $env:TRUSTED_ZIG build install-libraries build-rank-k-probe build-rotg-latency-probe build-symm-probe build-triangular-matrix-probe ${{ matrix.target_args }} --release=fast --summary failures
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
 
       - name: Check Windows library layout and tooling fixture boundary
         if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
-        shell: pwsh
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}
+          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}
+          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}
         run: |
+          Set-StrictMode -Version Latest
+          $env:PATH = $env:TRUSTED_PATH
+          $ErrorActionPreference = 'Stop'
           $dynamicLibrary = 'zig-out/bin/zynum_blas.dll'
           $importLibrary = 'zig-out/lib/zynum_blas.lib'
           $staticLibrary = 'zig-out/lib/static/zynum_blas.lib'
@@ -218,12 +475,12 @@ jobs:
             Write-Error "canonical Windows DLL must have exactly one hardlink path, found $($hardlinkPaths.Count)"
             exit 1
           }
-          $importMembers = @(zig ar t $importLibrary)
+          $importMembers = @(& $env:TRUSTED_ZIG ar t $importLibrary)
           if ($LASTEXITCODE -ne 0 -or @($importMembers | Where-Object { $_ -ceq 'zynum_blas.dll' }).Count -eq 0) {
             Write-Error 'zynum_blas.lib is not the reviewed DLL import library'
             exit 1
           }
-          $staticMembers = @(zig ar t $staticLibrary)
+          $staticMembers = @(& $env:TRUSTED_ZIG ar t $staticLibrary)
           if ($LASTEXITCODE -ne 0 -or $staticMembers.Count -eq 0 -or @($staticMembers | Where-Object { $_ -like '*.dll' }).Count -ne 0) {
             Write-Error 'lib/static/zynum_blas.lib is not the reviewed static object archive'
             exit 1
@@ -244,10 +501,15 @@ jobs:
 
       - name: Run Windows DLL ABI and CBLAS L1-L3 compatibility smoke (not inventory evidence)
         if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'
-        shell: pwsh
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
         timeout-minutes: 15
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}
+          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}
+          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}
         run: |
           Set-StrictMode -Version Latest
+          $env:PATH = $env:TRUSTED_PATH
           $ErrorActionPreference = 'Stop'
 
           $env:PYTHONHOME = $null
@@ -538,9 +800,8 @@ jobs:
               flush=True,
           )
           '@
-          $pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1
           $completionNonce = [guid]::NewGuid().ToString('N')
-          $smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)
+          $smokeOutput = @(& $env:TRUSTED_PYTHON -I -B -c $smokeScript $completionNonce)
           $smokeExitCode = $LASTEXITCODE
           if ($null -eq $smokeExitCode -or $smokeExitCode -ne 0) {
             throw "Windows DLL/CBLAS smoke failed with exit code $smokeExitCode"
@@ -553,68 +814,134 @@ jobs:
             throw "Windows DLL/CBLAS smoke completion record is missing or invalid: $($smokeOutput[0])"
           }
 
-      - name: Install Fortran compiler on Ubuntu
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gfortran
-
       - name: Run host tool smoke once
         if: matrix.zig_gate == 'inventory-certified'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build test-host-tool-smoke ${{ matrix.target_args }} --summary failures
 
       - name: Test Debug target
         if: matrix.zig_gate == 'inventory-certified'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures
 
       - name: Test ReleaseSafe target
         if: matrix.zig_gate == 'inventory-certified'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures
 
       - name: Test ReleaseFast target
         if: matrix.zig_gate == 'inventory-certified'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false --summary failures
 
       - name: Link test inventory for Debug target (POSIX structure-gated)
         if: matrix.zig_gate == 'link-only'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures
 
       - name: Link test inventory for ReleaseSafe target (POSIX structure-gated)
         if: matrix.zig_gate == 'link-only'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build --release=safe test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
 
       - name: Link test inventory for ReleaseFast target (POSIX structure-gated)
         if: matrix.zig_gate == 'link-only'
         timeout-minutes: 60
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build --release=fast test-inventory-link ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
 
       - name: Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)
         if: matrix.zig_gate == 'windows-native-compile-link-smoke'
         timeout-minutes: 60
-        run: zig build test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}
+          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}
+          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}
+        run: |
+          Set-StrictMode -Version Latest
+          $env:PATH = $env:TRUSTED_PATH
+          $ErrorActionPreference = 'Stop'
+          & $env:TRUSTED_ZIG build -j1 test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures
 
       - name: Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)
         if: matrix.zig_gate == 'windows-native-compile-link-smoke'
         timeout-minutes: 60
-        run: zig build --release=safe test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}
+          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}
+          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}
+        run: |
+          Set-StrictMode -Version Latest
+          $env:PATH = $env:TRUSTED_PATH
+          $ErrorActionPreference = 'Stop'
+          & $env:TRUSTED_ZIG build -j1 --release=safe test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures
 
       - name: Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)
         if: matrix.zig_gate == 'windows-native-compile-link-smoke'
         timeout-minutes: 60
-        run: zig build --release=fast test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
+        shell: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}
+          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}
+          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}
+        run: |
+          Set-StrictMode -Version Latest
+          $env:PATH = $env:TRUSTED_PATH
+          $ErrorActionPreference = 'Stop'
+          & $env:TRUSTED_ZIG build -j1 --release=fast test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
 
       - name: Build install artifacts
         if: matrix.install
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build ${{ matrix.target_args }} --release=fast --summary failures
 
       - name: Check ABI symbols
         if: matrix.install
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           python3 tools/check_abi_manifest.py \
             --manifest include/zynum/blas/abi_manifest.json \
@@ -623,6 +950,11 @@ jobs:
 
       - name: Check install metadata
         if: matrix.install
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -639,10 +971,20 @@ jobs:
 
       - name: Run Zig example
         if: matrix.full_smoke
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: zig build --build-file examples/zig/build.zig run
 
       - name: Run CBLAS example
         if: matrix.full_smoke
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           mkdir -p zig-out/examples
           cc -std=c11 examples/cblas/dgemm.c \
@@ -653,6 +995,11 @@ jobs:
 
       - name: Run Fortran example
         if: matrix.full_smoke && runner.os == 'Linux'
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           mkdir -p zig-out/examples/fortran-mod
           gfortran -std=f2008 -J zig-out/examples/fortran-mod \
@@ -666,6 +1013,11 @@ jobs:
 
       - name: Run benchmark executable smoke tests
         if: matrix.full_smoke
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           zig build bench -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 2 --reps 1
           zig build bench-gemm-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --kind dgemm --shape tiny:2:2:2 --reps 1
@@ -673,12 +1025,22 @@ jobs:
 
       - name: Run probe smoke tests
         if: matrix.full_smoke
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           zig-out/bin/level1-probe --lib "${{ matrix.dynlib }}" --op ddot --n 4 --seconds 0
           zig-out/bin/dcopy-probe --lib "${{ matrix.dynlib }}" --kind d --n 4 --seconds 0
 
       - name: Run Python benchmark tool smoke tests
         if: matrix.full_smoke
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           mkdir -p zig-out/ci
           python3 - <<'PY'
@@ -766,7 +1128,75 @@ jobs:
             zig-capability-${{ runner.os }}-0.16.0-${{ matrix.cache_target }}-
             zig-capability-${{ runner.os }}-0.16.0-
 
+      - name: Bind trusted POSIX toolchain paths
+        id: trusted-posix-tools
+        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          set -euo pipefail
+
+          reject_line_breaks() {
+            local name="$1"
+            local value="$2"
+            if [[ -z "$value" || "$value" == *$'\r'* || "$value" == *$'\n'* ]]; then
+              printf '%s is empty or contains a line break\n' "$name" >&2
+              exit 1
+            fi
+          }
+
+          trusted_path="$PATH"
+          reject_line_breaks PATH "$trusted_path"
+          workspace="${GITHUB_WORKSPACE%/}"
+          reject_line_breaks GITHUB_WORKSPACE "$workspace"
+          if [[ "$workspace" != /* || ! -d "$workspace" ]]; then
+            echo 'GITHUB_WORKSPACE must be an existing absolute directory' >&2
+            exit 1
+          fi
+
+          resolve_trusted_tool() {
+            local name="$1"
+            local candidate
+            candidate="$(PATH="$trusted_path" command -v "$name")"
+            reject_line_breaks "$name" "$candidate"
+            if [[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]; then
+              printf '%s did not resolve to an absolute executable regular file: %s\n' "$name" "$candidate" >&2
+              exit 1
+            fi
+            case "$candidate" in
+              "$workspace"|"$workspace"/*)
+                printf '%s resolved inside GITHUB_WORKSPACE: %s\n' "$name" "$candidate" >&2
+                exit 1
+                ;;
+            esac
+            printf '%s\n' "$candidate"
+          }
+
+          trusted_zig="$(resolve_trusted_tool zig)"
+          trusted_python="$(resolve_trusted_tool python3)"
+          zig_version="$("$trusted_zig" version)"
+          if [[ "$zig_version" != 0.16.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.16.0' >&2
+            exit 1
+          fi
+          python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+          if [[ ! "$python_version" =~ ^3\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'trusted Python isolation/version smoke failed: %s\n' "$python_version" >&2
+            exit 1
+          fi
+
+          printf 'zig=%s\n' "$trusted_zig" >> "$GITHUB_OUTPUT"
+          printf 'python=%s\n' "$trusted_python" >> "$GITHUB_OUTPUT"
+          printf 'gfortran=\n' >> "$GITHUB_OUTPUT"
+          printf 'path=%s\n' "$trusted_path" >> "$GITHUB_OUTPUT"
+
       - name: Build target capability
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: |
           zig build \
             --prefix "zig-out/capability-${{ matrix.cache_target }}" \
@@ -775,6 +1205,11 @@ jobs:
 
       - name: Compile enabled Level 2 width production-artifact probe
         if: matrix.cache_target == 'x86_64-v4'
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: >-
           zig build build-level2-width-enabled-artifact
           ${{ matrix.target_args }}
@@ -828,6 +1263,10 @@ jobs:
             zig-compile-${{ runner.os }}-${{ runner.arch }}-0.16.0-
 
       - name: Run matrix gate
+        shell: /bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"' _ {0}
+        env:
+          BASH_ENV: /dev/null
+          ENV: /dev/null
         run: ${{ matrix.command }}
 
   ci-gate:

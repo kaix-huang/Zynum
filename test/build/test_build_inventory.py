@@ -351,6 +351,11 @@ class BuildInventoryTests(unittest.TestCase):
     def test_inventory_factory_case_table_mutations_fail_closed(self) -> None:
         mutations = (
             (
+                '.{ .root_id = "zig-root:modern-tests", .logical_tests = modern_tests },',
+                '.{ .root_id = "zig-root:modern/tests", .logical_tests = modern_tests },',
+                "non-empty Windows-safe suffixes",
+            ),
+            (
                 '.{ .root_id = "zig-root:blas-module-tests", .logical_tests = blas_module_tests },',
                 '.{ .root_id = "zig-root:unknown-tests", .logical_tests = blas_module_tests },',
                 "root ids must be unique and canonically sorted",
@@ -581,6 +586,42 @@ class BuildInventoryTests(unittest.TestCase):
 
     def test_inventory_factory_loop_mutations_fail_closed(self) -> None:
         mutations = (
+            (
+                'b.fmt("inventory-zig-root-{s}", .{inventory_case.root_id[root_id_prefix.len..]})',
+                'b.fmt("inventory-{s}", .{inventory_case.root_id})',
+                "physical artifact name contract",
+            ),
+            (
+                "            const inventory_tests = b.addTest(.{\n"
+                '                .name = b.fmt("inventory-zig-root-{s}", .{inventory_case.root_id[root_id_prefix.len..]}),\n',
+                "            const ignored_physical_name = "
+                'b.fmt("inventory-zig-root-{s}", .{inventory_case.root_id[root_id_prefix.len..]});\n'
+                "            const inventory_tests = b.addTest(.{\n"
+                "                .name = inventory_case.root_id,\n",
+                "physical artifact name contract",
+            ),
+            (
+                'const root_id_prefix = "zig-root:";',
+                "// root ID prefix removed",
+                "physical artifact name contract",
+            ),
+            (
+                'const root_id_prefix = "zig-root:";',
+                'const root_id_prefix = "zig-root-";',
+                "physical artifact name contract",
+            ),
+            (
+                "            if (!std.mem.startsWith(u8, inventory_case.root_id, root_id_prefix)) {\n"
+                '                @panic("test inventory root ID must start with zig-root:");\n'
+                "            }\n",
+                "",
+                "physical artifact name contract",
+            ),
+            (
+                "std.mem.startsWith(u8, inventory_case.root_id, root_id_prefix)",
+                "std.mem.endsWith(u8, inventory_case.root_id, root_id_prefix)",
+                "physical artifact name contract",
+            ),
             (
                 ".root_module = official_tests.root_module,",
                 ".root_module = blas_module_tests.root_module,",
@@ -974,6 +1015,18 @@ class BuildInventoryTests(unittest.TestCase):
                 "structure_checker_dependency",
                 CHECKER.TEST_INVENTORY_STRUCTURE_CHECK_ID,
                 "must not inherit the POSIX structure checker",
+            ),
+            (
+                CHECKER.TEST_INVENTORY_FACTORY_COMPILE_ID,
+                "output_name",
+                "inventory-{root-id}",
+                "safe physical artifact pattern",
+            ),
+            (
+                CHECKER.TEST_INVENTORY_FACTORY_COMPILE_ID,
+                "produced_outputs",
+                ["inventory-{root-id}", "inventory-{root-id}.exe"],
+                "safe physical artifact patterns",
             ),
             (
                 CHECKER.TEST_INVENTORY_FACTORY_LAUNCH_ID,
@@ -1484,6 +1537,7 @@ class BuildInventoryTests(unittest.TestCase):
             race_launch["argv_shape"][0],
         )
         workflow_ids = (
+            "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths",
             "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory",
             "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure",
             "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite",
@@ -1492,6 +1546,8 @@ class BuildInventoryTests(unittest.TestCase):
             "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries",
             "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary",
             "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke",
             "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once",
             "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated",
             "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated",
@@ -1500,18 +1556,75 @@ class BuildInventoryTests(unittest.TestCase):
             "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence",
             "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence",
             "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe",
+            "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths",
+            "workflow-launch:.github/workflows/release.yml:build-inventory-security:bind-trusted-posix-toolchain-paths",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-build-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:require-current-only-test-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:build-inventory-security:run-build-inventory-security-suite",
             "workflow-launch:.github/workflows/release.yml:test-inventory-security:require-current-only-test-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:test-inventory-security:run-test-inventory-security-suite",
+            "workflow-launch:.github/workflows/release.yml:test-inventory-security:bind-trusted-posix-toolchain-paths",
             "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-build-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:artifacts:require-current-only-test-inventory-policy",
             "workflow-launch:.github/workflows/release.yml:artifacts:provision-fresh-publication-workspace",
             "workflow-launch:.github/workflows/release.yml:artifacts:verify-publication-workspace",
+            "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux",
             "workflow-launch:.github/workflows/release.yml:artifacts:run-host-tool-smoke-once",
             "workflow-launch:.github/workflows/release.yml:artifacts:test",
         )
+        binding_templates = {
+            "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": {
+                "condition": "always",
+                "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "evidence_role": "pre-repository source-check POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 120,
+            },
+            "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths": {
+                "condition": "runner.os == 'Windows'",
+                "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\\LASTEXITCODE) {{ exit $LASTEXITCODE }}\"",
+                "evidence_role": "pre-repository Windows Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 180,
+            },
+            "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": {
+                "condition": "runner.os != 'Windows'",
+                "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "evidence_role": "pre-repository POSIX Zig/Python/PATH binding with fail-closed Linux full-smoke Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 180,
+            },
+            "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux": {
+                "condition": "always",
+                "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "evidence_role": "pre-repository release POSIX Zig/Python/PATH binding with fail-closed Linux Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 180,
+            },
+            "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths": {
+                "condition": "always",
+                "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "evidence_role": "pre-repository capability-build POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 45,
+            },
+            "workflow-launch:.github/workflows/release.yml:build-inventory-security:bind-trusted-posix-toolchain-paths": {
+                "condition": "always",
+                "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "evidence_role": "pre-repository release build-inventory-security POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 240,
+            },
+            "workflow-launch:.github/workflows/release.yml:test-inventory-security:bind-trusted-posix-toolchain-paths": {
+                "condition": "always",
+                "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "evidence_role": "pre-repository release test-inventory-security POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+                "job_timeout_minutes": 120,
+            },
+        }
+        for identifier, expected_fields in binding_templates.items():
+            with self.subTest(reviewed_binding_template=identifier):
+                reviewed_fields = CHECKER.REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS[
+                    identifier
+                ]
+                self.assertEqual(
+                    expected_fields,
+                    {key: reviewed_fields[key] for key in expected_fields},
+                )
         expected_workflow_template = {
             "owner": "release-validation",
             "launch_class": "workflow",
@@ -4066,6 +4179,27 @@ class BuildInventoryTests(unittest.TestCase):
         release_source = (self.root / ".github/workflows/release.yml").read_text(
             encoding="utf-8"
         )
+        discovered_workflow_ids = {
+            item["id"] for item in CHECKER._discover_workflow_launches(self.root)
+        }
+        self.assertEqual(60, len(discovered_workflow_ids - {launch_id}))
+        expected_binding_ids = {
+            "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths",
+            "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke",
+            "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths",
+            "workflow-launch:.github/workflows/release.yml:build-inventory-security:bind-trusted-posix-toolchain-paths",
+            "workflow-launch:.github/workflows/release.yml:test-inventory-security:bind-trusted-posix-toolchain-paths",
+            "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux",
+        }
+        self.assertEqual(
+            expected_binding_ids,
+            {
+                identifier
+                for identifier in discovered_workflow_ids
+                if ":bind-trusted-" in identifier
+            },
+        )
         action_lines = [
             line
             for workflow_source in (ci_source, release_source)
@@ -4105,6 +4239,7 @@ class BuildInventoryTests(unittest.TestCase):
         assert_job_timeout(ci_source, "build-inventory-security", 240)
         assert_job_timeout(ci_source, "test-inventory-security", 120)
         assert_job_timeout(ci_source, "target-tests", 180)
+        assert_job_timeout(ci_source, "capability-builds", 45)
         assert_job_timeout(ci_source, "ci-gate", 5)
         assert_job_timeout(release_source, "build-inventory-security", 240)
         assert_job_timeout(release_source, "test-inventory-security", 120)
@@ -4136,6 +4271,7 @@ class BuildInventoryTests(unittest.TestCase):
             (ci_source, "build-inventory-security", 240, 30),
             (ci_source, "test-inventory-security", 120, 90),
             (ci_source, "target-tests", 180, 90),
+            (ci_source, "capability-builds", 45, 60),
             (ci_source, "ci-gate", 5, 1),
             (release_source, "build-inventory-security", 240, 30),
             (release_source, "test-inventory-security", 120, 90),
@@ -4165,8 +4301,452 @@ class BuildInventoryTests(unittest.TestCase):
         def named_step(source: str, name: str) -> str:
             marker = f"      - name: {name}\n"
             start = source.index(marker)
-            end = source.find("\n      - ", start + len(marker))
-            return (source[start:] if end < 0 else source[start:end]).rstrip()
+            lines = source[start:].splitlines()
+            step_lines = [lines[0]]
+            for line in lines[1:]:
+                if line.startswith("      - ") or (
+                    line.startswith("  ") and not line.startswith("   ")
+                ):
+                    break
+                step_lines.append(line)
+            return "\n".join(step_lines).rstrip()
+
+        trusted_posix_shell = (
+            "/bin/bash --noprofile --norc -p -eo pipefail -c "
+            '\'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null '
+            'GITHUB_PATH=/dev/null; source "$1"\' _ {0}'
+        )
+        trusted_posix_env = (
+            "        env:\n"
+            "          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n"
+            "          BASH_ENV: /dev/null\n"
+            "          ENV: /dev/null\n"
+        )
+        trusted_windows_shell = r'''C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"'''
+        trusted_windows_env = (
+            "        env:\n"
+            "          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}\n"
+            "          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}\n"
+            "          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}\n"
+        )
+        terminal_singleton_shell = (
+            "/bin/bash --noprofile --norc -p -eo pipefail -c "
+            "'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}"
+        )
+        terminal_singleton_env = (
+            "        env:\n          BASH_ENV: /dev/null\n          ENV: /dev/null\n"
+        )
+        ordinary_posix_binding_name = "Bind trusted POSIX toolchain paths"
+        windows_binding_name = "Bind trusted Windows toolchain paths"
+        ci_posix_binding_name = (
+            "Bind trusted POSIX toolchain paths and require Fortran for full smoke"
+        )
+        release_posix_binding_name = (
+            "Bind trusted POSIX toolchain paths and require Fortran on Linux"
+        )
+
+        def assert_posix_binding(
+            step: str, *, name: str, condition: str | None, require_fortran: str
+        ) -> None:
+            header = f"      - name: {name}\n        id: trusted-posix-tools\n"
+            if condition is not None:
+                header += f"        if: {condition}\n"
+            header += (
+                "        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}\n"
+                "        env:\n"
+                "          BASH_ENV: /dev/null\n"
+                "          ENV: /dev/null\n"
+                "        run: |\n"
+                "          set -euo pipefail\n"
+            )
+            if require_fortran:
+                header = header.replace(
+                    "          ENV: /dev/null\n        run: |\n",
+                    "          ENV: /dev/null\n"
+                    f"          REQUIRE_FORTRAN: {require_fortran}\n"
+                    "        run: |\n",
+                )
+            self.assertTrue(step.startswith(header))
+            for fragment in (
+                '[[ -z "$value" || "$value" == *$\'\\r\'* || "$value" == *$\'\\n\'* ]]',
+                '[[ "$workspace" != /* || ! -d "$workspace" ]]',
+                'candidate="$(PATH="$trusted_path" command -v "$name")"',
+                '[[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]',
+                '"$workspace"|"$workspace"/*)',
+                'zig_version="$("$trusted_zig" version)"',
+                '[[ "$zig_version" != 0.16.0 ]]',
+                '"$trusted_python" -I -B -c',
+                'printf \'zig=%s\\n\' "$trusted_zig" >> "$GITHUB_OUTPUT"',
+                'printf \'python=%s\\n\' "$trusted_python" >> "$GITHUB_OUTPUT"',
+                'printf \'path=%s\\n\' "$trusted_path" >> "$GITHUB_OUTPUT"',
+            ):
+                self.assertIn(fragment, step)
+            if require_fortran:
+                for fragment in (
+                    'trusted_gfortran="$(resolve_trusted_tool gfortran)"',
+                    '"$trusted_gfortran" --version >/dev/null',
+                    'printf \'gfortran=%s\\n\' "$trusted_gfortran" >> "$GITHUB_OUTPUT"',
+                ):
+                    self.assertIn(fragment, step)
+            else:
+                self.assertIn("printf 'gfortran=\\n' >> \"$GITHUB_OUTPUT\"", step)
+            self.assertEqual(4, step.count('>> "$GITHUB_OUTPUT"'))
+            self.assertNotIn("GITHUB_ENV", step)
+            self.assertNotIn("GITHUB_PATH", step)
+            self.assertNotIn("trusted_shell", step)
+            self.assertNotIn("RUNNER_TEMP", step)
+            self.assertNotIn("apt", step)
+            self.assertNotIn("sudo", step)
+            self.assertNotIn("continue-on-error", step)
+
+        def assert_trusted_tool_bindings(ci: str, release: str) -> None:
+            ci_jobs = {
+                job: job_block(ci, job)
+                for job in ("source-checks", "target-tests", "capability-builds")
+            }
+            release_jobs = {
+                job: job_block(release, job)
+                for job in (
+                    "build-inventory-security",
+                    "test-inventory-security",
+                    "artifacts",
+                )
+            }
+            target_gate = ci_jobs["target-tests"]
+            release_gate = release_jobs["artifacts"]
+            windows_binding = named_step(target_gate, windows_binding_name)
+
+            self.assertTrue(
+                windows_binding.startswith(
+                    f"      - name: {windows_binding_name}\n"
+                    "        id: trusted-windows-tools\n"
+                    "        if: runner.os == 'Windows'\n"
+                    f"        shell: {trusted_windows_shell}\n"
+                    "        run: |\n"
+                    "          Set-StrictMode -Version Latest\n"
+                    "          $ErrorActionPreference = 'Stop'\n"
+                )
+            )
+            for fragment in (
+                '$value.Contains("`r") -or $value.Contains("`n")',
+                "Get-Command -Name $name -CommandType Application -All -ErrorAction Stop",
+                "function Test-DriveRootedAbsolute([string] $path)",
+                "[IO.Path]::IsPathRooted($path) -and $path -match '^[A-Za-z]:[\\\\/]'",
+                "Test-DriveRootedAbsolute $candidate",
+                "$item -isnot [IO.FileInfo]",
+                "[IO.File]::Exists($candidate)",
+                "$candidate.Equals($workspace, [StringComparison]::OrdinalIgnoreCase)",
+                "$candidate.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase)",
+                "$zigVersion[0] -cne '0.16.0'",
+                "& $trustedPython -I -B -c",
+                '"zig=$trustedZig"',
+                '"python=$trustedPython"',
+                '"path=$trustedPath"',
+            ):
+                self.assertIn(fragment, windows_binding)
+            self.assertIn(
+                "$utf8NoBom = New-Object Text.UTF8Encoding($false)", windows_binding
+            )
+            self.assertIn(
+                "[IO.File]::AppendAllLines($env:GITHUB_OUTPUT", windows_binding
+            )
+            self.assertEqual(1, windows_binding.count('"zig=$trustedZig"'))
+            self.assertEqual(1, windows_binding.count('"python=$trustedPython"'))
+            self.assertEqual(1, windows_binding.count('"path=$trustedPath"'))
+            self.assertNotIn("gfortran=", windows_binding)
+            self.assertEqual(1, windows_binding.count("$env:GITHUB_ENV = 'NUL'"))
+            self.assertEqual(1, windows_binding.count("$env:GITHUB_PATH = 'NUL'"))
+            self.assertLess(
+                windows_binding.index("$env:GITHUB_ENV = 'NUL'"),
+                windows_binding.index("[IO.File]::ReadAllText('{0}')"),
+            )
+            self.assertLess(
+                windows_binding.index("$env:GITHUB_PATH = 'NUL'"),
+                windows_binding.index("[IO.File]::ReadAllText('{0}')"),
+            )
+
+            posix_binders = (
+                (ci_jobs["source-checks"], ordinary_posix_binding_name, None, ""),
+                (
+                    target_gate,
+                    ci_posix_binding_name,
+                    "runner.os != 'Windows'",
+                    "${{ matrix.full_smoke && runner.os == 'Linux' }}",
+                ),
+                (ci_jobs["capability-builds"], ordinary_posix_binding_name, None, ""),
+                (
+                    release_jobs["build-inventory-security"],
+                    ordinary_posix_binding_name,
+                    None,
+                    "",
+                ),
+                (
+                    release_jobs["test-inventory-security"],
+                    ordinary_posix_binding_name,
+                    None,
+                    "",
+                ),
+                (
+                    release_gate,
+                    release_posix_binding_name,
+                    None,
+                    "${{ runner.os == 'Linux' }}",
+                ),
+            )
+            for gate, name, condition, require_fortran in posix_binders:
+                self.assertEqual(1, gate.count(f"      - name: {name}\n"))
+                assert_posix_binding(
+                    named_step(gate, name),
+                    name=name,
+                    condition=condition,
+                    require_fortran=require_fortran,
+                )
+            self.assertEqual(
+                1, target_gate.count(f"      - name: {windows_binding_name}\n")
+            )
+
+            for gate in (*ci_jobs.values(), *release_jobs.values()):
+                self.assertNotIn("continue-on-error", gate)
+                self.assertNotIn("apt-get", gate)
+                self.assertNotIn("sudo", gate)
+
+            protected_posix_jobs = (
+                (
+                    ci_jobs["source-checks"],
+                    ordinary_posix_binding_name,
+                    (
+                        "Check formatting",
+                        "Check Python tools compile",
+                        "Check build inventory",
+                        "Check test inventory structure",
+                        "Check package paths",
+                        "Regenerate compatibility headers and kernel coverage",
+                        "Check generated files are up to date",
+                    ),
+                ),
+                (
+                    target_gate,
+                    ci_posix_binding_name,
+                    (
+                        "Run host tool smoke once",
+                        "Test Debug target",
+                        "Test ReleaseSafe target",
+                        "Test ReleaseFast target",
+                        "Link test inventory for Debug target (POSIX structure-gated)",
+                        "Link test inventory for ReleaseSafe target (POSIX structure-gated)",
+                        "Link test inventory for ReleaseFast target (POSIX structure-gated)",
+                        "Build install artifacts",
+                        "Check ABI symbols",
+                        "Check install metadata",
+                        "Run Zig example",
+                        "Run CBLAS example",
+                        "Run Fortran example",
+                        "Run benchmark executable smoke tests",
+                        "Run probe smoke tests",
+                        "Run Python benchmark tool smoke tests",
+                    ),
+                ),
+                (
+                    ci_jobs["capability-builds"],
+                    ordinary_posix_binding_name,
+                    (
+                        "Build target capability",
+                        "Compile enabled Level 2 width production-artifact probe",
+                    ),
+                ),
+                (
+                    release_jobs["build-inventory-security"],
+                    ordinary_posix_binding_name,
+                    (
+                        "Require current-only build inventory policy",
+                        "Require current-only test inventory policy",
+                        "Run build inventory security suite",
+                    ),
+                ),
+                (
+                    release_jobs["test-inventory-security"],
+                    ordinary_posix_binding_name,
+                    (
+                        "Require current-only test inventory policy",
+                        "Run test inventory security suite",
+                    ),
+                ),
+                (
+                    release_gate,
+                    release_posix_binding_name,
+                    (
+                        "Regenerate compatibility files",
+                        "Check generated files are up to date",
+                        "Require current-only build inventory policy",
+                        "Require current-only test inventory policy",
+                        "Run host tool smoke once",
+                        "Test",
+                        "Build install tree",
+                        "Check ABI manifest",
+                        "Require clean committed checkout before archiving",
+                        "Provision fresh publication workspace",
+                        "Pack source archive",
+                        "Pack artifact",
+                        "Verify publication workspace",
+                    ),
+                ),
+            )
+            self.assertEqual(
+                43, sum(len(names) for _, _, names in protected_posix_jobs)
+            )
+            for gate, binding_name, names in protected_posix_jobs:
+                self.assertEqual(
+                    len(names),
+                    gate.count(f"        shell: {trusted_posix_shell}\n"),
+                )
+                self.assertEqual(len(names), gate.count(trusted_posix_env))
+                binding = named_step(gate, binding_name)
+                self.assertLess(
+                    gate.index(binding),
+                    gate.index(f"        shell: {trusted_posix_shell}\n"),
+                )
+                for name in names:
+                    step = named_step(gate, name)
+                    self.assertIn(f"        shell: {trusted_posix_shell}\n", step)
+                    self.assertIn(trusted_posix_env, step)
+                    self.assertEqual(1, step.count("GITHUB_ENV=/dev/null"))
+                    self.assertEqual(1, step.count("GITHUB_PATH=/dev/null"))
+                    self.assertLess(
+                        step.index("GITHUB_ENV=/dev/null"), step.index('source "$1"')
+                    )
+                    self.assertLess(
+                        step.index("GITHUB_PATH=/dev/null"), step.index('source "$1"')
+                    )
+
+            trusted_windows_steps = (
+                "Build Windows Python tooling executable fixtures and libraries",
+                "Check Windows library layout and tooling fixture boundary",
+                "Run Windows DLL ABI and CBLAS L1-L3 compatibility smoke (not inventory evidence)",
+                "Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)",
+                "Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)",
+                "Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)",
+            )
+            windows_steps = {
+                name: named_step(target_gate, name) for name in trusted_windows_steps
+            }
+            for step in windows_steps.values():
+                self.assertIn(f"        shell: {trusted_windows_shell}\n", step)
+                self.assertIn(trusted_windows_env, step)
+                self.assertIn(
+                    "        run: |\n"
+                    "          Set-StrictMode -Version Latest\n"
+                    "          $env:PATH = $env:TRUSTED_PATH\n",
+                    step,
+                )
+                self.assertNotIn("Get-Command", step)
+                self.assertEqual(1, step.count("$env:GITHUB_ENV = 'NUL'"))
+                self.assertEqual(1, step.count("$env:GITHUB_PATH = 'NUL'"))
+                self.assertLess(
+                    step.index("$env:GITHUB_ENV = 'NUL'"),
+                    step.index("[IO.File]::ReadAllText('{0}')"),
+                )
+                self.assertLess(
+                    step.index("$env:GITHUB_PATH = 'NUL'"),
+                    step.index("[IO.File]::ReadAllText('{0}')"),
+                )
+            self.assertIn(
+                "& $env:TRUSTED_ZIG build install-libraries",
+                windows_steps[trusted_windows_steps[0]],
+            )
+            self.assertEqual(
+                2,
+                windows_steps[trusted_windows_steps[1]].count(
+                    "@(& $env:TRUSTED_ZIG ar t"
+                ),
+            )
+            self.assertIn(
+                "@(& $env:TRUSTED_PYTHON -I -B -c",
+                windows_steps[trusted_windows_steps[2]],
+            )
+            for name in trusted_windows_steps[3:]:
+                self.assertIn("& $env:TRUSTED_ZIG build -j1", windows_steps[name])
+
+            fortran_step = named_step(target_gate, "Run Fortran example")
+            self.assertIn(
+                "        if: matrix.full_smoke && runner.os == 'Linux'\n",
+                fortran_step,
+            )
+            self.assertEqual(2, fortran_step.count("          gfortran "))
+
+            expected_channel_counts = (
+                (ci_jobs["source-checks"], 7),
+                (target_gate, 23),
+                (ci_jobs["capability-builds"], 2),
+                (release_jobs["build-inventory-security"], 3),
+                (release_jobs["test-inventory-security"], 2),
+                (release_gate, 13),
+            )
+            for gate, expected_count in expected_channel_counts:
+                self.assertEqual(expected_count, gate.count("GITHUB_ENV"))
+                self.assertEqual(expected_count, gate.count("GITHUB_PATH"))
+
+        assert_trusted_tool_bindings(ci_source, release_source)
+
+        terminal_singletons = (
+            (
+                "build-inventory-security",
+                "Run build inventory security suite",
+                "python3 -B test/build/test_build_inventory.py",
+                "terminal singleton build-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
+            ),
+            (
+                "test-inventory-security",
+                "Run test inventory security suite",
+                "python3 -B test/build/test_test_inventory.py",
+                "terminal singleton test-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
+            ),
+            (
+                "feature-compile",
+                "Run matrix gate",
+                "${{ matrix.command }}",
+                "terminal singleton native-feature correctness or explicit build-only matrix run with GitHub command-file channels masked before repository execution and action post hooks",
+            ),
+        )
+
+        def assert_terminal_singletons(source: str) -> None:
+            for job, name, command, evidence_role in terminal_singletons:
+                gate = job_block(source, job)
+                step = named_step(gate, name)
+                self.assertEqual(
+                    f"      - name: {name}\n"
+                    f"        shell: {terminal_singleton_shell}\n"
+                    f"{terminal_singleton_env}"
+                    f"        run: {command}",
+                    step,
+                )
+                self.assertTrue(gate.rstrip().endswith(step))
+                self.assertNotIn("TRUSTED_PATH", step)
+                self.assertEqual(1, step.count("GITHUB_ENV=/dev/null"))
+                self.assertEqual(1, step.count("GITHUB_PATH=/dev/null"))
+                self.assertLess(
+                    step.index("GITHUB_ENV=/dev/null"), step.index('source "$1"')
+                )
+                self.assertLess(
+                    step.index("GITHUB_PATH=/dev/null"), step.index('source "$1"')
+                )
+                launch_id = (
+                    f"workflow-launch:.github/workflows/ci.yml:{job}:"
+                    + name.lower().replace(" ", "-")
+                )
+                reviewed = CHECKER.REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS[launch_id]
+                self.assertEqual("always", reviewed["condition"])
+                self.assertEqual(terminal_singleton_shell, reviewed["shell"])
+                self.assertEqual(evidence_role, reviewed["evidence_role"])
+                self.assertEqual(1, gate.count("GITHUB_ENV"))
+                self.assertEqual(1, gate.count("GITHUB_PATH"))
+
+        assert_terminal_singletons(ci_source)
+        self.assertEqual(
+            46,
+            ci_source.count(f"        shell: {trusted_posix_shell}\n")
+            + release_source.count(f"        shell: {trusted_posix_shell}\n")
+            + ci_source.count(f"        shell: {terminal_singleton_shell}\n"),
+        )
 
         target_test_commands = {
             "Test Debug target": (
@@ -4188,6 +4768,8 @@ class BuildInventoryTests(unittest.TestCase):
             "      - name: Run host tool smoke once\n"
             "        if: matrix.zig_gate == 'inventory-certified'\n"
             "        timeout-minutes: 60\n"
+            f"        shell: {trusted_posix_shell}\n"
+            f"{trusted_posix_env}"
             "        run: zig build test-host-tool-smoke "
             "${{ matrix.target_args }} --summary failures"
         )
@@ -4209,15 +4791,15 @@ class BuildInventoryTests(unittest.TestCase):
         }
         windows_link_commands = {
             "Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)": (
-                "zig build test-inventory-link-windows-native-smoke "
+                "& $env:TRUSTED_ZIG build -j1 test-inventory-link-windows-native-smoke "
                 "${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures"
             ),
             "Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)": (
-                "zig build --release=safe test-inventory-link-windows-native-smoke "
+                "& $env:TRUSTED_ZIG build -j1 --release=safe test-inventory-link-windows-native-smoke "
                 "${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures"
             ),
             "Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)": (
-                "zig build --release=fast test-inventory-link-windows-native-smoke "
+                "& $env:TRUSTED_ZIG build -j1 --release=fast test-inventory-link-windows-native-smoke "
                 "${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures"
             ),
         }
@@ -4257,6 +4839,8 @@ class BuildInventoryTests(unittest.TestCase):
                     f"      - name: {step_name}\n"
                     "        if: matrix.zig_gate == 'inventory-certified'\n"
                     "        timeout-minutes: 60\n"
+                    f"        shell: {trusted_posix_shell}\n"
+                    f"{trusted_posix_env}"
                     f"        run: {command}",
                     step,
                 )
@@ -4266,6 +4850,8 @@ class BuildInventoryTests(unittest.TestCase):
                     f"      - name: {step_name}\n"
                     "        if: matrix.zig_gate == 'link-only'\n"
                     "        timeout-minutes: 60\n"
+                    f"        shell: {trusted_posix_shell}\n"
+                    f"{trusted_posix_env}"
                     f"        run: {command}",
                     step,
                 )
@@ -4276,7 +4862,13 @@ class BuildInventoryTests(unittest.TestCase):
                     f"      - name: {step_name}\n"
                     "        if: matrix.zig_gate == 'windows-native-compile-link-smoke'\n"
                     "        timeout-minutes: 60\n"
-                    f"        run: {command}",
+                    f"        shell: {trusted_windows_shell}\n"
+                    f"{trusted_windows_env}"
+                    "        run: |\n"
+                    "          Set-StrictMode -Version Latest\n"
+                    "          $env:PATH = $env:TRUSTED_PATH\n"
+                    "          $ErrorActionPreference = 'Stop'\n"
+                    f"          {command}",
                     step,
                 )
                 self.assertNotIn("test-inventory-link ${{", step)
@@ -4343,6 +4935,24 @@ class BuildInventoryTests(unittest.TestCase):
             mutate_job(
                 ci_source,
                 "target-tests",
+                "& $env:TRUSTED_ZIG build -j1 test-inventory-link-windows-native-smoke",
+                "& $env:TRUSTED_ZIG build test-inventory-link-windows-native-smoke",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "& $env:TRUSTED_ZIG build -j1 --release=safe test-inventory-link-windows-native-smoke",
+                "& $env:TRUSTED_ZIG build -j2 --release=safe test-inventory-link-windows-native-smoke",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "& $env:TRUSTED_ZIG build -j1 --release=fast test-inventory-link-windows-native-smoke",
+                "& $env:TRUSTED_ZIG build --release=fast test-inventory-link-windows-native-smoke",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
                 windows_debug_step,
                 windows_debug_timeout_mutant,
             ),
@@ -4358,6 +4968,243 @@ class BuildInventoryTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 assert_target_test_watchdogs(mutant)
 
+        target_gate = job_block(ci_source, "target-tests")
+        target_posix_binding = named_step(target_gate, ci_posix_binding_name)
+        first_posix_step = named_step(target_gate, "Run host tool smoke once")
+        late_target_binding = target_gate.replace(
+            target_posix_binding + "\n\n", "", 1
+        ).replace(
+            first_posix_step,
+            first_posix_step + "\n\n" + target_posix_binding,
+            1,
+        )
+        self.assertNotEqual(target_gate, late_target_binding)
+        binding_mutants = (
+            ci_source.replace(target_posix_binding + "\n\n", "", 1),
+            ci_source.replace(target_gate, late_target_binding, 1),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+                "/bin/bash --noprofile --norc -eo pipefail {0}",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                f"        shell: {trusted_posix_shell}\n",
+                "        shell: bash\n",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                "          BASH_ENV: /dev/null\n",
+                "",
+            ),
+            mutate_job(
+                release_source,
+                "artifacts",
+                "          ENV: /dev/null\n",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                "          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"',
+                'source "$1"',
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                " GITHUB_ENV=/dev/null",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                " GITHUB_PATH=/dev/null",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                "GITHUB_ENV=/dev/null",
+                "GITHUB_ENV=/tmp/zynum-env",
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                'GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"',
+                'source "$1"; export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null',
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                '>> "$GITHUB_OUTPUT"',
+                '>> "$GITHUB_ENV"',
+            ),
+            mutate_job(
+                ci_source,
+                "source-checks",
+                'zig_version="$("$trusted_zig" version)"',
+                "zig_version=0.16.0",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                f"        shell: {trusted_windows_shell}\n",
+                "        shell: pwsh\n",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "{{ exit $LASTEXITCODE }}",
+                "{ exit $LASTEXITCODE }",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$env:GITHUB_ENV = 'NUL'; ",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$env:GITHUB_PATH = 'NUL'; ",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$env:GITHUB_ENV = 'NUL'",
+                "$env:GITHUB_ENV = 'NULL'",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$env:GITHUB_PATH = 'NUL'",
+                "$env:GITHUB_PATH = 'C:\\Temp\\zynum-path'",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}')))",
+                "& ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "[IO.File]::AppendAllLines($env:GITHUB_OUTPUT",
+                "[IO.File]::AppendAllLines($env:GITHUB_ENV",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$utf8NoBom = New-Object Text.UTF8Encoding($false)",
+                "$utf8NoBom = New-Object Text.UTF8Encoding($true)",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "& $env:TRUSTED_ZIG build install-libraries",
+                "zig build install-libraries",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "@(& $env:TRUSTED_PYTHON -I -B -c",
+                "@(python -I -B -c",
+            ),
+            mutate_job(
+                ci_source,
+                "target-tests",
+                "$env:PATH = $env:TRUSTED_PATH\n",
+                "",
+            ),
+            mutate_job(
+                release_source,
+                "artifacts",
+                'trusted_gfortran="$(resolve_trusted_tool gfortran)"',
+                'trusted_gfortran="$(command -v gfortran)"',
+            ),
+        )
+        for index, mutant in enumerate(binding_mutants):
+            with self.subTest(trusted_binding_mutant=index):
+                with self.assertRaises((AssertionError, ValueError)):
+                    if mutant.startswith(
+                        "# Copyright (C) 2026 Zynum contributors\n# SPDX-License-Identifier: LGPL-3.0-or-later\n\nname: Release"
+                    ):
+                        assert_trusted_tool_bindings(ci_source, mutant)
+                    else:
+                        assert_trusted_tool_bindings(mutant, release_source)
+
+        singleton_mutants = (
+            mutate_job(
+                ci_source,
+                "build-inventory-security",
+                " GITHUB_ENV=/dev/null",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "test-inventory-security",
+                " GITHUB_PATH=/dev/null",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "feature-compile",
+                "GITHUB_ENV=/dev/null",
+                "GITHUB_ENV=/tmp/zynum-env",
+            ),
+            mutate_job(
+                ci_source,
+                "feature-compile",
+                'GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source "$1"',
+                'source "$1"; export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null',
+            ),
+            mutate_job(
+                ci_source,
+                "build-inventory-security",
+                f"        shell: {terminal_singleton_shell}\n",
+                "        shell: bash\n",
+            ),
+            mutate_job(
+                ci_source,
+                "test-inventory-security",
+                "--norc -p -eo pipefail",
+                "--norc -eo pipefail",
+            ),
+            mutate_job(
+                ci_source,
+                "build-inventory-security",
+                "          BASH_ENV: /dev/null\n",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "test-inventory-security",
+                "          ENV: /dev/null\n",
+                "",
+            ),
+            mutate_job(
+                ci_source,
+                "feature-compile",
+                "        run: ${{ matrix.command }}\n",
+                "        run: ${{ matrix.command }}\n\n"
+                "      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0\n",
+            ),
+        )
+        for index, mutant in enumerate(singleton_mutants):
+            with self.subTest(terminal_singleton_mutant=index):
+                with self.assertRaises((AssertionError, ValueError)):
+                    assert_terminal_singletons(mutant)
+
         build_suite_command = "python3 -B test/build/test_build_inventory.py"
         test_suite_command = "python3 -B test/build/test_test_inventory.py"
 
@@ -4369,13 +5216,20 @@ class BuildInventoryTests(unittest.TestCase):
             test_gate = job_block(source, "test-inventory-security")
             build_step = named_step(build_gate, "Run build inventory security suite")
             test_step = named_step(test_gate, "Run test inventory security suite")
+            suite_protection = (
+                f"        shell: {trusted_posix_shell}\n{trusted_posix_env}"
+                if release
+                else f"        shell: {terminal_singleton_shell}\n{terminal_singleton_env}"
+            )
             self.assertEqual(
                 f"      - name: Run build inventory security suite\n"
+                f"{suite_protection}"
                 f"        run: {build_suite_command}",
                 build_step,
             )
             self.assertEqual(
                 f"      - name: Run test inventory security suite\n"
+                f"{suite_protection}"
                 f"        run: {test_suite_command}",
                 test_step,
             )
@@ -7377,6 +8231,38 @@ class BuildInventoryTests(unittest.TestCase):
     def test_named_workflow_step_command_drift_fails(self) -> None:
         path = self.root / ".github/workflows/ci.yml"
         text = path.read_text(encoding="utf-8")
+        trusted_windows_shell = r'''C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoLogo -NoProfile -NonInteractive -Command "$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\LASTEXITCODE) {{ exit $LASTEXITCODE }}"'''
+        trusted_windows_env = (
+            "        env:\n"
+            "          TRUSTED_PATH: ${{ steps.trusted-windows-tools.outputs.path }}\n"
+            "          TRUSTED_ZIG: ${{ steps.trusted-windows-tools.outputs.zig }}\n"
+            "          TRUSTED_PYTHON: ${{ steps.trusted-windows-tools.outputs.python }}\n"
+        )
+        trusted_posix_shell = (
+            "/bin/bash --noprofile --norc -p -eo pipefail -c "
+            '\'export PATH="$TRUSTED_PATH" GITHUB_ENV=/dev/null '
+            'GITHUB_PATH=/dev/null; source "$1"\' _ {0}'
+        )
+        trusted_posix_env = (
+            "        env:\n"
+            "          TRUSTED_PATH: ${{ steps.trusted-posix-tools.outputs.path }}\n"
+            "          BASH_ENV: /dev/null\n"
+            "          ENV: /dev/null\n"
+        )
+
+        def named_step(source: str, name: str) -> str:
+            marker = f"      - name: {name}\n"
+            start = source.index(marker)
+            lines = source[start:].splitlines()
+            step_lines = [lines[0]]
+            for line in lines[1:]:
+                if line.startswith("      - ") or (
+                    line.startswith("  ") and not line.startswith("   ")
+                ):
+                    break
+                step_lines.append(line)
+            return "\n".join(step_lines).rstrip()
+
         checkout = (
             "      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0\n"
             "        with:\n"
@@ -7396,64 +8282,125 @@ class BuildInventoryTests(unittest.TestCase):
             "            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-\n"
             "            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-\n"
         )
-        source_checker = (
+        expected_source_checker = (
             "      - name: Check build inventory\n"
-            "        run: python3 -B tools/check_build_inventory.py --root .\n"
+            f"        shell: {trusted_posix_shell}\n"
+            f"{trusted_posix_env}"
+            "        run: python3 -B tools/check_build_inventory.py --root ."
         )
-        windows_build = (
+        source_checker = named_step(text, "Check build inventory")
+        self.assertEqual(expected_source_checker, source_checker)
+        expected_windows_build = (
             "      - name: Build Windows Python tooling executable fixtures and libraries\n"
             "        if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'\n"
-            "        shell: pwsh\n"
+            f"        shell: {trusted_windows_shell}\n"
+            f"{trusted_windows_env}"
             "        run: |\n"
+            "          Set-StrictMode -Version Latest\n"
+            "          $env:PATH = $env:TRUSTED_PATH\n"
+            "          $ErrorActionPreference = 'Stop'\n"
             "          $dynamicLibrary = 'zig-out/bin/zynum_blas.dll'\n"
             "          if (Test-Path -LiteralPath $dynamicLibrary) {\n"
             '            Write-Error "canonical Windows DLL already exists before the reviewed build: $dynamicLibrary"\n'
             "            exit 1\n"
             "          }\n"
-            "          zig build install-libraries build-rank-k-probe build-rotg-latency-probe build-symm-probe build-triangular-matrix-probe ${{ matrix.target_args }} --release=fast --summary failures\n"
+            "          & $env:TRUSTED_ZIG build install-libraries build-rank-k-probe build-rotg-latency-probe build-symm-probe build-triangular-matrix-probe ${{ matrix.target_args }} --release=fast --summary failures\n"
             "          if ($LASTEXITCODE -ne 0) {\n"
             "            exit $LASTEXITCODE\n"
-            "          }\n"
+            "          }"
+        )
+        windows_binding_name = "Bind trusted Windows toolchain paths"
+        posix_binding_name = (
+            "Bind trusted POSIX toolchain paths and require Fortran for full smoke"
+        )
+        windows_build_name = (
+            "Build Windows Python tooling executable fixtures and libraries"
         )
         windows_layout_name = (
-            "      - name: Check Windows library layout and tooling fixture boundary\n"
+            "Check Windows library layout and tooling fixture boundary"
         )
         windows_gate_name = (
             "Run Windows DLL ABI and CBLAS L1-L3 compatibility smoke "
             "(not inventory evidence)"
         )
-        windows_gate_marker = f"      - name: {windows_gate_name}\n"
-        windows_gate_start = text.index(windows_gate_marker)
-        windows_gate_end = text.find("\n      - ", windows_gate_start + 1)
-        self.assertGreater(windows_gate_end, windows_gate_start)
-        windows_gate = text[windows_gate_start:windows_gate_end].rstrip()
-        host_tool_step = (
+        windows_binding = named_step(text, windows_binding_name)
+        posix_binding = named_step(text, posix_binding_name)
+        windows_build = named_step(text, windows_build_name)
+        windows_layout = named_step(text, windows_layout_name)
+        windows_gate = named_step(text, windows_gate_name)
+        expected_host_tool_step = (
             "      - name: Run host tool smoke once\n"
             "        if: matrix.zig_gate == 'inventory-certified'\n"
             "        timeout-minutes: 60\n"
+            f"        shell: {trusted_posix_shell}\n"
+            f"{trusted_posix_env}"
             "        run: zig build test-host-tool-smoke "
             "${{ matrix.target_args }} --summary failures"
+        )
+        host_tool_step = named_step(text, "Run host tool smoke once")
+        self.assertEqual(expected_windows_build, windows_build)
+        self.assertEqual(expected_host_tool_step, host_tool_step)
+        self.assertTrue(
+            windows_binding.startswith(
+                "      - name: Bind trusted Windows toolchain paths\n"
+                "        id: trusted-windows-tools\n"
+                "        if: runner.os == 'Windows'\n"
+                f"        shell: {trusted_windows_shell}\n"
+                "        run: |\n"
+            )
+        )
+        self.assertTrue(
+            posix_binding.startswith(
+                "      - name: Bind trusted POSIX toolchain paths and require Fortran for full smoke\n"
+                "        id: trusted-posix-tools\n"
+                "        if: runner.os != 'Windows'\n"
+                "        shell: /bin/bash --noprofile --norc -p -eo pipefail {0}\n"
+                "        env:\n"
+                "          BASH_ENV: /dev/null\n"
+                "          ENV: /dev/null\n"
+                "          REQUIRE_FORTRAN: ${{ matrix.full_smoke && runner.os == 'Linux' }}\n"
+                "        run: |\n"
+            )
         )
         checkout_index = text.index(checkout, text.index("  target-tests:\n"))
         setup_index = text.index(setup_zig, checkout_index + len(checkout))
         cache_index = text.index(cache, setup_index + len(setup_zig))
-        build_index = text.index(windows_build, cache_index + len(cache))
-        layout_index = text.index(windows_layout_name, build_index + len(windows_build))
-        gate_index = text.index(windows_gate, layout_index + len(windows_layout_name))
+        windows_binding_index = text.index(windows_binding, cache_index + len(cache))
+        posix_binding_index = text.index(
+            posix_binding, windows_binding_index + len(windows_binding)
+        )
+        build_index = text.index(
+            windows_build, posix_binding_index + len(posix_binding)
+        )
+        layout_index = text.index(windows_layout, build_index + len(windows_build))
+        gate_index = text.index(windows_gate, layout_index + len(windows_layout))
         host_tool_index = text.index(host_tool_step, gate_index + len(windows_gate))
         self.assertEqual(checkout_index + len(checkout) + 1, setup_index)
         self.assertEqual(setup_index + len(setup_zig) + 1, cache_index)
-        self.assertEqual(cache_index + len(cache) + 1, build_index)
-        self.assertEqual(build_index + len(windows_build) + 1, layout_index)
-        self.assertLess(layout_index, gate_index)
-        self.assertLess(gate_index, host_tool_index)
+        self.assertEqual(cache_index + len(cache) + 1, windows_binding_index)
+        self.assertEqual(
+            windows_binding_index + len(windows_binding) + 2,
+            posix_binding_index,
+        )
+        self.assertEqual(
+            posix_binding_index + len(posix_binding) + 2,
+            build_index,
+        )
+        self.assertEqual(build_index + len(windows_build) + 2, layout_index)
+        self.assertEqual(layout_index + len(windows_layout) + 2, gate_index)
+        self.assertEqual(gate_index + len(windows_gate) + 2, host_tool_index)
+        windows_gate_marker = f"      - name: {windows_gate_name}\n"
         self.assertTrue(
             windows_gate.startswith(
                 windows_gate_marker + "        if: runner.os == 'Windows' && "
                 "matrix.cache_target == 'windows-x86_64-baseline'\n"
-                "        shell: pwsh\n"
+                f"        shell: {trusted_windows_shell}\n"
                 "        timeout-minutes: 15\n"
+                f"{trusted_windows_env}"
                 "        run: |\n"
+                "          Set-StrictMode -Version Latest\n"
+                "          $env:PATH = $env:TRUSTED_PATH\n"
+                "          $ErrorActionPreference = 'Stop'\n"
             )
         )
         self.assertNotIn("tools/check_test_inventory.py", windows_gate)
@@ -7467,10 +8414,8 @@ class BuildInventoryTests(unittest.TestCase):
         self.assertNotIn("$preflightScript", windows_gate)
         for exact_completion_contract in (
             "Set-StrictMode -Version Latest",
-            "$ErrorActionPreference = 'Stop'",
-            "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1",
             "$completionNonce = [guid]::NewGuid().ToString('N')",
-            "$smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)",
+            "$smokeOutput = @(& $env:TRUSTED_PYTHON -I -B -c $smokeScript $completionNonce)",
             "$smokeExitCode = $LASTEXITCODE",
             "if ($null -eq $smokeExitCode -or $smokeExitCode -ne 0)",
             "if ($smokeOutput.Count -ne 1)",
@@ -7487,6 +8432,7 @@ class BuildInventoryTests(unittest.TestCase):
             "ensure_ascii=True",
         ):
             self.assertEqual(1, windows_gate.count(exact_completion_contract))
+        self.assertEqual(2, windows_gate.count("$ErrorActionPreference = 'Stop'"))
         self.assertEqual(2, windows_gate.count("flush=True"))
         self.assertEqual(1, windows_gate.count('$expectedCompletion = \'{"case_ids"'))
         self.assertNotIn("python -B -c", windows_gate)
@@ -7525,13 +8471,25 @@ class BuildInventoryTests(unittest.TestCase):
             source_checker, text.index("  source-checks:\n")
         )
         self.assertLess(source_checker_index, text.index("  target-tests:\n"))
+        self.assertTrue(
+            windows_layout.startswith(
+                "      - name: Check Windows library layout and tooling fixture boundary\n"
+                "        if: runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'\n"
+                f"        shell: {trusted_windows_shell}\n"
+                f"{trusted_windows_env}"
+                "        run: |\n"
+                "          Set-StrictMode -Version Latest\n"
+                "          $env:PATH = $env:TRUSTED_PATH\n"
+                "          $ErrorActionPreference = 'Stop'\n"
+            )
+        )
         for exact_layout_contract in (
             "$dynamicLibrary = 'zig-out/bin/zynum_blas.dll'",
             "$importLibrary = 'zig-out/lib/zynum_blas.lib'",
             "$staticLibrary = 'zig-out/lib/static/zynum_blas.lib'",
             "Sort-Object -Unique).Count -ne 3",
-            "zig ar t $importLibrary",
-            "zig ar t $staticLibrary",
+            "$importMembers = @(& $env:TRUSTED_ZIG ar t $importLibrary)",
+            "$staticMembers = @(& $env:TRUSTED_ZIG ar t $staticLibrary)",
             "'bench-zynum-blas.exe'",
             "'gemm-sweep.exe'",
             "'vector-matrix-sweep.exe'",
@@ -7539,17 +8497,22 @@ class BuildInventoryTests(unittest.TestCase):
             "'dcopy-probe.exe'",
             "Get-ChildItem -LiteralPath (Split-Path -Parent $dynamicLibrary) -Filter '*.dll' -File -Force",
         ):
-            self.assertIn(exact_layout_contract, text)
-        capability_command = (
+            self.assertIn(exact_layout_contract, windows_layout)
+        expected_capability_command = (
             "      - name: Compile enabled Level 2 width production-artifact probe\n"
             "        if: matrix.cache_target == 'x86_64-v4'\n"
+            f"        shell: {trusted_posix_shell}\n"
+            f"{trusted_posix_env}"
             "        run: >-\n"
             "          zig build build-level2-width-enabled-artifact\n"
             "          ${{ matrix.target_args }}\n"
             "          -Dlevel2-width-candidates=true\n"
-            "          --release=fast --summary failures\n"
+            "          --release=fast --summary failures"
         )
-        self.assertIn(capability_command, text)
+        capability_command = named_step(
+            text, "Compile enabled Level 2 width production-artifact probe"
+        )
+        self.assertEqual(expected_capability_command, capability_command)
         build_id = (
             "workflow-launch:.github/workflows/ci.yml:target-tests:"
             "build-windows-python-tooling-executable-fixtures-and-libraries"
@@ -7578,7 +8541,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": "Build Windows Python tooling executable fixtures and libraries",
-                "ordinal": 4,
+                "ordinal": 6,
             },
             build["anchor"],
         )
@@ -7589,7 +8552,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": "Check Windows library layout and tooling fixture boundary",
-                "ordinal": 5,
+                "ordinal": 7,
             },
             layout["anchor"],
         )
@@ -7600,7 +8563,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": windows_gate_name,
-                "ordinal": 6,
+                "ordinal": 8,
             },
             gate["anchor"],
         )
@@ -7611,7 +8574,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": "Run host tool smoke once",
-                "ordinal": 8,
+                "ordinal": 9,
             },
             host_tool["anchor"],
         )
@@ -7662,7 +8625,11 @@ class BuildInventoryTests(unittest.TestCase):
                 build_id,
             ),
             (" build-rank-k-probe", "", build_id),
-            ("zig build install-libraries", "zig build", build_id),
+            (
+                "& $env:TRUSTED_ZIG build install-libraries",
+                "& $env:TRUSTED_ZIG build",
+                build_id,
+            ),
             (
                 "$importLibrary = 'zig-out/lib/zynum_blas.lib'",
                 "$importLibrary = 'zig-out/lib/static/zynum_blas.lib'",
@@ -7673,16 +8640,15 @@ class BuildInventoryTests(unittest.TestCase):
                 "$staticLibrary = 'zig-out/lib/zynum_blas.lib'",
                 layout_id,
             ),
-            ("zig ar t $importLibrary", "zig ar t $staticLibrary", layout_id),
+            (
+                "& $env:TRUSTED_ZIG ar t $importLibrary",
+                "& $env:TRUSTED_ZIG ar t $staticLibrary",
+                layout_id,
+            ),
             ("-Filter '*.dll' -File -Force", "-Filter '*.dll' -File", layout_id),
             ("          $env:PYTHONHOME = $null\n", "", gate_id),
             ("          Set-StrictMode -Version Latest\n", "", gate_id),
             ("          $ErrorActionPreference = 'Stop'\n", "", gate_id),
-            (
-                "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop | Select-Object -First 1",
-                "$pythonCommand = Get-Command python -CommandType Application -ErrorAction Stop",
-                gate_id,
-            ),
             (
                 "$completionNonce = [guid]::NewGuid().ToString('N')",
                 "$completionNonce = '00000000000000000000000000000000'",
@@ -7779,8 +8745,8 @@ class BuildInventoryTests(unittest.TestCase):
             ),
             ('"executed": 3', '"executed": 2', gate_id),
             (
-                "$smokeOutput = @(& $pythonCommand.Path -I -B -c $smokeScript $completionNonce)",
-                "$smokeOutput = @(& $pythonCommand.Path -B -c $smokeScript $completionNonce)",
+                "$smokeOutput = @(& $env:TRUSTED_PYTHON -I -B -c $smokeScript $completionNonce)",
+                "$smokeOutput = @(& $env:TRUSTED_PYTHON -B -c $smokeScript $completionNonce)",
                 gate_id,
             ),
             ("$smokeExitCode = $LASTEXITCODE", "$smokeExitCode = 0", gate_id),
@@ -7819,19 +8785,34 @@ class BuildInventoryTests(unittest.TestCase):
                 capability_id,
             ),
         )
-        baselines = {item["id"]: item for item in (build, layout, gate, host_tool)}
-        baselines[capability_id] = next(
+        launch_baselines = {
+            item["id"]: item for item in (build, layout, gate, host_tool)
+        }
+        launch_baselines[capability_id] = next(
             item for item in launches if item["id"] == capability_id
         )
+        step_baselines = {
+            build_id: windows_build,
+            layout_id: windows_layout,
+            gate_id: windows_gate,
+            host_tool_id: host_tool_step,
+            capability_id: capability_command,
+        }
         for before, after, identifier in mutations:
             with self.subTest(windows_gate_mutation=before):
-                path.write_text(text.replace(before, after, 1), encoding="utf-8")
+                baseline_step = step_baselines[identifier]
+                self.assertIn(before, baseline_step)
+                mutated_step = baseline_step.replace(before, after, 1)
+                self.assertNotEqual(baseline_step, mutated_step)
+                path.write_text(
+                    text.replace(baseline_step, mutated_step, 1), encoding="utf-8"
+                )
                 mutated_launches = CHECKER._discover_workflow_launches(self.root)
                 mutated = next(
                     item for item in mutated_launches if item["id"] == identifier
                 )
                 self.assertNotEqual(
-                    baselines[identifier]["source_digest"],
+                    launch_baselines[identifier]["source_digest"],
                     mutated["source_digest"],
                 )
         path.write_text(text.replace(source_checker, "", 1), encoding="utf-8")

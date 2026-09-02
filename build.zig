@@ -978,8 +978,12 @@ pub fn build(b: *std.Build) void {
     if (inventory_profile) |resolved_inventory_profile| {
         for (inventory_cases) |inventory_case| {
             const official_tests = inventory_case.logical_tests orelse continue;
+            const root_id_prefix = "zig-root:";
+            if (!std.mem.startsWith(u8, inventory_case.root_id, root_id_prefix)) {
+                @panic("test inventory root ID must start with zig-root:");
+            }
             const inventory_tests = b.addTest(.{
-                .name = b.fmt("inventory-{s}", .{inventory_case.root_id}),
+                .name = b.fmt("inventory-zig-root-{s}", .{inventory_case.root_id[root_id_prefix.len..]}),
                 .root_module = official_tests.root_module,
                 .test_runner = .{
                     .path = b.path("tools/test_inventory_runner.zig"),

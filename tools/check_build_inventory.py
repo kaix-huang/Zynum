@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "0fad0134ea6cbc43ba2df57b474969bd0daae4664490ca0871ba07fc4bfd9c17"
+    "c2f5914c7c4b45622140c193448f8fc14c66b2c03c0b4da84413d8ddbdb77fc2"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -2314,10 +2314,87 @@ LEVEL2_WIDTH_ARTIFACT_CONTRACT_PATH = (
 )
 LEVEL2_WIDTH_STUB_ROOT_PATH = "src/blas/level2_width_stub_root.zig"
 REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
+    "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}",
+        "argv_shape": ["python3", "-B", "test/build/test_build_inventory.py"],
+        "evidence_role": "terminal singleton build-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
+        "job_timeout_minutes": 240,
+    },
+    "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}",
+        "argv_shape": ["python3", "-B", "test/build/test_test_inventory.py"],
+        "evidence_role": "terminal singleton test-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
+        "job_timeout_minutes": 120,
+    },
+    "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+        "argv_shape": [
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository source-check POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 120,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths": {
+        "condition": "runner.os == 'Windows'",
+        "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\\LASTEXITCODE) {{ exit $LASTEXITCODE }}\"",
+        "argv_shape": [
+            "fixed system Windows PowerShell: before repository execution, bind runner-resolved absolute regular non-reparse Zig 0.16.0 and isolated Python 3 application paths plus the original PATH outside GITHUB_WORKSPACE, reject CR/LF, and publish UTF-8 without BOM only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository Windows Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 180,
+    },
+    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": {
+        "condition": "runner.os != 'Windows'",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+        "argv_shape": [
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, require absolute gfortran for Linux full smoke, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/gfortran/path only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository POSIX Zig/Python/PATH binding with fail-closed Linux full-smoke Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 180,
+    },
+    "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+        "argv_shape": [
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, require absolute gfortran on Linux, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/gfortran/path only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository release POSIX Zig/Python/PATH binding with fail-closed Linux Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 180,
+    },
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+        "argv_shape": [
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository capability-build POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 45,
+    },
+    "workflow-launch:.github/workflows/release.yml:build-inventory-security:bind-trusted-posix-toolchain-paths": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+        "argv_shape": [
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository release build-inventory-security POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 240,
+    },
+    "workflow-launch:.github/workflows/release.yml:test-inventory-security:bind-trusted-posix-toolchain-paths": {
+        "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
+        "argv_shape": [
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+        ],
+        "evidence_role": "pre-repository release test-inventory-security POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
+        "job_timeout_minutes": 120,
+    },
     "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": {
         "condition": "runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'",
         "argv_shape": [
-            "pwsh -StrictMode Latest -ErrorAction Stop: resolve the first python Application by PATH precedence; generate one 32-lowercase-hex completion nonce; capture exactly one stdout line and an immediate non-null zero exit code from python -I -B -c <canonical-Windows-DLL-load-311-export-preflight-and-3-case-CBLAS-L1-L2-L3-functional-smoke-with-canonical-JSON-completion> <nonce>",
+            "pwsh -StrictMode Latest -ErrorAction Stop: reset PATH to the pre-repository trusted binding; use the bound absolute Python application; generate one 32-lowercase-hex completion nonce; capture exactly one stdout line and an immediate non-null zero exit code from trusted-python -I -B -c <canonical-Windows-DLL-load-311-export-preflight-and-3-case-CBLAS-L1-L2-L3-functional-smoke-with-canonical-JSON-completion> <nonce>",
         ],
         "evidence_role": "Windows canonical DLL identity after forced directory enumeration and pre-load re-enumeration, exact 311-export ABI surface, three ordered deterministic CBLAS L1-L3 functional cases, and one nonce-bound canonical JSON completion sentinel; compatibility smoke only, not inventory, complete ABI semantics, Fortran semantics, attestation, or performance evidence",
         "job_timeout_minutes": 180,
@@ -2453,8 +2530,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": {
         "condition": "matrix.zig_gate == 'windows-native-compile-link-smoke'",
         "argv_shape": [
-            "zig",
+            "& $env:TRUSTED_ZIG",
             "build",
+            "-j1",
             "test-inventory-link-windows-native-smoke",
             "<matrix.target_args>",
             "-Dtest-optimize=Debug",
@@ -2468,8 +2546,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": {
         "condition": "matrix.zig_gate == 'windows-native-compile-link-smoke'",
         "argv_shape": [
-            "zig",
+            "& $env:TRUSTED_ZIG",
             "build",
+            "-j1",
             "--release=safe",
             "test-inventory-link-windows-native-smoke",
             "<matrix.target_args>",
@@ -2484,8 +2563,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": {
         "condition": "matrix.zig_gate == 'windows-native-compile-link-smoke'",
         "argv_shape": [
-            "zig",
+            "& $env:TRUSTED_ZIG",
             "build",
+            "-j1",
             "--release=fast",
             "test-inventory-link-windows-native-smoke",
             "<matrix.target_args>",
@@ -2529,8 +2609,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     },
     "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": {
         "condition": "always",
+        "shell": "/bin/bash --noprofile --norc -p -eo pipefail -c 'export GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null; source \"$1\"' _ {0}",
         "argv_shape": ["<matrix.command>"],
-        "evidence_role": "native-feature-correctness-or-explicit-build-only-by-matrix-row",
+        "evidence_role": "terminal singleton native-feature correctness or explicit build-only matrix run with GitHub command-file channels masked before repository execution and action post hooks",
         "matrix_contract": {
             "host_native_correctness": [
                 "macOS / host-native correctness",
@@ -3254,6 +3335,13 @@ def _annotate_test_inventory_factory(
         raise InventoryError(
             "test inventory factory root ids must be unique and canonically sorted"
         )
+    if any(
+        re.fullmatch(r"zig-root:[a-z0-9]+(?:-[a-z0-9]+)*", root_id) is None
+        for root_id in root_ids
+    ):
+        raise InventoryError(
+            "test inventory factory root ids must have non-empty Windows-safe suffixes"
+        )
     if len(set(logical_ids)) != 21:
         raise InventoryError(
             "test inventory factory logical compile observations must be unique"
@@ -3416,12 +3504,30 @@ def _annotate_test_inventory_factory(
             "canonical test aggregate must depend on the test inventory run step"
         )
     add_test_call = _single_zig_call(loop_text, "b.addTest", "enumerator compile")
-    if (
-        'b.fmt("inventory-{s}", .{inventory_case.root_id})' not in add_test_call
-        or ".root_module = official_tests.root_module" not in add_test_call
-    ):
+    compact_loop = _compact_zig_contract(loop_text)
+    physical_name_contracts = (
+        'constroot_id_prefix="zig-root:";',
+        "if(!std.mem.startsWith(u8,inventory_case.root_id,root_id_prefix)){"
+        '@panic("test inventory root ID must start with zig-root:");}',
+    )
+    if any(compact_loop.count(contract) != 1 for contract in physical_name_contracts):
         raise InventoryError(
-            "test inventory factory compile must preserve logical name and root-module pointer"
+            "test inventory factory physical artifact name contract must preserve the "
+            "exact fail-closed zig-root prefix bijection"
+        )
+    compact_add_test_call = _compact_zig_contract(add_test_call)
+    physical_name_binding = (
+        '.name=b.fmt("inventory-zig-root-{s}",'
+        ".{inventory_case.root_id[root_id_prefix.len..]})"
+    )
+    if compact_add_test_call.count(physical_name_binding) != 1:
+        raise InventoryError(
+            "test inventory factory physical artifact name contract must preserve the "
+            "exact fail-closed zig-root prefix bijection"
+        )
+    if ".root_module = official_tests.root_module" not in add_test_call:
+        raise InventoryError(
+            "test inventory factory compile must preserve the logical root-module pointer"
         )
     runner_match = re.search(
         r"\.test_runner\s*=\s*\.\{[\s\S]*?\.path\s*=\s*b\.path\s*\(\s*\"([^\"\\]+)\"\s*\)\s*,"
@@ -3855,6 +3961,20 @@ def _validate_test_inventory_factory_contract(
     _require(
         factory.get("structure_checker_dependency") is None,
         "test inventory shared Compile node must not inherit the POSIX structure checker",
+        errors,
+    )
+    _require(
+        factory.get("output_name") == "inventory-zig-root-{root-id-suffix}",
+        "test inventory factory output_name must preserve the safe physical artifact pattern",
+        errors,
+    )
+    _require(
+        factory.get("produced_outputs")
+        == [
+            "inventory-zig-root-{root-id-suffix}",
+            "inventory-zig-root-{root-id-suffix}.exe",
+        ],
+        "test inventory factory produced_outputs must preserve the safe physical artifact patterns",
         errors,
     )
     for case in factory.get("expansion_cases", []):
@@ -13664,6 +13784,14 @@ def validate(root: Path, inventory_path: Path) -> list[str]:
 
 
 def _reviewed_observation_refresh_fields(identifier: str) -> dict[str, Any]:
+    if identifier == TEST_INVENTORY_FACTORY_COMPILE_ID:
+        return {
+            "output_name": "inventory-zig-root-{root-id-suffix}",
+            "produced_outputs": [
+                "inventory-zig-root-{root-id-suffix}",
+                "inventory-zig-root-{root-id-suffix}.exe",
+            ],
+        }
     if identifier == HOST_TOOL_SMOKE_STEP_ID:
         return _host_tool_smoke_step_template()
     if identifier == PYTHON_TOOLING_STEP_ID:
@@ -14166,7 +14294,7 @@ def _new_test_inventory_observation(
         return {
             "owner": "test-infrastructure",
             "artifact_kind": "test",
-            "output_name": "inventory-{root-id}",
+            "output_name": "inventory-zig-root-{root-id-suffix}",
             "root_source": logical_sources,
             "linkage": "not-applicable",
             "compile_for": "requested-target",
@@ -14174,8 +14302,8 @@ def _new_test_inventory_observation(
             "optimize_source": "test-optimize",
             "condition": "one artifact for each applicable logical Zig root",
             "produced_outputs": [
-                "inventory-{root-id}",
-                "inventory-{root-id}.exe",
+                "inventory-zig-root-{root-id-suffix}",
+                "inventory-zig-root-{root-id-suffix}.exe",
             ],
             "install_destinations": [],
         }
