@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "0fbdde6b5b7509deac0f53b6a67dce93e7754dfd70702ec5de92998869e7f6f6"
+    "fbbff3ba7ae7ed410b130e6e3e365fd0c533cc42a7dc4ffd068d279cc6f23974"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -3524,6 +3524,14 @@ def _annotate_test_inventory_factory(
         raise InventoryError(
             "test inventory factory physical artifact name contract must preserve the "
             "exact fail-closed zig-root prefix bijection"
+        )
+    windows_strip_contract = (
+        "if(target.result.os.tag==.windowsandtarget.result.ofmt==.coff){"
+        "inventory_tests.root_module.strip=true;}"
+    )
+    if compact_loop.count(windows_strip_contract) != 1:
+        raise InventoryError(
+            "Windows COFF inventory compile artifacts must strip debug information"
         )
     if ".root_module = official_tests.root_module" not in add_test_call:
         raise InventoryError(
@@ -14341,7 +14349,7 @@ def _new_test_inventory_observation(
     if identifier == TEST_INVENTORY_WINDOWS_NATIVE_LINK_STEP_ID:
         return {
             "owner": "build-composition",
-            "description": "Compile/link the 21 canonical native Windows GNU inventory artifacts as compatibility-only evidence",
+            "description": "Compile/link the 21 canonical native Windows GNU inventory artifacts without debug information as compatibility-only evidence",
             "aggregate_test_membership": "supporting-entry-point",
             "aggregate_condition": "explicit named Windows compatibility step only",
             "intentional_orphan": False,

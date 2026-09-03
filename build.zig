@@ -967,7 +967,7 @@ pub fn build(b: *std.Build) void {
     );
     const test_inventory_link_windows_native_smoke_step = b.step(
         "test-inventory-link-windows-native-smoke",
-        "Compile/link the 21 canonical native Windows GNU inventory artifacts as compatibility-only evidence",
+        "Compile/link the 21 canonical native Windows GNU inventory artifacts without debug information as compatibility-only evidence",
     );
     const test_inventory_step = b.step(
         "test-inventory",
@@ -990,6 +990,9 @@ pub fn build(b: *std.Build) void {
                     .mode = .simple,
                 },
             });
+            if (target.result.os.tag == .windows and target.result.ofmt == .coff) {
+                inventory_tests.root_module.strip = true;
+            }
             const run_inventory_tests = b.addRunArtifact(inventory_tests);
             run_inventory_tests.step.dependOn(&test_inventory_structure_check.step);
             run_inventory_tests.addFileArg(b.path("tools/test_inventory.json"));

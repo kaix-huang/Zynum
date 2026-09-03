@@ -623,6 +623,18 @@ class BuildInventoryTests(unittest.TestCase):
                 "physical artifact name contract",
             ),
             (
+                "            if (target.result.os.tag == .windows and target.result.ofmt == .coff) {\n"
+                "                inventory_tests.root_module.strip = true;\n"
+                "            }\n",
+                "",
+                "Windows COFF inventory compile artifacts must strip debug information",
+            ),
+            (
+                "inventory_tests.root_module.strip = true;",
+                "inventory_tests.root_module.strip = false;",
+                "Windows COFF inventory compile artifacts must strip debug information",
+            ),
+            (
                 ".root_module = official_tests.root_module,",
                 ".root_module = blas_module_tests.root_module,",
                 "test inventory factory loop is missing required relation",
