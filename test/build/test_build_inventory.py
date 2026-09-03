@@ -4439,12 +4439,13 @@ class BuildInventoryTests(unittest.TestCase):
                 "$candidate.Equals($workspace, [StringComparison]::OrdinalIgnoreCase)",
                 "$candidate.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase)",
                 "$zigVersion[0] -cne '0.16.0'",
-                "& $trustedPython -I -B -c",
+                "& $trustedPython -I -B --version 2>&1",
                 '"zig=$trustedZig"',
                 '"python=$trustedPython"',
                 '"path=$trustedPath"',
             ):
                 self.assertIn(fragment, windows_binding)
+            self.assertNotIn("& $trustedPython -I -B -c", windows_binding)
             self.assertIn(
                 "$utf8NoBom = New-Object Text.UTF8Encoding($false)", windows_binding
             )
@@ -4661,7 +4662,7 @@ class BuildInventoryTests(unittest.TestCase):
                 ),
             )
             self.assertIn(
-                "@(& $env:TRUSTED_PYTHON -I -B -c",
+                "$smokeScript | & $env:TRUSTED_PYTHON -I -B - $completionNonce",
                 windows_steps[trusted_windows_steps[2]],
             )
             for name in trusted_windows_steps[3:]:
@@ -5111,8 +5112,8 @@ class BuildInventoryTests(unittest.TestCase):
             mutate_job(
                 ci_source,
                 "target-tests",
-                "@(& $env:TRUSTED_PYTHON -I -B -c",
-                "@(python -I -B -c",
+                "$smokeScript | & $env:TRUSTED_PYTHON -I -B - $completionNonce",
+                "$smokeScript | python -I -B - $completionNonce",
             ),
             mutate_job(
                 ci_source,
@@ -8409,7 +8410,7 @@ class BuildInventoryTests(unittest.TestCase):
         for exact_completion_contract in (
             "Set-StrictMode -Version Latest",
             "$completionNonce = [guid]::NewGuid().ToString('N')",
-            "$smokeOutput = @(& $env:TRUSTED_PYTHON -I -B -c $smokeScript $completionNonce)",
+            "$smokeOutput = @($smokeScript | & $env:TRUSTED_PYTHON -I -B - $completionNonce)",
             "$smokeExitCode = $LASTEXITCODE",
             "if ($null -eq $smokeExitCode -or $smokeExitCode -ne 0)",
             "if ($smokeOutput.Count -ne 1)",
@@ -8429,7 +8430,7 @@ class BuildInventoryTests(unittest.TestCase):
         self.assertEqual(2, windows_gate.count("$ErrorActionPreference = 'Stop'"))
         self.assertEqual(2, windows_gate.count("flush=True"))
         self.assertEqual(1, windows_gate.count('$expectedCompletion = \'{"case_ids"'))
-        self.assertNotIn("python -B -c", windows_gate)
+        self.assertNotIn("-I -B -c", windows_gate)
         for ffi_contract in (
             "cblas_daxpy.argtypes = [",
             "cblas_daxpy.restype = None",
@@ -8739,8 +8740,8 @@ class BuildInventoryTests(unittest.TestCase):
             ),
             ('"executed": 3', '"executed": 2', gate_id),
             (
-                "$smokeOutput = @(& $env:TRUSTED_PYTHON -I -B -c $smokeScript $completionNonce)",
-                "$smokeOutput = @(& $env:TRUSTED_PYTHON -B -c $smokeScript $completionNonce)",
+                "$smokeOutput = @($smokeScript | & $env:TRUSTED_PYTHON -I -B - $completionNonce)",
+                "$smokeOutput = @($smokeScript | & $env:TRUSTED_PYTHON -B - $completionNonce)",
                 gate_id,
             ),
             ("$smokeExitCode = $LASTEXITCODE", "$smokeExitCode = 0", gate_id),

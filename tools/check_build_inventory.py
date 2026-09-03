@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "51c0546c47f4f8384451c25455c6162223f5e4570531dde2797a557215756c1a"
+    "0fbdde6b5b7509deac0f53b6a67dce93e7754dfd70702ec5de92998869e7f6f6"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -2394,7 +2394,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": {
         "condition": "runner.os == 'Windows' && matrix.cache_target == 'windows-x86_64-baseline'",
         "argv_shape": [
-            "pwsh -StrictMode Latest -ErrorAction Stop: reset PATH to the pre-repository trusted binding; use the bound absolute Python application; generate one 32-lowercase-hex completion nonce; capture exactly one stdout line and an immediate non-null zero exit code from trusted-python -I -B -c <canonical-Windows-DLL-load-311-export-preflight-and-3-case-CBLAS-L1-L2-L3-functional-smoke-with-canonical-JSON-completion> <nonce>",
+            "pwsh -StrictMode Latest -ErrorAction Stop: reset PATH to the pre-repository trusted binding; use the bound absolute Python application; generate one 32-lowercase-hex completion nonce; stream the canonical Windows DLL/CBLAS smoke program to trusted-python -I -B - <nonce>; capture exactly one stdout line and an immediate non-null zero exit code with canonical JSON completion",
         ],
         "evidence_role": "Windows canonical DLL identity after forced directory enumeration and pre-load re-enumeration, exact 311-export ABI surface, three ordered deterministic CBLAS L1-L3 functional cases, and one nonce-bound canonical JSON completion sentinel; compatibility smoke only, not inventory, complete ABI semantics, Fortran semantics, attestation, or performance evidence",
         "job_timeout_minutes": 180,

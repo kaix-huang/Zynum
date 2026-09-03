@@ -329,8 +329,8 @@ jobs:
           if ($LASTEXITCODE -ne 0 -or $zigVersion.Count -ne 1 -or $zigVersion[0] -cne '0.16.0') {
             throw "trusted Zig must report exactly version 0.16.0; observed: $($zigVersion -join ', ')"
           }
-          $pythonVersion = @(& $trustedPython -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')
-          if ($LASTEXITCODE -ne 0 -or $pythonVersion.Count -ne 1 -or $pythonVersion[0] -notmatch '^3\.[0-9]+\.[0-9]+$') {
+          $pythonVersion = @(& $trustedPython -I -B --version 2>&1)
+          if ($LASTEXITCODE -ne 0 -or $pythonVersion.Count -ne 1 -or $pythonVersion[0] -notmatch '^Python 3\.[0-9]+\.[0-9]+$') {
             throw "trusted Python isolation/version smoke failed; observed: $($pythonVersion -join ', ')"
           }
 
@@ -801,7 +801,7 @@ jobs:
           )
           '@
           $completionNonce = [guid]::NewGuid().ToString('N')
-          $smokeOutput = @(& $env:TRUSTED_PYTHON -I -B -c $smokeScript $completionNonce)
+          $smokeOutput = @($smokeScript | & $env:TRUSTED_PYTHON -I -B - $completionNonce)
           $smokeExitCode = $LASTEXITCODE
           if ($null -eq $smokeExitCode -or $smokeExitCode -ne 0) {
             throw "Windows DLL/CBLAS smoke failed with exit code $smokeExitCode"
