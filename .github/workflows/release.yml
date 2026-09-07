@@ -456,8 +456,8 @@ jobs:
           binary_archive="$workspace/${{ matrix.artifact }}.tar.gz"
           tar -czf "$binary_archive" \
             -C zig-out lib include \
-            -C "$GITHUB_WORKSPACE" LICENSE COPYING COPYING.LESSER
-          licenses=(LICENSE COPYING COPYING.LESSER)
+            -C "$GITHUB_WORKSPACE" LICENSE COPYING
+          licenses=(LICENSE COPYING)
           members="$(tar -tzf "$binary_archive")"
           for license in "${licenses[@]}"; do
             count="$(printf '%s\n' "$members" | grep -Fxc "$license" || true)"

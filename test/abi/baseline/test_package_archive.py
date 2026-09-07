@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import importlib.util
 import inspect
 import json
@@ -94,10 +95,18 @@ class PackageArchiveTests(unittest.TestCase):
             allowed = root / ".github/workflows"
             allowed.mkdir(parents=True)
             checker.validate_path(root, ".github/workflows")
-            forbidden = root / ".git/hooks"
-            forbidden.mkdir(parents=True)
-            with self.assertRaisesRegex(ValueError, "forbidden package path"):
-                checker.validate_path(root, ".git/hooks")
+            for component in checker.FORBIDDEN_PATH_PARTS:
+                for rel in (f"{component}/data", f"payload/{component}/data"):
+                    with self.subTest(path=rel):
+                        forbidden = root / rel
+                        forbidden.mkdir(parents=True)
+                        with self.assertRaisesRegex(ValueError, "forbidden package path"):
+                            checker.validate_path(root, rel)
+                        with self.assertRaisesRegex(ValueError, "local metadata"):
+                            checker.package_files(root, (rel,), repository=None)
+                allowed = f"payload/{component}-public"
+                (root / allowed).mkdir(parents=True)
+                checker.validate_path(root, allowed)
 
     def test_git_allowlist_excludes_ignored_files(self) -> None:
         with tempfile.TemporaryDirectory() as name:
@@ -5022,15 +5031,23 @@ class PackageArchiveTests(unittest.TestCase):
                 self.assertEqual(0, checker.main())
 
     def test_distribution_license_documents_are_complete_and_archivable(self) -> None:
-        license_names = ("LICENSE", "COPYING", "COPYING.LESSER")
+        license_names = ("LICENSE", "COPYING")
         declared_paths = checker.package_paths(ROOT / "build.zig.zon")
         for name in license_names:
             self.assertIn(name, declared_paths)
 
-        self.assertEqual(
-            (ROOT / "LICENSE").read_bytes(),
-            (ROOT / "COPYING.LESSER").read_bytes(),
-        )
+        self.assertNotIn("COPYING.LESSER", declared_paths)
+        self.assertFalse((ROOT / "COPYING.LESSER").exists())
+        # Pin the complete, reviewed texts rather than accepting truncated files.
+        expected_digests = {
+            "LICENSE": "e3a994d82e644b03a792a930f574002658412f62407f5fee083f2555c5f23118",
+            "COPYING": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        }
+        for license_name, digest in expected_digests.items():
+            with self.subTest(license=license_name):
+                self.assertEqual(
+                    digest, hashlib.sha256((ROOT / license_name).read_bytes()).hexdigest()
+                )
         with tempfile.TemporaryDirectory() as name:
             archive_path = Path(name) / "licenses.tar.gz"
             files = checker.package_files(ROOT, license_names, repository=None)

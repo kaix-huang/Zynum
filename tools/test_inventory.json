@@ -222,6 +222,19 @@
       "matrix_applicable": true
     },
     {
+      "id": "python-root:build-profiles-direct",
+      "language": "python",
+      "root_kind": "direct",
+      "module_paths": [
+        "test/build/test_build_profiles.py"
+      ],
+      "launch_observation_ids": [
+        "launch:build.zig:build:build_profile_tests"
+      ],
+      "aggregate_step_observation_id": "step:build.zig:build:test",
+      "matrix_applicable": false
+    },
+    {
       "id": "python-root:test-inventory-direct",
       "language": "python",
       "root_kind": "direct",
@@ -8296,6 +8309,39 @@
       "gap_ids": []
     },
     {
+      "id": "python-module:test/build/test_build_profiles.py",
+      "path": "test/build/test_build_profiles.py",
+      "declarations": [
+        {
+          "id": "python-decl:test/build/test_build_profiles.py:0",
+          "name": "BuildProfileTests.test_default_and_explicitly_disabled_profiles",
+          "ordinal": 0
+        },
+        {
+          "id": "python-decl:test/build/test_build_profiles.py:1",
+          "name": "BuildProfileTests.test_each_single_profile",
+          "ordinal": 1
+        },
+        {
+          "id": "python-decl:test/build/test_build_profiles.py:2",
+          "name": "BuildProfileTests.test_all_conflicting_combinations",
+          "ordinal": 2
+        },
+        {
+          "id": "python-decl:test/build/test_build_profiles.py:3",
+          "name": "BuildProfileTests.test_non_profile_controls_remain_composable",
+          "ordinal": 3
+        }
+      ],
+      "root_ids": [
+        "python-root:build-profiles-direct"
+      ],
+      "launch_observation_ids": [
+        "launch:build.zig:build:build_profile_tests"
+      ],
+      "gap_ids": []
+    },
+    {
       "id": "python-module:test/build/test_test_inventory.py",
       "path": "test/build/test_test_inventory.py",
       "declarations": [
@@ -14583,6 +14629,35 @@
       ],
       "count": 348,
       "digest": "b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "enumeration_source": "static"
+    },
+    {
+      "id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "root_id": "python-root:build-profiles-direct",
+      "tests": [
+        {
+          "id": "test:python-root-build-profiles-direct:0",
+          "name": "test/build/test_build_profiles.py::BuildProfileTests.test_default_and_explicitly_disabled_profiles",
+          "ordinal": 0
+        },
+        {
+          "id": "test:python-root-build-profiles-direct:1",
+          "name": "test/build/test_build_profiles.py::BuildProfileTests.test_each_single_profile",
+          "ordinal": 1
+        },
+        {
+          "id": "test:python-root-build-profiles-direct:2",
+          "name": "test/build/test_build_profiles.py::BuildProfileTests.test_all_conflicting_combinations",
+          "ordinal": 2
+        },
+        {
+          "id": "test:python-root-build-profiles-direct:3",
+          "name": "test/build/test_build_profiles.py::BuildProfileTests.test_non_profile_controls_remain_composable",
+          "ordinal": 3
+        }
+      ],
+      "count": 4,
+      "digest": "1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
       "enumeration_source": "static"
     },
     {
@@ -21467,6 +21542,51 @@
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
+      "id": "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "environment_id": "env:aarch64-linux-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "environment_id": "env:aarch64-linux-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "environment_id": "env:aarch64-linux-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
       "id": "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "environment_id": "env:aarch64-linux-gnu-baseline",
       "root_id": "python-root:test-inventory-direct",
@@ -22634,6 +22754,51 @@
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
       "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:Debug",
+      "environment_id": "env:aarch64-macos-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-profiles-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "environment_id": "env:aarch64-macos-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "environment_id": "env:aarch64-macos-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23807,6 +23972,51 @@
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
+      "id": "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "environment_id": "env:x86-64-linux-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "environment_id": "env:x86-64-linux-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "environment_id": "env:x86-64-linux-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
       "id": "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "environment_id": "env:x86-64-linux-gnu-baseline",
       "root_id": "python-root:test-inventory-direct",
@@ -24975,6 +25185,51 @@
       "enumeration_class_id": "enumeration-class:python-static",
       "expected_test_set_id": null,
       "expectation_state": "not-applicable"
+    },
+    {
+      "id": "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "environment_id": "env:x86-64-windows-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "environment_id": "env:x86-64-windows-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "environment_id": "env:x86-64-windows-gnu-baseline",
+      "root_id": "python-root:build-profiles-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_build_profiles.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
     },
     {
       "id": "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:Debug",
@@ -26180,6 +26435,9 @@
       "row:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:Debug",
       "row:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseFast",
       "row:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseSafe",
+      "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26258,6 +26516,9 @@
       "row:env-aarch64-macos-baseline:python-root-build-inventory-direct:Debug",
       "row:env-aarch64-macos-baseline:python-root-build-inventory-direct:ReleaseFast",
       "row:env-aarch64-macos-baseline:python-root-build-inventory-direct:ReleaseSafe",
+      "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:Debug",
+      "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "row:env-aarch64-macos-baseline:python-root-test-inventory-direct:Debug",
       "row:env-aarch64-macos-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-aarch64-macos-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26336,6 +26597,9 @@
       "row:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:Debug",
       "row:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseFast",
       "row:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseSafe",
+      "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26414,6 +26678,9 @@
       "row:env-x86-64-windows-gnu-baseline:python-root-build-inventory-direct:Debug",
       "row:env-x86-64-windows-gnu-baseline:python-root-build-inventory-direct:ReleaseFast",
       "row:env-x86-64-windows-gnu-baseline:python-root-build-inventory-direct:ReleaseSafe",
+      "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:Debug",
+      "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
+      "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:Debug",
       "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26481,8 +26748,8 @@
       "row:env-x86-64-windows-gnu-baseline:zig-root-zynum-public-surface-contract-tests:ReleaseFast",
       "row:env-x86-64-windows-gnu-baseline:zig-root-zynum-public-surface-contract-tests:ReleaseSafe"
     ],
-    "count": 312,
-    "digest": "14613e4aee4ef61b0891597850bd785f44e7169ac8cc4bb1a96a2b15a5e46ad3"
+    "count": 324,
+    "digest": "0c0a3fd5e546c9f339dada58a5e03b174048cbd325c1b8784edcd421b49ea2cf"
   },
   "strict_summary": {
     "test_enumeration_classes": {
@@ -26490,28 +26757,28 @@
       "digest": "6e0497ce988495e354c68513e0df0413fd38f5a61060c4856bf07aad4ecacba5"
     },
     "test_roots": {
-      "count": 26,
-      "digest": "38c803913436538e6dc4696edeb6a37bf4393e89e80f3214313e1671c9288340"
+      "count": 27,
+      "digest": "dcf53dd459edb1be5ed2a588d6190d71d5159740722735fe04f2fcb187056744"
     },
     "zig_test_files": {
       "count": 51,
       "digest": "d520e2bd104edb933dbf84afdd0ac82816c0d45b6111d22fc012c9cc54bebabf"
     },
     "python_test_modules": {
-      "count": 19,
-      "digest": "ad51c537482e7f0db322a529294dc70fa97fe6e01585170a0d7670ed5892ddff"
+      "count": 20,
+      "digest": "2560a5a2c396b082a3266a0a9b40e4f36d3e470617d9435c33435d02ac1baedb"
     },
     "expected_test_sets": {
-      "count": 42,
-      "digest": "511844c7014a9bd352229fc045a0fb3d52d54207ce94f59d18d0ea8b1c236e75"
+      "count": 43,
+      "digest": "decefcf9d1aa4bb4397150ba2438dc433e794e422046cd6a2f6ab868ed438817"
     },
     "native_observation_bindings": {
       "count": 123,
       "digest": "a0418aeefff6bcf51d7e802262923042e9e2ff100bab6166a07b04c5379296d3"
     },
     "test_mode_rows": {
-      "count": 312,
-      "digest": "db532ded9a72b1be183634e42eeb8d114e5b277b2299ae0203816684718793da"
+      "count": 324,
+      "digest": "ad28a27528c1366a57b075ab05f90cabec7a80f68147a8c11dffddabf016dd4d"
     },
     "workflow_mode_bindings": {
       "count": 4,

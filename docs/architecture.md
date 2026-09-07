@@ -46,7 +46,9 @@ architecture-specific dispatch or instruction modules.
 
 ## Core Semantics
 
-- `src/blas/core.zig` is the checked internal facade.
+- `src/blas/core.zig` is the internal facade for checked callers; it currently
+  also re-exports unchecked operations, so the import boundary alone does not
+  enforce validation.
 - `src/blas/core/unchecked.zig` is the narrow ABI-facing facade.
 - `src/blas/core/shared/` owns scalar arithmetic and indexing.
 - `src/blas/core/checked/` owns validated operands and checked execution.
@@ -265,6 +267,7 @@ Run these security and consistency gates in a process with no inherited
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_INVENTORY_CHECKS'
+set -eu
 python3 -B tools/check_build_inventory.py --root .
 python3 -B tools/check_test_inventory.py --structure-only
 zig build test-build-inventory --summary failures
@@ -275,6 +278,68 @@ ZYNUM_INVENTORY_CHECKS
 Performance changes require correctness-checked native evidence for
 representative shapes on the advertised AArch64 or x86_64 capability tier.
 Raw reports and host-specific records remain outside the public repository.
+
+## Improvement Priorities
+
+The completed item below records the first review follow-up; the remaining
+items are proposed work, not implemented behavior changes. Preserve numerical
+semantics, public imports, ABI symbols, and measured fallback gates while
+addressing them incrementally.
+
+### Near Term
+
+1. **Completed: reject conflicting experimental profiles.** `build.zig`
+   rejects multiple enabled profile flags before selecting `selected_profile`.
+   The six flags are `structured-object-candidates`,
+   `structured-object-baseline`, `level1-sve-candidates`,
+   `level1-fixed-candidates`, `level2-fixed-candidates`, and
+   `level2-width-candidates`. Default and single-profile behavior is unchanged;
+   `apple-amx` and `level2-compact-triangular-baseline` remain independent
+   controls. `zig build test-build-profiles` checks defaults, every single
+   profile, all 57 conflicting combinations, and independent controls. It also
+   runs through `test-host-tool-smoke`. These are configuration checks, not
+   native kernel correctness or performance evidence.
+2. **Remove unreachable tuning rules without enabling new routes.** In
+   `src/blas/kernels/shared/matrix_matrix/tuning.zig`, the f32 branch of
+   `selectAmx` rejects `k > 512` before later rules for `k == 1024` and
+   `k >= 2048`/`4096`. Remove the unreachable conditions while retaining the
+   current safety gate; test selection boundaries such as `K=512/513`.
+   Relaxing that gate is separate performance work requiring native evidence.
+3. **Narrow product/tool build dependencies.** `install-libraries` already
+   exists, but the default non-Windows install also builds benchmark/probe
+   executables, and some benchmark run steps depend on the entire install
+   step. Make tool installation explicit and individual run steps depend only
+   on their required artifacts. Review install compatibility and refresh the
+   build inventory together; split `build.zig` by responsibility only after
+   those dependencies are clear.
+
+### Subsequent Boundary Work
+
+- **Make checked imports narrower.** API callers use the broad `core.zig`
+  facade; expose a smaller checked-operands/operations boundary and add import
+  direction checks. Public declaration contract tests already exist but do not
+  enforce internal dependency direction. Do not remove public facade aliases
+  merely because they are re-exports.
+- **Separate measured preferences from plan feasibility.**
+  `src/blas/core/matrix_matrix/planner.zig` embeds shape/type/thread preferences
+  alongside task construction, while kernel preferences also live in
+  `kernels/shared/matrix_matrix/tuning.zig`. Name and centralize empirical
+  policy, retaining workspace, alignment, task coverage, and fallback
+  constraints in the planner. Compare selection results before retuning.
+- **Explain and test runtime scheduling exceptions.**
+  `src/blas/core/execution/thread_pool.zig` shares admission between ordinary
+  and persistent execution and contains a `count == 3` helper-index special
+  case. Establish evidence for that exception; extend lifecycle coverage for
+  mixed modes, concurrent callers, shutdown/restart, and thread-cap changes.
+  Existing shutdown/failure tests are useful foundations. Do not merge the
+  two lifecycles or change waiting protocols without independent correctness
+  and native performance validation.
+
+Build/test inventories and benchmark report helpers are maintained project
+infrastructure, not disposable planning metadata. Keep their safety gates and
+shared utilities; delete tools only after checking build, CI, test, and report
+consumers. Complete pending native inventory rows on the exact target systems
+rather than replacing missing evidence with cross-link results.
 
 ## Naming Rules
 

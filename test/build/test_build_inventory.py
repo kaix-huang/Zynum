@@ -82,10 +82,11 @@ class BuildInventoryTests(unittest.TestCase):
     def _assert_binary_license_archive(self, archive_path: Path) -> None:
         expected = {
             name: (REPOSITORY_ROOT / name).read_bytes()
-            for name in ("LICENSE", "COPYING", "COPYING.LESSER")
+            for name in ("LICENSE", "COPYING")
         }
         with tarfile.open(archive_path, "r:gz") as archive:
             names = archive.getnames()
+            self.assertNotIn("COPYING.LESSER", names)
             for name, expected_bytes in expected.items():
                 self.assertEqual(1, names.count(name))
                 member = archive.getmember(name)
@@ -841,6 +842,22 @@ class BuildInventoryTests(unittest.TestCase):
                 )
             ),
             (
+                'b.pathFromRoot("test/build/test_build_profiles.py"),',
+                'b.pathFromRoot("test/build/test_build_inventory.py"),',
+                "build profile launch must preserve its exact reviewed argv",
+            ),
+            (
+                "build_profile_test_step.dependOn(&build_profile_tests.step);",
+                "build_profile_test_step.dependOn(&build_inventory_tests.step);",
+                "build profile named step must close over exactly its launch",
+            ),
+            (
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
+                "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);\n"
+                "    test_step.dependOn(build_profile_test_step);",
+                "must not bypass the host-tool aggregate or include build inventory",
+            ),
+            (
                 "python_tooling_test_step.dependOn(&python_tooling_tests.step);",
                 "python_tooling_test_step.dependOn(&test_inventory_security_tests.step);",
                 "named step must close over exactly its launch",
@@ -871,7 +888,7 @@ class BuildInventoryTests(unittest.TestCase):
                 (
                     dependency,
                     "// removed reviewed host-tool dependency",
-                    "must preserve its exact six direct dependencies",
+                    "must preserve its exact seven direct dependencies",
                 )
                 for dependency in (
                     "host_tool_smoke_test_step.dependOn(python_tooling_test_step);",
@@ -880,13 +897,14 @@ class BuildInventoryTests(unittest.TestCase):
                     "host_tool_smoke_test_step.dependOn(&cpp_header_smoke_test.step);",
                     "host_tool_smoke_test_step.dependOn(&fortran_module_smoke_test.step);",
                     "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);",
+                    "host_tool_smoke_test_step.dependOn(build_profile_test_step);",
                 )
             ),
             (
                 "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);",
                 "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);\n"
                 "    host_tool_smoke_test_step.dependOn(&build_inventory_tests.step);",
-                "must preserve its exact six direct dependencies",
+                "must preserve its exact seven direct dependencies",
             ),
         )
         baseline_build = (self.root / "build.zig").read_text(encoding="utf-8")
@@ -5475,10 +5493,10 @@ class BuildInventoryTests(unittest.TestCase):
             any("$workspace/" in command for command in observed_checksum_commands)
         )
         self.assertIn(
-            '-C "$GITHUB_WORKSPACE" LICENSE COPYING COPYING.LESSER',
+            '-C "$GITHUB_WORKSPACE" LICENSE COPYING',
             binary_package,
         )
-        self.assertIn("licenses=(LICENSE COPYING COPYING.LESSER)", binary_package)
+        self.assertIn("licenses=(LICENSE COPYING)", binary_package)
         self.assertIn('members="$(tar -tzf "$binary_archive")"', binary_package)
         self.assertIn('grep -Fxc "$license"', binary_package)
         self.assertIn('test "$count" -eq 1', binary_package)
@@ -5581,7 +5599,7 @@ class BuildInventoryTests(unittest.TestCase):
 
         expected = {
             name: (REPOSITORY_ROOT / name).read_bytes()
-            for name in ("LICENSE", "COPYING", "COPYING.LESSER")
+            for name in ("LICENSE", "COPYING")
         }
         legacy = self.root / "legacy-binary.tar.gz"
         write_archive(legacy, {"LICENSE": expected["LICENSE"]})
@@ -5592,6 +5610,11 @@ class BuildInventoryTests(unittest.TestCase):
         write_archive(corrupted, {**expected, "COPYING": b"not the GPL\n"})
         with self.assertRaises(AssertionError):
             self._assert_binary_license_archive(corrupted)
+
+        redundant = self.root / "redundant-binary.tar.gz"
+        write_archive(redundant, {**expected, "COPYING.LESSER": expected["LICENSE"]})
+        with self.assertRaises(AssertionError):
+            self._assert_binary_license_archive(redundant)
 
         complete = self.root / "complete-binary.tar.gz"
         write_archive(complete, expected)
@@ -14241,6 +14264,7 @@ class BuildInventoryTests(unittest.TestCase):
             "test/build/level2_width_artifact_probe_contract.zig": "zig-source",
             "test/build/level2_width_default_artifact_probe.zig": "zig-source",
             "test/build/level2_width_enabled_artifact_probe.zig": "zig-source",
+            "test/build/test_build_profiles.py": "python-source",
             "test/build/test_test_inventory.py": "python-source",
             "test/build/windows_python_tooling_probe_fixture.zig": "zig-source",
             "tools/check_test_inventory.py": "python-source",
@@ -14253,7 +14277,8 @@ class BuildInventoryTests(unittest.TestCase):
                 self.assertEqual(kind, rows[path]["kind"])
                 self.assertEqual("non-generated-source", rows[path]["class"])
                 self.assertEqual("test-infrastructure", rows[path]["owner"])
-        for path in ("COPYING", "COPYING.LESSER", "LICENSE"):
+        self.assertNotIn("COPYING.LESSER", rows)
+        for path in ("COPYING", "LICENSE"):
             with self.subTest(path=path):
                 self.assertEqual("legal-governance", rows[path]["kind"])
                 self.assertEqual("non-generated-source", rows[path]["class"])

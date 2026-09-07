@@ -51,38 +51,16 @@ with `GIT_`. Use the single canonical sequence in the
 tool compilation, inventory gates, all baseline correctness modes, both
 generators and their drift check, formatting, and the default build.
 
-Inventory-dependent test steps require the exact `-Dcpu=baseline` query.
-Ordinary `zig build` remains host-native and unrestricted by the inventory.
-On POSIX hosts, use the ordinary structure-gated `test-inventory-link` step to
-compile a declared foreign test graph without claiming native execution
-evidence:
+Inventory-dependent tests require the exact `-Dcpu=baseline` query; ordinary
+`zig build` remains host-native. For target applicability, compile-only steps,
+and the distinction between native evidence and cross-compilation, see
+[Architecture: Validation Boundaries](architecture.md#validation-boundaries).
+The inventory checker is authoritative for pending native rows.
 
-```sh
-zig build test-inventory-link \
-  -Dtarget=x86_64-linux-gnu \
-  -Dcpu=baseline \
-  -Dtest-optimize=Debug \
-  --summary failures
-```
-
-The exact native x86_64 Windows GNU baseline instead has the explicit
-`test-inventory-link-windows-native-smoke` compatibility-only compile/link
-step. It omits the POSIX structure checker and executes no inventory runner or
-test body. It supplies no inventory certification, enumeration, or correctness
-evidence; all 63 Windows rows remain pending.
-
-The public test inventory records logical roots, ordered compiler-enumerated
-sets, target applicability, modes, and native-evidence joins. Pending rows stay
-pending until the exact native environment supplies validated enumeration; they
-cannot borrow evidence from cross-compilation, emulation, or another target
-class. The checkers run before official test bodies and reject unreviewed or
-inconsistent inputs.
-
-Use `--structure-only` for the declared matrix while native rows remain pending.
-Running `tools/check_test_inventory.py` without that option is the full native
-matrix gate. For exact schemas, resource bounds, and refresh behavior, use the
-checker and runner sources as the authoritative reference rather than copying
-their implementation details into public documentation.
+Use the [release checklist](open_source_release_checklist.md) for the stricter
+publication gates and required license/package contents. Use
+[Architecture: Improvement Priorities](architecture.md#improvement-priorities)
+for completed configuration hardening and explicitly pending internal work.
 
 ## Documentation Rules
 

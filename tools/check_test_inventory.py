@@ -64,6 +64,7 @@ HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES = (
         "id": "step:build.zig:build:test-abi-baseline-observer",
         "condition": "always",
     },
+    {"id": "step:build.zig:build:test-build-profiles", "condition": "always"},
 )
 LEGACY_WORKFLOW_MODE_COMMANDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
@@ -957,7 +958,7 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "95873919040e797481897d9711b4dfb11a2277d88e8cc6499de50f65323a7470"
+    "fb23230b483a99c73a89175ab4ea984724f6b9b5d28a12a5dc82dc8fa7b47744"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
@@ -1168,6 +1169,14 @@ PYTHON_ROOTS = (
         "launch_ids": ("launch:build.zig:build:build_inventory_tests",),
         "aggregate": False,
         "matrix": True,
+    },
+    {
+        "id": "python-root:build-profiles-direct",
+        "kind": "direct",
+        "module_paths": ("test/build/test_build_profiles.py",),
+        "launch_ids": ("launch:build.zig:build:build_profile_tests",),
+        "aggregate": True,
+        "matrix": False,
     },
     {
         "id": PYTHON_TOOLING_ROOT_ID,
@@ -2404,7 +2413,7 @@ def discover(
         or host_tool_step.get("closure_contract")
         != {
             "direct_dependency_count": len(HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES),
-            "relation": "exact-six-direct-host-tool-dependencies",
+            "relation": "exact-seven-direct-host-tool-dependencies",
         }
     ):
         raise InventoryError("host-tool smoke aggregate closure drifted")
@@ -2581,9 +2590,9 @@ def discover(
         if PurePosixPath(path).suffix == ".py"
         and PurePosixPath(path).name.startswith("test_")
     )
-    if len(python_paths) != 19:
+    if len(python_paths) != 20:
         raise InventoryError(
-            f"expected exactly 19 Python test candidates, found {len(python_paths)}"
+            f"expected exactly 20 Python test candidates, found {len(python_paths)}"
         )
     benchmark_paths = tuple(
         path for path in python_paths if path.startswith("bench/tools/")

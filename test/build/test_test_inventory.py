@@ -555,8 +555,8 @@ class TestInventoryTests(unittest.TestCase):
                 environment.pop("GIT_PAGER", None)
             else:
                 environment["GIT_PAGER"] = ambient_git_pager
-        self.assertEqual(312, len(self.inventory["test_mode_rows"]))
-        self.assertEqual(42, len(self.inventory["expected_test_sets"]))
+        self.assertEqual(324, len(self.inventory["test_mode_rows"]))
+        self.assertEqual(43, len(self.inventory["expected_test_sets"]))
         self.assertEqual(123, len(self.inventory["native_observation_bindings"]))
         self.assertEqual(123, CHECKER._matrix_incomplete_count(self.inventory))
 
@@ -585,6 +585,17 @@ class TestInventoryTests(unittest.TestCase):
         )
         self.assertIsNone(build_inventory_root["aggregate_step_observation_id"])
         self.assertIs(build_inventory_root["matrix_applicable"], True)
+        profile_root = next(
+            row for row in self.inventory["test_roots"]
+            if row["id"] == "python-root:build-profiles-direct"
+        )
+        self.assertEqual(["test/build/test_build_profiles.py"], profile_root["module_paths"])
+        self.assertEqual(
+            ["launch:build.zig:build:build_profile_tests"],
+            profile_root["launch_observation_ids"],
+        )
+        self.assertEqual(CHECKER.AGGREGATE_STEP_ID, profile_root["aggregate_step_observation_id"])
+        self.assertIs(profile_root["matrix_applicable"], False)
         windows_build_inventory_rows = [
             row
             for row in self.inventory["test_mode_rows"]
@@ -928,7 +939,7 @@ class TestInventoryTests(unittest.TestCase):
             "import unittest\nclass Added(unittest.TestCase):\n    def test_added(self): pass\n",
             encoding="utf-8",
         )
-        self.assertIn("19 Python test candidates", self._errors())
+        self.assertIn("20 Python test candidates", self._errors())
 
         added.unlink()
         source = self.root / "test/build/test_test_inventory.py"
@@ -4174,8 +4185,8 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(0, real_binding_summary.artifact_platform_skips)
         self.assertEqual(0, real_binding_summary.publication_platform_skips)
         self.assertEqual(0, real_binding_summary.platform_skips)
-        self.assertEqual(42, len(source_current["expected_test_sets"]))
-        self.assertEqual(312, len(source_current["test_mode_rows"]))
+        self.assertEqual(43, len(source_current["expected_test_sets"]))
+        self.assertEqual(324, len(source_current["test_mode_rows"]))
         self.assertEqual(123, len(source_current["native_observation_bindings"]))
         self.assertEqual(123, CHECKER._matrix_incomplete_count(source_current))
         self.assertEqual(

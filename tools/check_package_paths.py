@@ -43,7 +43,17 @@ repository_snapshot = _load_sibling(
 )
 repository_git = _load_sibling("repository_git.py", "_zynum_repository_git")
 
-FORBIDDEN_PATH_PARTS = frozenset((".git", ".local-docs", ".zig-cache", "zig-out"))
+FORBIDDEN_PATH_PARTS = frozenset(
+    (
+        ".git",
+        ".agents",
+        ".local-docs",
+        ".zig-cache",
+        ".zig-global-cache",
+        ".ruff_cache",
+        "zig-out",
+    )
+)
 FORBIDDEN_MEMBER_NAMES = frozenset((".DS_Store",))
 FORBIDDEN_MEMBER_PARTS = frozenset(("__pycache__",))
 FORBIDDEN_MEMBER_SUFFIXES = frozenset((".pyc", ".pyo"))

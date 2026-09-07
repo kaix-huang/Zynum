@@ -3,6 +3,9 @@
 zig-out/
 
 .DS_Store
+.ruff_cache/
+.local-docs/
+docs/local/
 __pycache__/
 *.py[cod]
 

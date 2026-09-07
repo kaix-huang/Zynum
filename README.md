@@ -92,6 +92,7 @@ checkout commands in a sanitized subprocess:
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_QUICK_START'
+set -eu
 zig build test -Dcpu=baseline
 zig build
 zig build generate-headers
@@ -499,7 +500,10 @@ requests. Security reports must follow `SECURITY.md`.
 ## License
 
 Zynum is released under the GNU Lesser General Public License, version 3 or any
-later version (`LGPL-3.0-or-later`). See `LICENSE`.
+later version (`LGPL-3.0-or-later`). [LICENSE](LICENSE) contains the LGPL v3
+text; [COPYING](COPYING) contains the GPL v3 terms incorporated by LGPL v3.
+Both files must accompany source and binary distributions. They form one
+licensing scheme, not a choice between two independent project licenses.
 
 The build installs both shared and static `zynum_blas` libraries. Downstream
 distributors should review LGPL linking and relinking obligations, especially

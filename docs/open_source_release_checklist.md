@@ -18,7 +18,7 @@ Release line: `0.0.1-beta`
   records outside the distributable repository.
 - Confirm the public project files are present: `README.md`, `docs/README.md`,
   `CHANGELOG.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`,
-  `LICENSE`, CI workflow, and issue/PR templates.
+  `LICENSE`, `COPYING`, CI workflow, and issue/PR templates.
 - Confirm package version, release notes, badges, and license all agree.
 - Confirm project links are repository-relative where appropriate.
 - Confirm generated compatibility files are intentional:
@@ -33,6 +33,7 @@ subprocess:
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_RELEASE_VALIDATION'
+set -eu
 zig fmt --check build.zig build.zig.zon src test bench examples tools
 python3 -B tools/check_build_inventory.py --root . --require-current-only
 python3 -B tools/check_test_inventory.py --structure-only --require-current-only
@@ -114,6 +115,25 @@ git status --short -- include/zynum/blas
 Any generated change must correspond to an intentional ABI source change and be
 described in release notes. Update generator source lists and export
 expectations when moving ABI functions.
+
+## License And Package Contents
+
+The project remains `LGPL-3.0-or-later`. Ship exactly one copy of each:
+
+- `LICENSE`: the unmodified LGPL v3 text.
+- `COPYING`: the unmodified GPL v3 text incorporated by LGPL v3.
+
+These are complementary legal texts, not conflicting project licenses. Do not
+remove `COPYING` or duplicate the LGPL text under a second filename. Preserve
+SPDX declarations in source files. Source and binary release packaging must
+verify these files against the repository originals.
+
+`build.zig.zon` defines the source-package allowlist;
+`tools/check_package_paths.py` validates its selected paths. Binary packaging
+in `.github/workflows/release.yml` separately adds the license texts and checks
+their uniqueness and byte identity. Keep both paths covered when changing the
+release layout. Local planning metadata, editor automation, caches, and raw
+reports are not release inputs.
 
 ## Compatibility Review
 

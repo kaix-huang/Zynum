@@ -25,6 +25,7 @@ native-feature correctness step on a matching host:
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_AARCH64_CHECKS'
+set -eu
 zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
 zig build test -Dtarget=aarch64-macos -Dcpu=baseline -Dtest-optimize=ReleaseFast --release=fast --summary failures
 zig build test-native-feature -Dcpu=native -Dtest-optimize=ReleaseSafe --release=safe --summary failures

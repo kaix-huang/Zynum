@@ -10,6 +10,21 @@ change. Standard BLAS ABI compatibility is a core project goal.
 
 The `0.1.x` line is the BLAS-completion and performance line.
 
+### Maintenance
+
+- Reject conflicting experimental build profile flags instead of silently
+  selecting the first enabled profile. Default and single-profile builds keep
+  their existing behavior; exhaustive configuration checks run in host-tool
+  smoke tests.
+
+- Remove the redundant LGPL text copy from source and binary packages. Keep
+  `LICENSE` (LGPL v3) and `COPYING` (the incorporated GPL v3 terms); project
+  licensing remains `LGPL-3.0-or-later`.
+- Keep local automation metadata and caches outside the source-package boundary,
+  with regression checks for archive contents and license integrity.
+- Consolidate documentation navigation and record incremental architecture
+  improvements without changing the public API, BLAS ABI, or runtime behavior.
+
 ### Planned
 
 - Complete all BLAS Level 1, Level 2, and Level 3 routines across real and

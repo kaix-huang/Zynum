@@ -390,7 +390,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "fbbff3ba7ae7ed410b130e6e3e365fd0c533cc42a7dc4ffd068d279cc6f23974"
+    "d320db8ec989c8e0e71a3610377e6eb35fe494a618124e87cf4fa55ca297f864"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -499,8 +499,8 @@ REQUIRED_GAP_FACT_DIGESTS = {
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5",
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
-    "option_surfaces": "541971c010ac504f13251a97f0305669d460cbba4ccbd6224c9e8915fd9a8bc1",
-    "repository_file_classifications": "1f590bfdc466c53aa8d19f2ce386549158576cd414e38845bc2fb896f37cf228",
+    "option_surfaces": "63edcd6da0d793e0b945e63077ca59a5f7e7e0eb460d0365e6aa858bdc9c533a",
+    "repository_file_classifications": "cc2c6c226fb29f671cd672476e0ec9a117d1148c22aa0a35540e39ccd3f37d78",
     "derived_candidates": "ce431613bae70ff88c1b6a7b2c7862fc94a4be4f9f24d1f0c5c592a135108ef9",
     "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
 }
@@ -1119,7 +1119,6 @@ def _repository_file_kind(node: repository_snapshot.FrozenNode) -> str:
     if name in {
         "LICENSE",
         "COPYING",
-        "COPYING.LESSER",
         "NOTICE",
         "SECURITY.md",
         "CODE_OF_CONDUCT.md",
@@ -1979,6 +1978,12 @@ TEST_INVENTORY_RUN_STEP_ID = "step:build.zig:build:test-inventory"
 TEST_INVENTORY_AGGREGATE_STEP_ID = "step:build.zig:build:test"
 HOST_TOOL_SMOKE_STEP_ID = "step:build.zig:build:test-host-tool-smoke"
 BUILD_INVENTORY_STEP_ID = "step:build.zig:build:test-build-inventory"
+BUILD_PROFILE_STEP_ID = "step:build.zig:build:test-build-profiles"
+BUILD_PROFILE_LAUNCH_ID = "launch:build.zig:build:build_profile_tests"
+BUILD_PROFILE_TEST_PATH = "test/build/test_build_profiles.py"
+BUILD_PROFILE_PYTHON_LAUNCH_ID = (
+    "python-launch:test/build/test_build_profiles.py:_configure:subprocess.run:1"
+)
 NATIVE_FEATURE_STEP_ID = "step:build.zig:build:test-native-feature"
 NATIVE_FEATURE_LAUNCH_ID = "launch:build.zig:build:run_native_feature_tests"
 NATIVE_FEATURE_GUARDS = (
@@ -2238,6 +2243,7 @@ REVIEWED_ARCHIVE_AND_NATIVE_FEATURE_PYTHON_LAUNCHES = {
     },
 }
 REQUIRED_TEST_INVENTORY_PYTHON_LAUNCH_IDS = {
+    BUILD_PROFILE_PYTHON_LAUNCH_ID,
     "python-launch:test/build/test_build_inventory.py:test_unknown_target_configures_and_inventory_steps_fail_closed:subprocess.run:1",
     "python-launch:test/build/test_build_inventory.py:test_unknown_target_configures_and_inventory_steps_fail_closed:subprocess.run:2",
     *REVIEWED_ARCHIVE_AND_NATIVE_FEATURE_PYTHON_LAUNCHES,
@@ -2275,6 +2281,7 @@ HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES = (
         "id": "step:build.zig:build:test-abi-baseline-observer",
         "condition": "always",
     },
+    {"id": BUILD_PROFILE_STEP_ID, "condition": "always"},
 )
 PYTHON_TOOLING_STRUCTURE_BARRIER_ID = (
     "launch:build.zig:build:test_inventory_structure_check"
@@ -2884,7 +2891,7 @@ def _host_tool_smoke_step_template() -> dict[str, Any]:
         "step_role": "aggregate-validation",
         "closure_contract": {
             "direct_dependency_count": len(HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES),
-            "relation": "exact-six-direct-host-tool-dependencies",
+            "relation": "exact-seven-direct-host-tool-dependencies",
         },
     }
 
@@ -2928,6 +2935,8 @@ def _annotate_python_tooling_tests(
         TEST_INVENTORY_AGGREGATE_STEP_ID,
         HOST_TOOL_SMOKE_STEP_ID,
         BUILD_INVENTORY_STEP_ID,
+        BUILD_PROFILE_STEP_ID,
+        BUILD_PROFILE_LAUNCH_ID,
     }
     missing = required_ids - set(by_id)
     if missing:
@@ -3016,7 +3025,23 @@ def _annotate_python_tooling_tests(
             "Python tooling launch must preserve the exact ordered Windows artifact argv and dependency contract"
         )
 
+    profile_launch_calls = [
+        _compact_zig_contract(call)
+        for position, call in _calls(text, "b.addSystemCommand")
+        if _symbol_before(text, position, call) == "build_profile_tests"
+    ]
+    if profile_launch_calls != [
+        'b.addSystemCommand(&.{"python3","-B",'
+        f'b.pathFromRoot("{BUILD_PROFILE_TEST_PATH}"),}})'
+    ]:
+        raise InventoryError("build profile launch must preserve its exact reviewed argv")
+
     source_relations = (
+        (
+            "build_profile_test_step.dependOn",
+            "build_profile_test_step.dependOn(&build_profile_tests.step);",
+            "build profile named step must close over exactly its launch",
+        ),
         (
             "python_tooling_test_step.dependOn",
             "python_tooling_test_step.dependOn(&python_tooling_tests.step);",
@@ -3038,10 +3063,11 @@ def _annotate_python_tooling_tests(
         "host_tool_smoke_test_step.dependOn(&cpp_header_smoke_test.step);",
         "host_tool_smoke_test_step.dependOn(&fortran_module_smoke_test.step);",
         "host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);",
+        "host_tool_smoke_test_step.dependOn(build_profile_test_step);",
     ]
     if host_dependency_calls != expected_host_dependency_calls:
         raise InventoryError(
-            "host-tool smoke aggregate must preserve its exact six direct dependencies"
+            "host-tool smoke aggregate must preserve its exact seven direct dependencies"
         )
     default_host_edge = (
         "if(host_tool_smoke)test_step.dependOn(host_tool_smoke_test_step);"
@@ -3060,6 +3086,8 @@ def _annotate_python_tooling_tests(
         "test_step.dependOn(&abi_baseline_observer_tests.step);",
         "test_step.dependOn(&build_inventory_tests.step);",
         "test_step.dependOn(build_inventory_test_step);",
+        "test_step.dependOn(build_profile_test_step);",
+        "test_step.dependOn(&build_profile_tests.step);",
     )
     default_dependency_calls = {
         _compact_zig_contract(call) + ";"
@@ -13877,6 +13905,13 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
     classifications = {
         item["path"]: item for item in inventory["repository_file_classifications"]
     }
+    classifications.pop("COPYING.LESSER", None)
+    classifications[BUILD_PROFILE_TEST_PATH] = {
+        "path": BUILD_PROFILE_TEST_PATH,
+        "kind": "python-source",
+        "class": "non-generated-source",
+        "owner": "test-infrastructure",
+    }
     for path in NEW_REVIEWED_TEST_INFRASTRUCTURE_CLASSIFICATIONS:
         classifications[path] = {
             "path": path,
@@ -13916,12 +13951,6 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
                 "class": "non-generated-source",
                 "owner": "project-governance",
             },
-            "COPYING.LESSER": {
-                "path": "COPYING.LESSER",
-                "kind": "legal-governance",
-                "class": "non-generated-source",
-                "owner": "project-governance",
-            },
         }
     )
     inventory["repository_file_classifications"] = [
@@ -13931,6 +13960,23 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         inventory["repository_file_classifications"]
     )
     option_surfaces = {item["id"]: item for item in inventory["option_surfaces"]}
+    for name in (
+        "structured-object-candidates",
+        "structured-object-baseline",
+        "level1-sve-candidates",
+        "level1-fixed-candidates",
+        "level2-fixed-candidates",
+        "level2-width-candidates",
+    ):
+        option_surfaces[f"option-surface:build.zig:{name}"].update(
+            {
+                "conflict": "mutually exclusive with every other experimental profile flag",
+                "precedence": (
+                    "true selects this profile only when all other profile flags are false; "
+                    "multiple true flags fail configuration; all false retains the default profile"
+                ),
+            }
+        )
     option_surfaces["option-surface:build.zig:host-tool-smoke"].update(
         {
             "description": "Include the test-host-tool-smoke aggregate in the default test step",
@@ -14051,6 +14097,29 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
 def _new_test_inventory_observation(
     identifier: str, inventory: dict[str, Any]
 ) -> dict[str, Any]:
+    if identifier == BUILD_PROFILE_LAUNCH_ID:
+        return {
+            "owner": "test-infrastructure",
+            "detail_status": "process-lifecycle-out-of-scope",
+            "cwd_shape": "repository-root",
+            "command_shape": "system-command",
+            "source_artifact": None,
+            "compile_for": "host",
+            "execute_on": "host",
+            "argv_shape": ["python3", "-B", BUILD_PROFILE_TEST_PATH],
+            "launch_class": "validation",
+        }
+    if identifier == BUILD_PROFILE_STEP_ID:
+        return {
+            "owner": "build-composition",
+            "description": "Check default, single, and conflicting experimental build profiles",
+            "direct_dependencies": [{"id": BUILD_PROFILE_LAUNCH_ID, "condition": "always"}],
+            "aggregate_test_membership": "host-tool-smoke-member",
+            "aggregate_condition": "always within test-host-tool-smoke",
+            "intentional_orphan": False,
+            "orphan_reason": "direct dependency of the host-tool smoke aggregate",
+            "step_role": "focused-validation",
+        }
     if identifier == PYTHON_TOOLING_LAUNCH_ID:
         return _python_tooling_launch_template()
     if identifier == PYTHON_TOOLING_STEP_ID:
@@ -14421,6 +14490,16 @@ def _new_test_inventory_observation(
 
 
 def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
+    if identifier == BUILD_PROFILE_PYTHON_LAUNCH_ID:
+        return {
+            "owner": "test-infrastructure",
+            "detail_status": "process-lifecycle-out-of-scope",
+            "compile_for": "host",
+            "execute_on": "host",
+            "cwd_shape": "repository-root",
+            "launch_class": "build-profile-configuration-check",
+            "argv_shape": ["zig", "build", "--help", "<profile-and-control-options>"],
+        }
     if identifier not in REQUIRED_TEST_INVENTORY_PYTHON_LAUNCH_IDS:
         raise InventoryError(f"no reviewed template for new Python launch {identifier}")
     reviewed_launch = REVIEWED_ARCHIVE_AND_NATIVE_FEATURE_PYTHON_LAUNCHES.get(

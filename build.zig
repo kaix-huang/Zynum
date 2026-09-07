@@ -145,6 +145,22 @@ pub fn build(b: *std.Build) void {
         @panic("structured-object-candidates and structured-object-baseline are mutually exclusive");
     }
     const structured_object_requested = structured_object_candidates or structured_object_baseline;
+    var requested_profile_count: usize = 0;
+    for ([_]bool{
+        structured_object_requested,
+        level1_sve_candidates,
+        level1_fixed_candidates,
+        level2_fixed_candidates,
+        level2_width_candidates,
+    }) |requested| {
+        requested_profile_count += @intFromBool(requested);
+    }
+    if (requested_profile_count > 1) {
+        @panic("experimental profile flags are mutually exclusive: select at most one of " ++
+            "-Dstructured-object-candidates, -Dstructured-object-baseline, " ++
+            "-Dlevel1-sve-candidates, -Dlevel1-fixed-candidates, " ++
+            "-Dlevel2-fixed-candidates, -Dlevel2-width-candidates");
+    }
     const structured_object_root = if (structured_object_baseline)
         "src/blas/structured_object_stub_root.zig"
     else
@@ -862,6 +878,16 @@ pub fn build(b: *std.Build) void {
         "Run fresh-artifact parity parser and verifier tests",
     );
     abi_artifact_parity_verifier_test_step.dependOn(&abi_artifact_parity_verifier_tests.step);
+    const build_profile_tests = b.addSystemCommand(&.{
+        "python3",
+        "-B",
+        b.pathFromRoot("test/build/test_build_profiles.py"),
+    });
+    const build_profile_test_step = b.step(
+        "test-build-profiles",
+        "Check default, single, and conflicting experimental build profiles",
+    );
+    build_profile_test_step.dependOn(&build_profile_tests.step);
     const build_inventory_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
@@ -929,6 +955,7 @@ pub fn build(b: *std.Build) void {
     host_tool_smoke_test_step.dependOn(&cpp_header_smoke_test.step);
     host_tool_smoke_test_step.dependOn(&fortran_module_smoke_test.step);
     host_tool_smoke_test_step.dependOn(abi_baseline_observer_test_step);
+    host_tool_smoke_test_step.dependOn(build_profile_test_step);
 
     const InventoryCase = struct {
         root_id: []const u8,
