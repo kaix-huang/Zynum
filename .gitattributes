@@ -11,6 +11,12 @@
 *.yml text eol=lf
 *.yaml text eol=lf
 
+# Exclude Python engineering tooling from language statistics.
+# These files remain maintained source, not vendored or generated code.
+tools/**/*.py linguist-detectable=false
+bench/tools/**/*.py linguist-detectable=false
+test/**/*.py linguist-detectable=false
+
 *.png binary
 *.jpg binary
 *.jpeg binary
