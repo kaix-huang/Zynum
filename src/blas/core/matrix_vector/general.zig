@@ -1902,14 +1902,14 @@ fn gemvUnitComplex(comptime T: type, trans_: Order, m_: BlasInt, n_: BlasInt, al
 
     if (trans_ == .no_trans) {
         if (parallelGemvNoTransRowsUnitComplex(T, m, n, alpha, a, lda, x, y)) return;
-        if (comptime matrix_vector_kernels.supportsGemvNoTransUnitComplex(T)) {
+        if (matrix_vector_kernels.supportsGemvNoTransUnitComplex(T)) {
             if (matrix_vector_kernels.gemvNoTransUnitComplex(T, m, n, alpha, a, lda, x, y)) return;
         }
         if (parallelGemvNoTransUnitComplex(T, m, n, m_, alpha, a, lda, x, y)) return;
         gemvNoTransUnitComplex(T, m_, n, alpha, a, lda, x, y);
     } else {
         const do_conj = trans_ == .conj_trans;
-        if (comptime matrix_vector_kernels.supportsGemvTransUnitComplex(T)) {
+        if (matrix_vector_kernels.supportsGemvTransUnitComplex(T)) {
             if (matrix_vector_kernels.gemvTransUnitComplex(T, m, n, alpha, a, lda, x, y, do_conj)) return;
         }
         if (parallelGemvTransUnitComplex(T, m, n, m_, alpha, a, lda, x, y, do_conj)) return;

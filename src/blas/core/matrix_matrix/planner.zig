@@ -154,7 +154,7 @@ fn requestedThreadCountForPlan(m: usize, n: usize, k: usize) usize {
 }
 
 fn forceSingleThreadPlan(comptime T: type, m: usize, n: usize, k: usize, alpha: T, beta: T) bool {
-    if (comptime switch (gemm_kernels.active_capability) {
+    if (switch (gemm_kernels.activeCapability()) {
         .x86_64_sse2, .x86_64_avx, .x86_64_avx2, .x86_64_avx2_fma, .x86_64_avx512f_fma => true,
         else => false,
     }) return false;

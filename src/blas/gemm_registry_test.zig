@@ -346,6 +346,45 @@ test "Apple AMX benchmark shapes have explicit selected subkernel ids" {
     const f32_plan = tuning.executionPlan(f32, f32_desc, shape, requested_threads, performance_l2_bytes);
     try std.testing.expectEqual(gemm_task.AppleAmxKernelId.apple_amx_f32_n32, f32_plan.amx);
 
+    // Preserve the K cap, panel exclusions, and fringe boundaries when
+    // simplifying preference rules. These inspect policy without executing AMX.
+    const f32_cases = [_]struct {
+        shape: tuning.Shape,
+        amx: gemm_task.AppleAmxKernelId,
+        partial_n16: bool = false,
+    }{
+        .{ .shape = .{ .m = 128, .n = 32, .k = 0 }, .amx = .none },
+        .{ .shape = .{ .m = 128, .n = 32, .k = 255 }, .amx = .none },
+        .{ .shape = .{ .m = 128, .n = 32, .k = 256 }, .amx = .apple_amx_f32_n32 },
+        .{ .shape = .{ .m = 128, .n = 32, .k = 512 }, .amx = .apple_amx_f32_n32 },
+        .{ .shape = .{ .m = 128, .n = 32, .k = 513 }, .amx = .none },
+        .{ .shape = .{ .m = 128, .n = 32, .k = 4096 }, .amx = .none },
+        .{ .shape = .{ .m = 512, .n = 32, .k = 511 }, .amx = .apple_amx_f32_n32 },
+        .{ .shape = .{ .m = 512, .n = 32, .k = 512 }, .amx = .none },
+        .{ .shape = .{ .m = 512, .n = 32, .k = 2048 }, .amx = .none },
+        .{ .shape = .{ .m = 1024, .n = 32, .k = 512 }, .amx = .apple_amx_f32_n32 },
+        .{ .shape = .{ .m = 1024, .n = 32, .k = 1024 }, .amx = .none },
+        .{ .shape = .{ .m = 512, .n = 512, .k = 512 }, .amx = .apple_amx_f32_n32 },
+        .{ .shape = .{ .m = 768, .n = 768, .k = 768 }, .amx = .none },
+        .{ .shape = .{ .m = 512, .n = 16, .k = 512 }, .amx = .apple_amx_f32_n16 },
+        .{ .shape = .{ .m = 512, .n = 16, .k = 513 }, .amx = .none },
+        .{ .shape = .{ .m = 127, .n = 129, .k = 64 }, .amx = .none },
+        .{ .shape = .{ .m = 127, .n = 129, .k = 65 }, .amx = .apple_amx_f32_n16 },
+        .{ .shape = .{ .m = 127, .n = 129, .k = 256 }, .amx = .apple_amx_f32_n16 },
+        .{ .shape = .{ .m = 127, .n = 129, .k = 257 }, .amx = .none },
+        .{ .shape = .{ .m = 128, .n = 33, .k = 512 }, .amx = .none, .partial_n16 = true },
+        .{ .shape = .{ .m = 128, .n = 33, .k = 513 }, .amx = .none },
+    };
+    for (f32_cases) |case| {
+        const plan = tuning.executionPlan(f32, f32_desc, case.shape, requested_threads, performance_l2_bytes);
+        try std.testing.expectEqual(case.amx, plan.amx);
+        try std.testing.expectEqual(case.partial_n16, plan.amx_partial_n16);
+        if (case.shape.k > 512) {
+            try std.testing.expect(!tuning.amxKernelCompatible(f32, .apple_amx_f32_n16, case.shape));
+            try std.testing.expect(!tuning.amxKernelCompatible(f32, .apple_amx_f32_n32, case.shape));
+        }
+    }
+
     const f64_candidates = catalog.candidateList(.{
         catalog.aarch64SmeDescriptor(f64, 64),
         catalog.aarch64AsimdDescriptor(f64),
@@ -355,6 +394,10 @@ test "Apple AMX benchmark shapes have explicit selected subkernel ids" {
     try std.testing.expectEqual(catalog.KernelId.aarch64_sme_f64_4mx2n, f64_desc.kernel);
     const f64_plan = tuning.executionPlan(f64, f64_desc, shape, requested_threads, performance_l2_bytes);
     try std.testing.expectEqual(gemm_task.AppleAmxKernelId.apple_amx_f64_n16, f64_plan.amx);
+    const f64_high_k_shape: tuning.Shape = .{ .m = 128, .n = 32, .k = 4096 };
+    const f64_high_k_plan = tuning.executionPlan(f64, f64_desc, f64_high_k_shape, requested_threads, performance_l2_bytes);
+    try std.testing.expectEqual(gemm_task.AppleAmxKernelId.apple_amx_f64_n32, f64_high_k_plan.amx);
+    try std.testing.expect(tuning.amxKernelCompatible(f64, f64_high_k_plan.amx, f64_high_k_shape));
 }
 
 test "SME epilogue rejection falls back without entering streaming state" {

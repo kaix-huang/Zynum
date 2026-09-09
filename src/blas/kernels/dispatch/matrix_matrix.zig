@@ -32,7 +32,13 @@ else if (x86_64_simd.enabled)
 else
     .generic;
 
+pub fn activeCapability() catalog.IsaCapability {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").activeCapability();
+    return active_capability;
+}
+
 pub fn candidates(comptime T: type) catalog.CandidateList {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_candidates, T, .{});
     return switch (active_capability) {
         .aarch64_sme => if (T == f64 and !aarch64_sme.supports_f64_accumulate)
             if (comptime aarch64_sve2.enabled)
@@ -58,6 +64,7 @@ pub fn candidates(comptime T: type) catalog.CandidateList {
 }
 
 pub fn noTransReal(comptime T: type, task: Task(T)) void {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_noTransReal, T, .{task});
     if (T == f32) {
         noTransRealF32(task);
     } else if (T == f64) {
@@ -68,6 +75,7 @@ pub fn noTransReal(comptime T: type, task: Task(T)) void {
 }
 
 pub fn tryNoTransRealF32Fast(m: gemm_task.BlasInt, n: gemm_task.BlasInt, k: gemm_task.BlasInt, alpha: f32, a: [*]const f32, lda: gemm_task.BlasInt, b: [*]const f32, ldb: gemm_task.BlasInt, beta: f32, c: [*]f32, ldc: gemm_task.BlasInt) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_tryNoTransRealF32Fast, void, .{ m, n, k, alpha, a, lda, b, ldb, beta, c, ldc });
     return switch (active_capability) {
         .aarch64_sme => aarch64_sme.tryNoTransRealF32Fast(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc),
         else => false,
@@ -75,13 +83,16 @@ pub fn tryNoTransRealF32Fast(m: gemm_task.BlasInt, n: gemm_task.BlasInt, k: gemm
 }
 
 pub fn freeCurrentThreadCaches() void {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_freeCurrentThreadCaches, void, .{});
     if (comptime aarch64_sme.enabled) aarch64_sme.freeCurrentThreadCaches();
 }
 
 pub fn noTransRealF32(task: Task(f32)) void {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_noTransRealF32, void, .{task});
     executor.runF32(task);
 }
 
 pub fn noTransRealF64(task: Task(f64)) void {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_noTransRealF64, void, .{task});
     executor.runF64(task);
 }

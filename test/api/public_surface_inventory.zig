@@ -326,6 +326,7 @@ pub const runtime_declarations: []const []const u8 = &.{
     "efficiencyThreadCount",
     "performanceL2Bytes",
     "cacheLineBytes",
+    "selectedKernelTier",
     "configureWorkerThread",
 };
 
@@ -500,6 +501,7 @@ pub const owner_declarations = [_]OwnerDeclaration{
     owner("blas.runtime", "efficiencyThreadCount", "src/blas/runtime.zig", .function, "fn () usize", "return detected efficiency-thread capacity or zero"),
     owner("blas.runtime", "performanceL2Bytes", "src/blas/runtime.zig", .function, "fn () usize", "return performance-cluster L2 capacity or fallback"),
     owner("blas.runtime", "cacheLineBytes", "src/blas/runtime.zig", .function, "fn () usize", "return detected cache-line bytes or fallback"),
+    owner("blas.runtime", "selectedKernelTier", "src/blas/runtime.zig", .function, "fn () []const u8", "return the admitted ISA tier or specialized build marker"),
     owner("blas.runtime", "configureWorkerThread", "src/blas/runtime.zig", .function, "fn (affinity_ordinal: ?usize) void", "apply supported worker QoS and optional affinity"),
 
     owner("blas.api.views", "BlasInt", "src/blas/api/views.zig", .type_alias, "const BlasInt = types.BlasInt", "public view dimension and stride integer"),

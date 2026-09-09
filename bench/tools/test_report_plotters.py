@@ -84,6 +84,64 @@ class ReportPlotterPublicationTest(unittest.TestCase):
             self.assertNotIn(b"nan", contents)
             self.assertNotIn(b"inf", contents)
 
+    def assert_median_statistic(self, module, csv_path, argv):
+        with csv_path.open(newline="") as handle:
+            reader = csv.DictReader(handle)
+            fields = list(reader.fieldnames)
+            rows = list(reader)
+        is_gemm = module is plot_gemm_sweep
+        field = "median_ns" if is_gemm else "metric_median"
+        median_argv = [*argv, "--stat", "median"]
+
+        # Old CSVs without median evidence must never silently fall back to best.
+        with (
+            mock.patch.object(module, "publish_outputs") as publish,
+            self.assertRaisesRegex(ValueError, field + " must be"),
+        ):
+            module.main(median_argv)
+        publish.assert_not_called()
+
+        fields.append(field)
+        for row in rows:
+            row[field] = "512" if is_gemm else "3.25"
+        write_rows(csv_path, fields, rows)
+        if is_gemm:
+            for kind, expected in (
+                ("sgemm", 16),
+                ("dgemm", 16),
+                ("cgemm", 64),
+                ("zgemm", 64),
+            ):
+                evidence = dict(rows[0], kind=kind, m="16", n="16", k="16")
+                self.assertEqual(module.row_gflops(evidence, "median"), expected)
+                self.assertEqual(module.row_gflops(evidence), float(evidence["gflops"]))
+        else:
+            key = "value" if module is plot_level1_report else "rate_gops"
+            self.assertTrue(
+                all(row[key] == 3.25 for row in module.read_rows(csv_path, "median"))
+            )
+            self.assertNotEqual(module.read_rows(csv_path)[0][key], 3.25)
+        published = []
+        with mock.patch.object(module, "publish_outputs", side_effect=published.extend):
+            module.main(median_argv)
+        self.assertTrue(published)
+        for output in published:
+            self.assertIn(
+                b"Median-time" if is_gemm else b"Statistic: median", output.contents
+            )
+        self.assert_outputs_are_finite(published)
+
+        for value in (*INVALID_PERFORMANCE_VALUES, ""):
+            with self.subTest(stat="median", value=value):
+                rows[0][field] = value
+                write_rows(csv_path, fields, rows)
+                with (
+                    mock.patch.object(module, "publish_outputs") as publish,
+                    self.assertRaisesRegex(ValueError, field + " must be"),
+                ):
+                    module.main(median_argv)
+                publish.assert_not_called()
+
     def test_gemm_publishes_one_exact_output_in_one_call(self):
         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temporary:
             root = Path(temporary)
@@ -158,6 +216,9 @@ class ReportPlotterPublicationTest(unittest.TestCase):
                 "d8c29f308e82a75c43d3b954011a03e7bd2ecbb0049520f2ad531e8b2f54cac9",
             )
             self.assertFalse(output_path.parent.exists())
+            self.assert_median_statistic(
+                plot_gemm_sweep, csv_path, [str(csv_path), str(output_path)]
+            )
 
     def test_gemm_rejects_non_positive_or_non_finite_checked_evidence(self):
         fields = (
@@ -296,14 +357,25 @@ class ReportPlotterPublicationTest(unittest.TestCase):
             self.assertEqual(
                 [digest(item.contents) for item in published[0]],
                 [
-                    "a6a5086514a5d1e67ede8d958c7096c2e6ba8b32195b0f481bae5dae2feeb1bf",
-                    "7bc730d9cc0ebaf8ace9bc54821f97b49d30bae486852a63703c9422c740a9bf",
+                    "7ec6a988f56149dfd64a1b894995981f382af279fdc47183b26320a219bb2d36",
+                    "299c6dd765359cf3b49167cfabd14990f04e698feb3a930f224908a1bcefc1a4",
                 ],
             )
             self.assertTrue(
                 all(isinstance(item.contents, bytes) for item in published[0])
             )
             self.assertFalse(bars_path.parent.exists())
+            self.assert_median_statistic(
+                plot_level1_report,
+                csv_path,
+                [
+                    str(csv_path),
+                    "--bars-svg",
+                    str(bars_path),
+                    "--ratio-svg",
+                    str(ratio_path),
+                ],
+            )
 
     def test_level1_rejects_non_positive_or_non_finite_ok_evidence(self):
         for value in INVALID_PERFORMANCE_VALUES:
@@ -570,9 +642,14 @@ class ReportPlotterPublicationTest(unittest.TestCase):
             self.assertIsInstance(contents, bytes)
             self.assertEqual(
                 digest(contents),
-                "5ee1af00bbb0f40c54e4518d77dedbaa974f3d70e5d5c87c874aebafed799249",
+                "031a793a46a6d758afcece7345fe2f5ffb1ae700071b1855f5c100f24961eff0",
             )
             self.assertFalse(output_path.parent.exists())
+            self.assert_median_statistic(
+                plot_level2_report,
+                csv_path,
+                [str(csv_path), "--bars-svg", str(output_path)],
+            )
 
     def test_level2_rejects_non_positive_or_non_finite_ok_evidence(self):
         fields = ("case", "kind", "library", "n", "rate_gops", "status")

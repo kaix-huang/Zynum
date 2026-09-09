@@ -371,8 +371,8 @@ dispatch policy.
 
 ## Public README Charts
 
-No benchmark chart is currently published in the README. A future chart may be
-published only from correctness-checked fresh-process results and must include a
+README charts are generated from correctness-checked fresh-process results.
+Each dated chart must include a
 public reproducibility package containing:
 
 - source commit and measurement date;
@@ -383,8 +383,17 @@ public reproducibility package containing:
 
 The chart and caption must identify the metric, statistic, library order, and
 measured type and shape scope, and state whether higher or lower is better.
-Private or unavailable evidence does not qualify. The public raw artifact may
-be hosted outside source control when its immutable link accompanies the chart.
+Private or unavailable evidence does not qualify. The curated README reproduction package lives under `docs/assets/benchmarks/`;
+its CSVs are an explicit exception to the transient-output policy. Other raw
+runs remain outside source control. The public raw artifact may also be hosted
+externally when its immutable link accompanies the chart.
+
+Use `--stat median` with `plot_level1_report.py`, `plot_level2_report.py`, and
+`plot_gemm_sweep.py` for README charts. Level 1/2 plot the median process rate;
+GEMM plots operation count divided by the median of per-process median timings.
+The default `--stat best` remains available for diagnostic compatibility.
+GEMM CSVs retain `median_ns_samples` in process order so median dispersion can
+be inspected without reconstructing discarded worker outputs.
 
 ## Regression And Rollback
 

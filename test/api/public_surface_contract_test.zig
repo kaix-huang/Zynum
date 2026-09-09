@@ -340,6 +340,7 @@ fn expectRuntimeContract(comptime Facade: type) !void {
     expectType(fn () usize, @TypeOf(Runtime.efficiencyThreadCount));
     expectType(fn () usize, @TypeOf(Runtime.performanceL2Bytes));
     expectType(fn () usize, @TypeOf(Runtime.cacheLineBytes));
+    expectType(fn () []const u8, @TypeOf(Runtime.selectedKernelTier));
     expectType(fn (?usize) void, @TypeOf(Runtime.configureWorkerThread));
     try std.testing.expect(!@hasDecl(Runtime, "shutdown"));
 }
@@ -1597,7 +1598,7 @@ test "inventory is a complete three-surface partition" {
     @setEvalBranchQuota(1_000_000);
     try std.testing.expectEqual(@as(usize, 21), inventory.namespaces.len);
     try std.testing.expectEqual(@as(usize, 15), inventory.signature_closure.len);
-    try std.testing.expectEqual(@as(usize, 75), inventory.owner_declarations.len);
+    try std.testing.expectEqual(@as(usize, 76), inventory.owner_declarations.len);
     try std.testing.expectEqual(@as(usize, 211), inventory.facade_forwarding.len);
     inline for (inventory.namespaces, 0..) |entry, index| {
         try std.testing.expect(entry.namespace_path.len != 0);

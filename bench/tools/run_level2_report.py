@@ -13,22 +13,6 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import benchmark_artifacts
-import benchmark_metadata
-from report_comparison import (
-    parse_positive_finite,
-    positive_finite_median,
-    validate_optional_metric_evidence,
-    validate_performance_fields,
-)
-from report_publication import ReportOutput, publish_outputs
-from report_schedule import (
-    SCHEDULE_CHOICES,
-    library_repeat_schedule,
-    validate_schedule,
-    validate_unique_library_labels,
-)
-
 DEFAULT_ACCELERATE = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
 DEFAULT_OPENBLAS = "/opt/homebrew/opt/openblas/lib/libopenblas.dylib"
 
@@ -398,6 +382,34 @@ def parse_op(value):
     return op
 
 
+def add_worker_arguments(parser):
+    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--library-name", help=argparse.SUPPRESS)
+    parser.add_argument("--library-path", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-shape", help=argparse.SUPPRESS)
+    parser.add_argument("--worker-m", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-n", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-bandwidth", type=int, help=argparse.SUPPRESS)
+    parser.add_argument("--worker-reps", type=int, help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--worker-op",
+        action="append",
+        type=parse_op,
+        default=[],
+        help=argparse.SUPPRESS,
+    )
+
+
+def parse_worker_args(argv=None):
+    parser = argparse.ArgumentParser(description="Run one isolated Level 2 worker.")
+    parser.add_argument("--csv", required=True)
+    add_worker_arguments(parser)
+    args = parser.parse_args(argv)
+    if args.worker_reps is not None and args.worker_reps < 1:
+        parser.error("--worker-reps must be at least 1")
+    return args
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Run representative Level 2 fresh-process probes and write a report CSV."
@@ -489,21 +501,7 @@ def parse_args(argv=None):
     )
     parser.add_argument("--csv", required=True)
     parser.add_argument("--skip-missing", action="store_true")
-    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--library-name", help=argparse.SUPPRESS)
-    parser.add_argument("--library-path", help=argparse.SUPPRESS)
-    parser.add_argument("--worker-shape", help=argparse.SUPPRESS)
-    parser.add_argument("--worker-m", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-n", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-bandwidth", type=int, help=argparse.SUPPRESS)
-    parser.add_argument("--worker-reps", type=int, help=argparse.SUPPRESS)
-    parser.add_argument(
-        "--worker-op",
-        action="append",
-        type=parse_op,
-        default=[],
-        help=argparse.SUPPRESS,
-    )
+    add_worker_arguments(parser)
     benchmark_metadata.add_identity_arguments(parser)
     args = parser.parse_args(argv)
     if args.reps_small < 1 or args.reps_large < 1:
@@ -3299,13 +3297,47 @@ def run_controller(args):
     )
 
 
+def worker_main(argv):
+    args = parse_worker_args(argv)
+    try:
+        run_worker(args)
+    except ValueError as exc:
+        print(exc, file=sys.stderr)
+        return 2
+    return 0
+
+
+# Artifact snapshots execute this file without sibling controller modules.
+# Finish worker execution before loading the controller-only dependencies.
+if __name__ == "__main__" and "--worker" in sys.argv[1:]:
+    sys.exit(worker_main(sys.argv[1:]))
+
+
+import benchmark_artifacts
+import benchmark_metadata
+from report_comparison import (
+    parse_positive_finite,
+    positive_finite_median,
+    validate_optional_metric_evidence,
+    validate_performance_fields,
+)
+from report_publication import ReportOutput, publish_outputs
+from report_schedule import (
+    SCHEDULE_CHOICES,
+    library_repeat_schedule,
+    validate_schedule,
+    validate_unique_library_labels,
+)
+
+
 def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if "--worker" in argv:
+        return worker_main(argv)
+
     args = parse_args(argv)
     try:
-        if args.worker:
-            run_worker(args)
-        else:
-            run_controller(args)
+        run_controller(args)
     except (ValueError, benchmark_artifacts.ArtifactSnapshotError) as exc:
         print(exc, file=sys.stderr)
         return 2

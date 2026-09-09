@@ -555,12 +555,19 @@ class TestInventoryTests(unittest.TestCase):
                 environment.pop("GIT_PAGER", None)
             else:
                 environment["GIT_PAGER"] = ambient_git_pager
-        self.assertEqual(324, len(self.inventory["test_mode_rows"]))
-        self.assertEqual(43, len(self.inventory["expected_test_sets"]))
+        self.assertEqual(336, len(self.inventory["test_mode_rows"]))
+        self.assertEqual(44, len(self.inventory["expected_test_sets"]))
         self.assertEqual(123, len(self.inventory["native_observation_bindings"]))
         self.assertEqual(123, CHECKER._matrix_incomplete_count(self.inventory))
 
     def test_fixture_positive_validation(self) -> None:
+        correctness_roots = self.inventory["correctness_only_roots"]
+        self.assertEqual(1, len(correctness_roots))
+        self.assertFalse(correctness_roots[0]["native_inventory_evidence"])
+        self.assertEqual([{}, {"ZYNUM_MAX_ISA": "baseline"}], correctness_roots[0]["process_environments"])
+        self.assertEqual(2, len(correctness_roots[0]["launch_observation_ids"]))
+        self.assertNotIn("correctness_only_roots", CHECKER._native_projection(self.inventory))
+        self.assertEqual(21, sum(root["language"] == "zig" for root in self.inventory["test_roots"]))
         self.assertEqual(
             [],
             CHECKER.validate(self.root, self.inventory_path, structure_only=True),
@@ -760,6 +767,17 @@ class TestInventoryTests(unittest.TestCase):
         self.assertIn("top-level keys", self._errors())
 
     def test_missing_duplicate_and_folded_logical_roots_fail(self) -> None:
+        for mutation in ("missing", "duplicate", "claims-native-evidence"):
+            with self.subTest(correctness_only=mutation):
+                inventory = copy.deepcopy(self.inventory)
+                if mutation == "missing":
+                    inventory["correctness_only_roots"] = []
+                elif mutation == "duplicate":
+                    inventory["correctness_only_roots"] *= 2
+                else:
+                    inventory["correctness_only_roots"][0]["native_inventory_evidence"] = True
+                self._write(inventory)
+                self.assertIn("correctness_only_roots", self._errors())
         inventory = copy.deepcopy(self.inventory)
         inventory["test_roots"].pop()
         self._write(inventory)
@@ -939,7 +957,7 @@ class TestInventoryTests(unittest.TestCase):
             "import unittest\nclass Added(unittest.TestCase):\n    def test_added(self): pass\n",
             encoding="utf-8",
         )
-        self.assertIn("20 Python test candidates", self._errors())
+        self.assertIn("21 Python test candidates", self._errors())
 
         added.unlink()
         source = self.root / "test/build/test_test_inventory.py"
@@ -4017,6 +4035,8 @@ class TestInventoryTests(unittest.TestCase):
                 "python-root:abi-baseline-discovery",
                 "python-root:benchmark-tools-discovery",
                 "python-root:build-inventory-direct",
+                "python-root:build-profiles-direct",
+                "python-root:darwin-archive-repack-direct",
                 "python-root:test-inventory-direct",
             },
             set(roots),
@@ -4039,6 +4059,10 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(
             "python3 -B test/build/test_build_inventory.py",
             commands["python-root:build-inventory-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_build_profiles.py",
+            commands["python-root:build-profiles-direct"],
         )
         self.assertEqual(
             'python3 -B -m unittest discover -s bench/tools -p "test_*.py"',
@@ -4185,8 +4209,8 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(0, real_binding_summary.artifact_platform_skips)
         self.assertEqual(0, real_binding_summary.publication_platform_skips)
         self.assertEqual(0, real_binding_summary.platform_skips)
-        self.assertEqual(43, len(source_current["expected_test_sets"]))
-        self.assertEqual(324, len(source_current["test_mode_rows"]))
+        self.assertEqual(44, len(source_current["expected_test_sets"]))
+        self.assertEqual(336, len(source_current["test_mode_rows"]))
         self.assertEqual(123, len(source_current["native_observation_bindings"]))
         self.assertEqual(123, CHECKER._matrix_incomplete_count(source_current))
         self.assertEqual(

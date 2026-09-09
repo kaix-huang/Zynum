@@ -1,0 +1,208 @@
+{
+  "banded_profiles": [],
+  "benchmark_identity": {
+    "controller": {
+      "compiler": {
+        "default_target": "aarch64-macos.26.6.2...26.6.2-none",
+        "default_target_diagnostic": {
+          "classification": "zig_env_parsed",
+          "format": "zig-object",
+          "status": "ok"
+        },
+        "name": "zig",
+        "version": "0.16.0"
+      },
+      "host": {
+        "detected_capabilities": [
+          "feat_sme",
+          "feat_sme2"
+        ],
+        "machine": "arm64",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "processor": "arm",
+        "system": "Darwin"
+      },
+      "python": {
+        "version": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]"
+      }
+    },
+    "payload": {
+      "artifacts": {
+        "binaries": [
+          {
+            "name": "run_level2_report",
+            "sha256": "987a558291e509760e517d37cf5e04d5541b100aeea961382e64eb73cdcbe361"
+          }
+        ],
+        "hash_claim_scope": "content_identity_only; artifact hashes do not prove build flags",
+        "libraries": [
+          {
+            "name": "Zynum",
+            "sha256": "06781c85d9703d792f1a20009d1cc91582ab8036eb4ef5d4748fac0fa0bbce71"
+          },
+          {
+            "name": "Accelerate",
+            "sha256": null
+          },
+          {
+            "name": "OpenBLAS",
+            "sha256": "aeb5f40d3b5cc0fca84e05e90b8e7da6921cea2c33ca701062b0ccd7b4caf117"
+          }
+        ]
+      },
+      "build": {
+        "declaration_status": "complete",
+        "missing_fields": [],
+        "requested": {
+          "cpu": "apple_m4+sme+sme2+sme2p1",
+          "optimization": "ReleaseFast",
+          "target_triple": "aarch64-macos"
+        },
+        "schema_version": 1,
+        "source": {
+          "kind": "controller_cli",
+          "options": {
+            "cpu": "--build-cpu",
+            "optimization": "--build-optimize",
+            "target_triple": "--build-target"
+          }
+        },
+        "validation": {
+          "artifact_match": "not_verified",
+          "claim_scope": "requested_configuration_only",
+          "syntax": "valid"
+        }
+      },
+      "declared_capabilities": [],
+      "kernel_selection": {
+        "coverage_artifact": {
+          "authority_detail": "schema_version must be 1",
+          "authority_diagnostic": "kernel_coverage_invalid_document",
+          "authority_status": "malformed",
+          "generator": null,
+          "schema_version": null,
+          "sha256": "9377ed4bef261475cfc3b4ffa968f6bdd582365a979ef6769ccf7b71df61b5b0",
+          "summary": null
+        },
+        "registry_ids": [],
+        "selected_paths": [],
+        "selection_observation": "no per-call selection mapping supplied; do not infer a selected kernel from declared capability alone"
+      }
+    },
+    "schema_version": 2,
+    "source": {
+      "branch": null,
+      "cleanliness_status": "known",
+      "dirty": true,
+      "identity_diagnostic": "source_identity_manifest_loaded",
+      "identity_status": "exported",
+      "revision": "28314cf7b6c0e72526771d8c7d23752020a0bdab",
+      "snapshot_created_utc": "2026-09-09T10:38:12.190415+00:00",
+      "snapshot_manifest_sha256": "b5e7c267b32867d5b4ec0baf1cd8ea1faca3eebb3ed80e86765091eb3e809750",
+      "snapshot_tree_sha256": "03222c868c212af4ede0411adf68f4671d9748a244b094c45451ee9ed77582d3"
+    }
+  },
+  "command": {
+    "controller": "run_level2_report.py",
+    "parameters": {
+      "banded_profiles": [],
+      "interleave_libraries": true,
+      "operations": [
+        "legacy"
+      ],
+      "packed_profiles": [],
+      "process_repeats": 3,
+      "reps_large": 30,
+      "reps_small": 100,
+      "shapes": [
+        {
+          "m": 128,
+          "n": 128,
+          "name": "sq128"
+        },
+        {
+          "m": 256,
+          "n": 256,
+          "name": "sq256"
+        },
+        {
+          "m": 512,
+          "n": 512,
+          "name": "sq512"
+        }
+      ],
+      "sizes": [
+        128,
+        256,
+        512
+      ]
+    }
+  },
+  "correctness_check": "sampled per library/case/shape before timing",
+  "detected_cpu_count": 10,
+  "environment": {
+    "AOCL_DYNAMIC": "unset",
+    "BLIS_NUM_THREADS": "10",
+    "MKL_DYNAMIC": "FALSE",
+    "MKL_NUM_THREADS": "10",
+    "OMP_NUM_THREADS": "10",
+    "OPENBLAS_DYNAMIC": "0",
+    "OPENBLAS_NUM_THREADS": "10",
+    "VECLIB_MAXIMUM_THREADS": "10",
+    "ZYNUM_MAXIMUM_THREADS": "unset"
+  },
+  "generated_at_unix": 1788951099.245874,
+  "git_revision": "28314cf7b6c0e72526771d8c7d23752020a0bdab",
+  "interleave_libraries": true,
+  "isolation": "fresh process per library/shape/repeat; libraries use balanced cyclic Latin rotations; best repeat kept as the primary metric with min/median/max and ordered samples retained",
+  "libraries": [
+    {
+      "name": "Zynum",
+      "sha256": "06781c85d9703d792f1a20009d1cc91582ab8036eb4ef5d4748fac0fa0bbce71"
+    },
+    {
+      "name": "Accelerate",
+      "sha256": null
+    },
+    {
+      "name": "OpenBLAS",
+      "sha256": "aeb5f40d3b5cc0fca84e05e90b8e7da6921cea2c33ca701062b0ccd7b4caf117"
+    }
+  ],
+  "metadata_projection": {
+    "audience": "public",
+    "private_diagnostics": "excluded",
+    "schema_version": 1
+  },
+  "operations": [
+    "legacy"
+  ],
+  "packed_profiles": [],
+  "process_repeats": 3,
+  "reps_large": 30,
+  "reps_small": 100,
+  "shapes": [
+    {
+      "m": 128,
+      "n": 128,
+      "name": "sq128"
+    },
+    {
+      "m": 256,
+      "n": 256,
+      "name": "sq256"
+    },
+    {
+      "m": 512,
+      "n": 512,
+      "name": "sq512"
+    }
+  ],
+  "sizes": [
+    128,
+    256,
+    512
+  ],
+  "zig_version": "0.16.0",
+  "zynum_maximum_threads": 10
+}

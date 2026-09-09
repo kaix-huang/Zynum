@@ -153,6 +153,8 @@ jobs:
         run: |
           zig build generate-headers --summary failures
           zig build generate-kernel-coverage --summary failures
+          python3 tools/generate_multiversion.py --check
+          python3 -B test/build/test_repack_darwin_archive.py
 
       - name: Check generated files are up to date
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}

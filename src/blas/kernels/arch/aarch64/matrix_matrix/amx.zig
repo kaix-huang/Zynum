@@ -490,7 +490,7 @@ pub fn sgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b
     return if (amxSgemmN16WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
 }
 
-pub export fn zynum_blas_amx_sgemm_nn_f32_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_sgemm_nn_f32_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return sgemmN16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
@@ -543,12 +543,12 @@ pub fn sgemmN32TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_
     return if (amxSgemmN32TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
 }
 
-pub export fn zynum_blas_amx_sgemm_nn_f32_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_sgemm_nn_f32_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return sgemmN32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
-pub export fn zynum_blas_amx_sgemm_nn_f32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_sgemm_nn_f32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return zynum_blas_amx_sgemm_nn_f32_n16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
 }
@@ -860,7 +860,7 @@ pub fn dgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b
     return if (amxDgemmN16WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
 }
 
-pub export fn zynum_blas_amx_dgemm_nn_f64_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_dgemm_nn_f64_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return dgemmN16(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
@@ -881,12 +881,12 @@ pub fn dgemmN8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b:
     return if (amxDgemmN8WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
 }
 
-pub export fn zynum_blas_amx_dgemm_nn_f64_n8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_dgemm_nn_f64_n8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return dgemmN8(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
-pub export fn zynum_blas_amx_dgemm_nn_f64(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_dgemm_nn_f64(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return zynum_blas_amx_dgemm_nn_f64_n8(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
 }
@@ -959,13 +959,27 @@ pub fn dgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b
     return if (amxDgemmN32WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
 }
 
-pub export fn zynum_blas_amx_dgemm_nn_f64_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_dgemm_nn_f64_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return dgemmN32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, compat_pack_plan);
 }
 
 // Legacy exported symbol kept as an ABI alias; shape policy lives in tuning.zig.
-pub export fn zynum_blas_amx_dgemm_nn_f64_n32_square(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
+pub fn zynum_blas_amx_dgemm_nn_f64_n32_square(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
     if (comptime !enabled) return 0;
     return zynum_blas_amx_dgemm_nn_f64_n32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_);
+}
+
+comptime {
+    // Preserve standalone helper exports only in the host, never ISA objects.
+    if (!@hasDecl(@import("zynum-build-options"), "kernel_entry")) {
+        @export(&zynum_blas_amx_sgemm_nn_f32_n16, .{ .name = "zynum_blas_amx_sgemm_nn_f32_n16" });
+        @export(&zynum_blas_amx_sgemm_nn_f32_n32, .{ .name = "zynum_blas_amx_sgemm_nn_f32_n32" });
+        @export(&zynum_blas_amx_sgemm_nn_f32, .{ .name = "zynum_blas_amx_sgemm_nn_f32" });
+        @export(&zynum_blas_amx_dgemm_nn_f64_n16, .{ .name = "zynum_blas_amx_dgemm_nn_f64_n16" });
+        @export(&zynum_blas_amx_dgemm_nn_f64_n8, .{ .name = "zynum_blas_amx_dgemm_nn_f64_n8" });
+        @export(&zynum_blas_amx_dgemm_nn_f64, .{ .name = "zynum_blas_amx_dgemm_nn_f64" });
+        @export(&zynum_blas_amx_dgemm_nn_f64_n32, .{ .name = "zynum_blas_amx_dgemm_nn_f64_n32" });
+        @export(&zynum_blas_amx_dgemm_nn_f64_n32_square, .{ .name = "zynum_blas_amx_dgemm_nn_f64_n32_square" });
+    }
 }

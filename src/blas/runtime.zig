@@ -3,6 +3,14 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("zynum-build-options");
+
+comptime {
+    // COFF requires the task bridge even when host-side feature folding removes
+    // all stride-two calls. Other platforms retain it through their call graph.
+    if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .windows and !@hasDecl(build_options, "kernel_entry"))
+        _ = @import("kernels/isolated/task_runtime_host.zig");
+}
 
 pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";
 // pthread stack reservations include static TLS on ELF. Debug and ReleaseSafe
@@ -52,11 +60,12 @@ pub fn totalThreadCount() usize {
 }
 
 pub fn maxThreads() usize {
+    const capacity = if (comptime build_options.thread_limit != 0) @min(build_options.thread_limit, totalThreadCount()) else totalThreadCount();
     const override = maxThreadsOverride();
-    if (override != 0) return @min(override, totalThreadCount());
+    if (override != 0) return @min(override, capacity);
     const env_limit = envThreadLimit();
-    if (env_limit != 0) return @min(env_limit, totalThreadCount());
-    return totalThreadCount();
+    if (env_limit != 0) return @min(env_limit, capacity);
+    return capacity;
 }
 
 pub fn helperThreadCount(max_helpers: usize) usize {
@@ -66,7 +75,7 @@ pub fn helperThreadCount(max_helpers: usize) usize {
 }
 
 pub fn hasExplicitThreadLimit() bool {
-    return maxThreadsOverride() != 0 or envThreadLimit() != 0;
+    return build_options.thread_limit != 0 or maxThreadsOverride() != 0 or envThreadLimit() != 0;
 }
 
 fn sysctlInt(comptime name: [:0]const u8) usize {
@@ -172,4 +181,10 @@ fn ensureWorkerAffinity(ordinal: usize) void {
 pub fn configureWorkerThread(affinity_ordinal: ?usize) void {
     ensureWorkerQoS();
     if (affinity_ordinal) |ordinal| ensureWorkerAffinity(ordinal);
+}
+
+/// Diagnostic only; specialization does not query the runtime ISA resolver.
+pub fn selectedKernelTier() []const u8 {
+    if (comptime build_options.dynamic_dispatch) return @tagName(@import("kernels/multiversion/client.zig").selectedTier());
+    return "specialized";
 }

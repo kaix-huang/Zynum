@@ -2,9 +2,9 @@
 # Copyright (C) 2026 Zynum contributors
 # SPDX-License-Identifier: LGPL-3.0-or-later
 
+import argparse
 import csv
 import html
-import sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -33,8 +33,25 @@ def display_name(value):
     return DISPLAY_NAMES.get(value, value)
 
 
-def usage():
-    print("usage: plot_gemm_sweep.py input.csv output.svg", file=sys.stderr)
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(description="Plot a checked GEMM sweep CSV.")
+    parser.add_argument("csv")
+    parser.add_argument("svg")
+    parser.add_argument("--stat", choices=("best", "median"), default="best")
+    return parser.parse_args(argv)
+
+
+def row_gflops(raw, stat="best"):
+    if stat == "best":
+        return parse_positive_finite(raw.get("gflops"), "gflops")
+    factors = {"sgemm": 2, "dgemm": 2, "cgemm": 8, "zgemm": 8}
+    if raw["kind"] not in factors:
+        raise ValueError(f"unsupported GEMM kind: {raw['kind']!r}")
+    duration = parse_positive_finite(raw.get("median_ns"), "median_ns")
+    work = factors[raw["kind"]]
+    for dimension in ("m", "n", "k"):
+        work *= parse_positive_finite(raw.get(dimension), dimension)
+    return parse_positive_finite(work / duration, "median gflops")
 
 
 def sx(index, shape_count, left, width):
@@ -62,23 +79,24 @@ def library_heading(libs):
     return " vs ".join(names)
 
 
-def plot_heading(kinds, libs):
+def plot_heading(kinds, libs, stat="best"):
+    statistic = "Best-of-reps" if stat == "best" else "Median-time"
     kind_set = set(kinds)
     library_text = library_heading(libs)
     if kind_set == {"cgemm", "zgemm"}:
         return (
             f"Complex GEMM Performance Sweep: {library_text}",
-            "Best-of-reps GF/s for CGEMM/ZGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
+            f"{statistic} GF/s for CGEMM/ZGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
         )
     if kind_set == {"sgemm", "dgemm"}:
         return (
             f"Real GEMM Performance Sweep: {library_text}",
-            "Best-of-reps GF/s for SGEMM/DGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
+            f"{statistic} GF/s for SGEMM/DGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
         )
     kind_text = "/".join(kind.upper() for kind in kinds)
     return (
         f"{kind_text} Performance Sweep: {library_text}",
-        "Best-of-reps GF/s across square, remainder, skinny, wide, and K-varied column-major GEMM shapes",
+        f"{statistic} GF/s across square, remainder, skinny, wide, and K-varied column-major GEMM shapes",
     )
 
 
@@ -140,11 +158,9 @@ def draw_panel(
     return out
 
 
-def main():
-    if len(sys.argv) != 3:
-        usage()
-        return 2
-    csv_path, svg_path = sys.argv[1:]
+def main(argv=None):
+    args = parse_args(argv)
+    csv_path, svg_path = args.csv, args.svg
     rows = []
     with open(csv_path, newline="") as f:
         for raw in csv.DictReader(f):
@@ -161,7 +177,7 @@ def main():
                     "n": int(raw["n"]),
                     "k": int(raw["k"]),
                     "library": raw["library"],
-                    "gflops": parse_positive_finite(raw["gflops"], "gflops"),
+                    "gflops": row_gflops(raw, args.stat),
                 }
             )
 
@@ -236,7 +252,7 @@ def main():
 </style>
 """
     )
-    title, subtitle = plot_heading(kinds, libs)
+    title, subtitle = plot_heading(kinds, libs, args.stat)
     subtitle = (
         "Higher is better. Shapes are ordered by m*n*k so smaller cases stay at the front. "
         + subtitle

@@ -535,6 +535,7 @@ with open(args.csv, "w", newline="") as output:
         ]
         aggregate = runner.merge_repeat_rows(rows)
         self.assertEqual(float(aggregate["median_ns"]), 20)
+        self.assertEqual(aggregate["median_ns_samples"], "10,30")
         self.assertEqual(float(aggregate["p95_ns"]), 30)
 
         fractional = runner.merge_repeat_rows(

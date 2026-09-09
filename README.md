@@ -29,12 +29,34 @@ Transformer workloads across portable and architecture-specific CPU kernels.
 
 ## Performance Evidence
 
-No benchmark chart is currently published. A public performance chart requires
-complete public reproduction metadata and raw results, including source
-identity and measurement date, hardware and software details, commands, thread
-policy, comparator versions, and a public CSV or immutable artifact. See the
-[benchmarking guide](docs/common/benchmarking.md) for the measurement and
-correctness requirements.
+The charts below retain the early Level 1 / Level 2 / GEMM layout and compare
+**Zynum, Accelerate, OpenBLAS**, in that order. **Higher is better.** They use
+medians from three interleaved fresh-process runs on Apple M5 (10 logical CPUs),
+macOS 26.6.2, Zig 0.16.0, `apple_m4+sme+sme2+sme2p1` CPU profile, ReleaseFast, measured 2026-09-09.
+Zynum uses its default thread policy; comparator thread caps are 10.
+
+![Level 1 median performance](docs/assets/benchmarks/2026-09-09/level1.svg)
+
+<sub>Level 1: real and complex vector routines at n=1,048,576, plus 8 KiB and
+8 MiB copy cases. Panels identify Gops or GB/s. The four nonstandard AXPBY
+extensions are excluded from this common-operation comparison.</sub>
+
+![Level 2 median performance](docs/assets/benchmarks/2026-09-09/level2.svg)
+
+<sub>Level 2: real/complex GEMV, symmetric/Hermitian matrix-vector operations,
+and rank-one updates at n=128, 256, 512; GFLOP/s.</sub>
+
+![GEMM median performance](docs/assets/benchmarks/2026-09-09/gemm.svg)
+
+<sub>Level 3: SGEMM, DGEMM, CGEMM, ZGEMM over the 42-shape NN column-major sweep,
+including square, remainder, skinny, wide, and K-varied cases; GFLOP/s computed
+from median timings.</sub>
+
+These are measurements of the recorded specialized snapshot, not a before/after speedup
+claim or a portable performance guarantee. See the
+[reproduction package and methodology](docs/performance/README.md#readme-snapshot-2026-09-09)
+for source identity, raw CSVs, checks, comparator versions, commands, and
+measurement limits.
 
 ## Highlights
 
@@ -101,9 +123,9 @@ ZYNUM_QUICK_START
 ```
 
 Inventory-dependent test steps require the exact `-Dcpu=baseline` query. The
-ordinary `zig build` command remains host-native and unrestricted by the test
-inventory; use an explicit target and CPU tier there when doing compile-only
-feature coverage. The frozen AArch64 macOS and x86_64 Linux environments can
+ordinary `zig build` command builds a runtime-dispatched library for the host
+architecture and OS; explicit `-Dcpu` selects a specialized build. Both remain
+independent of frozen test-inventory evidence. The frozen AArch64 macOS and x86_64 Linux environments can
 validate native test enumeration today. AArch64 Linux and x86_64 Windows
 remain fail-closed for native tests until their enumeration gaps are frozen.
 Ordinary `test-inventory-link` is the POSIX structure-gated link-only step used
@@ -112,6 +134,45 @@ for the AArch64 Linux graph. On the exact native x86_64 Windows GNU baseline,
 only and omits the POSIX structure checker, inventory runner, and test bodies.
 It does not certify inventory or native correctness; all 63 Windows rows remain
 pending.
+
+### Portable And Specialized Builds
+
+| Configuration | Compiled code | Runtime policy |
+| --- | --- | --- |
+| No `-Dcpu` (default) | Baseline host code plus isolated ISA objects for the selected architecture/OS | CPU **and OS** capability admission, then existing operation/shape policy |
+| Explicit `-Dcpu=...` | Requested CPU profile, without dynamic ISA objects | ISA choices fold at compile time; size, alignment and threading checks remain |
+| `-Ddispatch=specialized` | Baseline unless a CPU is also specified | No dynamic ISA resolver |
+| `-Dthread-limit=N` | Constant worker ceiling | Clamped to available CPUs and any stricter runtime limit |
+
+```sh
+# One AArch64/macOS library usable across supported Apple Silicon CPUs.
+zig build install-libraries --release=fast -Dtarget=aarch64-macos
+# One x86_64/Linux library with runtime AVX/AVX2/FMA/AVX512 selection.
+zig build install-libraries --release=fast -Dtarget=x86_64-linux-gnu
+# Machine-specific build: removes dynamic ISA dispatch.
+zig build install-libraries --release=fast \
+  -Dcpu=apple_m4+sme+sme2+sme2p1 -Dthread-limit=10
+# Native universal-library correctness, also in a fresh forced-baseline process.
+zig build test-dynamic-dispatch --release=fast -Dtest-optimize=ReleaseFast
+```
+
+`-Doptimize=ReleaseFast` is also accepted, including from Zig dependencies,
+and takes precedence over the release preset.
+
+`-Ddispatch=auto` is the default. `-Ddispatch=dynamic` explicitly requests the
+portable path and resets the host CPU to the architecture baseline, including
+when a Zig dependency forwards a CPU option. A target always selects one architecture, OS and ABI;
+this is not a combined x86/ARM or cross-OS binary. When using `b.dependency`,
+pass `.dispatch = "dynamic"` for a portable library, since Zig implicitly
+forwards a CPU option with `.target`. The included Zig example handles this
+automatically and switches to specialization when its caller supplies `-Dcpu`.
+
+Dynamic builds accept `ZYNUM_MAX_ISA=baseline` for safe downgrade testing, or an
+architecture tier name described in [the architecture guide](docs/architecture.md#runtime-kernel-selection).
+The override never grants unsupported capabilities and is read once. Specialized
+builds ignore it. `runtime.selectedKernelTier()` reports the chosen tier or
+`specialized`. The process-wide thread pool and `ZYNUM_MAXIMUM_THREADS` policy
+remain shared across all ISA objects.
 
 Build artifacts are installed under `zig-out/` by default. On ELF and Mach-O
 targets, the library layout remains:
@@ -456,7 +517,8 @@ tools/*                       project-level maintenance tools
 docs/*                        architecture, usage, compatibility, roadmap, performance notes
 ```
 
-Generated benchmark CSVs, raw traces, sampling output, disassembly notes,
+Except for the curated README reproduction package under `docs/assets/benchmarks/`,
+generated benchmark CSVs, raw traces, sampling output, disassembly notes,
 temporary binaries, host-local instructions, and build products are not part
 of the public package. Keep transient reproducible build products under
 `zig-out/`, `.zig-cache/`, or a temporary directory. Keep raw evidence and

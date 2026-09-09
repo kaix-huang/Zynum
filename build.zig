@@ -3,6 +3,8 @@
 
 const std = @import("std");
 
+const DispatchMode = enum { auto, dynamic, specialized };
+
 const TestInventoryProfile = struct {
     environment_id: []const u8,
     enumeration_class_id: []const u8,
@@ -49,9 +51,25 @@ fn addOptionalIsolatedBenchLibrary(run: *std.Build.Step.Run, flag: []const u8, e
 }
 
 pub fn build(b: *std.Build) void {
-    const target_query = b.standardTargetOptionsQueryOnly(.{});
+    var target_query = b.standardTargetOptionsQueryOnly(.{ .default_target = .{ .cpu_model = .baseline } });
+    const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Explicit optimization mode (also accepted from Zig dependencies)") orelse
+        b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
+    const dispatch_mode = b.option(DispatchMode, "dispatch", "auto: dynamic by default, specialized when -Dcpu is explicit; or select dynamic/specialized") orelse .auto;
+    const explicit_cpu = b.user_input_options.contains("cpu");
+    const dynamic_dispatch = switch (dispatch_mode) {
+        .auto => !explicit_cpu,
+        .dynamic => true,
+        .specialized => false,
+    };
+    if (dynamic_dispatch) {
+        // Dependencies forward a synthetic CPU option with ResolvedTarget. An
+        // explicit dynamic request must still compile the resolver at baseline.
+        target_query.cpu_model = .baseline;
+        target_query.cpu_features_add = .empty;
+        target_query.cpu_features_sub = .empty;
+    }
     const target = b.resolveTargetQuery(target_query);
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
+    const thread_limit = b.option(usize, "thread-limit", "Compile-time ceiling for worker threads; zero uses runtime hardware capacity") orelse 0;
     const test_optimize = b.option(std.builtin.OptimizeMode, "test-optimize", "Optimize mode for correctness tests") orelse .ReleaseSafe;
     const host_tool_smoke = b.option(bool, "host-tool-smoke", "Include the test-host-tool-smoke aggregate in the default test step") orelse true;
     const apple_amx = b.option(
@@ -64,7 +82,9 @@ pub fn build(b: *std.Build) void {
     }
     const zynum_build_options = b.addOptions();
     zynum_build_options.addOption(bool, "apple_amx", apple_amx);
-    const exact_baseline_request = target_query.cpu_model == .baseline and
+    zynum_build_options.addOption(bool, "dynamic_dispatch", dynamic_dispatch);
+    zynum_build_options.addOption(usize, "thread_limit", thread_limit);
+    const exact_baseline_request = explicit_cpu and !dynamic_dispatch and target_query.cpu_model == .baseline and
         target_query.cpu_features_add.isEmpty() and target_query.cpu_features_sub.isEmpty();
     const expected_baseline_cpu = std.Target.Cpu.baseline(target.result.cpu.arch, target.result.os);
     const resolved_cpu_matches_canonical_baseline = target.result.cpu.model == expected_baseline_cpu.model and
@@ -192,6 +212,15 @@ pub fn build(b: *std.Build) void {
     else
         "src/blas/level2_width_stub_root.zig";
 
+    const kernel_libraries = if (dynamic_dispatch)
+        buildKernelTiers(b, target, optimize, apple_amx, level1_sve_candidates, level1_fixed_candidates, level2_fixed_candidates, level2_width_candidates)
+    else
+        &.{};
+    const kernel_test_libraries = if (dynamic_dispatch)
+        buildKernelTiers(b, target, test_optimize, apple_amx, level1_sve_candidates, level1_fixed_candidates, level2_fixed_candidates, level2_width_candidates)
+    else
+        &.{};
+
     const zynum_mod = b.addModule("zynum", .{
         .root_source_file = b.path("src/zynum.zig"),
         .target = target,
@@ -262,9 +291,21 @@ pub fn build(b: *std.Build) void {
     zynum_blas_test_mod.addOptions("zynum-build-options", zynum_build_options);
     fortran_compat_test_mod.addOptions("zynum-build-options", zynum_build_options);
     cblas_compat_test_mod.addOptions("zynum-build-options", zynum_build_options);
-    const stride2_isolated_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    for (kernel_libraries) |library| {
+        zynum_mod.addObject(library);
+        zynum_blas_mod.addObject(library);
+        blas_compat_mod.addObject(library);
+        fortran_compat_mod.addObject(library);
+        cblas_compat_mod.addObject(library);
+    }
+    for (kernel_test_libraries) |library| {
+        zynum_test_mod.addObject(library);
+        zynum_blas_test_mod.addObject(library);
+        fortran_compat_test_mod.addObject(library);
+        cblas_compat_test_mod.addObject(library);
+    }
+    const stride2_isolated_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level1-x86-stride2-isolated",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/blas/level1_stride2_object_root.zig"),
             .target = target,
@@ -272,9 +313,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const stride2_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    const stride2_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level1-x86-stride2-isolated-test",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/blas/level1_stride2_object_root.zig"),
             .target = target,
@@ -282,9 +322,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const compact_triangular_isolated_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    const compact_triangular_isolated_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level2-x86-compact-triangular-isolated",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path(compact_triangular_object_root),
             .target = target,
@@ -293,9 +332,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const compact_triangular_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    const compact_triangular_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level2-x86-compact-triangular-isolated-test",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path(compact_triangular_object_root),
             .target = target,
@@ -304,9 +342,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const level2_width_isolated_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    const level2_width_isolated_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level2-x86-width-isolated",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path(level2_width_object_root),
             .target = target,
@@ -315,9 +352,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const level2_width_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    const level2_width_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level2-x86-width-isolated-test",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/blas/level2_width_object_root.zig"),
             .target = target,
@@ -326,9 +362,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const structured_isolated_library = if (target.result.cpu.arch == .x86_64 and structured_object_requested) b.addLibrary(.{
+    const structured_isolated_library = if (target.result.cpu.arch == .x86_64 and structured_object_requested) b.addObject(.{
         .name = "zynum-level3-x86-structured-isolated",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path(structured_object_root),
             .target = target,
@@ -337,9 +372,8 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
-    const structured_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addLibrary(.{
+    const structured_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level3-x86-structured-isolated-test",
-        .linkage = .static,
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/blas/structured_object_root.zig"),
             .target = target,
@@ -349,40 +383,40 @@ pub fn build(b: *std.Build) void {
         }),
     }) else null;
     if (stride2_isolated_library) |library| {
-        zynum_mod.linkLibrary(library);
-        zynum_blas_mod.linkLibrary(library);
-        blas_compat_mod.linkLibrary(library);
+        zynum_mod.addObject(library);
+        zynum_blas_mod.addObject(library);
+        blas_compat_mod.addObject(library);
     }
     if (stride2_isolated_test_library) |library| {
-        zynum_test_mod.linkLibrary(library);
-        zynum_blas_test_mod.linkLibrary(library);
-        fortran_compat_test_mod.linkLibrary(library);
-        cblas_compat_test_mod.linkLibrary(library);
+        zynum_test_mod.addObject(library);
+        zynum_blas_test_mod.addObject(library);
+        fortran_compat_test_mod.addObject(library);
+        cblas_compat_test_mod.addObject(library);
     }
     if (compact_triangular_isolated_library) |library| {
-        zynum_mod.linkLibrary(library);
-        zynum_blas_mod.linkLibrary(library);
-        blas_compat_mod.linkLibrary(library);
+        zynum_mod.addObject(library);
+        zynum_blas_mod.addObject(library);
+        blas_compat_mod.addObject(library);
     }
     if (compact_triangular_isolated_test_library) |library| {
-        zynum_test_mod.linkLibrary(library);
-        zynum_blas_test_mod.linkLibrary(library);
-        fortran_compat_test_mod.linkLibrary(library);
-        cblas_compat_test_mod.linkLibrary(library);
+        zynum_test_mod.addObject(library);
+        zynum_blas_test_mod.addObject(library);
+        fortran_compat_test_mod.addObject(library);
+        cblas_compat_test_mod.addObject(library);
     }
     if (level2_width_isolated_library) |library| {
-        zynum_mod.linkLibrary(library);
-        zynum_blas_mod.linkLibrary(library);
-        blas_compat_mod.linkLibrary(library);
+        zynum_mod.addObject(library);
+        zynum_blas_mod.addObject(library);
+        blas_compat_mod.addObject(library);
     }
     if (level2_width_isolated_test_library) |library| {
-        zynum_test_mod.linkLibrary(library);
-        zynum_blas_test_mod.linkLibrary(library);
-        fortran_compat_test_mod.linkLibrary(library);
-        cblas_compat_test_mod.linkLibrary(library);
+        zynum_test_mod.addObject(library);
+        zynum_blas_test_mod.addObject(library);
+        fortran_compat_test_mod.addObject(library);
+        cblas_compat_test_mod.addObject(library);
     }
     if (structured_isolated_library) |library| {
-        blas_compat_mod.linkLibrary(library);
+        blas_compat_mod.addObject(library);
     }
     const lib = b.addLibrary(.{
         .name = "zynum_blas",
@@ -400,15 +434,23 @@ pub fn build(b: *std.Build) void {
         .{ .dest_dir = .{ .override = .{ .custom = "lib/static" } } }
     else
         .{};
-    const install_static_lib = b.addInstallArtifact(static_lib, static_install_options);
+    // Zig's archive writer can leave embedded Mach-O members misaligned. Rebuild
+    // the container with LLVM ar's Darwin format before installing the single library.
+    const repack_static_lib = b.addSystemCommand(&.{ "python3", "tools/repack_darwin_archive.py", b.graph.zig_exe });
+    repack_static_lib.addFileArg(static_lib.getEmittedBin());
+    const repacked_static_archive = repack_static_lib.addOutputFileArg("libzynum_blas.a");
+    const install_static_lib = if (target.result.ofmt == .macho)
+        &b.addInstallFileWithDir(repacked_static_archive, .lib, "libzynum_blas.a").step
+    else
+        &b.addInstallArtifact(static_lib, static_install_options).step;
     b.getInstallStep().dependOn(&install_dynamic_lib.step);
-    b.getInstallStep().dependOn(&install_static_lib.step);
+    b.getInstallStep().dependOn(install_static_lib);
     const install_libraries_step = b.step(
         "install-libraries",
         "Install the shared and static Zynum BLAS libraries without tools",
     );
     install_libraries_step.dependOn(&install_dynamic_lib.step);
-    install_libraries_step.dependOn(&install_static_lib.step);
+    install_libraries_step.dependOn(install_static_lib);
 
     const install_compat_headers = b.option(bool, "compat-headers", "Install Zynum BLAS CBLAS and BLAS/Fortran compatibility headers/modules") orelse true;
     if (install_compat_headers) {
@@ -642,7 +684,7 @@ pub fn build(b: *std.Build) void {
             .optimize = test_optimize,
             .link_libc = true,
         });
-        structured_object_test_mod.linkLibrary(structured_isolated_test_library.?);
+        structured_object_test_mod.addObject(structured_isolated_test_library.?);
         const structured_object_tests = b.addTest(.{
             .name = "zynum-blas-structured-object-tests",
             .root_module = structured_object_test_mod,
@@ -694,7 +736,7 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    if (compact_triangular_isolated_test_library) |library| triangular_packed_unit_test_mod.linkLibrary(library);
+    if (compact_triangular_isolated_test_library) |library| triangular_packed_unit_test_mod.addObject(library);
     const triangular_packed_unit_tests = b.addTest(.{
         .name = "zynum-blas-triangular-packed-unit-tests",
         .root_module = triangular_packed_unit_test_mod,
@@ -707,7 +749,7 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    if (compact_triangular_isolated_test_library) |library| triangular_band_solve_test_mod.linkLibrary(library);
+    if (compact_triangular_isolated_test_library) |library| triangular_band_solve_test_mod.addObject(library);
     const triangular_band_solve_tests = b.addTest(.{
         .name = "zynum-blas-triangular-band-solve-tests",
         .root_module = triangular_band_solve_test_mod,
@@ -724,7 +766,7 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    if (stride2_isolated_test_library) |library| vector_stride2_parallel_test_mod.linkLibrary(library);
+    if (stride2_isolated_test_library) |library| vector_stride2_parallel_test_mod.addObject(library);
     const vector_stride2_parallel_tests = b.addTest(.{
         .name = "zynum-blas-vector-stride2-parallel-tests",
         .root_module = vector_stride2_parallel_test_mod,
@@ -743,7 +785,7 @@ pub fn build(b: *std.Build) void {
     else
         null;
     if (level2_width_default_artifact_probe_mod) |probe_mod| {
-        probe_mod.linkLibrary(level2_width_isolated_library.?);
+        probe_mod.addObject(level2_width_isolated_library.?);
     }
     const level2_width_default_artifact_probe = if (level2_width_default_artifact_probe_mod) |probe_mod|
         b.addExecutable(.{
@@ -775,7 +817,7 @@ pub fn build(b: *std.Build) void {
     else
         null;
     if (level2_width_enabled_artifact_probe_mod) |probe_mod| {
-        probe_mod.linkLibrary(level2_width_isolated_library.?);
+        probe_mod.addObject(level2_width_isolated_library.?);
     }
     const level2_width_enabled_artifact_probe = if (level2_width_enabled_artifact_probe_mod) |probe_mod|
         b.addExecutable(.{
@@ -987,6 +1029,7 @@ pub fn build(b: *std.Build) void {
     for (inventory_cases) |inventory_case| {
         const official_tests = inventory_case.logical_tests orelse continue;
         official_tests.root_module.addOptions("zynum-build-options", zynum_build_options);
+        for (kernel_test_libraries) |library| official_tests.root_module.addObject(library);
     }
     const test_inventory_link_step = b.step(
         "test-inventory-link",
@@ -1107,32 +1150,67 @@ pub fn build(b: *std.Build) void {
     run_vector_stride2_parallel_tests.step.dependOn(test_inventory_step);
     run_zynum_public_surface_contract_tests.step.dependOn(test_inventory_step);
 
+    const multiversion_check = b.addSystemCommand(&.{ "python3", "tools/generate_multiversion.py", "--check" });
+    const check_multiversion_step = b.step("check-multiversion", "Check generated private kernel dispatch protocol and adapters");
+    check_multiversion_step.dependOn(&multiversion_check.step);
+    const dynamic_tests = b.addTest(.{
+        .name = "zynum-dynamic-dispatch-tests",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/blas/dynamic_dispatch_test.zig"),
+            .target = target,
+            .optimize = test_optimize,
+            .link_libc = true,
+        }),
+    });
+    dynamic_tests.root_module.addOptions("zynum-build-options", zynum_build_options);
+    for (kernel_test_libraries) |library| dynamic_tests.root_module.addObject(library);
+    if (stride2_isolated_test_library) |library| dynamic_tests.root_module.addObject(library);
+    if (compact_triangular_isolated_test_library) |library| dynamic_tests.root_module.addObject(library);
+    if (level2_width_isolated_test_library) |library| dynamic_tests.root_module.addObject(library);
+    const run_dynamic_tests = b.addRunArtifact(dynamic_tests);
+    const run_dynamic_baseline_tests = b.addRunArtifact(dynamic_tests);
+    run_dynamic_baseline_tests.setEnvironmentVariable("ZYNUM_MAX_ISA", "baseline");
+    // Fresh processes make the cached capability ceiling independently testable.
+    const test_dynamic_step = b.step("test-dynamic-dispatch", "Run native dynamic-dispatch correctness and forced-baseline checks; not inventory evidence");
+    if (dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled) {
+        test_dynamic_step.dependOn(&run_dynamic_tests.step);
+        test_dynamic_step.dependOn(&run_dynamic_baseline_tests.step);
+        test_dynamic_step.dependOn(check_multiversion_step);
+    } else {
+        test_dynamic_step.dependOn(&b.addFail("test-dynamic-dispatch requires a native dynamic build without external executors; omit -Dcpu").step);
+    }
+
     const test_step = b.step("test", "Run correctness tests");
-    test_step.dependOn(&test_inventory_structure_check.step);
-    test_step.dependOn(test_inventory_step);
-    test_step.dependOn(&run_modern_tests.step);
-    test_step.dependOn(&run_blas_module_tests.step);
-    test_step.dependOn(&run_zynum_public_surface_contract_tests.step);
-    test_step.dependOn(&run_blas_public_surface_contract_tests.step);
-    test_step.dependOn(&run_fortran_tests.step);
-    test_step.dependOn(&run_cblas_tests.step);
-    test_step.dependOn(&run_gemm_registry_tests.step);
-    test_step.dependOn(&run_level1_registry_tests.step);
-    test_step.dependOn(&run_level2_fused_registry_tests.step);
-    test_step.dependOn(&run_level2_compact_registry_tests.step);
-    test_step.dependOn(&run_symm_dense_gemm_tests.step);
-    test_step.dependOn(&run_triangular_parallel_tests.step);
-    test_step.dependOn(&run_structured_blocked_tests.step);
-    if (run_structured_object_tests) |run| test_step.dependOn(&run.step);
-    test_step.dependOn(&run_packed_parallel_tests.step);
-    test_step.dependOn(&run_triangular_dense_unit_tests.step);
-    test_step.dependOn(&run_triangular_band_window_tests.step);
-    test_step.dependOn(&run_triangular_packed_unit_tests.step);
-    test_step.dependOn(&run_triangular_band_solve_tests.step);
-    test_step.dependOn(&run_vector_stride2_parallel_tests.step);
-    if (run_level2_width_default_artifact_probe != null) test_step.dependOn(level2_width_default_artifact_probe_step);
-    test_step.dependOn(&run_header_smoke_tests.step);
-    if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);
+    if (dynamic_dispatch) {
+        test_step.dependOn(test_dynamic_step);
+        if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);
+    } else {
+        test_step.dependOn(&test_inventory_structure_check.step);
+        test_step.dependOn(test_inventory_step);
+        test_step.dependOn(&run_modern_tests.step);
+        test_step.dependOn(&run_blas_module_tests.step);
+        test_step.dependOn(&run_zynum_public_surface_contract_tests.step);
+        test_step.dependOn(&run_blas_public_surface_contract_tests.step);
+        test_step.dependOn(&run_fortran_tests.step);
+        test_step.dependOn(&run_cblas_tests.step);
+        test_step.dependOn(&run_gemm_registry_tests.step);
+        test_step.dependOn(&run_level1_registry_tests.step);
+        test_step.dependOn(&run_level2_fused_registry_tests.step);
+        test_step.dependOn(&run_level2_compact_registry_tests.step);
+        test_step.dependOn(&run_symm_dense_gemm_tests.step);
+        test_step.dependOn(&run_triangular_parallel_tests.step);
+        test_step.dependOn(&run_structured_blocked_tests.step);
+        if (run_structured_object_tests) |run| test_step.dependOn(&run.step);
+        test_step.dependOn(&run_packed_parallel_tests.step);
+        test_step.dependOn(&run_triangular_dense_unit_tests.step);
+        test_step.dependOn(&run_triangular_band_window_tests.step);
+        test_step.dependOn(&run_triangular_packed_unit_tests.step);
+        test_step.dependOn(&run_triangular_band_solve_tests.step);
+        test_step.dependOn(&run_vector_stride2_parallel_tests.step);
+        if (run_level2_width_default_artifact_probe != null) test_step.dependOn(level2_width_default_artifact_probe_step);
+        test_step.dependOn(&run_header_smoke_tests.step);
+        if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);
+    }
 
     const bench = b.addExecutable(.{
         .name = "bench-zynum-blas",
@@ -1157,7 +1235,8 @@ pub fn build(b: *std.Build) void {
     addOptionalBenchLibrary(run_bench, "--mkl", bench_mkl, null);
     addOptionalBenchLibrary(run_bench, "--aocl-blis", bench_aocl_blis, null);
     if (b.args) |args| run_bench.addArgs(args);
-    run_bench.step.dependOn(b.getInstallStep());
+    // The emitted library argument supplies the dependency; unrelated installed
+    // probes and the static library are not prerequisites for a benchmark run.
 
     const bench_step = b.step("bench", "Benchmark Zynum BLAS against Accelerate and OpenBLAS");
     bench_step.dependOn(&run_bench.step);
@@ -1177,13 +1256,15 @@ pub fn build(b: *std.Build) void {
     run_gemm_sweep.addArg("--zynum-blas");
     run_gemm_sweep.addFileArg(lib.getEmittedBin());
     run_gemm_sweep.addArg("--csv");
-    run_gemm_sweep.addArg("zig-out/gemm_sweep.csv");
+    run_gemm_sweep.addArg(b.getInstallPath(.prefix, "gemm_sweep.csv"));
     addOptionalBenchLibrary(run_gemm_sweep, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
     addOptionalBenchLibrary(run_gemm_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     addOptionalBenchLibrary(run_gemm_sweep, "--mkl", bench_mkl, null);
     addOptionalBenchLibrary(run_gemm_sweep, "--aocl-blis", bench_aocl_blis, null);
     if (b.args) |args| run_gemm_sweep.addArgs(args);
-    run_gemm_sweep.step.dependOn(b.getInstallStep());
+    // Installing only the shared library also creates the selected output prefix
+    // before the sweep opens its default CSV on a clean checkout.
+    run_gemm_sweep.step.dependOn(&install_dynamic_lib.step);
 
     const gemm_sweep_step = b.step("bench-gemm-sweep", "Sweep GEMM shapes and write CSV results");
     gemm_sweep_step.dependOn(&run_gemm_sweep.step);
@@ -1207,7 +1288,6 @@ pub fn build(b: *std.Build) void {
     run_gemm_sweep_isolated.addArg("--check");
     run_gemm_sweep_isolated.addArg("--skip-missing");
     if (b.args) |args| run_gemm_sweep_isolated.addArgs(args);
-    run_gemm_sweep_isolated.step.dependOn(b.getInstallStep());
 
     const gemm_sweep_isolated_step = b.step("bench-gemm-sweep-isolated", "Run reportable fresh-process GEMM sweep with correctness checks");
     gemm_sweep_isolated_step.dependOn(&run_gemm_sweep_isolated.step);
@@ -1231,7 +1311,6 @@ pub fn build(b: *std.Build) void {
     addOptionalBenchLibrary(run_vector_matrix_sweep, "--mkl", bench_mkl, null);
     addOptionalBenchLibrary(run_vector_matrix_sweep, "--aocl-blis", bench_aocl_blis, null);
     if (b.args) |args| run_vector_matrix_sweep.addArgs(args);
-    run_vector_matrix_sweep.step.dependOn(b.getInstallStep());
 
     const vector_matrix_sweep_step = b.step("bench-vector-matrix-sweep", "Sweep representative BLAS Level 1/2 kernels");
     vector_matrix_sweep_step.dependOn(&run_vector_matrix_sweep.step);
@@ -1437,4 +1516,69 @@ pub fn build(b: *std.Build) void {
         }),
     });
     if (target.result.os.tag != .windows) b.installArtifact(dcopy_probe);
+}
+
+fn buildKernelTiers(
+    b: *std.Build,
+    baseline: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    apple_amx: bool,
+    level1_sve: bool,
+    level1_fixed: bool,
+    level2_fixed: bool,
+    level2_width: bool,
+) []const *std.Build.Step.Compile {
+    const names: []const []const u8 = switch (baseline.result.cpu.arch) {
+        .aarch64 => &.{ "baseline", "aarch64_sve2", "aarch64_sme", "aarch64_sme2", "aarch64_sme2p1" },
+        .x86_64 => &.{ "baseline", "x86_avx", "x86_avx2_fma", "x86_avx512" },
+        else => &.{"baseline"},
+    };
+    const libraries = b.allocator.alloc(*std.Build.Step.Compile, names.len) catch @panic("out of memory");
+    for (names, 0..) |name, index| {
+        var query = baseline.query;
+        if (index != 0) {
+            query.cpu_model = .baseline;
+            query.cpu_features_add = switch (baseline.result.cpu.arch) {
+                .aarch64 => switch (index) {
+                    1 => std.Target.aarch64.featureSet(&.{.sve2}),
+                    2 => std.Target.aarch64.featureSet(&.{.sme}),
+                    3 => std.Target.aarch64.featureSet(&.{ .sme2, .sme_f64f64 }),
+                    4 => std.Target.aarch64.featureSet(&.{ .sme2p1, .sme_f64f64 }),
+                    else => unreachable,
+                },
+                .x86_64 => switch (index) {
+                    1 => std.Target.x86.featureSet(&.{.avx}),
+                    2 => std.Target.x86.featureSet(&.{ .avx2, .fma }),
+                    3 => std.Target.x86.featureSet(&.{ .avx512f, .avx512dq, .avx512bw, .avx512vl, .fma }),
+                    else => unreachable,
+                },
+                else => unreachable,
+            };
+        }
+        const options = b.addOptions();
+        options.addOption(bool, "dynamic_dispatch", false);
+        options.addOption(bool, "apple_amx", apple_amx);
+        options.addOption(usize, "thread_limit", 0);
+        options.addOption([]const u8, "kernel_entry", b.fmt("zynum_internal_kernel_{s}", .{name}));
+        options.addOption(bool, "level1_sve_candidates", level1_sve);
+        options.addOption(bool, "level1_fixed_candidates", level1_fixed);
+        options.addOption(bool, "level2_fixed_candidates", level2_fixed);
+        options.addOption(bool, "level2_width_candidates", level2_width);
+        const module = b.createModule(.{
+            .root_source_file = b.path("src/blas/kernel_object_root.zig"),
+            .target = b.resolveTargetQuery(query),
+            .optimize = optimize,
+            .link_libc = true,
+            .pic = true,
+        });
+        module.addOptions("zynum-build-options", options);
+        libraries[index] = b.addObject(.{
+            .name = b.fmt("zynum-kernel-{s}-{s}", .{ name, @tagName(optimize) }),
+            .root_module = module,
+        });
+        // ISA objects must remain separate code-generation units. Never LTO
+        // target-specific instructions into the baseline resolver or scheduler.
+        libraries[index].lto = .none;
+    }
+    return libraries;
 }

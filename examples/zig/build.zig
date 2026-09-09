@@ -7,9 +7,15 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    const requested_dispatch = b.option([]const u8, "dispatch", "Zynum dispatch mode") orelse "auto";
+    const dispatch = if (std.mem.eql(u8, requested_dispatch, "auto"))
+        (if (b.user_input_options.contains("cpu")) "specialized" else "dynamic")
+    else
+        requested_dispatch;
     const zynum_dep = b.dependency("zynum", .{
         .target = target,
         .optimize = optimize,
+        .dispatch = dispatch,
     });
 
     const exe = b.addExecutable(.{

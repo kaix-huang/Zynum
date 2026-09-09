@@ -87,7 +87,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_gemm_sweep_tools.py",
-        "044a873001af17fe2100e381feba0ad4488e93cbfc9f55970bf81d5d5061d320",
+        "adb54c89ed176fb9034a6464374824982a1a723ac98e79db40ea523571fb6a98",
     ),
     (
         "bench/tools/test_level1_report.py",
@@ -95,7 +95,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_level2_report.py",
-        "2ce852761cc7e9e6d74a9c324419c56d2db6abc5a349e9d524281b3ddf3697ee",
+        "11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1",
     ),
     (
         "bench/tools/test_rank_k_report.py",
@@ -107,7 +107,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_report_plotters.py",
-        "362b6339cd9c76f45b4729cbaa9d42499f01b0e9833a6890d7dff7fce90b4e4f",
+        "29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10",
     ),
     (
         "bench/tools/test_report_publication.py",
@@ -145,7 +145,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_gemm_sweep_tools.py",
-        "044a873001af17fe2100e381feba0ad4488e93cbfc9f55970bf81d5d5061d320",
+        "adb54c89ed176fb9034a6464374824982a1a723ac98e79db40ea523571fb6a98",
     ),
     (
         "bench/tools/test_level1_report.py",
@@ -153,7 +153,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_level2_report.py",
-        "2ce852761cc7e9e6d74a9c324419c56d2db6abc5a349e9d524281b3ddf3697ee",
+        "11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1",
     ),
     (
         "bench/tools/test_rank_k_report.py",
@@ -165,7 +165,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_report_plotters.py",
-        "362b6339cd9c76f45b4729cbaa9d42499f01b0e9833a6890d7dff7fce90b4e4f",
+        "29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10",
     ),
     (
         "bench/tools/test_report_publication.py",
@@ -225,15 +225,15 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/plot_gemm_sweep.py",
-        "f61aaed27ced6fe8eeb21b6b69ec20f9338c8f9489bcb3e80cd492991a4c1aee",
+        "b138d2a4187f7ed154db50ae32c164aa7bc846b9cd7dcb1413e44a83d3f769cc",
     ),
     (
         "bench/tools/plot_level1_report.py",
-        "99d3765cc52c59d8a607b6d034bf469656336adb5e0a6468a9df7bf3c7531a4b",
+        "ce4e439ae7775f5c7d3d3cb801fbe86fd19d424073ccc58b2dc6b1218dfd5772",
     ),
     (
         "bench/tools/plot_level2_report.py",
-        "9436916d466b2950ef923b110a384650e5032eecd50d6e254e7085bdd95a9c3d",
+        "6ae1dfd588127c9a96e6e2eb892d0a4e0553f11a7a193a4892e985106f58b6f3",
     ),
     (
         "bench/tools/render_full_benchmark_report.py",
@@ -253,7 +253,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/run_gemm_sweep_isolated.py",
-        "cad1e4c83cced9493ca67fbd7e05b7c934088749413b2abc4f3e77a3087713b0",
+        "414a9364179fb0a317bc7a1ff6a8157bf6399edc533365c137b4cde6e0aaa2d5",
     ),
     (
         "bench/tools/run_level1_report.py",
@@ -261,7 +261,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/run_level2_report.py",
-        "3a7d01a7a7eb1e457b01fa3cf69395e20c95252c33450a325bc6480d18ac35f3",
+        "987a558291e509760e517d37cf5e04d5541b100aeea961382e64eb73cdcbe361",
     ),
     (
         "bench/tools/run_rank_k_report.py",
@@ -344,7 +344,7 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (
     ("_zynum_report_repository_snapshot", "tools/repository_snapshot.py"),
 )
 _PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
-    "21c39d3d89a73953a9d25ec9db95635c88a4a6ffb6e2a866a93a40b8ad887f04"
+    "62f43121525714829033f134d4447c8cc2cc151459b217ca33d7a6add6a9825d"
 )
 _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
     "fe47ceff1b1520d52339b694168560d4eafa6754b71349365a355ecaf1d6f5a6"
@@ -958,7 +958,7 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "fb23230b483a99c73a89175ab4ea984724f6b9b5d28a12a5dc82dc8fa7b47744"
+    "289af0274a538055ed4ba7c6bd098d4e4c2dfde808c70c69daf247f8db4360ba"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
@@ -974,6 +974,7 @@ TOP_LEVEL_KEYS = {
     "environment_profiles",
     "test_enumeration_classes",
     "test_roots",
+    "correctness_only_roots",
     "zig_test_files",
     "python_test_modules",
     "python_skip_contracts",
@@ -1140,6 +1141,9 @@ ROOT_MODULE_SYMBOLS = {
     "vector_stride2_parallel_tests": "vector_stride2_parallel_test_mod",
 }
 PYTHON_ROOTS = (
+    {"id": "python-root:darwin-archive-repack-direct", "kind": "direct",
+     "module_paths": ("test/build/test_repack_darwin_archive.py",), "launch_ids": (),
+     "aggregate": False, "matrix": False},
     {
         "id": "python-root:abi-baseline-discovery",
         "kind": "discovery",
@@ -2281,6 +2285,7 @@ def _section_summary(inventory: dict[str, Any]) -> dict[str, Any]:
     sections = (
         "test_enumeration_classes",
         "test_roots",
+        "correctness_only_roots",
         "zig_test_files",
         "python_test_modules",
         "expected_test_sets",
@@ -2321,6 +2326,7 @@ def discover(
             if item.get("call") == "b.addTest"
             and item.get("id") != FACTORY_COMPILE_ID
             and item.get("artifact_role") != FACTORY_ROLE
+            and item.get("id") != "compile:build.zig:build:dynamic_tests"
         ),
         key=lambda item: item["id"],
     )
@@ -2329,6 +2335,30 @@ def discover(
             f"expected exactly 21 b.addTest logical roots, found {len(compile_tests)}"
         )
 
+    dynamic_compile_id = "compile:build.zig:build:dynamic_tests"
+    dynamic_launch_ids = ["launch:build.zig:build:run_dynamic_tests", "launch:build.zig:build:run_dynamic_baseline_tests"]
+    dynamic_compile = by_id.get(dynamic_compile_id, {})
+    dynamic_launches = [by_id.get(identifier, {}) for identifier in dynamic_launch_ids]
+    if (dynamic_compile.get("call") != "b.addTest"
+        or dynamic_compile.get("artifact_role") != "dynamic-dispatch-correctness-only"
+        or dynamic_compile.get("root_source") != ["src/blas/dynamic_dispatch_test.zig"]
+        or any(launch.get("call") != "b.addRunArtifact"
+               or launch.get("source_artifact") != dynamic_compile_id
+               or launch.get("launch_role") != "dynamic-dispatch-correctness-only"
+               for launch in dynamic_launches)):
+        raise InventoryError("dynamic correctness-only root and two process launches must match the reviewed build contract")
+    correctness_only_roots = [{
+        "id": "correctness-root:dynamic-dispatch",
+        "language": "zig",
+        "physical_path": "src/blas/dynamic_dispatch_test.zig",
+        "compile_observation_id": dynamic_compile_id,
+        "launch_observation_ids": dynamic_launch_ids,
+        "selector_step_observation_id": "step:build.zig:build:test-dynamic-dispatch",
+        "guard": "dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled",
+        "process_environments": [{}, {"ZYNUM_MAX_ISA": "baseline"}],
+        "enumeration_source": "static-source-reachability-only",
+        "native_inventory_evidence": False,
+    }]
     public_paths = context.public_files.path_set
     zig_text: dict[str, str] = {}
     zig_declarations: dict[str, list[dict[str, Any]]] = {}
@@ -2345,6 +2375,10 @@ def discover(
     for observation in observations:
         source_artifact = observation.get("source_artifact")
         if isinstance(source_artifact, str):
+            if source_artifact == dynamic_compile_id:
+                if observation["id"] not in dynamic_launch_ids:
+                    raise InventoryError("unreviewed dynamic correctness launch")
+                continue
             if source_artifact in launch_by_compile:
                 raise InventoryError(f"duplicate launch for {source_artifact}")
             launch_by_compile[source_artifact] = observation
@@ -2558,9 +2592,30 @@ def discover(
             }
         )
 
+    # Track source declarations of the correctness-only root without adding native
+    # protocol rows or manufacturing compiler-enumerated test names.
+    for correctness_root in correctness_only_roots:
+        reached: set[str] = set()
+        pending = [correctness_root["physical_path"]]
+        while pending:
+            path = pending.pop()
+            if path in reached:
+                continue
+            reached.add(path)
+            if path not in zig_text:
+                raise InventoryError(f"correctness-only source is missing: {path}")
+            for imported in _zig_imports(zig_text[path], path):
+                candidate = posixpath.normpath((PurePosixPath(path).parent / imported).as_posix())
+                if candidate in public_paths and candidate not in reached:
+                    pending.append(candidate)
+        correctness_root["source_reachability"] = sorted(reached)
+        for path in sorted(reached):
+            if path in zig_declarations:
+                root_reach[path].append(correctness_root["id"])
+
     zig_file_rows: list[dict[str, Any]] = []
     zig_gap_paths: list[str] = []
-    root_physical_paths = {row["physical_path"] for row in root_rows}
+    root_physical_paths = {row["physical_path"] for row in [*root_rows, *correctness_only_roots]}
     for path, declarations in sorted(zig_declarations.items()):
         reaches = sorted(root_reach.get(path, []))
         if path in root_physical_paths:
@@ -2590,9 +2645,9 @@ def discover(
         if PurePosixPath(path).suffix == ".py"
         and PurePosixPath(path).name.startswith("test_")
     )
-    if len(python_paths) != 20:
+    if len(python_paths) != 21:
         raise InventoryError(
-            f"expected exactly 20 Python test candidates, found {len(python_paths)}"
+            f"expected exactly 21 Python test candidates, found {len(python_paths)}"
         )
     benchmark_paths = tuple(
         path for path in python_paths if path.startswith("bench/tools/")
@@ -2897,6 +2952,7 @@ def discover(
         "environment_profiles": [dict(item) for item in ENVIRONMENTS],
         "test_enumeration_classes": enumeration_classes,
         "test_roots": sorted(root_rows, key=lambda item: item["id"]),
+        "correctness_only_roots": correctness_only_roots,
         "zig_test_files": zig_file_rows,
         "python_test_modules": python_module_rows,
         "python_skip_contracts": [],
@@ -3505,6 +3561,8 @@ def _validate_factory_projection(
         "query_source": "standardTargetOptionsQueryOnly",
         "resolution_source": "resolveTargetQuery(target_query)",
         "requested_cpu_gate": {
+            "explicit_cpu": True,
+            "dynamic_dispatch": False,
             "cpu_model": "baseline",
             "features_add": "empty",
             "features_sub": "empty",
@@ -3660,12 +3718,14 @@ def _validate_factory_projection(
         sum(
             isinstance(edge, dict)
             and edge.get("id") == "step:build.zig:build:test-inventory"
-            and edge.get("condition") == "always"
+            and edge.get("condition") == "!dynamic_dispatch and (always)"
             for edge in aggregate_dependencies
         )
         != 1
     ):
         errors.append("canonical test aggregate factory foreign key is incorrect")
+    if sum(isinstance(edge, dict) and edge.get("id") == "step:build.zig:build:test-dynamic-dispatch" and edge.get("condition") == "dynamic_dispatch" for edge in aggregate_dependencies) != 1:
+        errors.append("dynamic correctness aggregate foreign key is incorrect")
     return errors
 
 
@@ -4559,6 +4619,7 @@ def _validate_impl(
         errors.extend(_validate_factory_projection(build_inventory, expected))
     for section in (
         "test_roots",
+        "correctness_only_roots",
         "zig_test_files",
         "python_test_modules",
         "expected_test_sets",
@@ -6890,10 +6951,10 @@ _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES = frozenset(
     {
         *(
             ("bench/tools/test_level2_report.py", line, "subprocess.run")
-            for line in (1566, 1632, 1696, 1808, 1859, 2352, 2402, 2451, 2504)
+            for line in (454, 1583, 1650, 1714, 1826, 1877, 2370, 2420, 2469, 2522)
         ),
         ("bench/tools/run_level1_report.py", 894, "subprocess.run"),
-        ("bench/tools/run_level2_report.py", 2881, "subprocess.run"),
+        ("bench/tools/run_level2_report.py", 2879, "subprocess.run"),
     }
 )
 _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
@@ -6909,11 +6970,11 @@ _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
         ("bench/tools/test_symm_report.py", 1218, "subprocess.run"),
         ("bench/tools/test_triangular_matrix_report.py", 1229, "subprocess.run"),
         ("bench/tools/benchmark_metadata.py", 287, "subprocess.run"),
-        ("bench/tools/run_gemm_sweep_isolated.py", 258, "subprocess.run"),
-        ("bench/tools/run_gemm_sweep_isolated.py", 502, "subprocess.run"),
+        ("bench/tools/run_gemm_sweep_isolated.py", 259, "subprocess.run"),
+        ("bench/tools/run_gemm_sweep_isolated.py", 506, "subprocess.run"),
         ("bench/tools/run_level1_report.py", 445, "subprocess.run"),
         ("bench/tools/run_level1_report.py", 1429, "subprocess.run"),
-        ("bench/tools/run_level2_report.py", 836, "subprocess.run"),
+        ("bench/tools/run_level2_report.py", 834, "subprocess.run"),
         ("bench/tools/run_rank_k_report.py", 612, "subprocess.run"),
         ("bench/tools/run_rank_k_report.py", 766, "subprocess.run"),
         ("bench/tools/run_rotg_latency_report.py", 412, "subprocess.run"),

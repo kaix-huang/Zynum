@@ -169,27 +169,23 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AppleAmxKernelId {
             ((shape.m & 15) != 0 or (shape.n & 15) != 0);
         if (medium_fringe) return .apple_amx_f32_n16;
         if ((shape.m & 15) != 0 or (shape.n & 15) != 0) return .none;
+        // The f32 AMX compatibility contract caps K at 512. Keep the
+        // preference rules below inside that range; high-K uses SME/ASIMD.
         if (shape.k > 512) return .none;
 
         const short_wide = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
-        const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64 and shape.m <= 768;
+        const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64;
         const square512_chunk = shape.m == 512 and shape.k == 512 and shape.n <= 128;
-        const square1024_chunk = shape.m == 1024 and shape.k == 1024 and shape.n <= 128;
         const narrow_n64_chunk = shape.m >= 1024 and shape.n == 32;
-        const tall_panel = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 256 and shape.k <= 1024 and !square512_chunk and !square1024_chunk;
-        const high_k_small = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
-        const high_k_m512_n32 = shape.m == 512 and shape.n == 32 and shape.k == 2048;
+        const tall_panel = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 256 and !square512_chunk;
         const low_k_large_n32 = shape.m >= 256 and shape.n >= 256 and shape.k <= 256;
-        const tall_n16 = shape.m >= 512 and shape.n == 16 and shape.k >= 128 and shape.k <= 1024;
-        const high_k_panel = shape.m >= 128 and shape.m <= 512 and shape.n >= 32 and shape.n <= 128 and shape.k >= 2048;
-        if (!short_wide and !square and !tall_panel and !high_k_small and !high_k_m512_n32 and !high_k_panel and !low_k_large_n32 and !tall_n16) return .none;
+        const tall_n16 = shape.m >= 512 and shape.n == 16 and shape.k >= 128;
+        if (!short_wide and !square and !tall_panel and !low_k_large_n32 and !tall_n16) return .none;
 
-        const square_n32 = square and (shape.m == 96 or shape.m == 128 or shape.m == 192 or shape.m == 256 or shape.m == 384 or shape.m == 512 or shape.m == 768);
+        const square_n32 = square and (shape.m == 96 or shape.m == 128 or shape.m == 192 or shape.m == 256 or shape.m == 384 or shape.m == 512);
         const short_wide_n32 = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
-        const tall_panel_n32 = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 128 and shape.k <= 1024 and !square512_chunk and !square1024_chunk and !narrow_n64_chunk;
-        const high_k_chunk_n32 = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
-        const high_k_panel_n32 = high_k_panel;
-        if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or high_k_chunk_n32 or high_k_panel_n32 or narrow_n64_chunk)) {
+        const tall_panel_n32 = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 128 and !square512_chunk and !narrow_n64_chunk;
+        if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or narrow_n64_chunk)) {
             return .apple_amx_f32_n32;
         }
         return .apple_amx_f32_n16;

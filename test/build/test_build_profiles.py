@@ -48,6 +48,38 @@ class BuildProfileTests(unittest.TestCase):
     def test_default_and_explicitly_disabled_profiles(self) -> None:
         self._assert_configures()
         self._assert_configures(*(f"-D{flag}=false" for flag in PROFILE_FLAGS))
+        source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+        for arguments in (("-Dcpu=baseline",), ("-Ddispatch=dynamic",), ("-Ddispatch=specialized",), ("-Ddispatch=specialized", "-Dcpu=baseline")):
+            with self.subTest(dispatch=arguments):
+                self._assert_configures(*arguments)
+        self._assert_configures("-Doptimize=ReleaseSafe")
+        self._assert_configures("-Ddispatch=dynamic", "-Dcpu=baseline")
+        self.assertIn("target_query.cpu_features_add = .empty", source)
+        self.assertIn("target_query.cpu_features_sub = .empty", source)
+        self.assertIn('.default_target = .{ .cpu_model = .baseline }', source)
+        self.assertIn('const explicit_cpu = b.user_input_options.contains("cpu")', source)
+        self.assertIn('.auto => !explicit_cpu', source)
+        self.assertIn('libraries[index].lto = .none', source)
+        for runner in (
+            "run_bench",
+            "run_gemm_sweep",
+            "run_gemm_sweep_isolated",
+            "run_vector_matrix_sweep",
+        ):
+            with self.subTest(benchmark=runner):
+                self.assertNotIn(f"{runner}.step.dependOn(b.getInstallStep())", source)
+                self.assertIn(f"{runner}.addFileArg(lib.getEmittedBin())", source)
+        self.assertIn("run_gemm_sweep.step.dependOn(&install_dynamic_lib.step)", source)
+        self.assertIn('b.getInstallPath(.prefix, "gemm_sweep.csv")', source)
+        # Standalone runs stay narrow while the default install still ships both
+        # libraries and the benchmark executables.
+        self.assertIn("b.getInstallStep().dependOn(install_static_lib)", source)
+        for library in ("dynamic",):
+            self.assertIn(
+                f"b.getInstallStep().dependOn(&install_{library}_lib.step)", source
+            )
+        for artifact in ("bench", "gemm_sweep", "vector_matrix_sweep"):
+            self.assertIn(f"b.installArtifact({artifact})", source)
 
     def test_each_single_profile(self) -> None:
         for selected in PROFILE_FLAGS:

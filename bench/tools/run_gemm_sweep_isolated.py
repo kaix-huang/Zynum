@@ -96,6 +96,7 @@ CSV_FIELDNAMES = [
     "max_ns",
     "reps",
     "process_repeats",
+    "median_ns_samples",
     "check",
 ]
 
@@ -445,6 +446,9 @@ def merge_repeat_rows(rows):
         nearest_rank_percentile(p95_values, 95, "p95_ns"), "p95_ns"
     )
     base["max_ns"] = format_gemm_evidence(max(max_values), "max_ns")
+    base["median_ns_samples"] = ",".join(
+        format_gemm_evidence(value, "median_ns") for value in median_values
+    )
     base["process_repeats"] = str(len(rows))
     base["check"] = merged_check_status(rows)
     validate_gemm_evidence(base)
@@ -568,6 +572,7 @@ def serialize_csv(rows_by_lib, shape_indexes):
                 row.setdefault("median_ns", row.get("best_ns", ""))
                 row.setdefault("p95_ns", row.get("best_ns", ""))
                 row.setdefault("max_ns", row.get("best_ns", ""))
+                row.setdefault("median_ns_samples", row["median_ns"])
                 row.setdefault("process_repeats", "1")
                 row.setdefault("check", "unchecked")
                 output_rows.append(row)

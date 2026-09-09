@@ -43,6 +43,7 @@ CASE_ORDER = [
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Plot Level 2 report CSV.")
     parser.add_argument("csv")
+    parser.add_argument("--stat", choices=("best", "median"), default="best")
     parser.add_argument("--bars-svg", required=True)
     return parser.parse_args(argv)
 
@@ -53,7 +54,8 @@ def sy(value, top, height, max_value):
     return top + height - value / max_value * height
 
 
-def read_rows(path):
+def read_rows(path, stat="best"):
+    value_field = "metric_median" if stat == "median" else "rate_gops"
     rows = []
     with open(path, newline="") as f:
         for raw in csv.DictReader(f):
@@ -65,7 +67,9 @@ def read_rows(path):
                     "kind": raw["kind"],
                     "library": raw["library"],
                     "n": int(raw["n"]),
-                    "rate_gops": parse_positive_finite(raw["rate_gops"], "rate_gops"),
+                    "rate_gops": parse_positive_finite(
+                        raw.get(value_field), value_field
+                    ),
                 }
             )
     return rows
@@ -81,7 +85,7 @@ def libraries_for(rows):
     return libs
 
 
-def render_svg(rows):
+def render_svg(rows, stat="best"):
     sizes = sorted({row["n"] for row in rows})
     libs = libraries_for(rows)
     values = {(row["n"], row["case"], row["library"]): row for row in rows}
@@ -115,7 +119,7 @@ def render_svg(rows):
 """,
         '<rect width="100%" height="100%" fill="#fff"/>',
         '<text x="38" y="42" class="title">Level 2 current performance - real and complex types</text>',
-        '<text x="38" y="66" class="sub">Higher is better. Fresh process per library and size, metric = Gops. Panels use the CSV n values; bars follow the legend order.</text>',
+        f'<text x="38" y="66" class="sub">Higher is better. Statistic: {stat}. Fresh process per library and size, metric = Gops. Panels use the CSV n values; bars follow the legend order.</text>',
     ]
 
     legend_spacing = 170
@@ -178,7 +182,7 @@ def render_svg(rows):
 
 def main(argv=None):
     args = parse_args(argv)
-    contents = render_svg(read_rows(args.csv))
+    contents = render_svg(read_rows(args.csv, args.stat), args.stat)
     publish_outputs([ReportOutput(Path(args.bars_svg), contents)])
 
 

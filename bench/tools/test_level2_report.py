@@ -449,6 +449,17 @@ class Level2RunnerTests(unittest.TestCase):
                 )
                 self.assertEqual(Path(library_path).read_bytes(), b"library-a")
                 if len(private_paths) == 2:
+                    # Execute the actual frozen bytes with no repository import
+                    # path, even on hosts without an installed BLAS library.
+                    result = subprocess.run(
+                        [sys.executable, str(script), "--worker", "--help"],
+                        cwd=temp_dir,
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertIn("isolated Level 2 worker", result.stdout)
                     library.write_bytes(b"library-b")
                 elif len(private_paths) == 4:
                     library.write_bytes(b"library-a")
@@ -1563,33 +1574,40 @@ class Level2RunnerTests(unittest.TestCase):
     @unittest.skipUnless(TEST_BLAS, "no drop-in BLAS library is available")
     def test_triangular_worker_correctness(self):
         n = 7
-        result = subprocess.run(
-            [
-                sys.executable,
-                str(TOOLS_DIR / "run_level2_report.py"),
-                "--worker",
-                "--csv",
-                os.devnull,
-                "--library-name",
-                "TestBLAS",
-                "--library-path",
-                TEST_BLAS,
-                "--worker-shape",
-                "sq7",
-                "--worker-m",
-                str(n),
-                "--worker-n",
-                str(n),
-                "--worker-reps",
-                "1",
-                "--worker-op",
-                "triangular",
-            ],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
+        request = runner.benchmark_artifacts.ArtifactRequest.interpreter_script(
+            "run_level2_report", TOOLS_DIR / "run_level2_report.py"
         )
+        with runner.benchmark_artifacts.ArtifactSnapshotSet.capture(
+            [request]
+        ) as snapshot:
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(snapshot.for_role("binary")[0].execution_path),
+                    "--worker",
+                    "--csv",
+                    os.devnull,
+                    "--library-name",
+                    "TestBLAS",
+                    "--library-path",
+                    TEST_BLAS,
+                    "--worker-shape",
+                    "sq7",
+                    "--worker-m",
+                    str(n),
+                    "--worker-n",
+                    str(n),
+                    "--worker-reps",
+                    "1",
+                    "--worker-op",
+                    "triangular",
+                ],
+                cwd=Path(snapshot.for_role("binary")[0].execution_path).parent,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            snapshot.finalize()
         self.assertEqual(result.returncode, 0, result.stderr)
         rows = list(csv.DictReader(result.stdout.splitlines()))
         self.assertEqual(len(rows), 80)

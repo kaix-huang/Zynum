@@ -616,7 +616,7 @@ pub fn sveDotComplexF32Candidate(n: usize, x: [*]const types.ComplexF32, y: [*]c
 }
 
 pub fn rotUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
-    if (comptime profile.enable_sme_linear_transform and features.has_sme2) {
+    if (comptime T == f32 and profile.enable_sme_linear_transform and features.has_sme2) {
         if (profile.preferSmeRot(T, n) and features.streamingVectorBytes() == 64) {
             const a_bits: u32 = @bitCast(c);
             const b_bits: u32 = @bitCast(s);

@@ -10,9 +10,17 @@
 //! explicit temporary storage for caller-approved aliasing.
 
 const aliasing = @import("aliasing.zig");
-const core = @import("../core.zig");
+const core = @import("../core/checked.zig");
 const std = @import("std");
 const views = @import("views.zig");
+
+comptime {
+    // Catch accidental replacement of the narrow facade with the legacy core
+    // umbrella before API code can begin depending on raw kernels or scheduling.
+    for (.{ "unchecked", "execution", "vector", "matrix_vector", "matrix_matrix", "scal", "copy", "axpy", "dot", "gemv", "gemm" }) |name| {
+        if (@hasDecl(core, name)) @compileError("checked API core boundary exposes " ++ name);
+    }
+}
 
 /// Errors returned by checked public Zig BLAS operations.
 pub const Error = views.Error;

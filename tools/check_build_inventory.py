@@ -89,13 +89,16 @@ BUILD_CALLS = {
     "b.step": "step",
     "b.addFail": "step",
     "b.addLibrary": "compile",
+    "b.addObject": "compile",
     "b.addExecutable": "compile",
     "b.addTest": "compile",
     "b.addRunArtifact": "launch",
     "b.addSystemCommand": "launch",
     "linkLibrary": "link",
+    "addObject": "link",
     "b.installArtifact": "install",
     "b.addInstallArtifact": "install",
+    "b.addInstallFileWithDir": "install",
     "b.installFile": "install",
 }
 PYTHON_PROCESS_CALLS = {
@@ -390,11 +393,11 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "d320db8ec989c8e0e71a3610377e6eb35fe494a618124e87cf4fa55ca297f864"
+    "485ef09187deabe19f07d619acfc8d463d8c16cf0b9fb1293ef2831c1f84de40"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
-    "6508636069ecc5885588bc8863e166e0fd376f59c4a102a805a235c14fcf01e8"
+    "13a9325ebba955bd1cb3742de59f741c9a24661df9c5db2850c30c42efda884e"
 )
 REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = (
     "83b807444228d772b60a7b1c4b140d356d8b580fb7842fc01cf99490573b033e"
@@ -471,17 +474,33 @@ PAYLOAD_CONTROLLER_LINKS = {
     ),
 }
 REQUIRED_GAP_IDS = {
-    "gap:process-bounds-deferred",
-    "gap:example-optimize-forwarding",
     "gap:cross-target-benchmark-payload-execution",
+    "gap:process-bounds-deferred",
 }
 REQUIRED_DERIVED_CANDIDATE_IDS = {
+    "derived:docs/assets/benchmarks/2026-09-09/gemm.csv",
+    "derived:docs/assets/benchmarks/2026-09-09/gemm.csv.meta.json",
+    "derived:docs/assets/benchmarks/2026-09-09/gemm.svg",
+    "derived:docs/assets/benchmarks/2026-09-09/level1.csv",
+    "derived:docs/assets/benchmarks/2026-09-09/level1.csv.meta.json",
+    "derived:docs/assets/benchmarks/2026-09-09/level1.svg",
+    "derived:docs/assets/benchmarks/2026-09-09/level2.csv",
+    "derived:docs/assets/benchmarks/2026-09-09/level2.csv.meta.json",
+    "derived:docs/assets/benchmarks/2026-09-09/level2.svg",
+    "derived:docs/assets/benchmarks/2026-09-09/source.json",
+    "derived:docs/assets/benchmarks/2026-09-09/source.patch",
+    "derived:docs/kernel_coverage.json",
+    "derived:include/zynum/blas/abi_manifest.json",
+    "derived:include/zynum/blas/blas.f90",
     "derived:include/zynum/blas/blas.h",
     "derived:include/zynum/blas/cblas.h",
-    "derived:include/zynum/blas/blas.f90",
-    "derived:include/zynum/blas/abi_manifest.json",
-    "derived:docs/kernel_coverage.json",
     "derived:pkgconfig/zynum_blas.pc",
+    "derived:src/blas/kernels/dispatch/matrix_matrix.zig",
+    "derived:src/blas/kernels/dispatch/matrix_vector.zig",
+    "derived:src/blas/kernels/dispatch/vector_binary.zig",
+    "derived:src/blas/kernels/dispatch/vector_unary.zig",
+    "derived:src/blas/kernels/multiversion/object.zig",
+    "derived:src/blas/kernels/multiversion/protocol.zig",
     "derived:tools/abi_baseline_observation.json",
 }
 REQUIRED_DERIVED_FACT_DIGESTS = {
@@ -492,19 +511,37 @@ REQUIRED_DERIVED_FACT_DIGESTS = {
     "derived:docs/kernel_coverage.json": "3585fdf4912ec58949ba689e2915c8620e6b8d3d941a54ce582137a2405b5fee",
     "derived:pkgconfig/zynum_blas.pc": "252c8c9903eb2c676d02bed6c7db32f8e50e4632702cbec852ddf1131310dc6c",
     "derived:tools/abi_baseline_observation.json": "2f78f017f1b8d531a4465f5ff54278464954a09169478e709ff6fff1e5c2a99a",
+    "derived:docs/assets/benchmarks/2026-09-09/gemm.csv": "b38047c0940c9c27477952ae901e87532b6626383181bd5683596fc11997d815",
+    "derived:docs/assets/benchmarks/2026-09-09/gemm.csv.meta.json": "027aafbda97df9a41549f9519fc4a151fb8f83d1ed52cc1bdcd2d0e24c318e03",
+    "derived:docs/assets/benchmarks/2026-09-09/gemm.svg": "72eb5b82d1766c609a523acce63f3fc481cc56f2dbc03a4ef253eaa7df9f3177",
+    "derived:docs/assets/benchmarks/2026-09-09/level1.csv": "b2400581757f2e2992cb2a993b27f2d659098f534460be5d02191f6e28cf58a5",
+    "derived:docs/assets/benchmarks/2026-09-09/level1.csv.meta.json": "c3cdc0f980aa1cf80a413611fc88c00360ad0d9172a0f2854bfe31fca97f3f30",
+    "derived:docs/assets/benchmarks/2026-09-09/level1.svg": "17bb10455fc7347805c524973a44e65b771c4c0d549e3a9e7a4b3c98472daac3",
+    "derived:docs/assets/benchmarks/2026-09-09/level2.csv": "aefe802ce0b08dd68fd0da1b25a682701ca92d5ad147c279676257b6caf5a95e",
+    "derived:docs/assets/benchmarks/2026-09-09/level2.csv.meta.json": "d36f822bf0ac0094c1f74d1cf4b2b14559481088406122a851c7650943d810e2",
+    "derived:docs/assets/benchmarks/2026-09-09/level2.svg": "eb3ab90c2d5737585cf03b99df69aa2d36ebf563c757c80734d7122e26bb63f1",
+    "derived:docs/assets/benchmarks/2026-09-09/source.json": "0c950c9208437f9c31cd314bb9481cb34276613870c4e2afc3d9e3b4b2a9beac",
+    "derived:docs/assets/benchmarks/2026-09-09/source.patch": "3194c4a1f9420912cbce8ac311f35fcf5e5196337c82aa2557f5eaa8029d68b6",
+    "derived:src/blas/kernels/dispatch/vector_unary.zig": "fc5aeee3dad3080d50bb69473003854755decb246ec87510d2fd41ca09a3b4f8",
+    "derived:src/blas/kernels/dispatch/vector_binary.zig": "57faef2bc9c5fc3a85fb94f7d8978ee2851eb52d7f0edd5f9a2b550995e7ef9b",
+    "derived:src/blas/kernels/dispatch/matrix_vector.zig": "74d392efe149eda5dc2ec65ba14942b993a0b468092ad8dcf709d5f1a6d6aab7",
+    "derived:src/blas/kernels/dispatch/matrix_matrix.zig": "227099547c77c5fa219f679e4643807da77355b2a9295c2882fde2197c19c5ce",
+    "derived:src/blas/kernels/multiversion/protocol.zig": "cc60aaf09c844e2b8341f1145686c5aa73efd7033401612eddd147080371ae3f",
+    "derived:src/blas/kernels/multiversion/object.zig": "599af08444ba25827ee5f93ab5e55a57b30a085dfa7010791dea2d656beb1929"
 }
 REQUIRED_GAP_FACT_DIGESTS = {
     "gap:process-bounds-deferred": "165ca9d0f5a67a60e33c0687c1752307caf444f89df7ff499cf7418694a22ee0",
-    "gap:example-optimize-forwarding": "b6d98cfa63851b999c7e144b78bfa654535f9c6733c1a63ce9312f4d075a62ec",
-    "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5",
+    "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5"
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
-    "option_surfaces": "63edcd6da0d793e0b945e63077ca59a5f7e7e0eb460d0365e6aa858bdc9c533a",
-    "repository_file_classifications": "cc2c6c226fb29f671cd672476e0ec9a117d1148c22aa0a35540e39ccd3f37d78",
-    "derived_candidates": "ce431613bae70ff88c1b6a7b2c7862fc94a4be4f9f24d1f0c5c592a135108ef9",
-    "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
+    "option_surfaces": "68a5942b5d4b1621d4822e0e832d0f3508c6d107eeb5d2d998c3bc0b2a8bfe1d",
+    "repository_file_classifications": "8aacc0997bd93e5dd17203fa9d434e870352442dc13b4ba33babdf90564cc7ad",
+    "derived_candidates": "465e698b3e28ae8201766cc259d867ec3de214e1c92ef83e44a3a9aff5b2a670",
+    "current_gaps": "781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd"
 }
 REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {
+    "bench/tools/test_level2_report.py:test_triangular_worker_correctness": "90c21f759b2e2e2648049f1d890e57580f7b9dc78c605e5cbc5a97f2adce5973",
+    "bench/tools/test_level2_report.py:run_one": "3c8de6ccdf7abfdc0ded13cb2d36095d61a7024795b39b83dd7ee53b6bbcb4df",
     "bench/tools/run_level1_report.py:check_worker_result": "a54ae66023bfd1d936e8e321fe0bb45a9da4555ed7d68283f0ababcc058a2c88",
     "bench/tools/run_level2_report.py:run_one_process": "3f7fbbff7b3d557d0b44c5b2dd3ea4457c1a058aa4171b1e8ef39e5435f64d2b",
 }
@@ -1427,7 +1464,7 @@ def _call_semantics(
         semicolon = text.find(";", close)
         if semicolon >= 0:
             parts.append(text[close : semicolon + 1])
-    if token in {"b.addLibrary", "b.addExecutable", "b.addTest"}:
+    if token in {"b.addLibrary", "b.addObject", "b.addExecutable", "b.addTest"}:
         module_match = re.search(r"\.root_module\s*=\s*([A-Za-z_][A-Za-z0-9_]*)", call)
         if module_match:
             module = module_match.group(1)
@@ -1527,7 +1564,7 @@ class ZigBuildContext(NamedTuple):
 
 
 ZIG_BUILD_RECEIVER_METHODS = {
-    token.removeprefix("b.") for token in BUILD_CALLS if token.startswith("b.")
+    token.removeprefix("b.") for token in BUILD_CALLS if token.startswith("b.") and token != "b.addObject"
 } | {
     "standardTargetOptions",
     "standardTargetOptionsQueryOnly",
@@ -1604,6 +1641,93 @@ def _zig_member_calls(
     return found
 
 
+# These reviewed contracts cover a bounded code-generation factory, not a
+# general escape hatch for arbitrary std.Build helper calls.
+MULTIVERSION_FACTORY_SHA256 = "32710085385b68b274b7da858dca40d85d3f73dc5fc2e1f3d92b53a71ac3c023"
+MULTIVERSION_TEST_CONTRACT_SHA256 = "c9bcea1297c8e836336428840b1a1063ff069747e9f9b0ad85d3cc44dc0b5908"
+MULTIVERSION_COMPILE_ID = "compile:build.zig:buildKernelTiers:libraries"
+MACHO_STATIC_PACKAGING_SHA256 = "7ce25251ae480425d3314a0224cef00cff8afb029f4c6d7303d9ee968df4639a"
+MULTIVERSION_DEFAULT_TEST_SHA256 = "9df63db09aba83e6cbc8c5a5b306735de9f7cbe26d43c9e6cdf2793fe38741ba"
+DYNAMIC_COMPILE_ID = "compile:build.zig:build:dynamic_tests"
+DYNAMIC_LAUNCH_IDS = (
+    "launch:build.zig:build:run_dynamic_tests",
+    "launch:build.zig:build:run_dynamic_baseline_tests",
+)
+MULTIVERSION_OUTPUTS = (
+    *(f"src/blas/kernels/dispatch/{name}.zig" for name in
+      ("vector_unary", "vector_binary", "matrix_vector", "matrix_matrix")),
+    "src/blas/kernels/multiversion/protocol.zig",
+    "src/blas/kernels/multiversion/object.zig",
+)
+
+
+def _multiversion_factory_contract(text: str) -> set[tuple[int, int]]:
+    masked = _code_mask(text)
+    declarations = list(re.finditer(r"\bfn\s+buildKernelTiers\s*\(", masked))
+    if len(declarations) != 1:
+        raise InventoryError("multiversion build factory must have one exact declaration")
+    start = declarations[0].start()
+    paren = masked.find("(", start)
+    brace = masked.find("{", _matching_paren(text, paren))
+    end = _matching_brace(masked, brace) + 1
+    digest = hashlib.sha256(_compact_zig_contract(text[start:end]).encode()).hexdigest()
+    if digest != MULTIVERSION_FACTORY_SHA256:
+        raise InventoryError("multiversion build factory target/options/non-LTO contract drifted")
+    safe = set()
+    for symbol, mode in (("kernel_libraries", "optimize"), ("kernel_test_libraries", "test_optimize")):
+        expected = (f"const{symbol}=if(dynamic_dispatch)buildKernelTiers(b,target,{mode},apple_amx,"
+                    "level1_sve_candidates,level1_fixed_candidates,level2_fixed_candidates,level2_width_candidates)else&.{};")
+        matches = list(re.finditer(rf"\bconst\s+{symbol}\s*=", masked))
+        if len(matches) != 1:
+            raise InventoryError("multiversion factory caller is missing or duplicated")
+        position = matches[0].start()
+        stop = _zig_statement_end(masked, matches[0].end(), len(masked)) + 1
+        if _compact_zig_contract(text[position:stop]) != expected:
+            raise InventoryError("multiversion factory caller must preserve dynamic guard and optimize source")
+        receiver = re.search(r"buildKernelTiers\s*\(\s*(b)\s*,", masked[position:stop])
+        assert receiver is not None
+        safe.add((position + receiver.start(1), position + receiver.end(1)))
+    if len(list(re.finditer(r"\bbuildKernelTiers\s*\(", masked))) != 3:
+        raise InventoryError("multiversion factory has an unreviewed caller")
+    return safe
+
+
+def _annotate_multiversion_contract(text: str, observations: list[dict[str, Any]]) -> None:
+    _multiversion_factory_contract(text)
+    masked = _code_mask(text)
+    package_start = re.search(r"\bconst\s+repack_static_lib\s*=", masked)
+    package_end = re.search(r"\bconst\s+install_compat_headers\s*=", masked)
+    if package_start is None or package_end is None or hashlib.sha256(_compact_zig_contract(text[package_start.start():package_end.start()]).encode()).hexdigest() != MACHO_STATIC_PACKAGING_SHA256:
+        raise InventoryError("MachO static archive repack/input/output/install branch contract drifted")
+    start = re.search(r"\bconst\s+multiversion_check\s*=", masked)
+    end = re.search(r"\bconst\s+test_step\s*=", masked)
+    if start is None or end is None:
+        raise InventoryError("dynamic correctness contract is missing")
+    digest = hashlib.sha256(_compact_zig_contract(text[start.start():end.start()]).encode()).hexdigest()
+    if digest != MULTIVERSION_TEST_CONTRACT_SHA256:
+        raise InventoryError("dynamic correctness two-process/generator/native guard contract drifted")
+    following = re.search(r"\bconst\s+bench\s*=", masked[end.start():])
+    if following is None or hashlib.sha256(_compact_zig_contract(text[end.start():end.start() + following.start()]).encode()).hexdigest() != MULTIVERSION_DEFAULT_TEST_SHA256:
+        raise InventoryError("default correctness aggregate must preserve exclusive dynamic and canonical specialized branches")
+    observations.append({
+        "id": MULTIVERSION_COMPILE_ID, "category": "compile",
+        "anchor": {"file": "build.zig", "enclosing_function": "buildKernelTiers", "symbol": "libraries", "ordinal": 1},
+        "call": "b.addObject", "source_digest": MULTIVERSION_FACTORY_SHA256,
+        "artifact_role": "architecture-exclusive-kernel-tier-factory",
+        "expansion_by_architecture": {
+            "aarch64": ["baseline", "aarch64_sve2", "aarch64_sme", "aarch64_sme2", "aarch64_sme2p1"],
+            "x86_64": ["baseline", "x86_avx", "x86_avx2_fma", "x86_avx512"],
+            "other": ["baseline"],
+        },
+        "caller_optimize_sources": {"kernel_libraries": "optimize", "kernel_test_libraries": "test-optimize"},
+        "lto": "none", "dynamic_dispatch": False,
+    })
+    by_id = {item["id"]: item for item in observations}
+    by_id[DYNAMIC_COMPILE_ID]["artifact_role"] = "dynamic-dispatch-correctness-only"
+    for identifier in DYNAMIC_LAUNCH_IDS:
+        by_id[identifier]["launch_role"] = "dynamic-dispatch-correctness-only"
+
+
 def _zig_build_context(text: str, rel_path: str) -> ZigBuildContext:
     masked = _code_mask(text)
     matches = list(re.finditer(r"\b(?:pub\s+)?fn\s+build\s*\(", masked))
@@ -1635,7 +1759,10 @@ def _zig_build_context(text: str, rel_path: str) -> ZigBuildContext:
     receiver = build_parameters[0] if build_parameters else None
     receivers = {receiver: body_start} if receiver is not None else {}
     declaration_names: set[tuple[int, int]] = set()
-    safe_alias_sources: set[tuple[int, int]] = set()
+    safe_alias_sources: set[tuple[int, int]] = (
+        _multiversion_factory_contract(text)
+        if rel_path == "build.zig" and "buildKernelTiers" in masked else set()
+    )
     declaration_pattern = re.compile(
         r"\b(?P<kind>const|var)\s+(?P<name>[A-Za-z_][A-Za-z0-9_]*)"
         r"(?:\s*:[^=;\n]+)?\s*="
@@ -1762,6 +1889,14 @@ def _discover_option_surface_semantics(
             ]
             default_match = re.search(r"\borelse\s+\.?(\w+)", trailer)
             default = default_match.group(1) if default_match else "unset"
+            if rel == "examples/zig/build.zig" and name == "dispatch":
+                if _compact_zig_contract(trailer) != 'orelse"auto"':
+                    raise InventoryError("example dispatch default must preserve explicit caller CPU intention")
+                default = "auto"
+            if rel == "build.zig" and name == "optimize":
+                if _compact_zig_contract(trailer) != "orelseb.standardOptimizeOption(.{.preferred_optimize_mode=.ReleaseFast})":
+                    raise InventoryError("explicit optimize must preserve standard release fallback")
+                default = "standard release selection"
             result[(rel, name)] = {
                 "type": arguments[0],
                 "default": default,
@@ -1775,7 +1910,7 @@ def _discover_option_surface_semantics(
             ),
             "cpu": (
                 "cpu-model-and-features",
-                "target default CPU selection",
+                "architecture baseline CPU selection" if rel == "build.zig" else "target default CPU selection",
                 "Select CPU model and feature set",
             ),
             "ofmt": (
@@ -1820,11 +1955,12 @@ def _discover_build_root(
     build = _zig_build_context(text, rel_path)
     observations: list[dict[str, Any]] = []
     for token, category in BUILD_CALLS.items():
-        if token == "linkLibrary":
+        if token in {"linkLibrary", "addObject"}:
             occurrences = [
                 occurrence
-                for occurrence in _calls(text, ".linkLibrary")
+                for occurrence in _calls(text, "." + token)
                 if build.body_start <= occurrence[0] < build.body_end
+                and not any(re.search(rf"(?<![A-Za-z0-9_.]){re.escape(receiver)}\s*$", text[:occurrence[0]]) for receiver in build.receivers)
             ]
         else:
             method = token.removeprefix("b.")
@@ -1841,22 +1977,22 @@ def _discover_build_root(
             symbol = _symbol_before(text, position, call)
             semantic_symbol = symbol
             provider: str | None = None
-            if token == "linkLibrary":
+            if token in {"linkLibrary", "addObject"}:
                 line_prefix = text[text.rfind("\n", 0, position) + 1 : position]
-                receiver_match = re.search(r"([A-Za-z_][A-Za-z0-9_]*)\s*$", line_prefix)
+                receiver_match = re.search(r"([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*$", line_prefix)
                 if receiver_match:
                     symbol = receiver_match.group(1)
                     semantic_symbol = (
                         _zig_optional_capture_source(text, position, symbol) or symbol
                     )
                 argument_match = re.search(
-                    r"\.linkLibrary\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)", call
+                    rf"\.{token}\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)", call
                 )
                 provider = argument_match.group(1) if argument_match else "unknown"
                 if provider == "library":
                     context = text[max(0, position - 1200) : position]
                     bindings = re.findall(
-                        r"if\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*\|library\|",
+                        r"(?:if|for)\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)\s*\|library\|",
                         context,
                     )
                     if bindings:
@@ -1876,10 +2012,10 @@ def _discover_build_root(
             ordinal = symbol_counts[symbol]
             name = _first_string(call)
             if token == "b.option":
-                semantic = name or symbol
+                semantic = "optimize-override" if rel_path == "build.zig" and name == "optimize" else name or symbol
             elif token == "b.step":
                 semantic = name or symbol
-            elif token == "linkLibrary":
+            elif token in {"linkLibrary", "addObject"}:
                 semantic = f"{semantic_symbol}<-{provider}"
             elif category == "install" and name:
                 semantic = name
@@ -1905,7 +2041,7 @@ def _discover_build_root(
                     build_context=build,
                 ),
             }
-            if token == "linkLibrary":
+            if token in {"linkLibrary", "addObject"}:
                 observation["guard_digest"] = _semantic_digest(
                     _enclosing_control_context(text, position)
                 )
@@ -1964,6 +2100,8 @@ def _discover_build_root(
         _annotate_test_inventory_factory(text, observations)
         _annotate_native_feature_test_contract(text, observations)
     if rel_path == "build.zig":
+        if "buildKernelTiers" in _code_mask(text):
+            _annotate_multiversion_contract(text, observations)
         _annotate_python_tooling_tests(text, observations)
     return observations
 
@@ -2476,6 +2614,8 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         "argv_shape": [
             "zig build generate-headers --summary failures",
             "zig build generate-kernel-coverage --summary failures",
+            "python3 tools/generate_multiversion.py --check",
+            "python3 -B test/build/test_repack_darwin_archive.py",
         ],
         "evidence_role": "regenerate tracked references before drift validation",
     },
@@ -3072,9 +3212,9 @@ def _annotate_python_tooling_tests(
     default_host_edge = (
         "if(host_tool_smoke)test_step.dependOn(host_tool_smoke_test_step);"
     )
-    if _compact_zig_contract(text).count(default_host_edge) != 1:
+    if _compact_zig_contract(text).count(default_host_edge) != 2:
         raise InventoryError(
-            "canonical test aggregate must conditionally depend exactly once on the host-tool smoke aggregate"
+            "each exclusive dynamic/specialized test branch must conditionally depend once on the host-tool smoke aggregate"
         )
     forbidden_direct_dependencies = (
         "test_step.dependOn(python_tooling_test_step);",
@@ -3112,13 +3252,20 @@ def _test_inventory_enumeration_projection(text: str) -> dict[str, Any]:
     compact_source = _compact_zig_contract(text)
     required_source_contracts = (
         "constTestInventoryProfile=struct{environment_id:[]constu8,enumeration_class_id:[]constu8,};",
-        "consttarget_query=b.standardTargetOptionsQueryOnly(.{});",
+        "vartarget_query=b.standardTargetOptionsQueryOnly(.{.default_target=.{.cpu_model=.baseline}});",
+        'constexplicit_cpu=b.user_input_options.contains("cpu");',
+        "constdynamic_dispatch=switch(dispatch_mode){.auto=>!explicit_cpu,.dynamic=>true,.specialized=>false,};",
+        "if(dynamic_dispatch){target_query.cpu_model=.baseline;target_query.cpu_features_add=.empty;target_query.cpu_features_sub=.empty;}",
         "consttarget=b.resolveTargetQuery(target_query);",
-        "constexact_baseline_request=target_query.cpu_model==.baselineandtarget_query.cpu_features_add.isEmpty()andtarget_query.cpu_features_sub.isEmpty();",
+        "constexact_baseline_request=explicit_cpuand!dynamic_dispatchandtarget_query.cpu_model==.baselineandtarget_query.cpu_features_add.isEmpty()andtarget_query.cpu_features_sub.isEmpty();",
         "constexpected_baseline_cpu=std.Target.Cpu.baseline(target.result.cpu.arch,target.result.os);",
         "constresolved_cpu_matches_canonical_baseline=target.result.cpu.model==expected_baseline_cpu.modelandtarget.result.cpu.features.eql(expected_baseline_cpu.features);",
     )
-    if any(
+    # The effective query is mutable only for the three reviewed dynamic-mode
+    # assignments. Account for every use, including the native-feature guard,
+    # so an added alias, mutation, or helper escape cannot masquerade as an
+    # explicitly requested canonical baseline profile.
+    if len(re.findall(r"\btarget_query\b", masked)) != 9 or any(
         compact_source.count(contract) != 1 for contract in required_source_contracts
     ):
         raise InventoryError(
@@ -3158,6 +3305,8 @@ def _test_inventory_enumeration_projection(text: str) -> dict[str, Any]:
         "query_source": "standardTargetOptionsQueryOnly",
         "resolution_source": "resolveTargetQuery(target_query)",
         "requested_cpu_gate": {
+            "explicit_cpu": True,
+            "dynamic_dispatch": False,
             "cpu_model": "baseline",
             "features_add": "empty",
             "features_sub": "empty",
@@ -3974,6 +4123,8 @@ def _validate_test_inventory_factory_contract(
         "query_source": "standardTargetOptionsQueryOnly",
         "resolution_source": "resolveTargetQuery(target_query)",
         "requested_cpu_gate": {
+            "explicit_cpu": True,
+            "dynamic_dispatch": False,
             "cpu_model": "baseline",
             "features_add": "empty",
             "features_sub": "empty",
@@ -12229,6 +12380,13 @@ def _discover_generator_targets(
                     },
                 }
             )
+    generator = "tools/generate_multiversion.py"
+    source = _frozen_regular_text(active, generator, "multiversion generator")
+    if hashlib.sha256(source.encode()).hexdigest() != "a34888100818929091c8f28505aa19e30b611a72cf9d297513d569803d1771ab":
+        raise InventoryError("multiversion generator output/formatter contract changed")
+    for ordinal, path in enumerate(MULTIVERSION_OUTPUTS, 1):
+        targets.append({"id": f"generated-target:{path}", "path": path,
+                        "anchor": {"file": generator, "enclosing_function": "outputs", "symbol": path, "ordinal": ordinal}})
     return targets
 
 
@@ -12630,6 +12788,9 @@ def _validate(
     root_standard_names = {"target", "cpu", "ofmt", "dynamic-linker", "release"}
     example_standard_names = {"target", "cpu", "ofmt", "dynamic-linker", "optimize"}
     project_names = {
+        "optimize",
+        "dispatch",
+        "thread-limit",
         "apple-amx",
         "test-optimize",
         "host-tool-smoke",
@@ -12656,12 +12817,12 @@ def _validate(
     }
     _require(
         surfaces_by_root.get("build.zig") == root_standard_names | project_names,
-        "build.zig option surfaces must contain exactly 20 standard/project surfaces",
+        "build.zig option surfaces must contain exactly 23 standard/project surfaces",
         errors,
     )
     _require(
-        surfaces_by_root.get("examples/zig/build.zig") == example_standard_names,
-        "example option surfaces must contain target/cpu/ofmt/dynamic-linker/optimize exactly",
+        surfaces_by_root.get("examples/zig/build.zig") == example_standard_names | {"dispatch"},
+        "example option surfaces must contain target/cpu/ofmt/dynamic-linker/optimize/dispatch exactly",
         errors,
     )
     option_observation_ids = {
@@ -12840,7 +13001,7 @@ def _validate(
                 errors,
             )
             _require(
-                item.get("artifact_kind") in {"library", "executable", "test"},
+                item.get("artifact_kind") in {"library", "executable", "test", "object"},
                 f"{item['id']}: invalid artifact_kind",
                 errors,
             )
@@ -12864,6 +13025,15 @@ def _validate(
                 f"{item['id']}: install_destinations must be an array",
                 errors,
             )
+            if item.get("artifact_kind") == "object":
+                name = item.get("output_name")
+                _require(item.get("call") == "b.addObject" and item.get("linkage") == "not-applicable",
+                         f"{item['id']}: object must be emitted by b.addObject", errors)
+                _require(item.get("produced_outputs") == [f"{name}.o", f"{name}.obj"]
+                         and item.get("produced_outputs_by_target") == {"elf": {"primary": f"{name}.o"}, "macho": {"primary": f"{name}.o"}, "windows": {"primary": f"{name}.obj"}},
+                         f"{item['id']}: object target-conditioned outputs are incorrect", errors)
+                _require(item.get("install_destinations") == [] and item.get("install_destinations_by_target") == {"elf": {}, "macho": {}, "windows": {}},
+                         f"{item['id']}: ISA objects must be consumed internally and not installed", errors)
             if item.get("artifact_kind") == "library":
                 output_map = item.get("produced_outputs_by_target")
                 _require(
@@ -13006,6 +13176,7 @@ def _validate(
         "structured_isolated_test_library": "test-optimize",
     }
     for item in isolated:
+        _require(item.get("artifact_kind") == "object" and item.get("call") == "b.addObject", f"{item['id']}: isolated unit must be an object for self-contained static archives", errors)
         symbol = item["anchor"]["symbol"]
         _require(
             item.get("optimize_source") == isolated_optimization.get(symbol),
@@ -13043,8 +13214,9 @@ def _validate(
         *(
             f"install:build.zig:build:{name}"
             for name in (
-                "lib",
-                "static_lib",
+                "install_dynamic_lib",
+                "install_static_lib",
+                "libzynum_blas.a",
                 "bench",
                 "gemm_sweep",
                 "vector_matrix_sweep",
@@ -13071,15 +13243,16 @@ def _validate(
     }
     expected_root_conditions = {
         identifier: (
-            "compat-headers is true"
-            if "/" in identifier.rsplit(":", 1)[-1]
-            else "always"
+            "target.result.ofmt == .macho" if identifier == "install:build.zig:build:libzynum_blas.a" else
+            "target.result.ofmt != .macho" if identifier == INSTALL_STATIC_LIBRARY_ID else
+            "target.result.os.tag != .windows" if identifier in WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS else
+            "compat-headers is true" if "/" in identifier.rsplit(":", 1)[-1] else "always"
         )
         for identifier in root_install_dependencies
     }
     _require(
         actual_root_install == root_install_dependencies,
-        "root implicit install dependencies are not the exact 7 artifacts plus 5 conditional files",
+        "root implicit install dependencies must preserve two exclusive static branches, the shared library, five executables and five conditional files",
         errors,
     )
     _require(
@@ -13444,6 +13617,7 @@ def _validate(
                     errors,
                 )
             expected_command = (
+                "python3 tools/generate_multiversion.py" if item.get("path") in MULTIVERSION_OUTPUTS else
                 "zig build generate-kernel-coverage --summary failures"
                 if item.get("path") == "docs/kernel_coverage.json"
                 else "zig build generate-headers --summary failures"
@@ -13454,6 +13628,7 @@ def _validate(
                 errors,
             )
             generator_input = (
+                "tools/generate_multiversion.py" if item.get("path") in MULTIVERSION_OUTPUTS else
                 "tools/generate_kernel_coverage.zig"
                 if item.get("path") == "docs/kernel_coverage.json"
                 else "tools/generate_compat_headers.zig"
@@ -13723,8 +13898,8 @@ def _validate(
         if item.get("category") == "link"
     ]
     _require(
-        len(expected_links) == 28,
-        f"expected 28 current conditional link edges, found {len(expected_links)}",
+        len(expected_links) == 42,
+        f"expected 42 current conditional link edges, found {len(expected_links)}",
         errors,
     )
     gap_ids = {item.get("id") for item in inventory.get("current_gaps", [])}
@@ -13783,25 +13958,6 @@ def _validate(
         "cross-target payload gap observed_result does not match the mechanical controller/payload counts",
         errors,
     )
-    _require(
-        gaps_by_id.get("gap:example-optimize-forwarding", {}).get(
-            "reproduction_command"
-        )
-        == "cd examples/zig && zig build --help",
-        "example optimize gap reproduction command is incorrect",
-        errors,
-    )
-    example_gap = gaps_by_id.get("gap:example-optimize-forwarding", {})
-    _require(
-        example_gap.get("observed_exit_code") == 0,
-        "example optimize gap exit code must be 0",
-        errors,
-    )
-    _require(
-        example_gap.get("stderr_contains") == "error: invalid option: -Doptimize",
-        "example optimize gap stderr observation is incorrect",
-        errors,
-    )
     return errors
 
 
@@ -13819,7 +13975,26 @@ def validate(root: Path, inventory_path: Path) -> list[str]:
         return [f"inventory structure is invalid: {type(exc).__name__}: {exc}"]
 
 
+ISOLATED_OBJECT_OUTPUT_NAMES = {'compile:build.zig:build:compact_triangular_isolated_library': 'zynum-level2-x86-compact-triangular-isolated',
+ 'compile:build.zig:build:compact_triangular_isolated_test_library': 'zynum-level2-x86-compact-triangular-isolated-test',
+ 'compile:build.zig:build:level2_width_isolated_library': 'zynum-level2-x86-width-isolated',
+ 'compile:build.zig:build:level2_width_isolated_test_library': 'zynum-level2-x86-width-isolated-test',
+ 'compile:build.zig:build:stride2_isolated_library': 'zynum-level1-x86-stride2-isolated',
+ 'compile:build.zig:build:stride2_isolated_test_library': 'zynum-level1-x86-stride2-isolated-test',
+ 'compile:build.zig:build:structured_isolated_library': 'zynum-level3-x86-structured-isolated',
+ 'compile:build.zig:build:structured_isolated_test_library': 'zynum-level3-x86-structured-isolated-test'}
+
+
 def _reviewed_observation_refresh_fields(identifier: str) -> dict[str, Any]:
+    if identifier in {INSTALL_STATIC_LIBRARY_ID, INSTALL_LIBRARIES_STEP_ID}:
+        return _new_test_inventory_observation(identifier, {})
+    if identifier in ISOLATED_OBJECT_OUTPUT_NAMES:
+        name = ISOLATED_OBJECT_OUTPUT_NAMES[identifier]
+        return {"artifact_kind": "object", "linkage": "not-applicable",
+                "produced_outputs": [f"{name}.o", f"{name}.obj"],
+                "produced_outputs_by_target": {"elf": {"primary": f"{name}.o"}, "macho": {"primary": f"{name}.o"}, "windows": {"primary": f"{name}.obj"}},
+                "install_destinations": [], "install_destinations_by_target": {"elf": {}, "macho": {}, "windows": {}},
+                "isolation_unit": "object-linked-into-final-library"}
     if identifier == TEST_INVENTORY_FACTORY_COMPILE_ID:
         return {
             "output_name": "inventory-zig-root-{root-id-suffix}",
@@ -13906,6 +14081,12 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         item["path"]: item for item in inventory["repository_file_classifications"]
     }
     classifications.pop("COPYING.LESSER", None)
+    classifications["src/blas/core/checked.zig"] = {
+        "path": "src/blas/core/checked.zig",
+        "kind": "zig-source",
+        "class": "non-generated-source",
+        "owner": "library-source",
+    }
     classifications[BUILD_PROFILE_TEST_PATH] = {
         "path": BUILD_PROFILE_TEST_PATH,
         "kind": "python-source",
@@ -14017,6 +14198,24 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
             "condition": "host-tool-smoke is true",
         }
     )
+    dynamic_step_id = "step:build.zig:build:test-dynamic-dispatch"
+    aggregate["direct_dependencies"] = [
+        {"id": edge["id"], "condition": edge["condition"] if edge["id"] == HOST_TOOL_SMOKE_STEP_ID else
+            (edge["condition"] if edge["condition"].startswith("!dynamic_dispatch") else "!dynamic_dispatch and (" + edge["condition"] + ")")}
+        for edge in aggregate["direct_dependencies"] if edge["id"] != dynamic_step_id
+    ] + [{"id": dynamic_step_id, "condition": "dynamic_dispatch"}]
+    install = observations["step:build.zig:build:install"]
+    aliases = {"install:build.zig:build:lib": INSTALL_DYNAMIC_LIBRARY_ID,
+               "install:build.zig:build:static_lib": INSTALL_STATIC_LIBRARY_ID}
+    installation_edges = {aliases.get(edge["id"], edge["id"]): dict(edge) for edge in install["direct_dependencies"]}
+    installation_edges["install:build.zig:build:libzynum_blas.a"] = {"id": "install:build.zig:build:libzynum_blas.a", "condition": "target.result.ofmt == .macho"}
+    for identifier, edge in installation_edges.items():
+        edge["id"] = identifier
+        if identifier == INSTALL_STATIC_LIBRARY_ID:
+            edge["condition"] = "target.result.ofmt != .macho"
+        elif identifier in WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS:
+            edge["condition"] = "target.result.os.tag != .windows"
+    install["direct_dependencies"] = list(installation_edges.values())
     drift_gate_ids = [
         "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
         "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date",
@@ -14097,6 +14296,64 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
 def _new_test_inventory_observation(
     identifier: str, inventory: dict[str, Any]
 ) -> dict[str, Any]:
+    if identifier in {"option:build.zig:build:dispatch", "option:build.zig:build:thread-limit", "option:examples/zig/build.zig:build:dispatch", "option:build.zig:build:optimize-override"}:
+        return {"owner": "build-composition"}
+    if identifier == "launch:build.zig:build:repack_static_lib":
+        return {"owner": "build-composition", "detail_status": "process-lifecycle-out-of-scope",
+                "cwd_shape": "repository-root", "command_shape": "system-command",
+                "source_artifact": "compile:build.zig:build:static_lib", "compile_for": "host", "execute_on": "host",
+                "argv_shape": ["python3", "tools/repack_darwin_archive.py", "<build Zig executable>", "<emitted static archive>", "<repacked static archive>"],
+                "launch_class": "macho-archive-packaging", "condition": "target.result.ofmt == .macho and static installation is reached"}
+    if identifier == "install:build.zig:build:libzynum_blas.a":
+        return {"owner": "build-composition", "producer": "launch:build.zig:build:repack_static_lib",
+                "source": "repacked_static_archive", "destination": ["zig-out/lib/libzynum_blas.a"],
+                "condition": "target.result.ofmt == .macho and install or install-libraries step is reached"}
+    if identifier == MULTIVERSION_COMPILE_ID:
+        name = "zynum-kernel-{tier}-{optimize}"
+        return {
+            "owner": "library-source", "artifact_kind": "object", "output_name": name,
+            "root_source": ["src/blas/kernel_object_root.zig"], "linkage": "not-applicable",
+            "compile_for": "requested-target", "execute_on": "not-executable",
+            "optimize_source": "caller optimize or test-optimize",
+            "condition": "dynamic_dispatch; architecture-exclusive tier expansion",
+            "produced_outputs": [f"{name}.o", f"{name}.obj"], "install_destinations": [],
+            "produced_outputs_by_target": {"elf": {"primary": f"{name}.o"}, "macho": {"primary": f"{name}.o"}, "windows": {"primary": f"{name}.obj"}},
+            "install_destinations_by_target": {"elf": {}, "macho": {}, "windows": {}},
+        }
+    if identifier == DYNAMIC_COMPILE_ID:
+        return {"owner": "test-infrastructure", "artifact_kind": "test",
+                "output_name": "zynum-dynamic-dispatch-tests",
+                "root_source": ["src/blas/dynamic_dispatch_test.zig"], "linkage": "not-applicable",
+                "compile_for": "requested-target", "execute_on": "requested-target",
+                "optimize_source": "test-optimize", "condition": "native dynamic correctness gate",
+                "produced_outputs": ["zynum-dynamic-dispatch-tests", "zynum-dynamic-dispatch-tests.exe"], "install_destinations": []}
+    if identifier in (*DYNAMIC_LAUNCH_IDS, "launch:build.zig:build:multiversion_check"):
+        generator = identifier.endswith(":multiversion_check")
+        return {"owner": "test-infrastructure", "detail_status": "process-lifecycle-out-of-scope",
+                "cwd_shape": "repository-root", "command_shape": "system-command" if generator else "run-artifact",
+                "source_artifact": None if generator else DYNAMIC_COMPILE_ID,
+                "compile_for": "host" if generator else "requested-target", "execute_on": "host" if generator else "requested-target",
+                "argv_shape": ["python3", "tools/generate_multiversion.py", "--check"] if generator else [],
+                "launch_class": "generated-source-drift-check" if generator else "dynamic-dispatch-correctness-only"}
+    dynamic_step = "step:build.zig:build:test-dynamic-dispatch"
+    generator_step = "step:build.zig:build:check-multiversion"
+    failure_step = dynamic_step + "-requires-a-native-dynamic-build-without-external-executors-omit-dcpu"
+    guard = "dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled"
+    if identifier in (dynamic_step, generator_step, failure_step):
+        dependencies = ([{"id": "launch:build.zig:build:multiversion_check", "condition": "always"}] if identifier == generator_step else
+                        [{"id": i, "condition": guard} for i in (*DYNAMIC_LAUNCH_IDS, generator_step)] + [{"id": failure_step, "condition": "not (" + guard + ")"}] if identifier == dynamic_step else [])
+        return {"owner": "build-composition", "description": {dynamic_step: "Run native dynamic-dispatch correctness and forced-baseline checks; not inventory evidence", generator_step: "Check generated private kernel dispatch protocol and adapters", failure_step: "test-dynamic-dispatch requires a native dynamic build without external executors; omit -Dcpu"}[identifier],
+                "direct_dependencies": dependencies, "aggregate_test_membership": "conditional-member",
+                "aggregate_condition": "dynamic_dispatch", "intentional_orphan": False,
+                "orphan_reason": "dynamic correctness branch or explicit generator drift entry point",
+                "step_role": "focused-validation"}
+    tier_consumers = {"zynum_mod", "zynum_blas_mod", "blas_compat_mod", "fortran_compat_mod", "cblas_compat_mod"}
+    test_tier_consumers = {"zynum_test_mod", "zynum_blas_test_mod", "fortran_compat_test_mod", "cblas_compat_test_mod", "official_tests.root_module", "dynamic_tests.root_module"}
+    reviewed_links = {f"link:build.zig:build:{consumer}<-kernel_libraries" for consumer in tier_consumers} | {f"link:build.zig:build:{consumer}<-kernel_test_libraries" for consumer in test_tier_consumers} | {f"link:build.zig:build:dynamic_tests.root_module<-{provider}" for provider in ("stride2_isolated_test_library", "compact_triangular_isolated_test_library", "level2_width_isolated_test_library")}
+    if identifier in reviewed_links:
+        consumer, provider = identifier.rsplit(":", 1)[1].split("<-")
+        return {"owner": "build-composition", "consumer": consumer, "provider": provider,
+                "condition": "dynamic_dispatch" if provider.startswith("kernel_") else "target.result.cpu.arch == .x86_64 and isolated test library is present"}
     if identifier == BUILD_PROFILE_LAUNCH_ID:
         return {
             "owner": "test-infrastructure",
@@ -14292,7 +14549,7 @@ def _new_test_inventory_observation(
                 "zig-out/lib/libzynum_blas.a",
                 "zig-out/lib/static/zynum_blas.lib",
             ],
-            "condition": "install or install-libraries step is reached",
+            "condition": "target.result.ofmt != .macho and install or install-libraries step is reached",
         }
     if identifier == INSTALL_LIBRARIES_STEP_ID:
         return {
@@ -14300,7 +14557,8 @@ def _new_test_inventory_observation(
             "description": "Install the shared and static Zynum BLAS libraries without tools",
             "direct_dependencies": [
                 {"id": INSTALL_DYNAMIC_LIBRARY_ID, "condition": "always"},
-                {"id": INSTALL_STATIC_LIBRARY_ID, "condition": "always"},
+                {"id": INSTALL_STATIC_LIBRARY_ID, "condition": "target.result.ofmt != .macho"},
+                {"id": "install:build.zig:build:libzynum_blas.a", "condition": "target.result.ofmt == .macho"},
             ],
             "aggregate_test_membership": "not-member",
             "aggregate_condition": "not-applicable",
@@ -14490,6 +14748,32 @@ def _new_test_inventory_observation(
 
 
 def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
+    repack_launches = {
+        "python-launch:tools/repack_darwin_archive.py:ar:subprocess.run:1": ["<resolved Zig executable>", "ar", "<trusted archive operation and flat members>"],
+        "python-launch:test/build/test_repack_darwin_archive.py:test_real_macho_members_are_eight_byte_aligned:subprocess.run:1": ["zig", "cc", "-target", "aarch64-macos", "-c", "<tiny C fixture>", "-o", "<object>"],
+        "python-launch:test/build/test_repack_darwin_archive.py:test_real_macho_members_are_eight_byte_aligned:subprocess.run:2": ["zig", "ar", "--format=gnu", "rcs", "<fixture archive>", "<object>"],
+    }
+    if identifier in repack_launches:
+        return {"owner": "test-infrastructure" if identifier.startswith("python-launch:test/") else "build-composition",
+                "detail_status": "process-lifecycle-out-of-scope", "compile_for": "host", "execute_on": "host",
+                "cwd_shape": "private temporary archive workspace", "launch_class": "archive-alignment-fixture" if identifier.startswith("python-launch:test/") else "trusted-build-archive-recreation",
+                "argv_shape": repack_launches[identifier]}
+    if identifier == "python-launch:tools/generate_multiversion.py:formatted:subprocess.run:1":
+        return {"owner": "library-source", "detail_status": "process-lifecycle-out-of-scope",
+                "compile_for": "host", "execute_on": "host", "cwd_shape": "invoking repository directory",
+                "launch_class": "generated-source-formatter", "argv_shape": ["zig", "fmt", "--stdin"]}
+    if identifier == (
+        "python-launch:bench/tools/test_level2_report.py:run_one:subprocess.run:1"
+    ):
+        return {
+            "owner": "test-infrastructure",
+            "detail_status": "process-lifecycle-out-of-scope",
+            "compile_for": "host",
+            "execute_on": "host",
+            "cwd_shape": "temporary artifact snapshot fixture",
+            "launch_class": "test-fixture",
+            "argv_shape": ["python", "<frozen-level2-script>", "--worker", "--help"],
+        }
     if identifier == BUILD_PROFILE_PYTHON_LAUNCH_ID:
         return {
             "owner": "test-infrastructure",
@@ -14841,6 +15125,8 @@ def _prepare_refreshed_source_candidate(
                     item = _new_test_inventory_python_launch(identifier)
                 elif section == "workflow_launches":
                     item = _new_test_inventory_workflow_launch(identifier)
+                elif source_item.get("path") in MULTIVERSION_OUTPUTS:
+                    item = {"owner": "library-source"}
                 else:
                     raise InventoryError(
                         f"no reviewed template for new generator target {identifier}"

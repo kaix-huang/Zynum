@@ -1,0 +1,3051 @@
+diff --git a/bench/tools/plot_gemm_sweep.py b/bench/tools/plot_gemm_sweep.py
+index bc85dd2..87947b9 100644
+--- a/bench/tools/plot_gemm_sweep.py
++++ b/bench/tools/plot_gemm_sweep.py
+@@ -2,9 +2,9 @@
+ # Copyright (C) 2026 Zynum contributors
+ # SPDX-License-Identifier: LGPL-3.0-or-later
+ 
++import argparse
+ import csv
+ import html
+-import sys
+ from collections import defaultdict
+ from pathlib import Path
+ 
+@@ -33,8 +33,25 @@ def display_name(value):
+     return DISPLAY_NAMES.get(value, value)
+ 
+ 
+-def usage():
+-    print("usage: plot_gemm_sweep.py input.csv output.svg", file=sys.stderr)
++def parse_args(argv=None):
++    parser = argparse.ArgumentParser(description="Plot a checked GEMM sweep CSV.")
++    parser.add_argument("csv")
++    parser.add_argument("svg")
++    parser.add_argument("--stat", choices=("best", "median"), default="best")
++    return parser.parse_args(argv)
++
++
++def row_gflops(raw, stat="best"):
++    if stat == "best":
++        return parse_positive_finite(raw.get("gflops"), "gflops")
++    factors = {"sgemm": 2, "dgemm": 2, "cgemm": 8, "zgemm": 8}
++    if raw["kind"] not in factors:
++        raise ValueError(f"unsupported GEMM kind: {raw['kind']!r}")
++    duration = parse_positive_finite(raw.get("median_ns"), "median_ns")
++    work = factors[raw["kind"]]
++    for dimension in ("m", "n", "k"):
++        work *= parse_positive_finite(raw.get(dimension), dimension)
++    return parse_positive_finite(work / duration, "median gflops")
+ 
+ 
+ def sx(index, shape_count, left, width):
+@@ -62,23 +79,24 @@ def library_heading(libs):
+     return " vs ".join(names)
+ 
+ 
+-def plot_heading(kinds, libs):
++def plot_heading(kinds, libs, stat="best"):
++    statistic = "Best-of-reps" if stat == "best" else "Median-time"
+     kind_set = set(kinds)
+     library_text = library_heading(libs)
+     if kind_set == {"cgemm", "zgemm"}:
+         return (
+             f"Complex GEMM Performance Sweep: {library_text}",
+-            "Best-of-reps GF/s for CGEMM/ZGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
++            f"{statistic} GF/s for CGEMM/ZGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
+         )
+     if kind_set == {"sgemm", "dgemm"}:
+         return (
+             f"Real GEMM Performance Sweep: {library_text}",
+-            "Best-of-reps GF/s for SGEMM/DGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
++            f"{statistic} GF/s for SGEMM/DGEMM across square, remainder, skinny, wide, and K-varied column-major shapes",
+         )
+     kind_text = "/".join(kind.upper() for kind in kinds)
+     return (
+         f"{kind_text} Performance Sweep: {library_text}",
+-        "Best-of-reps GF/s across square, remainder, skinny, wide, and K-varied column-major GEMM shapes",
++        f"{statistic} GF/s across square, remainder, skinny, wide, and K-varied column-major GEMM shapes",
+     )
+ 
+ 
+@@ -140,11 +158,9 @@ def draw_panel(
+     return out
+ 
+ 
+-def main():
+-    if len(sys.argv) != 3:
+-        usage()
+-        return 2
+-    csv_path, svg_path = sys.argv[1:]
++def main(argv=None):
++    args = parse_args(argv)
++    csv_path, svg_path = args.csv, args.svg
+     rows = []
+     with open(csv_path, newline="") as f:
+         for raw in csv.DictReader(f):
+@@ -161,7 +177,7 @@ def main():
+                     "n": int(raw["n"]),
+                     "k": int(raw["k"]),
+                     "library": raw["library"],
+-                    "gflops": parse_positive_finite(raw["gflops"], "gflops"),
++                    "gflops": row_gflops(raw, args.stat),
+                 }
+             )
+ 
+@@ -236,7 +252,7 @@ def main():
+ </style>
+ """
+     )
+-    title, subtitle = plot_heading(kinds, libs)
++    title, subtitle = plot_heading(kinds, libs, args.stat)
+     subtitle = (
+         "Higher is better. Shapes are ordered by m*n*k so smaller cases stay at the front. "
+         + subtitle
+diff --git a/bench/tools/plot_level1_report.py b/bench/tools/plot_level1_report.py
+index cd51a52..bee8921 100644
+--- a/bench/tools/plot_level1_report.py
++++ b/bench/tools/plot_level1_report.py
+@@ -52,6 +52,7 @@ def parse_args(argv=None):
+         description="Plot Level 1 report CSV as grouped bar SVGs."
+     )
+     parser.add_argument("csv")
++    parser.add_argument("--stat", choices=("best", "median"), default="best")
+     parser.add_argument("--bars-svg", required=True)
+     parser.add_argument("--ratio-svg", required=True)
+     return parser.parse_args(argv)
+@@ -96,7 +97,7 @@ def row_label(raw):
+     return f"{raw['op']}{suffix}"
+ 
+ 
+-def read_rows(path):
++def read_rows(path, stat="best"):
+     rows = []
+     with open(path, newline="") as f:
+         for raw in csv.DictReader(f):
+@@ -106,6 +107,8 @@ def read_rows(path):
+             value_field = (
+                 "bandwidth_gbps" if metric == "bandwidth_gbps" else "rate_gops"
+             )
++            if stat == "median":
++                value_field = "metric_median"
+             rows.append(
+                 {
+                     "group": raw["group"],
+@@ -117,7 +120,7 @@ def read_rows(path):
+                     "label": row_label(raw),
+                     "library": raw["library"],
+                     "metric": metric,
+-                    "value": parse_positive_finite(raw[value_field], value_field),
++                    "value": parse_positive_finite(raw.get(value_field), value_field),
+                     "n": int(raw["n"]),
+                     "copy_bytes": int(raw["copy_bytes"])
+                     if raw.get("copy_bytes")
+@@ -276,7 +279,7 @@ def draw_group_panel(svg, rows, group, top, left, width, height):
+             )
+ 
+ 
+-def render_bars(rows):
++def render_bars(rows, stat="best"):
+     by_group = grouped(rows)
+     groups = [group for group in GROUP_ORDER if group in by_group]
+     width = 1500
+@@ -307,7 +310,7 @@ def render_bars(rows):
+     else:
+         copy_part = ",".join(format_byte_size(size) for size in copy_sizes)
+     svg.append(
+-        f'<text x="40" y="66" class="subtitle">Higher is better. Fresh process per library/op/size; n={n_part}; copy={copy_part}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
++        f'<text x="40" y="66" class="subtitle">Higher is better. Statistic: {stat}. Fresh process per library/op/size; n={n_part}; copy={copy_part}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
+     )
+     legend_libraries = ordered_libraries(rows)
+     legend_x = max(40, width - len(legend_libraries) * 145 - 35)
+@@ -357,7 +360,7 @@ def ratio_rows(rows):
+     return result
+ 
+ 
+-def render_ratio(rows, ratios=None):
++def render_ratio(rows, ratios=None, stat="best"):
+     if ratios is None:
+         ratios = ratio_rows(rows)
+     width = max(1500, 54 * len(ratios) + 160)
+@@ -374,7 +377,7 @@ def render_ratio(rows, ratios=None):
+         '<text x="40" y="42" class="title">Zynum vs Fastest Comparator Ratio</text>'
+     )
+     svg.append(
+-        '<text x="40" y="66" class="subtitle">Higher is better. Ratio = Zynum metric / fastest non-Zynum comparator. Values below 1.0 indicate a measured slower operation.</text>'
++        f'<text x="40" y="66" class="subtitle">Higher is better. Statistic: {stat}. Ratio = Zynum metric / fastest non-Zynum comparator. Values below 1.0 indicate a measured slower operation.</text>'
+     )
+     for tick in ticks:
+         y = sy(tick, max_tick, top, chart_height)
+@@ -419,11 +422,11 @@ def render_ratio(rows, ratios=None):
+ 
+ def main(argv=None):
+     args = parse_args(argv)
+-    rows = read_rows(args.csv)
++    rows = read_rows(args.csv, args.stat)
+     ratios = ratio_rows(rows)
+     outputs = [
+-        ReportOutput(Path(args.bars_svg), render_bars(rows)),
+-        ReportOutput(Path(args.ratio_svg), render_ratio(rows, ratios)),
++        ReportOutput(Path(args.bars_svg), render_bars(rows, args.stat)),
++        ReportOutput(Path(args.ratio_svg), render_ratio(rows, ratios, args.stat)),
+     ]
+     publish_outputs(outputs)
+ 
+diff --git a/bench/tools/plot_level2_report.py b/bench/tools/plot_level2_report.py
+index d0e0e6e..9e80328 100644
+--- a/bench/tools/plot_level2_report.py
++++ b/bench/tools/plot_level2_report.py
+@@ -43,6 +43,7 @@ CASE_ORDER = [
+ def parse_args(argv=None):
+     parser = argparse.ArgumentParser(description="Plot Level 2 report CSV.")
+     parser.add_argument("csv")
++    parser.add_argument("--stat", choices=("best", "median"), default="best")
+     parser.add_argument("--bars-svg", required=True)
+     return parser.parse_args(argv)
+ 
+@@ -53,7 +54,8 @@ def sy(value, top, height, max_value):
+     return top + height - value / max_value * height
+ 
+ 
+-def read_rows(path):
++def read_rows(path, stat="best"):
++    value_field = "metric_median" if stat == "median" else "rate_gops"
+     rows = []
+     with open(path, newline="") as f:
+         for raw in csv.DictReader(f):
+@@ -65,7 +67,9 @@ def read_rows(path):
+                     "kind": raw["kind"],
+                     "library": raw["library"],
+                     "n": int(raw["n"]),
+-                    "rate_gops": parse_positive_finite(raw["rate_gops"], "rate_gops"),
++                    "rate_gops": parse_positive_finite(
++                        raw.get(value_field), value_field
++                    ),
+                 }
+             )
+     return rows
+@@ -81,7 +85,7 @@ def libraries_for(rows):
+     return libs
+ 
+ 
+-def render_svg(rows):
++def render_svg(rows, stat="best"):
+     sizes = sorted({row["n"] for row in rows})
+     libs = libraries_for(rows)
+     values = {(row["n"], row["case"], row["library"]): row for row in rows}
+@@ -115,7 +119,7 @@ def render_svg(rows):
+ """,
+         '<rect width="100%" height="100%" fill="#fff"/>',
+         '<text x="38" y="42" class="title">Level 2 current performance - real and complex types</text>',
+-        '<text x="38" y="66" class="sub">Higher is better. Fresh process per library and size, metric = Gops. Panels use the CSV n values; bars follow the legend order.</text>',
++        f'<text x="38" y="66" class="sub">Higher is better. Statistic: {stat}. Fresh process per library and size, metric = Gops. Panels use the CSV n values; bars follow the legend order.</text>',
+     ]
+ 
+     legend_spacing = 170
+@@ -178,7 +182,7 @@ def render_svg(rows):
+ 
+ def main(argv=None):
+     args = parse_args(argv)
+-    contents = render_svg(read_rows(args.csv))
++    contents = render_svg(read_rows(args.csv, args.stat), args.stat)
+     publish_outputs([ReportOutput(Path(args.bars_svg), contents)])
+ 
+ 
+diff --git a/bench/tools/run_gemm_sweep_isolated.py b/bench/tools/run_gemm_sweep_isolated.py
+index ad09d0f..bd77fdb 100644
+--- a/bench/tools/run_gemm_sweep_isolated.py
++++ b/bench/tools/run_gemm_sweep_isolated.py
+@@ -96,6 +96,7 @@ CSV_FIELDNAMES = [
+     "max_ns",
+     "reps",
+     "process_repeats",
++    "median_ns_samples",
+     "check",
+ ]
+ 
+@@ -445,6 +446,9 @@ def merge_repeat_rows(rows):
+         nearest_rank_percentile(p95_values, 95, "p95_ns"), "p95_ns"
+     )
+     base["max_ns"] = format_gemm_evidence(max(max_values), "max_ns")
++    base["median_ns_samples"] = ",".join(
++        format_gemm_evidence(value, "median_ns") for value in median_values
++    )
+     base["process_repeats"] = str(len(rows))
+     base["check"] = merged_check_status(rows)
+     validate_gemm_evidence(base)
+@@ -568,6 +572,7 @@ def serialize_csv(rows_by_lib, shape_indexes):
+                 row.setdefault("median_ns", row.get("best_ns", ""))
+                 row.setdefault("p95_ns", row.get("best_ns", ""))
+                 row.setdefault("max_ns", row.get("best_ns", ""))
++                row.setdefault("median_ns_samples", row["median_ns"])
+                 row.setdefault("process_repeats", "1")
+                 row.setdefault("check", "unchecked")
+                 output_rows.append(row)
+diff --git a/bench/tools/run_level2_report.py b/bench/tools/run_level2_report.py
+index 6ccfe74..f21ea2f 100644
+--- a/bench/tools/run_level2_report.py
++++ b/bench/tools/run_level2_report.py
+@@ -13,22 +13,6 @@ import time
+ from dataclasses import dataclass
+ from pathlib import Path
+ 
+-import benchmark_artifacts
+-import benchmark_metadata
+-from report_comparison import (
+-    parse_positive_finite,
+-    positive_finite_median,
+-    validate_optional_metric_evidence,
+-    validate_performance_fields,
+-)
+-from report_publication import ReportOutput, publish_outputs
+-from report_schedule import (
+-    SCHEDULE_CHOICES,
+-    library_repeat_schedule,
+-    validate_schedule,
+-    validate_unique_library_labels,
+-)
+-
+ DEFAULT_ACCELERATE = "/System/Library/Frameworks/Accelerate.framework/Accelerate"
+ DEFAULT_OPENBLAS = "/opt/homebrew/opt/openblas/lib/libopenblas.dylib"
+ 
+@@ -398,6 +382,34 @@ def parse_op(value):
+     return op
+ 
+ 
++def add_worker_arguments(parser):
++    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
++    parser.add_argument("--library-name", help=argparse.SUPPRESS)
++    parser.add_argument("--library-path", help=argparse.SUPPRESS)
++    parser.add_argument("--worker-shape", help=argparse.SUPPRESS)
++    parser.add_argument("--worker-m", type=int, help=argparse.SUPPRESS)
++    parser.add_argument("--worker-n", type=int, help=argparse.SUPPRESS)
++    parser.add_argument("--worker-bandwidth", type=int, help=argparse.SUPPRESS)
++    parser.add_argument("--worker-reps", type=int, help=argparse.SUPPRESS)
++    parser.add_argument(
++        "--worker-op",
++        action="append",
++        type=parse_op,
++        default=[],
++        help=argparse.SUPPRESS,
++    )
++
++
++def parse_worker_args(argv=None):
++    parser = argparse.ArgumentParser(description="Run one isolated Level 2 worker.")
++    parser.add_argument("--csv", required=True)
++    add_worker_arguments(parser)
++    args = parser.parse_args(argv)
++    if args.worker_reps is not None and args.worker_reps < 1:
++        parser.error("--worker-reps must be at least 1")
++    return args
++
++
+ def parse_args(argv=None):
+     parser = argparse.ArgumentParser(
+         description="Run representative Level 2 fresh-process probes and write a report CSV."
+@@ -489,21 +501,7 @@ def parse_args(argv=None):
+     )
+     parser.add_argument("--csv", required=True)
+     parser.add_argument("--skip-missing", action="store_true")
+-    parser.add_argument("--worker", action="store_true", help=argparse.SUPPRESS)
+-    parser.add_argument("--library-name", help=argparse.SUPPRESS)
+-    parser.add_argument("--library-path", help=argparse.SUPPRESS)
+-    parser.add_argument("--worker-shape", help=argparse.SUPPRESS)
+-    parser.add_argument("--worker-m", type=int, help=argparse.SUPPRESS)
+-    parser.add_argument("--worker-n", type=int, help=argparse.SUPPRESS)
+-    parser.add_argument("--worker-bandwidth", type=int, help=argparse.SUPPRESS)
+-    parser.add_argument("--worker-reps", type=int, help=argparse.SUPPRESS)
+-    parser.add_argument(
+-        "--worker-op",
+-        action="append",
+-        type=parse_op,
+-        default=[],
+-        help=argparse.SUPPRESS,
+-    )
++    add_worker_arguments(parser)
+     benchmark_metadata.add_identity_arguments(parser)
+     args = parser.parse_args(argv)
+     if args.reps_small < 1 or args.reps_large < 1:
+@@ -3299,13 +3297,47 @@ def run_controller(args):
+     )
+ 
+ 
++def worker_main(argv):
++    args = parse_worker_args(argv)
++    try:
++        run_worker(args)
++    except ValueError as exc:
++        print(exc, file=sys.stderr)
++        return 2
++    return 0
++
++
++# Artifact snapshots execute this file without sibling controller modules.
++# Finish worker execution before loading the controller-only dependencies.
++if __name__ == "__main__" and "--worker" in sys.argv[1:]:
++    sys.exit(worker_main(sys.argv[1:]))
++
++
++import benchmark_artifacts
++import benchmark_metadata
++from report_comparison import (
++    parse_positive_finite,
++    positive_finite_median,
++    validate_optional_metric_evidence,
++    validate_performance_fields,
++)
++from report_publication import ReportOutput, publish_outputs
++from report_schedule import (
++    SCHEDULE_CHOICES,
++    library_repeat_schedule,
++    validate_schedule,
++    validate_unique_library_labels,
++)
++
++
+ def main(argv=None):
++    argv = sys.argv[1:] if argv is None else argv
++    if "--worker" in argv:
++        return worker_main(argv)
++
+     args = parse_args(argv)
+     try:
+-        if args.worker:
+-            run_worker(args)
+-        else:
+-            run_controller(args)
++        run_controller(args)
+     except (ValueError, benchmark_artifacts.ArtifactSnapshotError) as exc:
+         print(exc, file=sys.stderr)
+         return 2
+diff --git a/bench/tools/test_gemm_sweep_tools.py b/bench/tools/test_gemm_sweep_tools.py
+index e942c47..b3db3e6 100644
+--- a/bench/tools/test_gemm_sweep_tools.py
++++ b/bench/tools/test_gemm_sweep_tools.py
+@@ -535,6 +535,7 @@ with open(args.csv, "w", newline="") as output:
+         ]
+         aggregate = runner.merge_repeat_rows(rows)
+         self.assertEqual(float(aggregate["median_ns"]), 20)
++        self.assertEqual(aggregate["median_ns_samples"], "10,30")
+         self.assertEqual(float(aggregate["p95_ns"]), 30)
+ 
+         fractional = runner.merge_repeat_rows(
+diff --git a/bench/tools/test_level2_report.py b/bench/tools/test_level2_report.py
+index 7ad5306..6f2fb4e 100644
+--- a/bench/tools/test_level2_report.py
++++ b/bench/tools/test_level2_report.py
+@@ -449,6 +449,17 @@ class Level2RunnerTests(unittest.TestCase):
+                 )
+                 self.assertEqual(Path(library_path).read_bytes(), b"library-a")
+                 if len(private_paths) == 2:
++                    # Execute the actual frozen bytes with no repository import
++                    # path, even on hosts without an installed BLAS library.
++                    result = subprocess.run(
++                        [sys.executable, str(script), "--worker", "--help"],
++                        cwd=temp_dir,
++                        capture_output=True,
++                        text=True,
++                        check=False,
++                    )
++                    self.assertEqual(result.returncode, 0, result.stderr)
++                    self.assertIn("isolated Level 2 worker", result.stdout)
+                     library.write_bytes(b"library-b")
+                 elif len(private_paths) == 4:
+                     library.write_bytes(b"library-a")
+@@ -1563,33 +1574,40 @@ class Level2RunnerTests(unittest.TestCase):
+     @unittest.skipUnless(TEST_BLAS, "no drop-in BLAS library is available")
+     def test_triangular_worker_correctness(self):
+         n = 7
+-        result = subprocess.run(
+-            [
+-                sys.executable,
+-                str(TOOLS_DIR / "run_level2_report.py"),
+-                "--worker",
+-                "--csv",
+-                os.devnull,
+-                "--library-name",
+-                "TestBLAS",
+-                "--library-path",
+-                TEST_BLAS,
+-                "--worker-shape",
+-                "sq7",
+-                "--worker-m",
+-                str(n),
+-                "--worker-n",
+-                str(n),
+-                "--worker-reps",
+-                "1",
+-                "--worker-op",
+-                "triangular",
+-            ],
+-            cwd=REPO_ROOT,
+-            check=False,
+-            capture_output=True,
+-            text=True,
++        request = runner.benchmark_artifacts.ArtifactRequest.interpreter_script(
++            "run_level2_report", TOOLS_DIR / "run_level2_report.py"
+         )
++        with runner.benchmark_artifacts.ArtifactSnapshotSet.capture(
++            [request]
++        ) as snapshot:
++            result = subprocess.run(
++                [
++                    sys.executable,
++                    str(snapshot.for_role("binary")[0].execution_path),
++                    "--worker",
++                    "--csv",
++                    os.devnull,
++                    "--library-name",
++                    "TestBLAS",
++                    "--library-path",
++                    TEST_BLAS,
++                    "--worker-shape",
++                    "sq7",
++                    "--worker-m",
++                    str(n),
++                    "--worker-n",
++                    str(n),
++                    "--worker-reps",
++                    "1",
++                    "--worker-op",
++                    "triangular",
++                ],
++                cwd=Path(snapshot.for_role("binary")[0].execution_path).parent,
++                check=False,
++                capture_output=True,
++                text=True,
++            )
++            snapshot.finalize()
+         self.assertEqual(result.returncode, 0, result.stderr)
+         rows = list(csv.DictReader(result.stdout.splitlines()))
+         self.assertEqual(len(rows), 80)
+diff --git a/bench/tools/test_report_plotters.py b/bench/tools/test_report_plotters.py
+index 01faf7f..eb330c8 100644
+--- a/bench/tools/test_report_plotters.py
++++ b/bench/tools/test_report_plotters.py
+@@ -84,6 +84,64 @@ class ReportPlotterPublicationTest(unittest.TestCase):
+             self.assertNotIn(b"nan", contents)
+             self.assertNotIn(b"inf", contents)
+ 
++    def assert_median_statistic(self, module, csv_path, argv):
++        with csv_path.open(newline="") as handle:
++            reader = csv.DictReader(handle)
++            fields = list(reader.fieldnames)
++            rows = list(reader)
++        is_gemm = module is plot_gemm_sweep
++        field = "median_ns" if is_gemm else "metric_median"
++        median_argv = [*argv, "--stat", "median"]
++
++        # Old CSVs without median evidence must never silently fall back to best.
++        with (
++            mock.patch.object(module, "publish_outputs") as publish,
++            self.assertRaisesRegex(ValueError, field + " must be"),
++        ):
++            module.main(median_argv)
++        publish.assert_not_called()
++
++        fields.append(field)
++        for row in rows:
++            row[field] = "512" if is_gemm else "3.25"
++        write_rows(csv_path, fields, rows)
++        if is_gemm:
++            for kind, expected in (
++                ("sgemm", 16),
++                ("dgemm", 16),
++                ("cgemm", 64),
++                ("zgemm", 64),
++            ):
++                evidence = dict(rows[0], kind=kind, m="16", n="16", k="16")
++                self.assertEqual(module.row_gflops(evidence, "median"), expected)
++                self.assertEqual(module.row_gflops(evidence), float(evidence["gflops"]))
++        else:
++            key = "value" if module is plot_level1_report else "rate_gops"
++            self.assertTrue(
++                all(row[key] == 3.25 for row in module.read_rows(csv_path, "median"))
++            )
++            self.assertNotEqual(module.read_rows(csv_path)[0][key], 3.25)
++        published = []
++        with mock.patch.object(module, "publish_outputs", side_effect=published.extend):
++            module.main(median_argv)
++        self.assertTrue(published)
++        for output in published:
++            self.assertIn(
++                b"Median-time" if is_gemm else b"Statistic: median", output.contents
++            )
++        self.assert_outputs_are_finite(published)
++
++        for value in (*INVALID_PERFORMANCE_VALUES, ""):
++            with self.subTest(stat="median", value=value):
++                rows[0][field] = value
++                write_rows(csv_path, fields, rows)
++                with (
++                    mock.patch.object(module, "publish_outputs") as publish,
++                    self.assertRaisesRegex(ValueError, field + " must be"),
++                ):
++                    module.main(median_argv)
++                publish.assert_not_called()
++
+     def test_gemm_publishes_one_exact_output_in_one_call(self):
+         with tempfile.TemporaryDirectory(dir=Path.cwd()) as temporary:
+             root = Path(temporary)
+@@ -158,6 +216,9 @@ class ReportPlotterPublicationTest(unittest.TestCase):
+                 "d8c29f308e82a75c43d3b954011a03e7bd2ecbb0049520f2ad531e8b2f54cac9",
+             )
+             self.assertFalse(output_path.parent.exists())
++            self.assert_median_statistic(
++                plot_gemm_sweep, csv_path, [str(csv_path), str(output_path)]
++            )
+ 
+     def test_gemm_rejects_non_positive_or_non_finite_checked_evidence(self):
+         fields = (
+@@ -296,14 +357,25 @@ class ReportPlotterPublicationTest(unittest.TestCase):
+             self.assertEqual(
+                 [digest(item.contents) for item in published[0]],
+                 [
+-                    "a6a5086514a5d1e67ede8d958c7096c2e6ba8b32195b0f481bae5dae2feeb1bf",
+-                    "7bc730d9cc0ebaf8ace9bc54821f97b49d30bae486852a63703c9422c740a9bf",
++                    "7ec6a988f56149dfd64a1b894995981f382af279fdc47183b26320a219bb2d36",
++                    "299c6dd765359cf3b49167cfabd14990f04e698feb3a930f224908a1bcefc1a4",
+                 ],
+             )
+             self.assertTrue(
+                 all(isinstance(item.contents, bytes) for item in published[0])
+             )
+             self.assertFalse(bars_path.parent.exists())
++            self.assert_median_statistic(
++                plot_level1_report,
++                csv_path,
++                [
++                    str(csv_path),
++                    "--bars-svg",
++                    str(bars_path),
++                    "--ratio-svg",
++                    str(ratio_path),
++                ],
++            )
+ 
+     def test_level1_rejects_non_positive_or_non_finite_ok_evidence(self):
+         for value in INVALID_PERFORMANCE_VALUES:
+@@ -570,9 +642,14 @@ class ReportPlotterPublicationTest(unittest.TestCase):
+             self.assertIsInstance(contents, bytes)
+             self.assertEqual(
+                 digest(contents),
+-                "5ee1af00bbb0f40c54e4518d77dedbaa974f3d70e5d5c87c874aebafed799249",
++                "031a793a46a6d758afcece7345fe2f5ffb1ae700071b1855f5c100f24961eff0",
+             )
+             self.assertFalse(output_path.parent.exists())
++            self.assert_median_statistic(
++                plot_level2_report,
++                csv_path,
++                [str(csv_path), "--bars-svg", str(output_path)],
++            )
+ 
+     def test_level2_rejects_non_positive_or_non_finite_ok_evidence(self):
+         fields = ("case", "kind", "library", "n", "rate_gops", "status")
+diff --git a/build.zig b/build.zig
+index 2b84050..fd10354 100644
+--- a/build.zig
++++ b/build.zig
+@@ -1157,7 +1157,8 @@ pub fn build(b: *std.Build) void {
+     addOptionalBenchLibrary(run_bench, "--mkl", bench_mkl, null);
+     addOptionalBenchLibrary(run_bench, "--aocl-blis", bench_aocl_blis, null);
+     if (b.args) |args| run_bench.addArgs(args);
+-    run_bench.step.dependOn(b.getInstallStep());
++    // The emitted library argument supplies the dependency; unrelated installed
++    // probes and the static library are not prerequisites for a benchmark run.
+ 
+     const bench_step = b.step("bench", "Benchmark Zynum BLAS against Accelerate and OpenBLAS");
+     bench_step.dependOn(&run_bench.step);
+@@ -1177,13 +1178,15 @@ pub fn build(b: *std.Build) void {
+     run_gemm_sweep.addArg("--zynum-blas");
+     run_gemm_sweep.addFileArg(lib.getEmittedBin());
+     run_gemm_sweep.addArg("--csv");
+-    run_gemm_sweep.addArg("zig-out/gemm_sweep.csv");
++    run_gemm_sweep.addArg(b.getInstallPath(.prefix, "gemm_sweep.csv"));
+     addOptionalBenchLibrary(run_gemm_sweep, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
+     addOptionalBenchLibrary(run_gemm_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
+     addOptionalBenchLibrary(run_gemm_sweep, "--mkl", bench_mkl, null);
+     addOptionalBenchLibrary(run_gemm_sweep, "--aocl-blis", bench_aocl_blis, null);
+     if (b.args) |args| run_gemm_sweep.addArgs(args);
+-    run_gemm_sweep.step.dependOn(b.getInstallStep());
++    // Installing only the shared library also creates the selected output prefix
++    // before the sweep opens its default CSV on a clean checkout.
++    run_gemm_sweep.step.dependOn(&install_dynamic_lib.step);
+ 
+     const gemm_sweep_step = b.step("bench-gemm-sweep", "Sweep GEMM shapes and write CSV results");
+     gemm_sweep_step.dependOn(&run_gemm_sweep.step);
+@@ -1207,7 +1210,6 @@ pub fn build(b: *std.Build) void {
+     run_gemm_sweep_isolated.addArg("--check");
+     run_gemm_sweep_isolated.addArg("--skip-missing");
+     if (b.args) |args| run_gemm_sweep_isolated.addArgs(args);
+-    run_gemm_sweep_isolated.step.dependOn(b.getInstallStep());
+ 
+     const gemm_sweep_isolated_step = b.step("bench-gemm-sweep-isolated", "Run reportable fresh-process GEMM sweep with correctness checks");
+     gemm_sweep_isolated_step.dependOn(&run_gemm_sweep_isolated.step);
+@@ -1231,7 +1233,6 @@ pub fn build(b: *std.Build) void {
+     addOptionalBenchLibrary(run_vector_matrix_sweep, "--mkl", bench_mkl, null);
+     addOptionalBenchLibrary(run_vector_matrix_sweep, "--aocl-blis", bench_aocl_blis, null);
+     if (b.args) |args| run_vector_matrix_sweep.addArgs(args);
+-    run_vector_matrix_sweep.step.dependOn(b.getInstallStep());
+ 
+     const vector_matrix_sweep_step = b.step("bench-vector-matrix-sweep", "Sweep representative BLAS Level 1/2 kernels");
+     vector_matrix_sweep_step.dependOn(&run_vector_matrix_sweep.step);
+diff --git a/src/blas/api/operations.zig b/src/blas/api/operations.zig
+index 0ce50b6..398965c 100644
+--- a/src/blas/api/operations.zig
++++ b/src/blas/api/operations.zig
+@@ -10,10 +10,18 @@
+ //! explicit temporary storage for caller-approved aliasing.
+ 
+ const aliasing = @import("aliasing.zig");
+-const core = @import("../core.zig");
++const core = @import("../core/checked.zig");
+ const std = @import("std");
+ const views = @import("views.zig");
+ 
++comptime {
++    // Catch accidental replacement of the narrow facade with the legacy core
++    // umbrella before API code can begin depending on raw kernels or scheduling.
++    for (.{ "unchecked", "execution", "vector", "matrix_vector", "matrix_matrix", "scal", "copy", "axpy", "dot", "gemv", "gemm" }) |name| {
++        if (@hasDecl(core, name)) @compileError("checked API core boundary exposes " ++ name);
++    }
++}
++
+ /// Errors returned by checked public Zig BLAS operations.
+ pub const Error = views.Error;
+ /// Backwards-compatible alias for the public BLAS API error set.
+diff --git a/src/blas/api/views.zig b/src/blas/api/views.zig
+index 1df34d4..d87df36 100644
+--- a/src/blas/api/views.zig
++++ b/src/blas/api/views.zig
+@@ -11,7 +11,7 @@
+ 
+ const builtin = @import("builtin");
+ const std = @import("std");
+-const core = @import("../core.zig");
++const core = @import("../core/checked.zig");
+ const types = @import("../types.zig");
+ 
+ pub const BlasInt = types.BlasInt;
+diff --git a/src/blas/core/execution/thread_pool.zig b/src/blas/core/execution/thread_pool.zig
+index 165cae9..472d898 100644
+--- a/src/blas/core/execution/thread_pool.zig
++++ b/src/blas/core/execution/thread_pool.zig
+@@ -20,7 +20,6 @@ var persistent_group: std.Io.Group = .init;
+ var persistent_worker_count = std.atomic.Value(u32).init(0);
+ var persistent_ready_count = std.atomic.Value(u32).init(0);
+ var persistent_exited_count = std.atomic.Value(u32).init(0);
+-var persistent_generation = std.atomic.Value(u32).init(0);
+ var persistent_worker_generation = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** max_tasks;
+ var persistent_active_helpers = std.atomic.Value(u32).init(0);
+ var persistent_first_helper = std.atomic.Value(u32).init(0);
+@@ -191,11 +190,14 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
+     persistent_active_helpers.store(active_helpers, .release);
+ 
+     const io = persistent_threaded.io();
+-    const generation = persistent_generation.fetchAdd(1, .acq_rel) + 1;
+     const lazy_wake_helpers = first_helper == 0 and active_helpers == workers;
+     for (0..active_helpers) |worker_id| {
+         const target_worker = first_helper + worker_id;
+-        persistent_worker_generation[target_worker].store(generation, .release);
++        // io_busy serializes jobs, and completion acknowledges each worker's
++        // observed generation before another job can be submitted. Increment
++        // locally so even wraparound differs from an idle worker's last value.
++        // The release publishes the task payload to the worker's acquire load.
++        _ = persistent_worker_generation[target_worker].fetchAdd(1, .release);
+         if (!lazy_wake_helpers) io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
+     }
+ 
+@@ -293,9 +295,8 @@ fn shutdownPersistentLocked() void {
+         persistent_shutdown_requested.store(1, .release);
+         persistent_exited_count.store(0, .release);
+ 
+-        const generation = persistent_generation.fetchAdd(1, .acq_rel) + 1;
+         for (0..worker_count) |worker_id| {
+-            persistent_worker_generation[worker_id].store(generation, .release);
++            _ = persistent_worker_generation[worker_id].fetchAdd(1, .release);
+             io.futexWake(u32, &persistent_worker_generation[worker_id].raw, 1);
+         }
+ 
+@@ -358,4 +359,49 @@ test "runLowLatency refuses partial execution when helpers cannot cover tasks" {
+ 
+     try std.testing.expect(!runLowLatency(CounterTask.run, @ptrCast(&tasks), tasks.len));
+     try std.testing.expectEqual(@as(u32, 0), counter.load(.monotonic));
++
++    shutdown();
++    runtime.setMaxThreads(5);
++    if (configuredHelperCount() == 0) return;
++
++    // Seed only while stopped: workers must acquire the seed before announcing
++    // readiness. The first phase wraps on shutdown, the second on submission.
++    for ([_]u32{ std.math.maxInt(u32) - 1, std.math.maxInt(u32) }) |seed| {
++        for (&persistent_worker_generation) |*generation| generation.store(seed, .release);
++        try std.testing.expect(ensurePersistentWorkers());
++        const workers = persistent_worker_count.load(.acquire);
++        try std.testing.expect(workers > 0);
++        var counters = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** 5;
++        var distinct_tasks: [5]CounterTask = undefined;
++        for (&distinct_tasks, &counters) |*task, *task_counter| task.* = .{ .counter = task_counter };
++
++        const counts = [_]usize{ 2, @min(workers + 1, 3), 2, workers + 1 };
++        const runs: usize = if (seed == std.math.maxInt(u32) - 1) 1 else counts.len;
++        for (counts[0..runs]) |count| {
++            var before: [max_tasks]u32 = undefined;
++            for (0..workers) |worker_id| before[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
++            for (&counters) |*task_counter| task_counter.store(0, .monotonic);
++            try std.testing.expect(runLowLatency(CounterTask.run, @ptrCast(&distinct_tasks), count));
++            // Separate counters catch a duplicated index hiding a missing one.
++            for (&counters, 0..) |*task_counter, index| {
++                try std.testing.expectEqual(@as(u32, if (index < count) 1 else 0), task_counter.load(.monotonic));
++            }
++            const active_helpers = count - 1;
++            const first_helper: usize = if (count == 3 and workers >= active_helpers + 2) 2 else 0;
++            for (0..workers) |worker_id| {
++                const active = worker_id >= first_helper and worker_id < first_helper + active_helpers;
++                const expected = before[worker_id] +% @as(u32, if (active) 1 else 0);
++                try std.testing.expectEqual(expected, persistent_worker_generation[worker_id].load(.acquire));
++            }
++        }
++
++        var before_shutdown: [max_tasks]u32 = undefined;
++        for (0..workers) |worker_id| before_shutdown[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
++        shutdown();
++        try std.testing.expectEqual(@as(u8, 0), persistent_init_state.load(.acquire));
++        try std.testing.expectEqual(@as(u32, 0), persistent_worker_count.load(.acquire));
++        for (0..workers) |worker_id| {
++            try std.testing.expectEqual(before_shutdown[worker_id] +% 1, persistent_worker_generation[worker_id].load(.acquire));
++        }
++    }
+ }
+diff --git a/src/blas/gemm_registry_test.zig b/src/blas/gemm_registry_test.zig
+index fa6001b..ffc6024 100644
+--- a/src/blas/gemm_registry_test.zig
++++ b/src/blas/gemm_registry_test.zig
+@@ -346,6 +346,45 @@ test "Apple AMX benchmark shapes have explicit selected subkernel ids" {
+     const f32_plan = tuning.executionPlan(f32, f32_desc, shape, requested_threads, performance_l2_bytes);
+     try std.testing.expectEqual(gemm_task.AppleAmxKernelId.apple_amx_f32_n32, f32_plan.amx);
+ 
++    // Preserve the K cap, panel exclusions, and fringe boundaries when
++    // simplifying preference rules. These inspect policy without executing AMX.
++    const f32_cases = [_]struct {
++        shape: tuning.Shape,
++        amx: gemm_task.AppleAmxKernelId,
++        partial_n16: bool = false,
++    }{
++        .{ .shape = .{ .m = 128, .n = 32, .k = 0 }, .amx = .none },
++        .{ .shape = .{ .m = 128, .n = 32, .k = 255 }, .amx = .none },
++        .{ .shape = .{ .m = 128, .n = 32, .k = 256 }, .amx = .apple_amx_f32_n32 },
++        .{ .shape = .{ .m = 128, .n = 32, .k = 512 }, .amx = .apple_amx_f32_n32 },
++        .{ .shape = .{ .m = 128, .n = 32, .k = 513 }, .amx = .none },
++        .{ .shape = .{ .m = 128, .n = 32, .k = 4096 }, .amx = .none },
++        .{ .shape = .{ .m = 512, .n = 32, .k = 511 }, .amx = .apple_amx_f32_n32 },
++        .{ .shape = .{ .m = 512, .n = 32, .k = 512 }, .amx = .none },
++        .{ .shape = .{ .m = 512, .n = 32, .k = 2048 }, .amx = .none },
++        .{ .shape = .{ .m = 1024, .n = 32, .k = 512 }, .amx = .apple_amx_f32_n32 },
++        .{ .shape = .{ .m = 1024, .n = 32, .k = 1024 }, .amx = .none },
++        .{ .shape = .{ .m = 512, .n = 512, .k = 512 }, .amx = .apple_amx_f32_n32 },
++        .{ .shape = .{ .m = 768, .n = 768, .k = 768 }, .amx = .none },
++        .{ .shape = .{ .m = 512, .n = 16, .k = 512 }, .amx = .apple_amx_f32_n16 },
++        .{ .shape = .{ .m = 512, .n = 16, .k = 513 }, .amx = .none },
++        .{ .shape = .{ .m = 127, .n = 129, .k = 64 }, .amx = .none },
++        .{ .shape = .{ .m = 127, .n = 129, .k = 65 }, .amx = .apple_amx_f32_n16 },
++        .{ .shape = .{ .m = 127, .n = 129, .k = 256 }, .amx = .apple_amx_f32_n16 },
++        .{ .shape = .{ .m = 127, .n = 129, .k = 257 }, .amx = .none },
++        .{ .shape = .{ .m = 128, .n = 33, .k = 512 }, .amx = .none, .partial_n16 = true },
++        .{ .shape = .{ .m = 128, .n = 33, .k = 513 }, .amx = .none },
++    };
++    for (f32_cases) |case| {
++        const plan = tuning.executionPlan(f32, f32_desc, case.shape, requested_threads, performance_l2_bytes);
++        try std.testing.expectEqual(case.amx, plan.amx);
++        try std.testing.expectEqual(case.partial_n16, plan.amx_partial_n16);
++        if (case.shape.k > 512) {
++            try std.testing.expect(!tuning.amxKernelCompatible(f32, .apple_amx_f32_n16, case.shape));
++            try std.testing.expect(!tuning.amxKernelCompatible(f32, .apple_amx_f32_n32, case.shape));
++        }
++    }
++
+     const f64_candidates = catalog.candidateList(.{
+         catalog.aarch64SmeDescriptor(f64, 64),
+         catalog.aarch64AsimdDescriptor(f64),
+@@ -355,6 +394,10 @@ test "Apple AMX benchmark shapes have explicit selected subkernel ids" {
+     try std.testing.expectEqual(catalog.KernelId.aarch64_sme_f64_4mx2n, f64_desc.kernel);
+     const f64_plan = tuning.executionPlan(f64, f64_desc, shape, requested_threads, performance_l2_bytes);
+     try std.testing.expectEqual(gemm_task.AppleAmxKernelId.apple_amx_f64_n16, f64_plan.amx);
++    const f64_high_k_shape: tuning.Shape = .{ .m = 128, .n = 32, .k = 4096 };
++    const f64_high_k_plan = tuning.executionPlan(f64, f64_desc, f64_high_k_shape, requested_threads, performance_l2_bytes);
++    try std.testing.expectEqual(gemm_task.AppleAmxKernelId.apple_amx_f64_n32, f64_high_k_plan.amx);
++    try std.testing.expect(tuning.amxKernelCompatible(f64, f64_high_k_plan.amx, f64_high_k_shape));
+ }
+ 
+ test "SME epilogue rejection falls back without entering streaming state" {
+diff --git a/src/blas/kernels/shared/matrix_matrix/tuning.zig b/src/blas/kernels/shared/matrix_matrix/tuning.zig
+index ad713b2..4525a71 100644
+--- a/src/blas/kernels/shared/matrix_matrix/tuning.zig
++++ b/src/blas/kernels/shared/matrix_matrix/tuning.zig
+@@ -169,27 +169,23 @@ fn selectAmx(comptime T: type, shape: Shape) gemm_task.AppleAmxKernelId {
+             ((shape.m & 15) != 0 or (shape.n & 15) != 0);
+         if (medium_fringe) return .apple_amx_f32_n16;
+         if ((shape.m & 15) != 0 or (shape.n & 15) != 0) return .none;
++        // The f32 AMX compatibility contract caps K at 512. Keep the
++        // preference rules below inside that range; high-K uses SME/ASIMD.
+         if (shape.k > 512) return .none;
+ 
+         const short_wide = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
+-        const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64 and shape.m <= 768;
++        const square = shape.m == shape.n and shape.k == shape.n and shape.m >= 64;
+         const square512_chunk = shape.m == 512 and shape.k == 512 and shape.n <= 128;
+-        const square1024_chunk = shape.m == 1024 and shape.k == 1024 and shape.n <= 128;
+         const narrow_n64_chunk = shape.m >= 1024 and shape.n == 32;
+-        const tall_panel = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 256 and shape.k <= 1024 and !square512_chunk and !square1024_chunk;
+-        const high_k_small = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
+-        const high_k_m512_n32 = shape.m == 512 and shape.n == 32 and shape.k == 2048;
++        const tall_panel = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 256 and !square512_chunk;
+         const low_k_large_n32 = shape.m >= 256 and shape.n >= 256 and shape.k <= 256;
+-        const tall_n16 = shape.m >= 512 and shape.n == 16 and shape.k >= 128 and shape.k <= 1024;
+-        const high_k_panel = shape.m >= 128 and shape.m <= 512 and shape.n >= 32 and shape.n <= 128 and shape.k >= 2048;
+-        if (!short_wide and !square and !tall_panel and !high_k_small and !high_k_m512_n32 and !high_k_panel and !low_k_large_n32 and !tall_n16) return .none;
++        const tall_n16 = shape.m >= 512 and shape.n == 16 and shape.k >= 128;
++        if (!short_wide and !square and !tall_panel and !low_k_large_n32 and !tall_n16) return .none;
+ 
+-        const square_n32 = square and (shape.m == 96 or shape.m == 128 or shape.m == 192 or shape.m == 256 or shape.m == 384 or shape.m == 512 or shape.m == 768);
++        const square_n32 = square and (shape.m == 96 or shape.m == 128 or shape.m == 192 or shape.m == 256 or shape.m == 384 or shape.m == 512);
+         const short_wide_n32 = shape.m <= 64 and shape.n >= 512 and shape.k >= 128;
+-        const tall_panel_n32 = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 128 and shape.k <= 1024 and !square512_chunk and !square1024_chunk and !narrow_n64_chunk;
+-        const high_k_chunk_n32 = shape.m == 128 and shape.n == 32 and shape.k >= 4096;
+-        const high_k_panel_n32 = high_k_panel;
+-        if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or high_k_chunk_n32 or high_k_panel_n32 or narrow_n64_chunk)) {
++        const tall_panel_n32 = shape.m >= 128 and shape.n >= 32 and shape.n <= 128 and shape.k >= 128 and !square512_chunk and !narrow_n64_chunk;
++        if ((shape.m & 31) == 0 and (shape.n & 31) == 0 and (low_k_large_n32 or square_n32 or short_wide_n32 or tall_panel_n32 or narrow_n64_chunk)) {
+             return .apple_amx_f32_n32;
+         }
+         return .apple_amx_f32_n16;
+diff --git a/test/build/test_build_inventory.py b/test/build/test_build_inventory.py
+index 393dec3..6ab46c3 100644
+--- a/test/build/test_build_inventory.py
++++ b/test/build/test_build_inventory.py
+@@ -14271,7 +14271,7 @@ class BuildInventoryTests(unittest.TestCase):
+             "tools/test_inventory.json": "json-data",
+             "tools/test_inventory_runner.zig": "zig-source",
+         }
+-        self.assertEqual(282, len(rows))
++        self.assertEqual(283, len(rows))
+         for path, kind in expected.items():
+             with self.subTest(path=path):
+                 self.assertEqual(kind, rows[path]["kind"])
+diff --git a/test/build/test_build_profiles.py b/test/build/test_build_profiles.py
+index ba32f69..61cfc79 100644
+--- a/test/build/test_build_profiles.py
++++ b/test/build/test_build_profiles.py
+@@ -48,6 +48,26 @@ class BuildProfileTests(unittest.TestCase):
+     def test_default_and_explicitly_disabled_profiles(self) -> None:
+         self._assert_configures()
+         self._assert_configures(*(f"-D{flag}=false" for flag in PROFILE_FLAGS))
++        source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
++        for runner in (
++            "run_bench",
++            "run_gemm_sweep",
++            "run_gemm_sweep_isolated",
++            "run_vector_matrix_sweep",
++        ):
++            with self.subTest(benchmark=runner):
++                self.assertNotIn(f"{runner}.step.dependOn(b.getInstallStep())", source)
++                self.assertIn(f"{runner}.addFileArg(lib.getEmittedBin())", source)
++        self.assertIn("run_gemm_sweep.step.dependOn(&install_dynamic_lib.step)", source)
++        self.assertIn('b.getInstallPath(.prefix, "gemm_sweep.csv")', source)
++        # Standalone runs stay narrow while the default install still ships both
++        # libraries and the benchmark executables.
++        for library in ("dynamic", "static"):
++            self.assertIn(
++                f"b.getInstallStep().dependOn(&install_{library}_lib.step)", source
++            )
++        for artifact in ("bench", "gemm_sweep", "vector_matrix_sweep"):
++            self.assertIn(f"b.installArtifact({artifact})", source)
+ 
+     def test_each_single_profile(self) -> None:
+         for selected in PROFILE_FLAGS:
+diff --git a/tools/build_inventory.json b/tools/build_inventory.json
+index 8b413c2..e92a66a 100644
+--- a/tools/build_inventory.json
++++ b/tools/build_inventory.json
+@@ -37,7 +37,7 @@
+     }
+   ],
+   "build_root_digests": {
+-    "build.zig": "23670219948de1040d57113aaad4ba21eb4c99a8315b3427cb65073edf12d3ca",
++    "build.zig": "cf5fca8a989015f83dc1c99556594d25ce6209679731dbfdd81f4d5405e678fd",
+     "examples/zig/build.zig": "53261cc7c3828382c193902df692fe8be07b78fac072b9b75f00194d44019979"
+   },
+   "option_surfaces": [
+@@ -585,7 +585,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "16e274746199787e9fe5e7efadbcf842fc0df2549e28db6aa960d0037109f6fb",
++      "source_digest": "c762f573e5a97b66bc0873d3b9f931ebd50a9d94c86af59363bf7b67c15bea98",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "bench-zynum-blas",
+@@ -616,7 +616,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "7d9d0e22ba1e3fffb71f09844adc22a51acf3f95e6cb823873a7aa97de0be978",
++      "source_digest": "f54fca42693bf67a81f25d722c03726bf3f64cd2d1854fc3a10c830382c68645",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-module-tests",
+@@ -644,7 +644,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "450850be8642a57fbb42dd6ee353cd876dba8cb2abb87c9542be55923d8ab687",
++      "source_digest": "78b500754edcf95a466981485eaef5b33ba3dce2a968fe0c740402428c129d4b",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-public-surface-contract-tests",
+@@ -672,7 +672,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "6722dce7ccc2d1e2ac47ca9ce5cdb5ea4055103b5528715f67be8e00bef562ce",
++      "source_digest": "22381ad834a33c98f5324af0bb9db0f4e5a0c077f73ff1fcb358fddb6d2cee8c",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-cblas-compat-tests",
+@@ -700,7 +700,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "52f495a3092584967c6cc4ca6203e71551a98d28e478e74a80634a3a692545b3",
++      "source_digest": "f4022ec4442be500cd070ed1583ee9674c26f5e29546e97ef46be0815d578790",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level2-x86-compact-triangular-isolated",
+@@ -745,7 +745,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "d3d22f57756234b1a5faeeefece0d43e030845e82eceb48a532e216b96861be2",
++      "source_digest": "4b3171329a1f7acdb0e802691e4aa07f890ced986af687d6ff6cb76d08edefc1",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level2-x86-compact-triangular-isolated-test",
+@@ -790,7 +790,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "8f792b72b90151c9a52adbc13228fe0f825d0b64f5971e2eb7e60e3ff5bd8b02",
++      "source_digest": "b122b2eaf199b40e5cdf24599f6d508ecf381bdbb6a20d8a1c1862a1fd3221ab",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "dcopy-probe",
+@@ -821,7 +821,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "423a7dad395ab94f20ff5f637c2b74b9568e06b17d8971a7adc77e8c8e68fc3d",
++      "source_digest": "95847cf974c52f230d8a61ac094549a4dedb80830603b1c281787aded56ffa6b",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-fortran-compat-tests",
+@@ -849,7 +849,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "7629d38839cd86df61553e30b85ab4b091b729c0abf7a45a3cd5dd5544c5f43d",
++      "source_digest": "f7d442de5fb7d4d3fa887db6ab6ad812e02f1041c7a2d354c9b76094f7d309c7",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-gemm-registry-tests",
+@@ -877,7 +877,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "cf8fe4f725280a70d010befbc9053d3da4c16112a99ef12092f06c91040c12ef",
++      "source_digest": "841abc26b238a85097623ba95958f1cd51c42a21c903a6ac0c624079847e8a43",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "gemm-sweep",
+@@ -908,7 +908,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "853ffd0ff5577c84006a183de1f36413eefb4f0c0fa15a1d0f104b917daa51b4",
++      "source_digest": "df5d74385fa6ffa6c3d845ef6432fcd61fe1e1e607afeb2c9ce927bf13813188",
+       "owner": "build-composition",
+       "artifact_kind": "executable",
+       "output_name": "generate_compat_headers",
+@@ -936,7 +936,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "acce0161194ea852bcc429be325b4acbdf1866b0bf646d270c5341607783a20b",
++      "source_digest": "2dce3e27c73d1a12ca41e928961b6d3b5aabae6ae7ea6463fd86cbb056ad0a25",
+       "owner": "build-composition",
+       "artifact_kind": "executable",
+       "output_name": "generate_kernel_coverage",
+@@ -964,7 +964,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "b2624c5e43305f73822c77a53a5303a40cff908720b9ba24a220952ccc4d388e",
++      "source_digest": "ad58e56252eb3367c36a5d6aefb7d27a6d9f8b062a4e7112b624549d22de4c7b",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-header-smoke-tests",
+@@ -1027,7 +1027,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "2e0dcfcd0dee07525d9cd5ca4269b5e7841f2983282c4c69d90d31be4c7cce2f",
++      "source_digest": "9557fa2dff8bd8c055611a3232d511e52a0a4894bb96bc1a7401e8f711310fe1",
+       "artifact_role": "test-inventory-enumerator-factory",
+       "expansion_relation": "one-per-applicable-logical-zig-root",
+       "root_module_relation": "same-pointer",
+@@ -1211,7 +1211,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "04a15bccd2e2f545cf2e611cb6c9aa17637584f7c3572d6ecd2aaed81c1265ee",
++      "source_digest": "faf54efd2b770a4a0666d31504e7762df8002784c5f073579bc53fb69c597f0f",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "level1-probe",
+@@ -1242,7 +1242,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "9ec4ca43263a9422f26187c099ea39e32864858c7dde40a39c06f5a6a87e944f",
++      "source_digest": "b0ab68daf901d554b7b49214dec6fb7e140bead7ee6af69b7974994eda6e36ef",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-level1-registry-tests",
+@@ -1270,7 +1270,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "abe4df8fddb5ff30cefe79936ab0d22ffdae85dfba33f55cd907b9681d6313c4",
++      "source_digest": "0ff44d3bebf36ef3086b923cf0e3e0c1acc036a361b8878badafbc8ca376e683",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-level2-compact-registry-tests",
+@@ -1298,7 +1298,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "96c27b76e42918b101e19791665658dc219eb8b145d43819784ac685478eb6a4",
++      "source_digest": "8a5403edd9c877c6a0a1997ecd3156dd8bb80d61467b9622b52df0497ab09747",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-level2-fused-registry-tests",
+@@ -1343,7 +1343,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "10ee361efa836c7d582603afe0d0341786105d995b229c7cc66d292427e68fe2",
++      "source_digest": "2f2d710f8942645212609a41e82ea8c61191dbaaab79f89e576f0e975787cfa5",
+       "probe_contract_source": "test/build/level2_width_artifact_probe_contract.zig"
+     },
+     {
+@@ -1374,7 +1374,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "809eb753ad489cd979525177423039e0e18f1571dfe7ac8950f4c0c322eeeb4c"
++      "source_digest": "721c2a172907419a55bb2f148c1f9df7b69a42374cb0dd2b2148966dbb6f59f8"
+     },
+     {
+       "id": "compile:build.zig:build:level2_width_isolated_library",
+@@ -1386,7 +1386,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "5f77625450c4d5a5b0d59ed0eb23f35616054e3cecf55722eba314a7ad5cf02a",
++      "source_digest": "b66766343bda4aaec82e607559924d4c1190de49a28d8c53169f86c84eabda0b",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level2-x86-width-isolated",
+@@ -1431,7 +1431,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "719b9e1cc465a41ca02da6c32d084337a2195380f5bc77fe6904f90b53a5e833",
++      "source_digest": "c955b096bcf3c5306d8f2fe08751112358bff9f46600d12d706ecbce0d8c5c0f",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level2-x86-width-isolated-test",
+@@ -1476,7 +1476,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "5b451269a5f5c9a528376644d62e579548695a911fe85c276e7261e7c10c44de",
++      "source_digest": "384b1422a2e97f590174892056a654af2b3cb14f35d1035403c3c4ffbf396f0e",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum_blas",
+@@ -1541,7 +1541,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "0fb892d2c57de1e7643683849b52a59db2eb29325ced08929dc330093ac6b7c1",
++      "source_digest": "ff2a3db61d5c6406957a3b420f69b27f76a1e899a82e66a230fb7a0c31a3510e",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-modern-tests",
+@@ -1569,7 +1569,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "f9bff037e828b26ecb20ed21953fcded5ef2254b1add179fe0e11adc9e1fb81d",
++      "source_digest": "da23c64b26e05e223fa385fff28ddc5313885072652efb42f0834347f43855ac",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-packed-parallel-tests",
+@@ -1597,7 +1597,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "04624bcb4c58ac42034176807c35dfa39b6f343ffa8fbfdd59b8109c8bb536c6",
++      "source_digest": "f24be8f4bd8ce60ea35fa9998256960072523c3d87b7895ff1f63473c78b6dc8",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "rank-k-probe",
+@@ -1637,7 +1637,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "ceee7f79bbd2f8c4670a8c332c57d0c5daf99731b1698c70a5116b22de36ddcd",
++      "source_digest": "37237aff7cfabd7df43eb228c227631f9c4f7b62d739484f8b12764a607fcc9b",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "rotg-latency-probe",
+@@ -1677,7 +1677,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "c1c7d29febb7ded728df3ffc1caa0326695337403379c82d1011c64e9258d188",
++      "source_digest": "7649ab08a883b792112fd549f0db4bfdeb9c530aa275aef32c83d6cb112530ad",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum_blas",
+@@ -1735,7 +1735,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "5fa5ff81f4955e24728739321ff7197bec2e31163d4e1032a50c2f7ea4fbebee",
++      "source_digest": "490f7fb64296603a646383aa1faf24c380b9ea1986a2b8605c3789c5f3360f8a",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level1-x86-stride2-isolated",
+@@ -1779,7 +1779,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "3987641fbaad15dfb1f79b69740312e34f998b15126899c7382888a57a745dad",
++      "source_digest": "e1b8ff28f7a9f52fe538c2bf158e8c1c77c38cf2d9adec678016d1389a2ae9d5",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level1-x86-stride2-isolated-test",
+@@ -1823,7 +1823,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "6e965b560442f72b12c7a478fe8c7a8036fc5b533c614f3f5057878cf0c4e916",
++      "source_digest": "8da515e2f59036d0d9d7034afeffdc1dbc68d613b72e58a7e097a31f7eb3ee40",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-structured-blocked-tests",
+@@ -1851,7 +1851,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "84095f6c544f266b59a5b1c66a582b55471c7a1c4c1a909345ba51986c9406a8",
++      "source_digest": "5bbfa78ed2ad34c95483a1a67a98cac8ea4c504e6b0fc5838835fba4431c7bac",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level3-x86-structured-isolated",
+@@ -1896,7 +1896,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addLibrary",
+-      "source_digest": "1b8b753fcb370ac036c1223477e592b136e68d5b86019f44c27287f2e62d3c6e",
++      "source_digest": "d9b286505fddc12742ef82954c6be7539c78e96a61d5719aad6afd8ef261572d",
+       "owner": "build-composition",
+       "artifact_kind": "library",
+       "output_name": "zynum-level3-x86-structured-isolated-test",
+@@ -1940,7 +1940,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "36a8ab9ad518c7dabb4c445e7456b2ab0275dd0ce981fa05a588d7f90df23d1d",
++      "source_digest": "94e190efcf10960bab5b0fe5d7574e7468ce110722e761f16a131709b944f387",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-structured-object-tests",
+@@ -1968,7 +1968,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "044205f4f260d77d01a9f84f62731abf217a2512e8a15f1a5e6c33327daf694d",
++      "source_digest": "03cc09bec98301a0238721e53c8d77a67e59d96c427ef2b5b3db3d1fcc8ecc7c",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-symm-dense-gemm-tests",
+@@ -1996,7 +1996,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "2eaa9bcce7b9fb6b50d0f379c79a4f844c9db158294ba29569ed5f6b0f8bb746",
++      "source_digest": "23ed2b2cc7f57d7edd622abddbf10862fa58ff3f02333f053cce7c8ac8685e3b",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "symm-probe",
+@@ -2036,7 +2036,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "2432890bb66867b1b65a89026fe7e3bfa8df7bd679b5400443d4ab17671ccd58",
++      "source_digest": "7de26d475a6f079e4729bd55dc188a241f5b608f91e02d235d655b3dacaa5203",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-triangular-band-solve-tests",
+@@ -2064,7 +2064,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "0a03cf7d396b56bcf37cd94702278d6dffe04f41650eec8f4391914749c2ea91",
++      "source_digest": "252a89285d8f7ad5f62e4ef1472c2a30c55e6295f56e1046c2db2fcda1da9e8e",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-triangular-band-window-tests",
+@@ -2092,7 +2092,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "dc94e0502165b5c191efb7148b7671b8ff68ec96ca6fa749d74eb8b3bd4f9be1",
++      "source_digest": "cecec80e3cec87677537f970cbde8d33d6175b2906ad815a16a5a958a31bfec9",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-triangular-dense-unit-tests",
+@@ -2120,7 +2120,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "21847c0348621921b6605ddf029842fbbcd8bf625fd4696ac86be54bce688154",
++      "source_digest": "e58d4a420e67c2d984efd67c242fcfe2ef1d2ab6214eda9b2a83183a2df6f457",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "triangular-matrix-probe",
+@@ -2160,7 +2160,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "53e626bc5971b27fca69af8cba4070754c323e0198640b3b080ee19d272d946a",
++      "source_digest": "a787076a082c673975ec1f5971a0880b696826443e0514b690385b3248d43568",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-triangular-packed-unit-tests",
+@@ -2188,7 +2188,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "ae1ac54dd65b6e9bbeb7bd07f68605c6ce299bcf7ac9a0123ef4a3b5590d84f8",
++      "source_digest": "32bdbbc3f423fd872581ae80f22ec734e2c604c9a3bcbb11fc4ce0411d22f697",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-triangular-parallel-tests",
+@@ -2216,7 +2216,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addExecutable",
+-      "source_digest": "636f2a49f675dcbed86196b2b7900ca6f881a741b583e9e9301f4046a4f0df0a",
++      "source_digest": "cdc911ddc231496f6c488f66303d2651ebece37dc56057161bde42960eb4119b",
+       "owner": "benchmark-maintainers",
+       "artifact_kind": "executable",
+       "output_name": "vector-matrix-sweep",
+@@ -2247,7 +2247,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "39d711c80998f7b2fd2e5140442d1d2d77336a124389475ac60677f4827e25c9",
++      "source_digest": "52da560550edab9414d85ca2f2499eaba1697af73ad1bc3bc2a2caa6275f9b80",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-blas-vector-stride2-parallel-tests",
+@@ -2275,7 +2275,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addTest",
+-      "source_digest": "82e9cafd348aa4c9a354b2ad5abe032c7d5fafe73cb6cb86a94ebc4607ab2ece",
++      "source_digest": "a07e856e83fb1d458b02b93b306e62db1195ed4557a1fd7953295bc1076a30f9",
+       "owner": "test-infrastructure",
+       "artifact_kind": "test",
+       "output_name": "zynum-public-surface-contract-tests",
+@@ -2334,7 +2334,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installArtifact",
+-      "source_digest": "86abcf7e622136a5cef499a4d790e03d9d5746c397baeb5dc4c63764b3a66984",
++      "source_digest": "907974436cd37bdb77aa8542a54b0e3fcc4500b3439f736b7e71ac98b83f61be",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:bench",
+       "source": "emitted artifact",
+@@ -2354,7 +2354,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installArtifact",
+-      "source_digest": "9358797409f63d508cfc125d8fbed21e9a6842314797aac2c6aab8610ffed836",
++      "source_digest": "732ecb4cc3b12b87e0329a78e89535da0a3eb5c5f121135a6f6f29873ef72e5c",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:dcopy_probe",
+       "source": "emitted artifact",
+@@ -2374,7 +2374,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installArtifact",
+-      "source_digest": "af1f9aaa64c24d4aa39a796283c86ad755da1a8567d593e30d2b116904e9fd91",
++      "source_digest": "6a331a191843db0f9d810ee7b1086b5294d393b886833bcd1e300be3e1086a17",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:gemm_sweep",
+       "source": "emitted artifact",
+@@ -2394,7 +2394,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installFile",
+-      "source_digest": "68a48077e4fd794165a21046be8423f6c6d185045286822f69a2e357352ba602",
++      "source_digest": "42bd935642edc60146b6ef8515fbf8b86a2430c9739c71d0376631ad21c9e0f1",
+       "owner": "build-composition",
+       "producer": "repository file",
+       "source": "include/zynum/blas/abi_manifest.json",
+@@ -2413,7 +2413,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installFile",
+-      "source_digest": "7940c5c538c989235fdb98bc1273c9bf13c754c87084cdecdc01fe8ea7b2e182",
++      "source_digest": "8a6fa95280fb850199b54180bc3414a67b4501ac4de84802b4095af5b38c0d49",
+       "owner": "build-composition",
+       "producer": "repository file",
+       "source": "include/zynum/blas/blas.f90",
+@@ -2432,7 +2432,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installFile",
+-      "source_digest": "bfd58444779fa13b2a2b7d6c1d6f79da293775f98956f2bbca4941451e9907a9",
++      "source_digest": "fc8ee8bc3a22d7575d15db53d47c167dc8fe03c721d8e1279ab5243ce7dd0f7d",
+       "owner": "build-composition",
+       "producer": "repository file",
+       "source": "include/zynum/blas/blas.h",
+@@ -2451,7 +2451,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installFile",
+-      "source_digest": "87c91ee1a7f492e420fb0ad558b65cff2473b8b8a4c2f16eb252667268cdd289",
++      "source_digest": "e99356970fdbad54517cedc80db9210dca7e5ee72e67701aae24c6e3d0a0bfb8",
+       "owner": "build-composition",
+       "producer": "repository file",
+       "source": "include/zynum/blas/cblas.h",
+@@ -2480,7 +2480,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addInstallArtifact",
+-      "source_digest": "2121d7d5e5ad673aa0454887a71ea769e475d00cd2787437ef2396fb004fcb17"
++      "source_digest": "751bedf69b6eff7771f3708a610a41229ff33e707db2af87222b399244443ad4"
+     },
+     {
+       "id": "install:build.zig:build:install_rank_k_probe",
+@@ -2492,7 +2492,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addInstallArtifact",
+-      "source_digest": "e0f17243e699b6cc6eacfac7ccf02ecf33c0887759dd3ef168a73fc11c1dde9e",
++      "source_digest": "a3369df03c553656ceeb23d039f0142aa2dcb121118138a5ab0502665c54858e",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:rank_k_probe",
+       "source": "emitted artifact",
+@@ -2512,7 +2512,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addInstallArtifact",
+-      "source_digest": "7e7953dc8cc592f0fe36af7411bbcff0bfa43e5ce33a6550f35af43c133c1d33",
++      "source_digest": "56c0da61a92fe8d13dfe00171d32ba045511242de1feca3c89befe2de7ad7721",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:rotg_latency_probe",
+       "source": "emitted artifact",
+@@ -2540,7 +2540,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addInstallArtifact",
+-      "source_digest": "04f14a9ba6c55dfc0ee5196fa87e2d66ece777581af4b304edb1576dd4771b3c"
++      "source_digest": "929607a7f85f4d279b15677044a59c74525c7e946c48d7f1dd509815009f87f4"
+     },
+     {
+       "id": "install:build.zig:build:install_symm_probe",
+@@ -2552,7 +2552,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addInstallArtifact",
+-      "source_digest": "faa8124b31acc24abb25f216d5213d7834dc75039041461d25331dcfa1c07418",
++      "source_digest": "7876e3757769ec8f4c235e8f79eb99ef308b85ba5a4960b1254f4f33b6892114",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:symm_probe",
+       "source": "emitted artifact",
+@@ -2572,7 +2572,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addInstallArtifact",
+-      "source_digest": "7c2e219fbaf4357d1e88e2974d62f8d58c1b9700ab44336afd430bb23358a0f8",
++      "source_digest": "3737c811b587f10c5ad3c9f0c454943f852a4b20d0b2762aa31d1b4bdd814884",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:triangular_matrix_probe",
+       "source": "emitted artifact",
+@@ -2592,7 +2592,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installArtifact",
+-      "source_digest": "09b2cb5e90d2129c65df2d38a592fd06cea07fb77f50c27a15804bdbdea50215",
++      "source_digest": "1a06bcdcc86b05bbd497e7ad3051731983ac4564698da6f1184e22f242a53bf9",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:level1_probe",
+       "source": "emitted artifact",
+@@ -2612,7 +2612,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installFile",
+-      "source_digest": "2d1b09051958df4540ae5c30592aaf5b165e4e99b48cf31510f780bb8b5bdd81",
++      "source_digest": "ea7bdbd14070f32a58be762b3cee8950eeba83b3ba22c3c863413d236160b87f",
+       "owner": "build-composition",
+       "producer": "repository file",
+       "source": "pkgconfig/zynum_blas.pc",
+@@ -2631,7 +2631,7 @@
+         "ordinal": 1
+       },
+       "call": "b.installArtifact",
+-      "source_digest": "a6be3657a7522977d1ea0ab51e0b4ce409f8279985f1b6514a89b9246442177d",
++      "source_digest": "6d97bf8d567a3a47ac6b36c871f2d1b913d95fe651f0b996e59ba2c2a2c7a137",
+       "owner": "build-composition",
+       "producer": "compile:build.zig:build:vector_matrix_sweep",
+       "source": "emitted artifact",
+@@ -2671,7 +2671,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "1b97c696b0fc0f8a3ab2ae4dd4fc0e989d42a2ec797eb0155ec13e480485dee6",
++      "source_digest": "cd75517d04dcbed42f539d8b37294d06d6d78e041ee9b8dff1a97a1e54b79152",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2696,7 +2696,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "45f903033a21fdf2e339951c49d6355e37ad5bc19ef3998f750b1e5eac355907",
++      "source_digest": "755a4a095bfe88d8f73ae3647051ef00958d191653d9c04897866dad9c4916fb",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2727,7 +2727,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "5dfeac9bf14b6eb159d57f157ef4b1f1bae012140145bbba340f1a2ece2a1f41",
++      "source_digest": "6a3a657f04f405a98542e1f69255a648ff6880ff66d0f493e950d1171fc35023",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2753,7 +2753,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "78aaaa6baedd1ac2e58d623c8e72d185bc9d3a9345b64bb2e9f491930713a0b1",
++      "source_digest": "595e7e0f8003293b429ede5162e7ee4fcf650afc82811402d750f2c8ddab356a",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2791,7 +2791,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "617faced0b6a57984137deb24a7e8c1f8e1bd5e1f8563689f6d3da12914dde82"
++      "source_digest": "b3330eb6337ea46946a4a4de51fcaf907de8fbe9a27e92c366d43a9a0a2ee613"
+     },
+     {
+       "id": "launch:build.zig:build:c_header_smoke_test",
+@@ -2803,7 +2803,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "d1fd6ba3e8ef0b2c07dad9708c8be532700fcd499f3b75d0c98e9c28615984ce",
++      "source_digest": "2b8dba20b1dd21602ae60db950c0a1282ac025d0832ea73419a7d50e92c4512f",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2832,7 +2832,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "e5db384ab8d4ccd7344251910b5a39171dcbb89b31b7b57dbacc46a930e78822",
++      "source_digest": "adf84986d91e7715694406af607808d766e057c8cd2ae0d844d931270ad075ed",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2861,7 +2861,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "c0091187c6f56ac633f75eed337bab0eec4b7d67f563b2beeb6d87827d04f84a",
++      "source_digest": "aa91051aabd60773264f20a606c6d9363131de46d9dc2653bf62012bb9953a99",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2890,7 +2890,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "647928cf3bd4fe4d0e918a66b113a167ceff2ea138a3947aa2cf2dfb14b73665",
++      "source_digest": "d388ca36454508540829dcecb4213b584c5496020f9c61a77be20f4aab9b4d08",
+       "owner": "build-composition",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -2913,7 +2913,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "73c890efcfbceaaffc64b3fd544489662113b7174735dc856c1d489d7139fc67",
++      "source_digest": "6732f39ba52e5bbf2ddffa558088d83a92530a43200aa0e4a06e28be6ca6da28",
+       "owner": "build-composition",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3034,7 +3034,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "b805776c5607db7a7a465183aa9ca5d2382edc74de83b9be3e9faaf1e236845c",
++      "source_digest": "e654ea68e97a5951ec02f4b067821c15626a951821b7fca80525116dd70fe2d5",
+       "windows_artifact_contract": {
+         "condition": "canonical native Windows x86_64 baseline target",
+         "emitted_artifact_id": "compile:build.zig:build:lib",
+@@ -3059,7 +3059,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "965dc77585068d6892bb9fee5916e027dfdba0b672c9301a3c6458401686d4c9",
++      "source_digest": "6ec62e9de6c1ac5facabd4c411a48d8d5ef53a958960856a00c3e413bc896df4",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3084,7 +3084,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "b55bbb64aff88793e57bb1ed0acc47912ddc70d20ff8a05c21b4ef172de65474",
++      "source_digest": "2b7c127bccdc9890ddbf91ed83a27d45383f71dc192aa81e86e5e6cf2de40714",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3110,7 +3110,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "2bc65ca99dde883847746303eca24b574d052ce1d80d9e95ba18728ab0288a3f",
++      "source_digest": "5d8fb5ad93629286c0cae85cb52602d0f2331ba909f7649bd979b28887449308",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3135,7 +3135,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "82729cd70400e13121ccf2dab8071b78c27a8796a5fefeb92ed18d6ced9a1dc3",
++      "source_digest": "ebd2bba7644139f20df0b5908d197db4aea41f6e447cd6d843bce9665207a867",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3160,7 +3160,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "ae615ee3aaf9e81950499093baa7fddb27fbb738742d2c85db8d1b0fe4bb90e3",
++      "source_digest": "7983391702bfad6574ce22024cbaa2b182ad7fee7b8aa58d5d7d24e1983aa7e0",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3185,7 +3185,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "99c0485cf57e26961ccb20ea72b95f4a9c7b6b27c04cb8ef7327edc0018aee6c",
++      "source_digest": "dca2545625c650c9746572827fbb61c16460c52bfbda6d2616cb6dda8a03fb74",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3210,7 +3210,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "dd8f2e51794b00dd699dc6be60e3b4b3e64304b7066f62abbf956e3c963a815a",
++      "source_digest": "56f252944c03db8e72c41390d0b5a5101bee29ca50dbe0d012da3e99986e33fd",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3235,7 +3235,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "a00f575e1daae382ddebd309f77fe9636111e6100b0990988e9cf63f670671c6",
++      "source_digest": "d4f31d5be987b0629777d3f7f3d2213fb334b971d1ca8847d3ad73c2a7977698",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3263,7 +3263,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "b89c881afb3244cfaaccd61d023adcb62781d632fe538c182a8ea9146610ad94",
++      "source_digest": "0c02b6e5e9e89fc04ca97f3c481d541fc3d6295df4d5abab9f790aae7ab0bc0e",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3299,7 +3299,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "a8f96b216fca2360365b856098965c0c73785b889d4c161a7d2fcd0dbc5f4eaa",
++      "source_digest": "56e1f41e2f575643b08196ec2e2e266fc2865b7390c36771bcfc80b697fd0ba5",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3343,7 +3343,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "4d2b8af495d671c535e1d4d4658a35a2b3e5d66125caf0eab370a3cd183488ad",
++      "source_digest": "7efbfc65ad41569025a96ceef9850657398ca3dbcceab82e4a00d189b5368fe9",
+       "launch_role": "test-inventory-enumerator-factory-run",
+       "source_factory": "compile:build.zig:build:inventory_tests",
+       "argument_contract": {
+@@ -3398,7 +3398,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "505382da6c3b35e29b3a3c1125ef543220adbfa1072c8167d774090dcf618df0",
++      "source_digest": "139f03842ae72ffa5eb3a4491a1a996339ecfd180728e8a461de25bc66e49444",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3423,7 +3423,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "eef9e9d89d387744beeeecd79ac5c71e49c2585508166b23b9928e2cef754a39",
++      "source_digest": "38f77163b1e1315f6f77b9587711ba9e0b44c8933cbf90b03c283e0d9377e387",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3448,7 +3448,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "4b7012679f8908d39e09f08cdf33e6a8cc27450e943da8d096c800b9938fd824",
++      "source_digest": "c625cc64d9c63f5a27beaa33700acd32d0e263d140a40e399f4125a3c1652306",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3482,7 +3482,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "08713d4728def3e874f00b348fe3f6a5ee520417bf4af7528440be799e8fa738"
++      "source_digest": "6e7719383aa4c45a14456fd3e4c2915a433fe39c5581a4eda8dd0f3f0ef35861"
+     },
+     {
+       "id": "launch:build.zig:build:run_modern_tests",
+@@ -3494,7 +3494,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "0661b2ba70daab4c0f0217cb75dbb98605d07104792a286f67ad23fe684973d9",
++      "source_digest": "1ff1c8dfcfe2057bd37396ea632e4d8c8942a613c609071988f8fa19e69068c1",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3528,7 +3528,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "a3427f4555a4c22442f0044bcf99e17ed6fc187e44c1a41d60c2a66c76706f19",
++      "source_digest": "19ad4dc70365f91f5877a5801f7f4e1b6e90b7c19ad9d773ddba870146368b5a",
+       "launch_role": "native-feature-correctness-only",
+       "source_compile_relation": "same-logical-test-compile-and-root-module-pointer",
+       "expansion_cases": [
+@@ -3655,7 +3655,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "8fca0be1c67a7e21645353d094638c7212a2c323fee5c1bdee02c13ad7ba40f4",
++      "source_digest": "3145912f7cdc25c2e322d1b6fb4e29aee2f96205ad0ff9af9d551b56aa894217",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3690,7 +3690,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "08713d4728def3e874f00b348fe3f6a5ee520417bf4af7528440be799e8fa738"
++      "source_digest": "6e7719383aa4c45a14456fd3e4c2915a433fe39c5581a4eda8dd0f3f0ef35861"
+     },
+     {
+       "id": "launch:build.zig:build:run_rank_k_report",
+@@ -3702,7 +3702,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "7bb89948e3949da9d418ab683f17e53078c092440013518dbb87af6808053def",
++      "source_digest": "1d045ef557e428ad48de0db76771d887046c8c5547e2b6edc2c16a3765f184ba",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3735,7 +3735,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "e5ee81bf9c2d8b40bc427d1fd40415b627c242fe79acd94309c2ff0a843df7b1",
++      "source_digest": "df6e0a1f7a622c6facde63b7db9bf6700d1ce2808b7a3996b84a5248513bdad2",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3768,7 +3768,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "79f82196540b48298616ffc8c4d1f510b62c2a61c7aa1342745dcd917814864b",
++      "source_digest": "0280b55d03cc174fa601f13b0d5b752ce5b6ccb7a0d4d4edab575cb523935715",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3793,7 +3793,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "236d1b76766a05a13530a2fb6b6ec5f101b550aad3150ec08b219ec6358cb3fb",
++      "source_digest": "4c7ade25526aa62a6d41d6c700da1d08d7865e6b36c5c82b8f2fa6700fed9f50",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3818,7 +3818,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "0f7569e652b5d5bdefc62c9375bfa9f6f5747862aab2f095a2244674be17ddba",
++      "source_digest": "10c433595cd7ea4b3409fe180bd98270a8e7e37c255c0e639f18ce20e68a5557",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3851,7 +3851,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "bc9f802dc7956dc266b295387c981944002d802b77c1849ce6b5f51fd7a7fac0",
++      "source_digest": "90a6e1114efffb01aa136ab1816d563efbc8cb6b3c7e8b8699f5a42ca6f55d48",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3876,7 +3876,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "0db17f29337e45f392fa4b6a31a3e22082fc65ec00e5ddf002f00f1557af222b",
++      "source_digest": "cac4deace93325f18e23e781dff21802d931d342844cdc3e5826bf8e63ac3961",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3901,7 +3901,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "b7b7a94e64f932d76ebd77748f518a59dd2534f1ae365f087da3ccd4e050dbec",
++      "source_digest": "be00f3bd4b593b07e83c17dc133076548e5e4e1811578c4e1f765843ae3aa3b4",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3926,7 +3926,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "4d275f600031f2c035ce8f20a0034edabb5254036cb12f6069d5a7d31975f5b0",
++      "source_digest": "3c1a82aba61219f600692eaf87b6c17c85b0f76cee2870d86d2ee9c0750ec036",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3959,7 +3959,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "aa7b4558ff7900d4baec57156b1752c18b0640df7b07d0a392dc2fa1b00767ae",
++      "source_digest": "63351c2734bb40025220dab73272de0e97b28537781fc0c936eae7d20fee6883",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -3984,7 +3984,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "72e2b471321fc177f77be5fb1690dcf12975a4fab34d11cf0491cec54fc3b438",
++      "source_digest": "d79a40b791c8d269eee134157931edd3bef32bf0278c2587b0ba2cd770d97e6d",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -4009,7 +4009,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "c51f07d583aea85a7b6d79a9fe0b3435d7729e7f11131c6e4ff2ea6fe3be228d",
++      "source_digest": "7668a1b380d7b2a6f6fd4e575210328bdd61f30ee7803ce11434766f7ef667d1",
+       "owner": "benchmark-maintainers",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -4035,7 +4035,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "d3a9daad93d2c25b6eebc334e80d2e9091ac8cc3884f67c2d2c93fb7f2952f95",
++      "source_digest": "ff5d545b60a1aa4acdbea3ce83bb9234708e5a20074b1556d6ad5f2305c7d29c",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -4060,7 +4060,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addRunArtifact",
+-      "source_digest": "ae1417ffd2ef725649285e016a521f81c08058fbdc7c483c87be03b6a877b78c",
++      "source_digest": "2029989132349286009ed5d073006614e18132389ed2af98d14333018fd0e634",
+       "owner": "test-infrastructure",
+       "detail_status": "process-lifecycle-out-of-scope",
+       "cwd_shape": "repository-root",
+@@ -4098,7 +4098,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "a7b594ada5d694f9b8cb006b9d2f6e1c6228a4cf49bc76e724a33f46cb447c1d"
++      "source_digest": "5e84b4d956776d27f6bccd7b8d633577770f15d91a422f3033099bdbed9c222d"
+     },
+     {
+       "owner": "test-infrastructure",
+@@ -4126,7 +4126,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addSystemCommand",
+-      "source_digest": "fb52d0ac7ebd708ce7a3c059cabf93f0fcb795eecdda4514492b5000c3c86830"
++      "source_digest": "ce12f1fd6834d054625ac4b9e09eebc2f0333b2f39c80811e18e11007a7dac38"
+     },
+     {
+       "id": "launch:examples/zig/build.zig:build:run",
+@@ -4161,7 +4161,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "b177e68a21e97e15c119ae43a95427fb1645b5c8e7bcf162bd60980615bc5157",
++      "source_digest": "a176f5e78c66ec639c433986bae09905ea043bad65ccbb381116c7f0f6214ed1",
+       "owner": "build-composition",
+       "consumer": "blas_compat_mod",
+       "provider": "compact_triangular_isolated_library",
+@@ -4178,7 +4178,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "1517f3f031f054446b09e0302027b81322e7c5ff0276bc62ee061701b0325e0b",
++      "source_digest": "1c650563028291169e32c412dfad152c836157a0b3c2e4981f9d897eae8ac64d",
+       "owner": "build-composition",
+       "consumer": "blas_compat_mod",
+       "provider": "level2_width_isolated_library",
+@@ -4195,7 +4195,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "cccd43c5cc666a8155089e96a5da7bdda1b043a84294f11252072f58a47d2e53",
++      "source_digest": "92029dd6785fe67d5b6a2aae58342c09121da3a17ea134c530fd5ca4372c5234",
+       "owner": "build-composition",
+       "consumer": "blas_compat_mod",
+       "provider": "stride2_isolated_library",
+@@ -4212,7 +4212,7 @@
+         "ordinal": 4
+       },
+       "call": "linkLibrary",
+-      "source_digest": "56c57ebc13863c6e3ddf568b9a0abb7248c985af744c6876ca4b46fded732274",
++      "source_digest": "7570bae5b99cfa32fa5b8188e26ab1d0f683647d210337cf5632b27cd79dcb7f",
+       "owner": "build-composition",
+       "consumer": "blas_compat_mod",
+       "provider": "structured_isolated_library",
+@@ -4229,7 +4229,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "ed33d8760c15f979a3ea0caea51a06738f8fa5af031aebd49b28abf964b5bd37",
++      "source_digest": "cf0e0ad50b1971c1e4bb3aa784beaeec153b66a5d0ad50954fde6cdfe98836b5",
+       "owner": "build-composition",
+       "consumer": "cblas_compat_test_mod",
+       "provider": "compact_triangular_isolated_test_library",
+@@ -4246,7 +4246,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "6e569fd0f647c573fb412625c92c941605daede0453e4cc690b9a5bc60bedb21",
++      "source_digest": "c18d789f63186287a98302104363ec686575f38c17158e5ac68ffa107fbc2ec8",
+       "owner": "build-composition",
+       "consumer": "cblas_compat_test_mod",
+       "provider": "level2_width_isolated_test_library",
+@@ -4263,7 +4263,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "2f315d437b786678ba5939632eacf17d808194f5375eec7cbfe40fd9f61ed330",
++      "source_digest": "70e268a30b5a504d22183bbdf6cf588f5de21acda984cdfdbaa8f52b1fa9e1a5",
+       "owner": "build-composition",
+       "consumer": "cblas_compat_test_mod",
+       "provider": "stride2_isolated_test_library",
+@@ -4280,7 +4280,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "ed33d8760c15f979a3ea0caea51a06738f8fa5af031aebd49b28abf964b5bd37",
++      "source_digest": "cf0e0ad50b1971c1e4bb3aa784beaeec153b66a5d0ad50954fde6cdfe98836b5",
+       "owner": "build-composition",
+       "consumer": "fortran_compat_test_mod",
+       "provider": "compact_triangular_isolated_test_library",
+@@ -4297,7 +4297,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "6e569fd0f647c573fb412625c92c941605daede0453e4cc690b9a5bc60bedb21",
++      "source_digest": "c18d789f63186287a98302104363ec686575f38c17158e5ac68ffa107fbc2ec8",
+       "owner": "build-composition",
+       "consumer": "fortran_compat_test_mod",
+       "provider": "level2_width_isolated_test_library",
+@@ -4314,7 +4314,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "2f315d437b786678ba5939632eacf17d808194f5375eec7cbfe40fd9f61ed330",
++      "source_digest": "70e268a30b5a504d22183bbdf6cf588f5de21acda984cdfdbaa8f52b1fa9e1a5",
+       "owner": "build-composition",
+       "consumer": "fortran_compat_test_mod",
+       "provider": "stride2_isolated_test_library",
+@@ -4335,7 +4335,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "913550de6c46bd31cc244902ccc881e44e504d9eed8882ffcfd0b130077373c1",
++      "source_digest": "95a45721cdc612ee67909a270d8d32ecb931448b6d5009cd8e4ab6a9f6a9d84b",
+       "guard_digest": "4d98ade8a82af2d69f5f1a9f1c8c71ac0642b424e6a4c18b6dbb6bd1083b037d"
+     },
+     {
+@@ -4352,7 +4352,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "913550de6c46bd31cc244902ccc881e44e504d9eed8882ffcfd0b130077373c1",
++      "source_digest": "95a45721cdc612ee67909a270d8d32ecb931448b6d5009cd8e4ab6a9f6a9d84b",
+       "guard_digest": "51ff76100f72393eb4e305048cec26ec86ca3fe038620770989e294b3935bb39"
+     },
+     {
+@@ -4365,7 +4365,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "b5c1a185666bdb5045c0b722d6d3c478da8e651d2a616153f8f2cbe38fdf1c02",
++      "source_digest": "2524ecfd3360b84c03d63324f523669f9f4d68a1ee2bb2ad45575bfcf929dc58",
+       "owner": "build-composition",
+       "consumer": "structured_object_test_mod",
+       "provider": "structured_isolated_test_library",
+@@ -4382,7 +4382,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "ed33d8760c15f979a3ea0caea51a06738f8fa5af031aebd49b28abf964b5bd37",
++      "source_digest": "cf0e0ad50b1971c1e4bb3aa784beaeec153b66a5d0ad50954fde6cdfe98836b5",
+       "owner": "build-composition",
+       "consumer": "triangular_band_solve_test_mod",
+       "provider": "compact_triangular_isolated_test_library",
+@@ -4399,7 +4399,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "ed33d8760c15f979a3ea0caea51a06738f8fa5af031aebd49b28abf964b5bd37",
++      "source_digest": "cf0e0ad50b1971c1e4bb3aa784beaeec153b66a5d0ad50954fde6cdfe98836b5",
+       "owner": "build-composition",
+       "consumer": "triangular_packed_unit_test_mod",
+       "provider": "compact_triangular_isolated_test_library",
+@@ -4416,7 +4416,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "2f315d437b786678ba5939632eacf17d808194f5375eec7cbfe40fd9f61ed330",
++      "source_digest": "70e268a30b5a504d22183bbdf6cf588f5de21acda984cdfdbaa8f52b1fa9e1a5",
+       "owner": "build-composition",
+       "consumer": "vector_stride2_parallel_test_mod",
+       "provider": "stride2_isolated_test_library",
+@@ -4433,7 +4433,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "b177e68a21e97e15c119ae43a95427fb1645b5c8e7bcf162bd60980615bc5157",
++      "source_digest": "a176f5e78c66ec639c433986bae09905ea043bad65ccbb381116c7f0f6214ed1",
+       "owner": "build-composition",
+       "consumer": "zynum_blas_mod",
+       "provider": "compact_triangular_isolated_library",
+@@ -4450,7 +4450,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "1517f3f031f054446b09e0302027b81322e7c5ff0276bc62ee061701b0325e0b",
++      "source_digest": "1c650563028291169e32c412dfad152c836157a0b3c2e4981f9d897eae8ac64d",
+       "owner": "build-composition",
+       "consumer": "zynum_blas_mod",
+       "provider": "level2_width_isolated_library",
+@@ -4467,7 +4467,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "cccd43c5cc666a8155089e96a5da7bdda1b043a84294f11252072f58a47d2e53",
++      "source_digest": "92029dd6785fe67d5b6a2aae58342c09121da3a17ea134c530fd5ca4372c5234",
+       "owner": "build-composition",
+       "consumer": "zynum_blas_mod",
+       "provider": "stride2_isolated_library",
+@@ -4484,7 +4484,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "ed33d8760c15f979a3ea0caea51a06738f8fa5af031aebd49b28abf964b5bd37",
++      "source_digest": "cf0e0ad50b1971c1e4bb3aa784beaeec153b66a5d0ad50954fde6cdfe98836b5",
+       "owner": "build-composition",
+       "consumer": "zynum_blas_test_mod",
+       "provider": "compact_triangular_isolated_test_library",
+@@ -4501,7 +4501,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "6e569fd0f647c573fb412625c92c941605daede0453e4cc690b9a5bc60bedb21",
++      "source_digest": "c18d789f63186287a98302104363ec686575f38c17158e5ac68ffa107fbc2ec8",
+       "owner": "build-composition",
+       "consumer": "zynum_blas_test_mod",
+       "provider": "level2_width_isolated_test_library",
+@@ -4518,7 +4518,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "2f315d437b786678ba5939632eacf17d808194f5375eec7cbfe40fd9f61ed330",
++      "source_digest": "70e268a30b5a504d22183bbdf6cf588f5de21acda984cdfdbaa8f52b1fa9e1a5",
+       "owner": "build-composition",
+       "consumer": "zynum_blas_test_mod",
+       "provider": "stride2_isolated_test_library",
+@@ -4535,7 +4535,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "b177e68a21e97e15c119ae43a95427fb1645b5c8e7bcf162bd60980615bc5157",
++      "source_digest": "a176f5e78c66ec639c433986bae09905ea043bad65ccbb381116c7f0f6214ed1",
+       "owner": "build-composition",
+       "consumer": "zynum_mod",
+       "provider": "compact_triangular_isolated_library",
+@@ -4552,7 +4552,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "1517f3f031f054446b09e0302027b81322e7c5ff0276bc62ee061701b0325e0b",
++      "source_digest": "1c650563028291169e32c412dfad152c836157a0b3c2e4981f9d897eae8ac64d",
+       "owner": "build-composition",
+       "consumer": "zynum_mod",
+       "provider": "level2_width_isolated_library",
+@@ -4569,7 +4569,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "cccd43c5cc666a8155089e96a5da7bdda1b043a84294f11252072f58a47d2e53",
++      "source_digest": "92029dd6785fe67d5b6a2aae58342c09121da3a17ea134c530fd5ca4372c5234",
+       "owner": "build-composition",
+       "consumer": "zynum_mod",
+       "provider": "stride2_isolated_library",
+@@ -4586,7 +4586,7 @@
+         "ordinal": 2
+       },
+       "call": "linkLibrary",
+-      "source_digest": "ed33d8760c15f979a3ea0caea51a06738f8fa5af031aebd49b28abf964b5bd37",
++      "source_digest": "cf0e0ad50b1971c1e4bb3aa784beaeec153b66a5d0ad50954fde6cdfe98836b5",
+       "owner": "build-composition",
+       "consumer": "zynum_test_mod",
+       "provider": "compact_triangular_isolated_test_library",
+@@ -4603,7 +4603,7 @@
+         "ordinal": 3
+       },
+       "call": "linkLibrary",
+-      "source_digest": "6e569fd0f647c573fb412625c92c941605daede0453e4cc690b9a5bc60bedb21",
++      "source_digest": "c18d789f63186287a98302104363ec686575f38c17158e5ac68ffa107fbc2ec8",
+       "owner": "build-composition",
+       "consumer": "zynum_test_mod",
+       "provider": "level2_width_isolated_test_library",
+@@ -4620,7 +4620,7 @@
+         "ordinal": 1
+       },
+       "call": "linkLibrary",
+-      "source_digest": "2f315d437b786678ba5939632eacf17d808194f5375eec7cbfe40fd9f61ed330",
++      "source_digest": "70e268a30b5a504d22183bbdf6cf588f5de21acda984cdfdbaa8f52b1fa9e1a5",
+       "owner": "build-composition",
+       "consumer": "zynum_test_mod",
+       "provider": "stride2_isolated_test_library",
+@@ -4639,7 +4639,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "54745deb41561e991edded85c51cc5ad22f41fb4ba82ae858367a0ccb43bcca9"
++      "source_digest": "a47d492d50bb29cd4b46be391bf9f8159260f63eb8abed6b139d8707b4d4a7a9"
+     },
+     {
+       "id": "option:build.zig:build:bench-accelerate",
+@@ -4651,7 +4651,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "fce0456b0be94e401a31c5a0fa878de57f5c5be1cd925dd15586a0d4a0acf701",
++      "source_digest": "a2fdf2d93e50f3d4c4b8dde574cc6e2543cfc55dd35f2fa37aecadb5ba4e66e7",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4665,7 +4665,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "866b5f67a1ddafc63966f31e2b528175602573293e3a049527d579a2aa584915",
++      "source_digest": "c84b6c366a38f64cde42cedb217a58c3e984958dc655a980c6871c878b0aa4f4",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4679,7 +4679,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "e6bfb23af64bf56285896964febe19c9e1c818d147a2fc5d323cdd5ebb342afa",
++      "source_digest": "1657e27cef8ca0c05d0f470dccd3c7ef6177af3e728ab13d66f48087dc3a6a9f",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4693,7 +4693,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "62074438b44348e6757f178eeb3f47ab711c3e1481eed821ded8c0c2c90f1c2d",
++      "source_digest": "eea023b25cd87332b5061fac8d56b23386c57ba63fc11d6d832bfc450902e48f",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4707,7 +4707,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "9ffa8e7fac0febc2ecdd1f0a3992126b02fbf83b2808bfd1da291883791533f0",
++      "source_digest": "6b7a5254e36aceb53b8f7f843c46ed57f60458df650e5c7ee777924272949b12",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4721,7 +4721,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "2b2a38bb4869a4bd83431c19c8bdc4fca8cdee6cc3a92b43d136a35e479562f6",
++      "source_digest": "02eb3102fdc2f605af78361cd8dd28da07d1be994d8690cd311c106738936a59",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4735,7 +4735,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "ac606a9490cb4ec09f8e813644060d11c6a49243efa42eb32cdbe3d8bcdebc97",
++      "source_digest": "9371a32e93b9251fff49bed34300366c13622006b1131d961d37da78e1399e08",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4749,7 +4749,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "36cff1273d04a2b237f42cb17a9f664c7b050ee21514d5b6ffac0a6a52f66804",
++      "source_digest": "13b2d32368221ff250486a481ff78c883839a40ac620a639d976b739b98e8254",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4763,7 +4763,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "a6f560cfaccd00153aec673ce2c14c5cf64b09cf8bed06af3f23e3fe521e471a",
++      "source_digest": "3e1d7bda33b5f512121e556b55818a39b05b7bdb9ed82e6a98de2c6324db68f2",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4777,7 +4777,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "c2a055285bc5caa36d422cb125f191b939b2f92580569d8a66ea67b4179a5f9b",
++      "source_digest": "5625bf774b089a0347a0664163c59cb4f499f013f64e7e94eaca2531a0e3c5d7",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4791,7 +4791,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "db53448694f28b08fe97e5bd29d26b7aa5df04f69e93c781298531af5c6761a9",
++      "source_digest": "ab6118d5ea855bf40be7f87731f0da1b47643592ec022578dd5d59cc2a1926e1",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4805,7 +4805,7 @@
+         "ordinal": 1
+       },
+       "call": "b.standardOptimizeOption",
+-      "source_digest": "efc9673e1f5f972c498cb0d03ced5ddd9f51878d29cea21a886a0f217828b868",
++      "source_digest": "f98fc554470ce3486f758b49297a9b23b2f7fc2f58bc3c7ad740e75a360203f2",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4819,7 +4819,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "31c07171fb9a40531304c1e8bee045f4f81c31ba78cd5056bcafd91db84d314b",
++      "source_digest": "27b3e5a0256d25eb9a9695267bf5cb3dceef16e005d493792151ba1bba2e7865",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4833,7 +4833,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "2398a30b427ea11e84c6470828fdf4b9e19fb6bb21649c42a737fd5def1e094c",
++      "source_digest": "d8b59e6bc5744a19d950c224ef9158a5e70b8c2cc11ced0cd58fe03797bd7a85",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4849,7 +4849,7 @@
+         "ordinal": 1
+       },
+       "call": "b.standardTargetOptionsQueryOnly",
+-      "source_digest": "396a74b293b1156247e2a9e100bab92679161c2f20f43a5b8cbff35c1b39d712"
++      "source_digest": "a53c70c980b8bfba3ff4e3e783f8591b86242541e20c3b50d3ec70b563d0cc44"
+     },
+     {
+       "id": "option:build.zig:build:test-optimize",
+@@ -4861,7 +4861,7 @@
+         "ordinal": 1
+       },
+       "call": "b.option",
+-      "source_digest": "ce1356177181fb3bf3c1795ccfdaed52d107277ae4b0055a4212c1d3c9d61d3a",
++      "source_digest": "6d77ad0b46cf21a0e76c78e57ba7b52eb6cebfb70bb59b79bbc0014a3549213e",
+       "owner": "build-composition",
+       "observation_role": "source declaration for option surfaces"
+     },
+@@ -4903,7 +4903,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "feed9f5a8ffad06bbe884c5f31dcd18d6e00e811728e5c238d84800322e5d43c",
++      "source_digest": "3386c79c14c9f1df5e984257521324b5b55632563e4c19df4708b2db38d6b971",
+       "owner": "build-composition",
+       "description": "Benchmark Zynum BLAS against Accelerate and OpenBLAS",
+       "direct_dependencies": [
+@@ -4928,7 +4928,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "cfce100c8b51ce1811a6bd9a876b71cf328324f88ed389d4ada794ccbd4b38f8",
++      "source_digest": "e5fd6c7cd17ffb257b352e0707daf9386bb452d85956f897c903b87ac2029731",
+       "owner": "build-composition",
+       "description": "Sweep GEMM shapes and write CSV results",
+       "direct_dependencies": [
+@@ -4953,7 +4953,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "ab54322cab20bc8d83d8413553d2f30a16ad469ec6ecdcd81bb6df458b4808a6",
++      "source_digest": "bc5c8bfb4e0ed15e7450d6db940091799e6da61e61597c7469e572b6c90bd42b",
+       "owner": "build-composition",
+       "description": "Run reportable fresh-process GEMM sweep with correctness checks",
+       "direct_dependencies": [
+@@ -4978,7 +4978,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "f5469fe998eb54cf7e9a9aa3ecb8d35bfbb6dcb29b633395a963892cbcdeb2a4",
++      "source_digest": "3a980fd9fa2f7979f7d9e938bd7e3537043d5515149311e78afe2857541b2541",
+       "owner": "build-composition",
+       "description": "Run the opt-in fresh-process SYRK/HERK comparator report",
+       "direct_dependencies": [
+@@ -5003,7 +5003,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "b3e46257a653395bb34e2b264d41f84de4c8600389b4c825a90de6842879a78f",
++      "source_digest": "dba5e1de7e7152f9f88dd673d5820e4af520f9d993797170b397befccf577dbe",
+       "owner": "build-composition",
+       "description": "Run the opt-in fresh-process ROTG/ROTMG latency report",
+       "direct_dependencies": [
+@@ -5028,7 +5028,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "1282985ec80717cb6b0028e6a17ce1c61e4a523d461ba8710733085acd1b649b",
++      "source_digest": "8ce23ef1ea2cb1c0fcb94d25800351a485261754df7f56ef7c87d79c7205187c",
+       "owner": "build-composition",
+       "description": "Run the opt-in fresh-process SYMM/HEMM comparator report",
+       "direct_dependencies": [
+@@ -5053,7 +5053,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "f7b6418a13b5abffd39e54a96fbdfdbe4f9df15f13404500910a24fd7947dfd2",
++      "source_digest": "56e29646ec548bb6eaee2ce88c3e96ecb9ebb7f55d7619b5a520451009d7c5b0",
+       "owner": "build-composition",
+       "description": "Run the opt-in fresh-process TRMM/TRSM comparator report",
+       "direct_dependencies": [
+@@ -5078,7 +5078,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "b83875d539689405b117405bb6ea6504aa5a760cbad1cbb0fccacdbb7d578e70",
++      "source_digest": "8e89b3a3b1d86ad4bd7fcfa9158848d18c32a7729f36ca00c86bab6238831327",
+       "owner": "build-composition",
+       "description": "Sweep representative BLAS Level 1/2 kernels",
+       "direct_dependencies": [
+@@ -5120,7 +5120,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "f9576bf24283a5406e7b99f41a10e952d2cbfd0e776dbc24df2b1f96fef1f4b6"
++      "source_digest": "d8f17c226d7cbbab17406712b640a7f4fec11b30b363885fec2693fb9a640208"
+     },
+     {
+       "id": "step:build.zig:build:build-rank-k-probe",
+@@ -5132,7 +5132,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "ab7f6b169725139ad07e1dfe993efb36cbda3da5d921a79f0a7df2b572db10c1",
++      "source_digest": "4c53449e6bd0c3479b65ca8f2062a17ed00279e44e9581cc79207fc41bb2fd49",
+       "owner": "build-composition",
+       "description": "Build the opt-in Level 3 rank-k probe",
+       "direct_dependencies": [
+@@ -5157,7 +5157,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "22e711cdfa0e5a4460e69316630058387ba87b685ddf77eb92bb75c3a9ed9d6a",
++      "source_digest": "19e46f176cd41cd87f88223f2fd9d9e810fcb78a4de4155dc3a9db7e141de00e",
+       "owner": "build-composition",
+       "description": "Build the opt-in Level 1 ROTG/ROTMG latency probe",
+       "direct_dependencies": [
+@@ -5182,7 +5182,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "c7530fa93408d9fafced4d747ad6fad23a4e123b3fec51feeae542c7f87c544f",
++      "source_digest": "78c1c246f0037f9b97016502e60100b94fba52c7e18f85f2a361377ce2c180ee",
+       "owner": "build-composition",
+       "description": "Build the opt-in Level 3 SYMM/HEMM probe",
+       "direct_dependencies": [
+@@ -5207,7 +5207,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "960afb0b63c0b09cc6b09f810d4f46625c73cef15a483c0053a373e07d007ceb",
++      "source_digest": "d1ca8a34de308ed095d479dd769b6ff038f328a73ac6dff1fe281e6b75199ac0",
+       "owner": "build-composition",
+       "description": "Build the opt-in Level 3 TRMM/TRSM probe",
+       "direct_dependencies": [
+@@ -5232,7 +5232,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "962723134dc3eb7fcbf1b39f81c00437df12a1f0bcd7df07c55879403fe7e0dc",
++      "source_digest": "557716e4fac9fe8f3b2a39fdf7069fe76b6844a2996f2a9710aa83cf199415c8",
+       "owner": "build-composition",
+       "description": "Regenerate Zynum BLAS CBLAS and BLAS/Fortran compatibility headers/modules",
+       "direct_dependencies": [
+@@ -5257,7 +5257,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "03a29282686566ae677ad8289c3bb6ea9537692e6cba56d74ae97856e5db875d",
++      "source_digest": "d325309db90ea72af2f4ea1ab1f35d963ff420f8618f235baf7ec01bf4a86892",
+       "owner": "build-composition",
+       "description": "Regenerate the normalized BLAS kernel coverage artifact",
+       "direct_dependencies": [
+@@ -5368,7 +5368,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "68de7693fa4d22d46bec54a3a111ffdb4e9309affa8eb45f20bd0475674d2005"
++      "source_digest": "84d68bc4cf53d063a1b09873a56f1b670a271208d40ca85cbebd59d12e2d0e47"
+     },
+     {
+       "id": "step:build.zig:build:test",
+@@ -5380,7 +5380,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "c1bb3fa614029fbf7a2839f81a1e39ea58cef0dee5f333442590b365828678ad",
++      "source_digest": "b83d00558a7f49146f2fef458efbe933c55a62abfec1a7d379aa40550dabeb86",
+       "owner": "build-composition",
+       "description": "Run correctness tests",
+       "direct_dependencies": [
+@@ -5493,7 +5493,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "eeb924844f4aa68cfe97bbaad4cefabc5b0ec0456774d554438c0630e412e509",
++      "source_digest": "f90211cda12c17e3456e8596a6367016757f1b7a8644d2edbb9138e0271a1544",
+       "owner": "build-composition",
+       "description": "Run fresh-artifact parity parser and verifier tests",
+       "direct_dependencies": [
+@@ -5518,7 +5518,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "fd0fe6a70ad1c93207036185f28caaf7f20f14e10fa99743ab082f5d4c8758fe",
++      "source_digest": "7474ae253a63fe250696f5da9b9e9f2cc8365e64db153794fa77d26690ed594a",
+       "owner": "build-composition",
+       "description": "Run whole-artifact ABI baseline observer tests",
+       "direct_dependencies": [
+@@ -5543,7 +5543,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "09cbda8351bf0d7c633dad933a8f863bc112b3a66d093b50f2895bdb2cacd989",
++      "source_digest": "37c9f41998765303fe0ef455164f728011117a9b63e72d1214ec0c22a62a9494",
+       "owner": "build-composition",
+       "description": "Validate the repository build and launch inventory",
+       "direct_dependencies": [
+@@ -5581,7 +5581,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "1b1d0197153321689a670b506ea79de59c3443bcb26eda5fd061aaebe3e25848"
++      "source_digest": "78f6ffaf87fe7bdf36cace402ca4d96198c86fd16b7afbb679f3aa251941154e"
+     },
+     {
+       "id": "step:build.zig:build:test-gemm-registry",
+@@ -5593,7 +5593,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "f17ddc6281c89d306230b78808071eeb88dbe20dd389180bf76166ef967994ab",
++      "source_digest": "c65aedca266986a8b20f699de3fe3de37073b7c5f9cad3b31e10a5df6376b3a3",
+       "owner": "build-composition",
+       "description": "Run real GEMM registry and forced-path correctness tests",
+       "direct_dependencies": [
+@@ -5659,7 +5659,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "d944da03b40a5402e78bbbcfe2531468af5c145ccc242a352b7055a31ea9cbdc"
++      "source_digest": "482543880f637efa44349f079ddc71ed4da8597b34eb64a6d515ab72d04fab84"
+     },
+     {
+       "owner": "build-composition",
+@@ -5677,7 +5677,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "651abacd8083e9f56635902ef7994ba6160568bf002f97dd28f0ade2d6bb64b1",
++      "source_digest": "a143858f04a7a2524394a3ac505f2edcba1e378bedbaff4f4bfa933c80256b05",
+       "step_role": "test-inventory-enumerator-run",
+       "direct_dependencies": [
+         {
+@@ -5843,7 +5843,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "f60639ba4d3c523433737eb264092012f3edcd72d3e06098e77621e68d48f290",
++      "source_digest": "bacd1de1aa2b542b2b2a2ca87122b68c22caa660e88656dd1e8fe0518808fda4",
+       "step_role": "test-inventory-enumerator-link",
+       "direct_dependencies": [
+         {
+@@ -5876,7 +5876,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "b1469e57f50bc3aae554c5975a0803c74d083f96dec95ec23c726a31a0f0f2df",
++      "source_digest": "1bac4599f38753589c6fa552df68f9953347bf273100d8fdce88a85da2132ef0",
+       "step_role": "windows-native-test-inventory-compile-link-smoke",
+       "direct_dependencies": [
+         {
+@@ -5905,7 +5905,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "4d30269448e33f4ebd9975ae5695164bc2f9b3e99c376ab382594abc795d322e",
++      "source_digest": "e13cc4bb120e17d19c490b8deafdce3b22e14426b4966ec553a09d228ac13ec5",
+       "owner": "build-composition",
+       "description": "Run Level 1 registry and forced-path correctness tests",
+       "direct_dependencies": [
+@@ -5930,7 +5930,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "1a7478f198eed1f46074133c7df82e341b6ccdbc697e7250c0f89ab39be4b743",
++      "source_digest": "e4fda0117dc737ef557d6867a76e8ee3057f053ab1877e94323b76cd2c8b62ab",
+       "owner": "build-composition",
+       "description": "Run isolated Level 1 stride-two bridge tests",
+       "direct_dependencies": [
+@@ -5955,7 +5955,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "31867e52df9fe7d403f3b8beae0fcc9185e785bc8a5ef68f8e67a148675e0ea5",
++      "source_digest": "f35bae841955513c2286a6e2d678956ea46c0c511e660a200627eb83d500435f",
+       "owner": "build-composition",
+       "description": "Run compact packed/banded registry and forced-path tests",
+       "direct_dependencies": [
+@@ -5996,7 +5996,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "d52485e0f586b5ae37b649b0e790aac1b63b1499a48a3c28bd8683ddb3037388",
++      "source_digest": "b35d5be7aab140de675d91e867064fbc1bc203dd9156983acf9b3712a27494b7",
+       "owner": "build-composition",
+       "description": "Run Level 2 fused-body registry and forced-path tests",
+       "direct_dependencies": [
+@@ -6034,7 +6034,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "2690640aa901cae10c1bce8dacb0e146b0db8dcfc37b7241c5e780fd02a0e088"
++      "source_digest": "a4065924e9e3458a0318108643bf9e20f33ffad387f0af6713e51a9d7dddb463"
+     },
+     {
+       "owner": "build-composition",
+@@ -6063,7 +6063,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "d5c726c6f3faf9328a1ffb924e4f5f4680df993c5aba6b1f3b7328c8a2fd5699"
++      "source_digest": "5453cea5046d5f301f5d05c612d111ec85b4751fda86fa6b018e44c245a048f8"
+     },
+     {
+       "owner": "build-composition",
+@@ -6081,7 +6081,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "b9b26b649a06d44a2ff68c2ce150dcbb17dc72f1144d423fabeb2362279d3bf7",
++      "source_digest": "f909b86805ac26df9fda9e470caf64629939436e3f54a8fd45a2058f1bbed269",
+       "step_role": "native-feature-correctness-only",
+       "direct_dependencies": [
+         {
+@@ -6111,7 +6111,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "3ce828941565854bfdf6a09c7b53d796075f5a57ef79a24fba49c531c4da6c14",
++      "source_digest": "24525643188f7d886fcbf90a93fd975b0a597ce623507b23955ab014ce6c43d6",
+       "step_role": "native-feature-fail-closed-guard",
+       "guard_order": 3,
+       "guard_condition": "QEMU, Rosetta, Wine, Darling, or Wasmtime execution is enabled",
+@@ -6135,7 +6135,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "e90bb3301de34a828f9e38016162ada4cadfb7053c844d1ec96218bb6f442cce",
++      "source_digest": "b9e578ae5a582f43b0b4ba913f26d43e0509a724a62f99a805626865d30c99f2",
+       "step_role": "native-feature-fail-closed-guard",
+       "guard_order": 4,
+       "guard_condition": "build-host CPU features are not a superset of requested target CPU features",
+@@ -6159,7 +6159,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "b824c1459822683a69b56ea6b5d677612595700b1883db8a564df656a2c07112",
++      "source_digest": "bb0ee3c4b7d41ae52510c79967aae073edd69101070e06689079060f4f8e025b",
+       "step_role": "native-feature-fail-closed-guard",
+       "guard_order": 1,
+       "guard_condition": "requested CPU model is baseline or determined by arch/OS",
+@@ -6183,7 +6183,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "26da49b82bb4b6146fd22ebe0f136e0a739c684c5386faf0f447ed4c2a9de82b",
++      "source_digest": "55c07894a5c1cdf58de3f8e61adb4511591f34c2a34b0ff555f2625837afe1da",
+       "step_role": "native-feature-fail-closed-guard",
+       "guard_order": 2,
+       "guard_condition": "requested target arch, OS, ABI, or object format differs from the build host",
+@@ -6201,7 +6201,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "33be7d429b69696502e21d7b6d97fa36003582210468eb76a636d11ee6bea371",
++      "source_digest": "6368e990f8df656be4efdb8f60a3398ef4a5eba73ba0e871a1ec29ad91b378fb",
+       "owner": "build-composition",
+       "description": "Run exhaustive public Zig surface inventory and reflection contracts",
+       "direct_dependencies": [
+@@ -6248,7 +6248,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "9c3cc9779954875919f0b7cb6b20e563c88243c4290548b2876eabb48a802a93"
++      "source_digest": "2f29460582bc9baf9a0207437df71d8c4e157e7c5095c031603dfbc67e4a50ae"
+     },
+     {
+       "id": "step:build.zig:build:test-structured-blocked",
+@@ -6260,7 +6260,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "652eb84be9b42f136b9e7763987573d6d392327f40791e7560beba6a1c21215c",
++      "source_digest": "4e07accfabd2fc19ca4a615a661c7762557c44e6da7841248641300ed5a6ee48",
+       "owner": "build-composition",
+       "description": "Run blocked structured Level 3 packing and update tests",
+       "direct_dependencies": [
+@@ -6285,7 +6285,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "4a9f03c3dfbc82f61eaba8e7132b701ac53c3d6138d693673f59ad8a4533fad9",
++      "source_digest": "55c71f123ea0c0252ff34c81025595764dd6daa88aa63d30c7c17b54bf1d6bd3",
+       "owner": "build-composition",
+       "description": "Run isolated x86 structured Level 3 ABI and correctness tests",
+       "direct_dependencies": [
+@@ -6323,7 +6323,7 @@
+         "ordinal": 1
+       },
+       "call": "b.step",
+-      "source_digest": "c9b65010c3e22ceea6b0d7a6f1ef957a3bdc47f3322807b5174feadfd59b118a"
++      "source_digest": "3d878cbae423d5f992a92e04fbab3a7be4d42e01eb8a931f942f96c76d6f9dac"
+     },
+     {
+       "id": "step:build.zig:build:uninstall",
+@@ -6363,7 +6363,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "c5affbebcc21035a51fff00b86183246af190ef4ffb4556378c39be1f14310b7"
++      "source_digest": "4bf7352f6b844e27347ad767c538ce0c09fadd96624751a1e6b24dfb6d50cccc"
+     },
+     {
+       "owner": "build-composition",
+@@ -6381,7 +6381,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "5b2e44e8ada731e8772b83cf051f078c39863f7ea391913cbed5b08ffe0c84dc",
++      "source_digest": "8383793e8d2581dc18408345421df80cf0b6aa9f25735e0cdae2623de65ade27",
+       "step_role": "unsupported-test-inventory-target-failure",
+       "direct_dependencies": [],
+       "error_message": "test inventory enumeration is unavailable for the requested target CPU profile"
+@@ -6402,7 +6402,7 @@
+         "ordinal": 1
+       },
+       "call": "b.addFail",
+-      "source_digest": "c4b5af89ccd35216aa80aaec41b5ee5dce89aebfee4cb98454878ee96d45f98c",
++      "source_digest": "bec164f533a93f26dd922dbb5c35e08ec6b897db0c23b465454594a6c1b586ac",
+       "step_role": "unsupported-windows-native-inventory-link-failure",
+       "direct_dependencies": [],
+       "error_message": "test-inventory-link-windows-native-smoke requires an x86_64 Windows host and the exact x86_64-windows-gnu COFF target requested with -Dcpu=baseline and no CPU feature modifiers",
+@@ -6908,6 +6908,30 @@
+       "launch_class": "test-fixture",
+       "call_semantics_digest": "09214211824891b9dfc51089706b0cbb3239370144b533bb8266b8d7c689d1bd"
+     },
++    {
++      "owner": "test-infrastructure",
++      "detail_status": "process-lifecycle-out-of-scope",
++      "compile_for": "host",
++      "execute_on": "host",
++      "cwd_shape": "temporary artifact snapshot fixture",
++      "launch_class": "test-fixture",
++      "argv_shape": [
++        "python",
++        "<frozen-level2-script>",
++        "--worker",
++        "--help"
++      ],
++      "id": "python-launch:bench/tools/test_level2_report.py:run_one:subprocess.run:1",
++      "category": "python-launch",
++      "anchor": {
++        "file": "bench/tools/test_level2_report.py",
++        "enclosing_function": "run_one",
++        "symbol": "subprocess.run",
++        "ordinal": 1
++      },
++      "call": "subprocess.run",
++      "call_semantics_digest": "982a3f020bde4228c9b7daa7da4bd157b8867496461e5f7087eacc55fa69fee1"
++    },
+     {
+       "id": "python-launch:bench/tools/test_level2_report.py:test_banded_controller_keeps_fresh_process_statistics:subprocess.run:1",
+       "category": "python-launch",
+@@ -7050,7 +7074,7 @@
+       "cwd_shape": "declared by call or inherited from invoking repository command",
+       "owner": "test-infrastructure",
+       "launch_class": "test-fixture",
+-      "call_semantics_digest": "b7793a783a7abf4034c6377d27ce2b33f29cf9a0dce63f7c45a3eba2b0b6f18d"
++      "call_semantics_digest": "19b7e83a16b780610d81f1ace4966e79a8bbaf2e7bcabaa80477bb112ebd29c4"
+     },
+     {
+       "id": "python-launch:bench/tools/test_rank_k_report.py:test_all_twelve_routines_cover_both_triangles_and_legal_transposes:subprocess.run:1",
+@@ -10237,6 +10261,12 @@
+       "class": "non-generated-source",
+       "owner": "library-source"
+     },
++    {
++      "path": "src/blas/core/checked.zig",
++      "kind": "zig-source",
++      "class": "non-generated-source",
++      "owner": "library-source"
++    },
+     {
+       "path": "src/blas/core/checked/operands.zig",
+       "kind": "zig-source",
+@@ -11198,7 +11228,7 @@
+       "owner": "developer-tooling"
+     }
+   ],
+-  "repository_file_classifications_digest": "cc2c6c226fb29f671cd672476e0ec9a117d1148c22aa0a35540e39ccd3f37d78",
++  "repository_file_classifications_digest": "b099a813dccda30a7769dd57c6e82bcf93e62eefeff49bfa76e6695c23af89b9",
+   "derived_candidates": [
+     {
+       "id": "derived:include/zynum/blas/blas.h",
+diff --git a/tools/check_build_inventory.py b/tools/check_build_inventory.py
+index af71fb8..047fb81 100644
+--- a/tools/check_build_inventory.py
++++ b/tools/check_build_inventory.py
+@@ -390,11 +390,11 @@ SOURCE_PROJECTION_FIELDS = (
+     "workflow_source_digests",
+ )
+ CURRENT_SOURCE_PROJECTION_SHA256 = (
+-    "d320db8ec989c8e0e71a3610377e6eb35fe494a618124e87cf4fa55ca297f864"
++    "96c9252631a215e217ced1248254826ff2511c95fb4c7164015eca480cbaf94d"
+ )
+ NEXT_SOURCE_PROJECTION_SHA256: str | None = None
+ REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
+-    "6508636069ecc5885588bc8863e166e0fd376f59c4a102a805a235c14fcf01e8"
++    "13a9325ebba955bd1cb3742de59f741c9a24661df9c5db2850c30c42efda884e"
+ )
+ REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = (
+     "83b807444228d772b60a7b1c4b140d356d8b580fb7842fc01cf99490573b033e"
+@@ -500,11 +500,13 @@ REQUIRED_GAP_FACT_DIGESTS = {
+ }
+ REQUIRED_SECTION_FACT_DIGESTS = {
+     "option_surfaces": "63edcd6da0d793e0b945e63077ca59a5f7e7e0eb460d0365e6aa858bdc9c533a",
+-    "repository_file_classifications": "cc2c6c226fb29f671cd672476e0ec9a117d1148c22aa0a35540e39ccd3f37d78",
++    "repository_file_classifications": "b099a813dccda30a7769dd57c6e82bcf93e62eefeff49bfa76e6695c23af89b9",
+     "derived_candidates": "ce431613bae70ff88c1b6a7b2c7862fc94a4be4f9f24d1f0c5c592a135108ef9",
+     "current_gaps": "8e202364b2fee4ddf3aed378ab6478abc70c36c90053e4cfffa45326a8ae44a7",
+ }
+ REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {
++    "bench/tools/test_level2_report.py:test_triangular_worker_correctness": "90c21f759b2e2e2648049f1d890e57580f7b9dc78c605e5cbc5a97f2adce5973",
++    "bench/tools/test_level2_report.py:run_one": "3c8de6ccdf7abfdc0ded13cb2d36095d61a7024795b39b83dd7ee53b6bbcb4df",
+     "bench/tools/run_level1_report.py:check_worker_result": "a54ae66023bfd1d936e8e321fe0bb45a9da4555ed7d68283f0ababcc058a2c88",
+     "bench/tools/run_level2_report.py:run_one_process": "3f7fbbff7b3d557d0b44c5b2dd3ea4457c1a058aa4171b1e8ef39e5435f64d2b",
+ }
+@@ -13906,6 +13908,12 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
+         item["path"]: item for item in inventory["repository_file_classifications"]
+     }
+     classifications.pop("COPYING.LESSER", None)
++    classifications["src/blas/core/checked.zig"] = {
++        "path": "src/blas/core/checked.zig",
++        "kind": "zig-source",
++        "class": "non-generated-source",
++        "owner": "library-source",
++    }
+     classifications[BUILD_PROFILE_TEST_PATH] = {
+         "path": BUILD_PROFILE_TEST_PATH,
+         "kind": "python-source",
+@@ -14490,6 +14498,18 @@ def _new_test_inventory_observation(
+ 
+ 
+ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
++    if identifier == (
++        "python-launch:bench/tools/test_level2_report.py:run_one:subprocess.run:1"
++    ):
++        return {
++            "owner": "test-infrastructure",
++            "detail_status": "process-lifecycle-out-of-scope",
++            "compile_for": "host",
++            "execute_on": "host",
++            "cwd_shape": "temporary artifact snapshot fixture",
++            "launch_class": "test-fixture",
++            "argv_shape": ["python", "<frozen-level2-script>", "--worker", "--help"],
++        }
+     if identifier == BUILD_PROFILE_PYTHON_LAUNCH_ID:
+         return {
+             "owner": "test-infrastructure",
+diff --git a/tools/check_test_inventory.py b/tools/check_test_inventory.py
+index f1ca8f5..92471d0 100644
+--- a/tools/check_test_inventory.py
++++ b/tools/check_test_inventory.py
+@@ -87,7 +87,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/test_gemm_sweep_tools.py",
+-        "044a873001af17fe2100e381feba0ad4488e93cbfc9f55970bf81d5d5061d320",
++        "adb54c89ed176fb9034a6464374824982a1a723ac98e79db40ea523571fb6a98",
+     ),
+     (
+         "bench/tools/test_level1_report.py",
+@@ -95,7 +95,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/test_level2_report.py",
+-        "2ce852761cc7e9e6d74a9c324419c56d2db6abc5a349e9d524281b3ddf3697ee",
++        "11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1",
+     ),
+     (
+         "bench/tools/test_rank_k_report.py",
+@@ -107,7 +107,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/test_report_plotters.py",
+-        "362b6339cd9c76f45b4729cbaa9d42499f01b0e9833a6890d7dff7fce90b4e4f",
++        "29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10",
+     ),
+     (
+         "bench/tools/test_report_publication.py",
+@@ -145,7 +145,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/test_gemm_sweep_tools.py",
+-        "044a873001af17fe2100e381feba0ad4488e93cbfc9f55970bf81d5d5061d320",
++        "adb54c89ed176fb9034a6464374824982a1a723ac98e79db40ea523571fb6a98",
+     ),
+     (
+         "bench/tools/test_level1_report.py",
+@@ -153,7 +153,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/test_level2_report.py",
+-        "2ce852761cc7e9e6d74a9c324419c56d2db6abc5a349e9d524281b3ddf3697ee",
++        "11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1",
+     ),
+     (
+         "bench/tools/test_rank_k_report.py",
+@@ -165,7 +165,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/test_report_plotters.py",
+-        "362b6339cd9c76f45b4729cbaa9d42499f01b0e9833a6890d7dff7fce90b4e4f",
++        "29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10",
+     ),
+     (
+         "bench/tools/test_report_publication.py",
+@@ -225,15 +225,15 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/plot_gemm_sweep.py",
+-        "f61aaed27ced6fe8eeb21b6b69ec20f9338c8f9489bcb3e80cd492991a4c1aee",
++        "b138d2a4187f7ed154db50ae32c164aa7bc846b9cd7dcb1413e44a83d3f769cc",
+     ),
+     (
+         "bench/tools/plot_level1_report.py",
+-        "99d3765cc52c59d8a607b6d034bf469656336adb5e0a6468a9df7bf3c7531a4b",
++        "ce4e439ae7775f5c7d3d3cb801fbe86fd19d424073ccc58b2dc6b1218dfd5772",
+     ),
+     (
+         "bench/tools/plot_level2_report.py",
+-        "9436916d466b2950ef923b110a384650e5032eecd50d6e254e7085bdd95a9c3d",
++        "6ae1dfd588127c9a96e6e2eb892d0a4e0553f11a7a193a4892e985106f58b6f3",
+     ),
+     (
+         "bench/tools/render_full_benchmark_report.py",
+@@ -253,7 +253,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/run_gemm_sweep_isolated.py",
+-        "cad1e4c83cced9493ca67fbd7e05b7c934088749413b2abc4f3e77a3087713b0",
++        "414a9364179fb0a317bc7a1ff6a8157bf6399edc533365c137b4cde6e0aaa2d5",
+     ),
+     (
+         "bench/tools/run_level1_report.py",
+@@ -261,7 +261,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
+     ),
+     (
+         "bench/tools/run_level2_report.py",
+-        "3a7d01a7a7eb1e457b01fa3cf69395e20c95252c33450a325bc6480d18ac35f3",
++        "987a558291e509760e517d37cf5e04d5541b100aeea961382e64eb73cdcbe361",
+     ),
+     (
+         "bench/tools/run_rank_k_report.py",
+@@ -344,7 +344,7 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (
+     ("_zynum_report_repository_snapshot", "tools/repository_snapshot.py"),
+ )
+ _PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
+-    "21c39d3d89a73953a9d25ec9db95635c88a4a6ffb6e2a866a93a40b8ad887f04"
++    "62f43121525714829033f134d4447c8cc2cc151459b217ca33d7a6add6a9825d"
+ )
+ _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
+     "fe47ceff1b1520d52339b694168560d4eafa6754b71349365a355ecaf1d6f5a6"
+@@ -6890,10 +6890,10 @@ _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES = frozenset(
+     {
+         *(
+             ("bench/tools/test_level2_report.py", line, "subprocess.run")
+-            for line in (1566, 1632, 1696, 1808, 1859, 2352, 2402, 2451, 2504)
++            for line in (454, 1583, 1650, 1714, 1826, 1877, 2370, 2420, 2469, 2522)
+         ),
+         ("bench/tools/run_level1_report.py", 894, "subprocess.run"),
+-        ("bench/tools/run_level2_report.py", 2881, "subprocess.run"),
++        ("bench/tools/run_level2_report.py", 2879, "subprocess.run"),
+     }
+ )
+ _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
+@@ -6909,11 +6909,11 @@ _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
+         ("bench/tools/test_symm_report.py", 1218, "subprocess.run"),
+         ("bench/tools/test_triangular_matrix_report.py", 1229, "subprocess.run"),
+         ("bench/tools/benchmark_metadata.py", 287, "subprocess.run"),
+-        ("bench/tools/run_gemm_sweep_isolated.py", 258, "subprocess.run"),
+-        ("bench/tools/run_gemm_sweep_isolated.py", 502, "subprocess.run"),
++        ("bench/tools/run_gemm_sweep_isolated.py", 259, "subprocess.run"),
++        ("bench/tools/run_gemm_sweep_isolated.py", 506, "subprocess.run"),
+         ("bench/tools/run_level1_report.py", 445, "subprocess.run"),
+         ("bench/tools/run_level1_report.py", 1429, "subprocess.run"),
+-        ("bench/tools/run_level2_report.py", 836, "subprocess.run"),
++        ("bench/tools/run_level2_report.py", 834, "subprocess.run"),
+         ("bench/tools/run_rank_k_report.py", 612, "subprocess.run"),
+         ("bench/tools/run_rank_k_report.py", 766, "subprocess.run"),
+         ("bench/tools/run_rotg_latency_report.py", 412, "subprocess.run"),
+diff --git a/src/blas/core/checked.zig b/src/blas/core/checked.zig
+new file mode 100644
+index 0000000..093429c
+--- /dev/null
++++ b/src/blas/core/checked.zig
+@@ -0,0 +1,33 @@
++// Copyright (C) 2026 Zynum contributors
++// SPDX-License-Identifier: LGPL-3.0-or-later
++
++//! Narrow core boundary for the checked Zig API.
++//!
++//! The API validates public views before constructing these pointer operands.
++//! Only descriptive operand operations cross this boundary; raw BLAS kernels
++//! and execution policy remain internal to their implementations.
++
++const scalar = @import("shared/scalar.zig");
++const operands = @import("checked/operands.zig");
++const operations = @import("checked/operations.zig");
++
++pub const TransposeMode = scalar.TransposeMode;
++pub const Real = scalar.Real;
++pub const isZero = scalar.isZero;
++pub const one = scalar.one;
++pub const zero = scalar.zero;
++
++pub const ConstVector = operands.ConstVector;
++pub const Vector = operands.Vector;
++pub const ConstMatrix = operands.ConstMatrix;
++pub const Matrix = operands.Matrix;
++
++pub const swapVectorViews = operations.swapVectors;
++pub const copyVectorView = operations.copyVector;
++pub const scaleVectorView = operations.scaleVector;
++pub const addScaledVectorView = operations.addScaledVector;
++pub const combineVectorViews = operations.combineVectors;
++pub const dotProductView = operations.dotProduct;
++pub const euclideanNormView = operations.euclideanNorm;
++pub const multiplyMatrixVector = operations.multiplyMatrixVector;
++pub const multiplyMatrices = operations.multiplyMatrices;

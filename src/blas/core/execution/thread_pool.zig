@@ -4,6 +4,16 @@
 const std = @import("std");
 
 const runtime = @import("../../runtime.zig");
+fn freeWorkerCaches() void {
+    // Only SME owns persistent kernel pack allocations. Keep the baseline
+    // scheduler independent of the matrix kernel graph (and its test roots).
+    const builtin = @import("builtin");
+    if (comptime @import("zynum-build-options").dynamic_dispatch or
+        (builtin.cpu.arch == .aarch64 and builtin.cpu.features.isEnabled(@intFromEnum(std.Target.aarch64.Feature.sme))))
+    {
+        @import("../../kernels/dispatch/matrix_matrix.zig").freeCurrentThreadCaches();
+    }
+}
 
 pub const max_tasks = 64;
 pub const TaskFn = *const fn (*const anyopaque, usize) void;
@@ -20,7 +30,6 @@ var persistent_group: std.Io.Group = .init;
 var persistent_worker_count = std.atomic.Value(u32).init(0);
 var persistent_ready_count = std.atomic.Value(u32).init(0);
 var persistent_exited_count = std.atomic.Value(u32).init(0);
-var persistent_generation = std.atomic.Value(u32).init(0);
 var persistent_worker_generation = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** max_tasks;
 var persistent_active_helpers = std.atomic.Value(u32).init(0);
 var persistent_first_helper = std.atomic.Value(u32).init(0);
@@ -67,6 +76,9 @@ fn ensureIoThreaded() bool {
 
 fn runIoTask(task_fn: TaskFn, tasks: *const anyopaque, index: usize) void {
     runtime.configureWorkerThread(index);
+    // Io.Threaded owns its worker lifetimes; release this task's thread-local
+    // kernel allocations before returning to a thread we cannot finalize.
+    defer freeWorkerCaches();
     task_fn(tasks, index);
 }
 
@@ -74,6 +86,9 @@ fn runPersistentWorker(worker_id: usize) void {
     runtime.configureWorkerThread(worker_id + 1);
     const io = persistent_threaded.io();
     defer {
+        // A TLS pointer disappearing at thread exit does not free its backing
+        // allocation. Dispatch cleanup on the owner thread before reporting exit.
+        freeWorkerCaches();
         const exited = persistent_exited_count.fetchAdd(1, .acq_rel) + 1;
         if (exited >= persistent_worker_count.load(.acquire)) {
             io.futexWake(u32, &persistent_exited_count.raw, 1);
@@ -191,11 +206,14 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
     persistent_active_helpers.store(active_helpers, .release);
 
     const io = persistent_threaded.io();
-    const generation = persistent_generation.fetchAdd(1, .acq_rel) + 1;
     const lazy_wake_helpers = first_helper == 0 and active_helpers == workers;
     for (0..active_helpers) |worker_id| {
         const target_worker = first_helper + worker_id;
-        persistent_worker_generation[target_worker].store(generation, .release);
+        // io_busy serializes jobs, and completion acknowledges each worker's
+        // observed generation before another job can be submitted. Increment
+        // locally so even wraparound differs from an idle worker's last value.
+        // The release publishes the task payload to the worker's acquire load.
+        _ = persistent_worker_generation[target_worker].fetchAdd(1, .release);
         if (!lazy_wake_helpers) io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
     }
 
@@ -293,9 +311,8 @@ fn shutdownPersistentLocked() void {
         persistent_shutdown_requested.store(1, .release);
         persistent_exited_count.store(0, .release);
 
-        const generation = persistent_generation.fetchAdd(1, .acq_rel) + 1;
         for (0..worker_count) |worker_id| {
-            persistent_worker_generation[worker_id].store(generation, .release);
+            _ = persistent_worker_generation[worker_id].fetchAdd(1, .release);
             io.futexWake(u32, &persistent_worker_generation[worker_id].raw, 1);
         }
 
@@ -358,4 +375,49 @@ test "runLowLatency refuses partial execution when helpers cannot cover tasks" {
 
     try std.testing.expect(!runLowLatency(CounterTask.run, @ptrCast(&tasks), tasks.len));
     try std.testing.expectEqual(@as(u32, 0), counter.load(.monotonic));
+
+    shutdown();
+    runtime.setMaxThreads(5);
+    if (configuredHelperCount() == 0) return;
+
+    // Seed only while stopped: workers must acquire the seed before announcing
+    // readiness. The first phase wraps on shutdown, the second on submission.
+    for ([_]u32{ std.math.maxInt(u32) - 1, std.math.maxInt(u32) }) |seed| {
+        for (&persistent_worker_generation) |*generation| generation.store(seed, .release);
+        try std.testing.expect(ensurePersistentWorkers());
+        const workers = persistent_worker_count.load(.acquire);
+        try std.testing.expect(workers > 0);
+        var counters = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** 5;
+        var distinct_tasks: [5]CounterTask = undefined;
+        for (&distinct_tasks, &counters) |*task, *task_counter| task.* = .{ .counter = task_counter };
+
+        const counts = [_]usize{ 2, @min(workers + 1, 3), 2, workers + 1 };
+        const runs: usize = if (seed == std.math.maxInt(u32) - 1) 1 else counts.len;
+        for (counts[0..runs]) |count| {
+            var before: [max_tasks]u32 = undefined;
+            for (0..workers) |worker_id| before[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
+            for (&counters) |*task_counter| task_counter.store(0, .monotonic);
+            try std.testing.expect(runLowLatency(CounterTask.run, @ptrCast(&distinct_tasks), count));
+            // Separate counters catch a duplicated index hiding a missing one.
+            for (&counters, 0..) |*task_counter, index| {
+                try std.testing.expectEqual(@as(u32, if (index < count) 1 else 0), task_counter.load(.monotonic));
+            }
+            const active_helpers = count - 1;
+            const first_helper: usize = if (count == 3 and workers >= active_helpers + 2) 2 else 0;
+            for (0..workers) |worker_id| {
+                const active = worker_id >= first_helper and worker_id < first_helper + active_helpers;
+                const expected = before[worker_id] +% @as(u32, if (active) 1 else 0);
+                try std.testing.expectEqual(expected, persistent_worker_generation[worker_id].load(.acquire));
+            }
+        }
+
+        var before_shutdown: [max_tasks]u32 = undefined;
+        for (0..workers) |worker_id| before_shutdown[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
+        shutdown();
+        try std.testing.expectEqual(@as(u8, 0), persistent_init_state.load(.acquire));
+        try std.testing.expectEqual(@as(u32, 0), persistent_worker_count.load(.acquire));
+        for (0..workers) |worker_id| {
+            try std.testing.expectEqual(before_shutdown[worker_id] +% 1, persistent_worker_generation[worker_id].load(.acquire));
+        }
+    }
 }

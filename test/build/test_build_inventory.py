@@ -99,8 +99,11 @@ class BuildInventoryTests(unittest.TestCase):
     def _append_to_build(self, statement: str, relative: str = "build.zig") -> None:
         path = self.root / relative
         text = path.read_text(encoding="utf-8")
-        prefix, suffix = text.rsplit("}", 1)
-        path.write_text(f"{prefix}    {statement}\n}}{suffix}", encoding="utf-8")
+        masked = CHECKER._code_mask(text)
+        declaration = masked.index("pub fn build(")
+        body_start = masked.index("{", CHECKER._matching_paren(text, masked.index("(", declaration)))
+        body_end = CHECKER._matching_brace(masked, body_start)
+        path.write_text(text[:body_end] + f"    {statement}\n" + text[body_end:], encoding="utf-8")
 
     def _assert_error_contains(self, expected: str) -> None:
         errors = CHECKER.validate(self.root, self.inventory_path)
@@ -299,10 +302,10 @@ class BuildInventoryTests(unittest.TestCase):
             ),
             (
                 "if (level2_width_enabled_artifact_probe_mod) |probe_mod| {\n"
-                "        probe_mod.linkLibrary(level2_width_isolated_library.?);\n"
+                "        probe_mod.addObject(level2_width_isolated_library.?);\n"
                 "    }",
                 "if (level2_width_enabled_artifact_probe_mod) |probe_mod| {\n"
-                "        probe_mod.linkLibrary(stride2_isolated_library.?);\n"
+                "        probe_mod.addObject(stride2_isolated_library.?);\n"
                 "    }",
             ),
         )
@@ -394,7 +397,17 @@ class BuildInventoryTests(unittest.TestCase):
     def test_inventory_enumeration_projection_mutations_fail_closed(self) -> None:
         mutations = (
             (
-                "const target_query = b.standardTargetOptionsQueryOnly(.{});",
+                "const target = b.resolveTargetQuery(target_query);",
+                "const target = b.resolveTargetQuery(target_query); target_query.cpu_model = .baseline;",
+                "query provenance and canonical baseline resolved features",
+            ),
+            (
+                "explicit_cpu and !dynamic_dispatch and target_query.cpu_model",
+                "target_query.cpu_model",
+                "query provenance and canonical baseline resolved features",
+            ),
+            (
+                "var target_query = b.standardTargetOptionsQueryOnly(.{ .default_target = .{ .cpu_model = .baseline } });",
                 "const target_query = b.standardTargetOptions(.{}).query;",
                 "query provenance and canonical baseline resolved features",
             ),
@@ -855,7 +868,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);\n"
                 "    test_step.dependOn(build_profile_test_step);",
-                "must not bypass the host-tool aggregate or include build inventory",
+                "default correctness aggregate must preserve exclusive dynamic and canonical specialized branches",
             ),
             (
                 "python_tooling_test_step.dependOn(&python_tooling_tests.step);",
@@ -865,24 +878,24 @@ class BuildInventoryTests(unittest.TestCase):
             (
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
                 "if (!host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
-                "must conditionally depend exactly once on the host-tool smoke aggregate",
+                "default correctness aggregate must preserve exclusive dynamic and canonical specialized branches",
             ),
             (
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
                 "if (host_tool_smoke) test_step.dependOn(python_tooling_test_step);",
-                "must conditionally depend exactly once on the host-tool smoke aggregate",
+                "default correctness aggregate must preserve exclusive dynamic and canonical specialized branches",
             ),
             (
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);\n"
                 "    test_step.dependOn(python_tooling_test_step);",
-                "must not bypass the host-tool aggregate or include build inventory",
+                "default correctness aggregate must preserve exclusive dynamic and canonical specialized branches",
             ),
             (
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);",
                 "if (host_tool_smoke) test_step.dependOn(host_tool_smoke_test_step);\n"
                 "    test_step.dependOn(&build_inventory_tests.step);",
-                "must not bypass the host-tool aggregate or include build inventory",
+                "default correctness aggregate must preserve exclusive dynamic and canonical specialized branches",
             ),
             *(
                 (
@@ -1536,8 +1549,12 @@ class BuildInventoryTests(unittest.TestCase):
             CHECKER.INSTALL_LIBRARIES_STEP_ID, original_inventory
         )
         self.assertEqual(
-            [CHECKER.INSTALL_DYNAMIC_LIBRARY_ID, CHECKER.INSTALL_STATIC_LIBRARY_ID],
-            [item["id"] for item in install_step["direct_dependencies"]],
+            [
+                {"id": CHECKER.INSTALL_DYNAMIC_LIBRARY_ID, "condition": "always"},
+                {"id": CHECKER.INSTALL_STATIC_LIBRARY_ID, "condition": "target.result.ofmt != .macho"},
+                {"id": "install:build.zig:build:libzynum_blas.a", "condition": "target.result.ofmt == .macho"},
+            ],
+            install_step["direct_dependencies"],
         )
         for (
             identifier,
@@ -3180,7 +3197,19 @@ class BuildInventoryTests(unittest.TestCase):
         }
         runner_paths = set(runner_functions)
         inventory_launches = self.inventory["python_launches"]
-        self.assertEqual(71, len(inventory_launches))
+        self.assertEqual(77, len(inventory_launches))
+        self.assertEqual(
+            {
+                "python-launch:tools/generate_multiversion.py:formatted:subprocess.run:1",
+                "python-launch:tools/repack_darwin_archive.py:ar:subprocess.run:1",
+                "python-launch:test/build/test_repack_darwin_archive.py:test_real_macho_members_are_eight_byte_aligned:subprocess.run:1",
+                "python-launch:test/build/test_repack_darwin_archive.py:test_real_macho_members_are_eight_byte_aligned:subprocess.run:2",
+            },
+            {item["id"] for item in inventory_launches if item["anchor"]["file"] in {
+                "tools/generate_multiversion.py", "tools/repack_darwin_archive.py",
+                "test/build/test_repack_darwin_archive.py",
+            }},
+        )
         self.assertNotIn("python_launches", CHECKER.REQUIRED_SECTION_FACT_DIGESTS)
         self.assertEqual(
             inventory_launches,
@@ -8968,7 +8997,7 @@ class BuildInventoryTests(unittest.TestCase):
         self._write_inventory(inventory)
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
         self.assertIn(
-            "build.zig option surfaces must contain exactly 20 standard/project surfaces",
+            "build.zig option surfaces must contain exactly 23 standard/project surfaces",
             errors,
         )
         self.assertIn("default does not match source", errors)
@@ -9299,6 +9328,7 @@ class BuildInventoryTests(unittest.TestCase):
                 + item["id"]
                 for item in inventory["build_observations"]
                 if item["anchor"]["file"] == "build.zig"
+                and item["anchor"]["enclosing_function"] == "build"
                 and "source_digest" in item
                 and item["call"] != "implicit"
             ),
@@ -9561,6 +9591,17 @@ class BuildInventoryTests(unittest.TestCase):
     def test_build_receiver_helper_escape_mutation_fails_source_discovery(
         self,
     ) -> None:
+        path = self.root / "build.zig"
+        original = path.read_text(encoding="utf-8")
+        for before, after in (
+            ("libraries[index].lto = .none", "libraries[index].lto = .full"),
+            ('options.addOption(bool, "dynamic_dispatch", false)', 'options.addOption(bool, "dynamic_dispatch", true)'),
+        ):
+            with self.subTest(multiversion_factory=before):
+                self.assertIn(before, original)
+                path.write_text(original.replace(before, after, 1), encoding="utf-8")
+                self._assert_error_contains("multiversion build factory target/options/non-LTO contract drifted")
+                path.write_text(original, encoding="utf-8")
         self._append_to_build("register(b);")
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
         self.assertIn("source discovery failed closed", errors)
@@ -9571,7 +9612,7 @@ class BuildInventoryTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         original = (
             "const stride2_isolated_library = if "
-            "(target.result.cpu.arch == .x86_64) b.addLibrary(.{"
+            "(target.result.cpu.arch == .x86_64) b.addObject(.{"
         )
         replacement = original.replace(".x86_64", ".aarch64")
         self.assertIn(original, text)
@@ -9588,7 +9629,7 @@ class BuildInventoryTests(unittest.TestCase):
         text = path.read_text(encoding="utf-8")
         original = (
             "const stride2_isolated_library = if "
-            "(target.result.cpu.arch == .x86_64) b.addLibrary(.{"
+            "(target.result.cpu.arch == .x86_64) b.addObject(.{"
         )
         replacement = original.replace(".x86_64", ".aarch64")
         self.assertIn(original, text)
@@ -9665,9 +9706,9 @@ class BuildInventoryTests(unittest.TestCase):
     def test_inline_link_guard_mutation_survives_rehashed_root_digest(self) -> None:
         path = self.root / "build.zig"
         text = path.read_text(encoding="utf-8")
-        original = "        zynum_test_mod.linkLibrary(library);"
+        original = "        zynum_test_mod.addObject(library);"
         replacement = (
-            "        if (host_tool_smoke) zynum_test_mod.linkLibrary(library);"
+            "        if (host_tool_smoke) zynum_test_mod.addObject(library);"
         )
         self.assertIn(original, text)
         path.write_text(text.replace(original, replacement, 1), encoding="utf-8")
@@ -9709,7 +9750,7 @@ class BuildInventoryTests(unittest.TestCase):
         ).hexdigest()
         self._write_inventory(inventory)
         self._assert_error_contains(
-            "canonical test aggregate must conditionally depend exactly once on the host-tool smoke aggregate"
+            "default correctness aggregate must preserve exclusive dynamic and canonical specialized branches"
         )
 
     def test_compat_install_guard_mutation_hits_root_digest(self) -> None:
@@ -9760,7 +9801,7 @@ class BuildInventoryTests(unittest.TestCase):
         }
         root_dependencies = steps["step:build.zig:build:install"]["direct_dependencies"]
         root_ids = {item["id"] for item in root_dependencies}
-        self.assertEqual(12, len(root_ids))
+        self.assertEqual(13, len(root_ids))
         self.assertNotIn("install:build.zig:build:install_rank_k_probe", root_ids)
         self.assertEqual(
             [{"id": "install:examples/zig/build.zig:build:exe", "condition": "always"}],
@@ -9802,12 +9843,16 @@ class BuildInventoryTests(unittest.TestCase):
             "zig-out/lib/static/zynum_blas.lib",
             static["install_destinations_by_target"]["windows"]["primary"],
         )
-        for item in libraries:
+        objects = [item for item in inventory["build_observations"] if item.get("artifact_kind") == "object"]
+        self.assertEqual(9, len(objects))
+        self.assertEqual(8, sum(bool(item.get("isolated_library")) for item in objects))
+        for item in objects:
+            self.assertEqual("b.addObject", item["call"])
             if item.get("isolated_library"):
                 self.assertEqual([], item["install_destinations"])
                 self.assertTrue(
                     item["produced_outputs_by_target"]["windows"]["primary"].endswith(
-                        ".lib"
+                        ".obj"
                     )
                 )
         gap_ids = {item["id"] for item in inventory["current_gaps"]}
@@ -9835,22 +9880,12 @@ class BuildInventoryTests(unittest.TestCase):
                 observations[identifier]["condition"],
             )
 
-    def test_example_optimize_forwarding_gap_is_recorded(self) -> None:
+    def test_example_optimize_forwarding_gap_is_closed(self) -> None:
         inventory = self._inventory()
-        gap = next(
-            item
-            for item in inventory["current_gaps"]
-            if item["id"] == "gap:example-optimize-forwarding"
-        )
-        self.assertEqual(
-            "cd examples/zig && zig build --help", gap["reproduction_command"]
-        )
-        self.assertEqual(
-            "prints error: invalid option: -Doptimize and returns exit status 0",
-            gap["observed_result"],
-        )
-        self.assertEqual(0, gap["observed_exit_code"])
-        self.assertEqual("error: invalid option: -Doptimize", gap["stderr_contains"])
+        self.assertNotIn("gap:example-optimize-forwarding", {item["id"] for item in inventory["current_gaps"]})
+        option = next(item for item in inventory["option_surfaces"] if item["id"] == "option-surface:build.zig:optimize")
+        self.assertEqual("standard release selection", option["default"])
+        self.assertEqual("option:build.zig:build:optimize-override", option["source_observation"])
 
     def test_every_reviewed_gap_is_mandatory(self) -> None:
         baseline = self._inventory()
@@ -14271,7 +14306,7 @@ class BuildInventoryTests(unittest.TestCase):
             "tools/test_inventory.json": "json-data",
             "tools/test_inventory_runner.zig": "zig-source",
         }
-        self.assertEqual(282, len(rows))
+        self.assertEqual(303, len(rows))
         for path, kind in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(kind, rows[path]["kind"])

@@ -52,6 +52,7 @@ def parse_args(argv=None):
         description="Plot Level 1 report CSV as grouped bar SVGs."
     )
     parser.add_argument("csv")
+    parser.add_argument("--stat", choices=("best", "median"), default="best")
     parser.add_argument("--bars-svg", required=True)
     parser.add_argument("--ratio-svg", required=True)
     return parser.parse_args(argv)
@@ -96,7 +97,7 @@ def row_label(raw):
     return f"{raw['op']}{suffix}"
 
 
-def read_rows(path):
+def read_rows(path, stat="best"):
     rows = []
     with open(path, newline="") as f:
         for raw in csv.DictReader(f):
@@ -106,6 +107,8 @@ def read_rows(path):
             value_field = (
                 "bandwidth_gbps" if metric == "bandwidth_gbps" else "rate_gops"
             )
+            if stat == "median":
+                value_field = "metric_median"
             rows.append(
                 {
                     "group": raw["group"],
@@ -117,7 +120,7 @@ def read_rows(path):
                     "label": row_label(raw),
                     "library": raw["library"],
                     "metric": metric,
-                    "value": parse_positive_finite(raw[value_field], value_field),
+                    "value": parse_positive_finite(raw.get(value_field), value_field),
                     "n": int(raw["n"]),
                     "copy_bytes": int(raw["copy_bytes"])
                     if raw.get("copy_bytes")
@@ -276,7 +279,7 @@ def draw_group_panel(svg, rows, group, top, left, width, height):
             )
 
 
-def render_bars(rows):
+def render_bars(rows, stat="best"):
     by_group = grouped(rows)
     groups = [group for group in GROUP_ORDER if group in by_group]
     width = 1500
@@ -307,7 +310,7 @@ def render_bars(rows):
     else:
         copy_part = ",".join(format_byte_size(size) for size in copy_sizes)
     svg.append(
-        f'<text x="40" y="66" class="subtitle">Higher is better. Fresh process per library/op/size; n={n_part}; copy={copy_part}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
+        f'<text x="40" y="66" class="subtitle">Higher is better. Statistic: {stat}. Fresh process per library/op/size; n={n_part}; copy={copy_part}; seconds={",".join(map(str, seconds_values))}; grouped bars use operation names on the x-axis</text>'
     )
     legend_libraries = ordered_libraries(rows)
     legend_x = max(40, width - len(legend_libraries) * 145 - 35)
@@ -357,7 +360,7 @@ def ratio_rows(rows):
     return result
 
 
-def render_ratio(rows, ratios=None):
+def render_ratio(rows, ratios=None, stat="best"):
     if ratios is None:
         ratios = ratio_rows(rows)
     width = max(1500, 54 * len(ratios) + 160)
@@ -374,7 +377,7 @@ def render_ratio(rows, ratios=None):
         '<text x="40" y="42" class="title">Zynum vs Fastest Comparator Ratio</text>'
     )
     svg.append(
-        '<text x="40" y="66" class="subtitle">Higher is better. Ratio = Zynum metric / fastest non-Zynum comparator. Values below 1.0 indicate a measured slower operation.</text>'
+        f'<text x="40" y="66" class="subtitle">Higher is better. Statistic: {stat}. Ratio = Zynum metric / fastest non-Zynum comparator. Values below 1.0 indicate a measured slower operation.</text>'
     )
     for tick in ticks:
         y = sy(tick, max_tick, top, chart_height)
@@ -419,11 +422,11 @@ def render_ratio(rows, ratios=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    rows = read_rows(args.csv)
+    rows = read_rows(args.csv, args.stat)
     ratios = ratio_rows(rows)
     outputs = [
-        ReportOutput(Path(args.bars_svg), render_bars(rows)),
-        ReportOutput(Path(args.ratio_svg), render_ratio(rows, ratios)),
+        ReportOutput(Path(args.bars_svg), render_bars(rows, args.stat)),
+        ReportOutput(Path(args.ratio_svg), render_ratio(rows, ratios, args.stat)),
     ]
     publish_outputs(outputs)
 

@@ -9,6 +9,7 @@ const aarch64 = @import("../arch/aarch64/vector/binary.zig");
 const x86_64 = @import("../arch/x86_64/vector/binary.zig");
 
 pub fn fixedCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_fixedCopyBytes, void, .{ n_bytes, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.fixedCopyBytes(n_bytes, x, y),
         .x86_64 => x86_64.fixedCopyBytes(n_bytes, x, y),
@@ -17,6 +18,7 @@ pub fn fixedCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
 }
 
 pub fn copyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_copyBytes, void, .{ n_bytes, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.copyBytes(n_bytes, x, y),
         .x86_64 => x86_64.copyBytes(n_bytes, x, y),
@@ -25,10 +27,12 @@ pub fn copyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
 }
 
 pub fn copyUnit(comptime T: type, n: usize, x: [*]const T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_copyUnit, T, .{ n, x, y });
     return copyBytes(n * @sizeOf(T), @ptrCast(x), @ptrCast(y));
 }
 
 pub fn copyUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_copyUnitReal, T, .{ n, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.copyUnitReal(T, n, x, y),
         .x86_64 => x86_64.copyUnitReal(T, n, x, y),
@@ -37,6 +41,7 @@ pub fn copyUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]T) bool {
 }
 
 pub fn swapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_swapUnitReal, T, .{ n, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.swapUnitReal(T, n, x, y),
         .x86_64 => x86_64.swapUnitReal(T, n, x, y),
@@ -45,6 +50,7 @@ pub fn swapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
 }
 
 pub fn swapUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_swapUnitRealStreaming, T, .{ n, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.swapUnitRealStreaming(T, n, x, y),
         else => false,
@@ -52,6 +58,7 @@ pub fn swapUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T) bool 
 }
 
 pub fn axpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_axpyUnitReal, T, .{ n, alpha, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.axpyUnitReal(T, n, alpha, x, y),
         .x86_64 => x86_64.axpyUnitReal(T, n, alpha, x, y),
@@ -60,6 +67,7 @@ pub fn axpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T
 }
 
 pub fn axpyUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_axpyUnitComplex, T, .{ n, alpha, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.axpyUnitComplex(T, n, alpha, x, y),
         .x86_64 => x86_64.axpyUnitComplex(T, n, alpha, x, y),
@@ -68,6 +76,7 @@ pub fn axpyUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [
 }
 
 pub fn axpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_axpbyUnitReal, T, .{ n, alpha, x, beta, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.axpbyUnitReal(T, n, alpha, x, beta, y),
         .x86_64 => x86_64.axpbyUnitReal(T, n, alpha, x, beta, y),
@@ -76,6 +85,7 @@ pub fn axpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: 
 }
 
 pub fn axpbyUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_axpbyUnitComplex, T, .{ n, alpha, x, beta, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.axpbyUnitComplex(T, n, alpha, x, beta, y),
         .x86_64 => x86_64.axpbyUnitComplex(T, n, alpha, x, beta, y),
@@ -84,6 +94,7 @@ pub fn axpbyUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]const T, bet
 }
 
 pub fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_dotUnitReal, T, .{ n, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.dotUnitReal(T, n, x, y),
         .x86_64 => x86_64.dotUnitReal(T, n, x, y),
@@ -92,6 +103,7 @@ pub fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T 
 }
 
 pub fn dotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_dotF32AccF64Unit, void, .{ n, x, y });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.dotF32AccF64Unit(n, x, y),
         .x86_64 => x86_64.dotF32AccF64Unit(n, x, y),
@@ -100,6 +112,7 @@ pub fn dotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
 }
 
 pub fn dotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_dotUnitComplex, T, .{ n, x, y, conjx });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.dotUnitComplex(T, n, x, y, conjx),
         .x86_64 => x86_64.dotUnitComplex(T, n, x, y, conjx),
@@ -108,6 +121,7 @@ pub fn dotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, 
 }
 
 pub fn rotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_rotUnitReal, T, .{ n, x, y, c, s });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.rotUnitReal(T, n, x, y, c, s),
         .x86_64 => x86_64.rotUnitReal(T, n, x, y, c, s),
@@ -116,6 +130,7 @@ pub fn rotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) boo
 }
 
 pub fn rotUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_rotUnitRealStreaming, T, .{ n, x, y, c, s });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.rotUnitRealStreaming(T, n, x, y, c, s),
         else => false,
@@ -123,6 +138,7 @@ pub fn rotUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, 
 }
 
 pub fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_rotmUnitReal, T, .{ n, x, y, flag, h11, h21, h12, h22 });
     return switch (builtin.cpu.arch) {
         .aarch64 => aarch64.rotmUnitReal(T, n, x, y, flag, h11, h21, h12, h22),
         .x86_64 => x86_64.rotmUnitReal(T, n, x, y, flag, h11, h21, h12, h22),

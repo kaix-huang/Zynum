@@ -11,7 +11,7 @@
 
 const builtin = @import("builtin");
 const std = @import("std");
-const core = @import("../core.zig");
+const core = @import("../core/checked.zig");
 const types = @import("../types.zig");
 
 pub const BlasInt = types.BlasInt;

@@ -235,6 +235,17 @@
       "matrix_applicable": false
     },
     {
+      "id": "python-root:darwin-archive-repack-direct",
+      "language": "python",
+      "root_kind": "direct",
+      "module_paths": [
+        "test/build/test_repack_darwin_archive.py"
+      ],
+      "launch_observation_ids": [],
+      "aggregate_step_observation_id": null,
+      "matrix_applicable": false
+    },
+    {
       "id": "python-root:test-inventory-direct",
       "language": "python",
       "root_kind": "direct",
@@ -682,6 +693,112 @@
       "required_isolated_objects": []
     }
   ],
+  "correctness_only_roots": [
+    {
+      "id": "correctness-root:dynamic-dispatch",
+      "language": "zig",
+      "physical_path": "src/blas/dynamic_dispatch_test.zig",
+      "compile_observation_id": "compile:build.zig:build:dynamic_tests",
+      "launch_observation_ids": [
+        "launch:build.zig:build:run_dynamic_tests",
+        "launch:build.zig:build:run_dynamic_baseline_tests"
+      ],
+      "selector_step_observation_id": "step:build.zig:build:test-dynamic-dispatch",
+      "guard": "dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled",
+      "process_environments": [
+        {},
+        {
+          "ZYNUM_MAX_ISA": "baseline"
+        }
+      ],
+      "enumeration_source": "static-source-reachability-only",
+      "native_inventory_evidence": false,
+      "source_reachability": [
+        "src/blas/abi/fortran.zig",
+        "src/blas/api.zig",
+        "src/blas/api/aliasing.zig",
+        "src/blas/api/operations.zig",
+        "src/blas/api/views.zig",
+        "src/blas/core/checked.zig",
+        "src/blas/core/checked/operands.zig",
+        "src/blas/core/checked/operations.zig",
+        "src/blas/core/execution/thread_pool.zig",
+        "src/blas/core/matrix_matrix.zig",
+        "src/blas/core/matrix_matrix/gemm.zig",
+        "src/blas/core/matrix_matrix/planner.zig",
+        "src/blas/core/matrix_matrix/symmetric.zig",
+        "src/blas/core/matrix_matrix/triangular.zig",
+        "src/blas/core/matrix_vector.zig",
+        "src/blas/core/matrix_vector/access.zig",
+        "src/blas/core/matrix_vector/compact_triangular_entry.zig",
+        "src/blas/core/matrix_vector/general.zig",
+        "src/blas/core/matrix_vector/rank_update.zig",
+        "src/blas/core/matrix_vector/symmetric.zig",
+        "src/blas/core/matrix_vector/triangular.zig",
+        "src/blas/core/shared/indexing.zig",
+        "src/blas/core/shared/scalar.zig",
+        "src/blas/core/unchecked.zig",
+        "src/blas/core/vector.zig",
+        "src/blas/core/vector/operations.zig",
+        "src/blas/dynamic_dispatch_test.zig",
+        "src/blas/hardware.zig",
+        "src/blas/kernels/arch/aarch64/asm/builders.zig",
+        "src/blas/kernels/arch/aarch64/asm/matrix_vector.zig",
+        "src/blas/kernels/arch/aarch64/asm/vector.zig",
+        "src/blas/kernels/arch/aarch64/features.zig",
+        "src/blas/kernels/arch/aarch64/matrix_matrix/amx.zig",
+        "src/blas/kernels/arch/aarch64/matrix_matrix/amx_ops.zig",
+        "src/blas/kernels/arch/aarch64/matrix_matrix/asimd.zig",
+        "src/blas/kernels/arch/aarch64/matrix_matrix/sme.zig",
+        "src/blas/kernels/arch/aarch64/matrix_matrix/sme_asm.zig",
+        "src/blas/kernels/arch/aarch64/matrix_matrix/sve2.zig",
+        "src/blas/kernels/arch/aarch64/matrix_vector.zig",
+        "src/blas/kernels/arch/aarch64/simd_config.zig",
+        "src/blas/kernels/arch/aarch64/vector/binary.zig",
+        "src/blas/kernels/arch/aarch64/vector/unary.zig",
+        "src/blas/kernels/arch/x86_64/features.zig",
+        "src/blas/kernels/arch/x86_64/matrix_matrix/simd.zig",
+        "src/blas/kernels/arch/x86_64/matrix_vector.zig",
+        "src/blas/kernels/arch/x86_64/simd_config.zig",
+        "src/blas/kernels/arch/x86_64/vector/binary.zig",
+        "src/blas/kernels/arch/x86_64/vector/unary.zig",
+        "src/blas/kernels/contract.zig",
+        "src/blas/kernels/dispatch/matrix_matrix.zig",
+        "src/blas/kernels/dispatch/matrix_vector.zig",
+        "src/blas/kernels/dispatch/vector_binary.zig",
+        "src/blas/kernels/dispatch/vector_unary.zig",
+        "src/blas/kernels/isolated/structured_gemm_host.zig",
+        "src/blas/kernels/isolated/task_runtime_host.zig",
+        "src/blas/kernels/isolated/x86_64_compact_triangular_abi.zig",
+        "src/blas/kernels/isolated/x86_64_compact_triangular_bridge.zig",
+        "src/blas/kernels/isolated/x86_64_level2_width_abi.zig",
+        "src/blas/kernels/isolated/x86_64_level2_width_bridge.zig",
+        "src/blas/kernels/isolated/x86_64_structured_abi.zig",
+        "src/blas/kernels/isolated/x86_64_structured_bridge.zig",
+        "src/blas/kernels/multiversion/client.zig",
+        "src/blas/kernels/multiversion/protocol.zig",
+        "src/blas/kernels/shared/matrix_matrix/catalog.zig",
+        "src/blas/kernels/shared/matrix_matrix/epilogue.zig",
+        "src/blas/kernels/shared/matrix_matrix/executor.zig",
+        "src/blas/kernels/shared/matrix_matrix/generic.zig",
+        "src/blas/kernels/shared/matrix_matrix/generic/basic.zig",
+        "src/blas/kernels/shared/matrix_matrix/packed_params.zig",
+        "src/blas/kernels/shared/matrix_matrix/packed_simd.zig",
+        "src/blas/kernels/shared/matrix_matrix/packing.zig",
+        "src/blas/kernels/shared/matrix_matrix/structured_catalog.zig",
+        "src/blas/kernels/shared/matrix_matrix/task.zig",
+        "src/blas/kernels/shared/matrix_matrix/tuning.zig",
+        "src/blas/kernels/shared/matrix_vector/catalog.zig",
+        "src/blas/kernels/shared/matrix_vector/fixed_simd.zig",
+        "src/blas/kernels/shared/matrix_vector/tuning.zig",
+        "src/blas/kernels/shared/vector/fixed_simd.zig",
+        "src/blas/kernels/shared/vector/tuning.zig",
+        "src/blas/kernels/tuning/structured.zig",
+        "src/blas/runtime.zig",
+        "src/blas/types.zig"
+      ]
+    }
+  ],
   "zig_test_files": [
     {
       "id": "zig-file:bench/gemm_sweep.zig",
@@ -870,6 +987,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:cblas-tests",
         "zig-root:fortran-tests"
       ],
@@ -888,6 +1006,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -930,6 +1049,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -990,6 +1110,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1004,6 +1125,71 @@
         "zig-root:triangular-packed-unit-tests",
         "zig-root:triangular-parallel-tests",
         "zig-root:zynum-public-surface-contract-tests"
+      ],
+      "gap_id": null
+    },
+    {
+      "id": "zig-file:src/blas/dynamic_dispatch_test.zig",
+      "path": "src/blas/dynamic_dispatch_test.zig",
+      "classification": "logical-root",
+      "declarations": [
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:0",
+          "name": "ISA ceilings never grant features and baseline always stays baseline",
+          "ordinal": 0,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:1",
+          "name": "missing compiler prerequisites downgrade an otherwise capable host",
+          "ordinal": 1,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:2",
+          "name": "selected tier agrees with host evidence and fresh process baseline ceiling",
+          "ordinal": 2,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:3",
+          "name": "private packets keep arguments and results within aligned storage",
+          "ordinal": 3,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:4",
+          "name": "ABI scaling and checked dot preserve vector tails for every scalar",
+          "ordinal": 4,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:5",
+          "name": "ABI GEMV handles padded leading dimensions and complex coefficients",
+          "ordinal": 5,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:6",
+          "name": "ABI GEMM matches explicit fringe products for all four scalar types",
+          "ordinal": 6,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:7",
+          "name": "checked workspace aliasing works through the selected object",
+          "ordinal": 7,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/dynamic_dispatch_test.zig:8",
+          "name": "parallel fringe GEMM remains usable after repeated shutdown",
+          "ordinal": 8,
+          "kind": "named"
+        }
+      ],
+      "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch"
       ],
       "gap_id": null
     },
@@ -1085,6 +1271,55 @@
       "gap_id": null
     },
     {
+      "id": "zig-file:src/blas/hardware.zig",
+      "path": "src/blas/hardware.zig",
+      "classification": "permitted-source-local",
+      "declarations": [
+        {
+          "id": "zig-decl:src/blas/hardware.zig:0",
+          "name": "x86 vector tiers require CPU support and every OS state component",
+          "ordinal": 0,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/hardware.zig:1",
+          "name": "aarch64 capability tiers fail closed without parent features",
+          "ordinal": 1,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/hardware.zig:2",
+          "name": "capability cache representation preserves empty and complete snapshots",
+          "ordinal": 2,
+          "kind": "named"
+        }
+      ],
+      "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
+        "zig-root:blas-module-tests",
+        "zig-root:blas-public-surface-contract-tests",
+        "zig-root:cblas-tests",
+        "zig-root:fortran-tests",
+        "zig-root:gemm-registry-tests",
+        "zig-root:level1-registry-tests",
+        "zig-root:level2-compact-registry-tests",
+        "zig-root:level2-fused-registry-tests",
+        "zig-root:modern-tests",
+        "zig-root:packed-parallel-tests",
+        "zig-root:structured-blocked-tests",
+        "zig-root:structured-object-tests",
+        "zig-root:symm-dense-gemm-tests",
+        "zig-root:triangular-band-solve-tests",
+        "zig-root:triangular-band-window-tests",
+        "zig-root:triangular-dense-unit-tests",
+        "zig-root:triangular-packed-unit-tests",
+        "zig-root:triangular-parallel-tests",
+        "zig-root:vector-stride2-parallel-tests",
+        "zig-root:zynum-public-surface-contract-tests"
+      ],
+      "gap_id": null
+    },
+    {
       "id": "zig-file:src/blas/kernels/arch/aarch64/features.zig",
       "path": "src/blas/kernels/arch/aarch64/features.zig",
       "classification": "permitted-source-local",
@@ -1097,6 +1332,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1139,6 +1375,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1205,6 +1442,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1268,6 +1506,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1297,6 +1536,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1331,6 +1571,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1369,11 +1610,13 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
         "zig-root:fortran-tests",
         "zig-root:gemm-registry-tests",
+        "zig-root:level1-registry-tests",
         "zig-root:level2-compact-registry-tests",
         "zig-root:level2-fused-registry-tests",
         "zig-root:modern-tests",
@@ -1386,6 +1629,7 @@
         "zig-root:triangular-dense-unit-tests",
         "zig-root:triangular-packed-unit-tests",
         "zig-root:triangular-parallel-tests",
+        "zig-root:vector-stride2-parallel-tests",
         "zig-root:zynum-public-surface-contract-tests"
       ],
       "gap_id": null
@@ -1443,11 +1687,13 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
         "zig-root:fortran-tests",
         "zig-root:gemm-registry-tests",
+        "zig-root:level1-registry-tests",
         "zig-root:level2-compact-registry-tests",
         "zig-root:level2-fused-registry-tests",
         "zig-root:modern-tests",
@@ -1460,6 +1706,7 @@
         "zig-root:triangular-dense-unit-tests",
         "zig-root:triangular-packed-unit-tests",
         "zig-root:triangular-parallel-tests",
+        "zig-root:vector-stride2-parallel-tests",
         "zig-root:zynum-public-surface-contract-tests"
       ],
       "gap_id": null
@@ -1512,6 +1759,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1575,6 +1823,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1679,6 +1928,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1798,6 +2048,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -1840,6 +2091,7 @@
         }
       ],
       "reaching_root_ids": [
+        "correctness-root:dynamic-dispatch",
         "zig-root:blas-module-tests",
         "zig-root:blas-public-surface-contract-tests",
         "zig-root:cblas-tests",
@@ -7686,7 +7938,7 @@
         },
         {
           "id": "python-decl:test/build/test_build_inventory.py:225",
-          "name": "BuildInventoryTests.test_example_optimize_forwarding_gap_is_recorded",
+          "name": "BuildInventoryTests.test_example_optimize_forwarding_gap_is_closed",
           "ordinal": 225
         },
         {
@@ -8339,6 +8591,37 @@
       "launch_observation_ids": [
         "launch:build.zig:build:build_profile_tests"
       ],
+      "gap_ids": []
+    },
+    {
+      "id": "python-module:test/build/test_repack_darwin_archive.py",
+      "path": "test/build/test_repack_darwin_archive.py",
+      "declarations": [
+        {
+          "id": "python-decl:test/build/test_repack_darwin_archive.py:0",
+          "name": "RepackTests.test_member_validation",
+          "ordinal": 0
+        },
+        {
+          "id": "python-decl:test/build/test_repack_darwin_archive.py:1",
+          "name": "RepackTests.test_restores_owner_permissions_and_preserves_order",
+          "ordinal": 1
+        },
+        {
+          "id": "python-decl:test/build/test_repack_darwin_archive.py:2",
+          "name": "RepackTests.test_failed_recreation_preserves_existing_output",
+          "ordinal": 2
+        },
+        {
+          "id": "python-decl:test/build/test_repack_darwin_archive.py:3",
+          "name": "RepackTests.test_real_macho_members_are_eight_byte_aligned",
+          "ordinal": 3
+        }
+      ],
+      "root_ids": [
+        "python-root:darwin-archive-repack-direct"
+      ],
+      "launch_observation_ids": [],
       "gap_ids": []
     },
     {
@@ -12883,7 +13166,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "root_id": "python-root:build-inventory-direct",
       "tests": [
         {
@@ -14013,7 +14296,7 @@
         },
         {
           "id": "test:python-root-build-inventory-direct:225",
-          "name": "test/build/test_build_inventory.py::BuildInventoryTests.test_example_optimize_forwarding_gap_is_recorded",
+          "name": "test/build/test_build_inventory.py::BuildInventoryTests.test_example_optimize_forwarding_gap_is_closed",
           "ordinal": 225
         },
         {
@@ -14628,7 +14911,7 @@
         }
       ],
       "count": 348,
-      "digest": "b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "digest": "767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "enumeration_source": "static"
     },
     {
@@ -14658,6 +14941,35 @@
       ],
       "count": 4,
       "digest": "1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "enumeration_source": "static"
+    },
+    {
+      "id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "tests": [
+        {
+          "id": "test:python-root-darwin-archive-repack-direct:0",
+          "name": "test/build/test_repack_darwin_archive.py::RepackTests.test_member_validation",
+          "ordinal": 0
+        },
+        {
+          "id": "test:python-root-darwin-archive-repack-direct:1",
+          "name": "test/build/test_repack_darwin_archive.py::RepackTests.test_restores_owner_permissions_and_preserves_order",
+          "ordinal": 1
+        },
+        {
+          "id": "test:python-root-darwin-archive-repack-direct:2",
+          "name": "test/build/test_repack_darwin_archive.py::RepackTests.test_failed_recreation_preserves_existing_output",
+          "ordinal": 2
+        },
+        {
+          "id": "test:python-root-darwin-archive-repack-direct:3",
+          "name": "test/build/test_repack_darwin_archive.py::RepackTests.test_real_macho_members_are_eight_byte_aligned",
+          "ordinal": 3
+        }
+      ],
+      "count": 4,
+      "digest": "d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
       "enumeration_source": "static"
     },
     {
@@ -21508,7 +21820,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21523,7 +21835,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21538,7 +21850,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21584,6 +21896,51 @@
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
       "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "environment_id": "env:aarch64-linux-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "environment_id": "env:aarch64-linux-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "environment_id": "env:aarch64-linux-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22723,7 +23080,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22738,7 +23095,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22753,7 +23110,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -22799,6 +23156,51 @@
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
       "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "environment_id": "env:aarch64-macos-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "environment_id": "env:aarch64-macos-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "environment_id": "env:aarch64-macos-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23938,7 +24340,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:Debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23953,7 +24355,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseFast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -23968,7 +24370,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:b72eb245b99fb4123289626352eb2a81c8df7d8aa3098b41471c3b3277860512",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:767e2bcdeeec1db881b8dedff2d7cb0bbc2c2e0fd3e4fe58158fcf64d7455f88",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -24014,6 +24416,51 @@
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:python-static",
       "expected_test_set_id": "set:python-root:build-profiles-direct:1523daac61fea10a8d6298a19add86209a188670ab39291fc2865a32b9b66201",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "environment_id": "env:x86-64-linux-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "environment_id": "env:x86-64-linux-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "environment_id": "env:x86-64-linux-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -25232,6 +25679,51 @@
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
+      "id": "row:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "environment_id": "env:x86-64-windows-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:Debug",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "environment_id": "env:x86-64-windows-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
+      "id": "row:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "environment_id": "env:x86-64-windows-gnu-baseline",
+      "root_id": "python-root:darwin-archive-repack-direct",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "disposition": "execute",
+      "predicate_id": "predicate:always",
+      "command_template": "python3 -B test/build/test_repack_darwin_archive.py",
+      "mode_effect": "not-applicable",
+      "expected_actual_module_optimize": null,
+      "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:python-static",
+      "expected_test_set_id": "set:python-root:darwin-archive-repack-direct:d24ecfdc3b1608a1c77be47c052fad5c472115e4a372e2f47b47f423124e97c9",
+      "expectation_state": "frozen-compiler-enumeration"
+    },
+    {
       "id": "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:Debug",
       "environment_id": "env:x86-64-windows-gnu-baseline",
       "root_id": "python-root:test-inventory-direct",
@@ -26438,6 +26930,9 @@
       "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
       "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
       "row:env-aarch64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "row:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "row:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "row:env-aarch64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
       "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26519,6 +27014,9 @@
       "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:Debug",
       "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseFast",
       "row:env-aarch64-macos-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "row:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "row:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "row:env-aarch64-macos-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
       "row:env-aarch64-macos-baseline:python-root-test-inventory-direct:Debug",
       "row:env-aarch64-macos-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-aarch64-macos-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26600,6 +27098,9 @@
       "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:Debug",
       "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
       "row:env-x86-64-linux-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "row:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "row:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "row:env-x86-64-linux-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
       "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:Debug",
       "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26681,6 +27182,9 @@
       "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:Debug",
       "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseFast",
       "row:env-x86-64-windows-gnu-baseline:python-root-build-profiles-direct:ReleaseSafe",
+      "row:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:Debug",
+      "row:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseFast",
+      "row:env-x86-64-windows-gnu-baseline:python-root-darwin-archive-repack-direct:ReleaseSafe",
       "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:Debug",
       "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:ReleaseFast",
       "row:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:ReleaseSafe",
@@ -26748,8 +27252,8 @@
       "row:env-x86-64-windows-gnu-baseline:zig-root-zynum-public-surface-contract-tests:ReleaseFast",
       "row:env-x86-64-windows-gnu-baseline:zig-root-zynum-public-surface-contract-tests:ReleaseSafe"
     ],
-    "count": 324,
-    "digest": "0c0a3fd5e546c9f339dada58a5e03b174048cbd325c1b8784edcd421b49ea2cf"
+    "count": 336,
+    "digest": "c159550f89253cbeebc79f476941824595de22d0064e5bf9ddbd4bff2b2ed8cd"
   },
   "strict_summary": {
     "test_enumeration_classes": {
@@ -26757,28 +27261,32 @@
       "digest": "6e0497ce988495e354c68513e0df0413fd38f5a61060c4856bf07aad4ecacba5"
     },
     "test_roots": {
-      "count": 27,
-      "digest": "dcf53dd459edb1be5ed2a588d6190d71d5159740722735fe04f2fcb187056744"
+      "count": 28,
+      "digest": "1bc282f589877914744444e2a191fb5ca913dee3648308a6389916072f553e0f"
+    },
+    "correctness_only_roots": {
+      "count": 1,
+      "digest": "85625aca02d1ba38e2f5bee0ff81d9ab882ef03ab5e7404e7fb59691fada791f"
     },
     "zig_test_files": {
-      "count": 51,
-      "digest": "d520e2bd104edb933dbf84afdd0ac82816c0d45b6111d22fc012c9cc54bebabf"
+      "count": 53,
+      "digest": "3350dd4d6ac7c264198ca75e992d2e90707ae02d7bbcc1cfa4fd1981f2cb51bc"
     },
     "python_test_modules": {
-      "count": 20,
-      "digest": "2560a5a2c396b082a3266a0a9b40e4f36d3e470617d9435c33435d02ac1baedb"
+      "count": 21,
+      "digest": "e96868e3dccc067219fe72fc9d6c02bf7236840f93ff82fbce0379b2f74e77de"
     },
     "expected_test_sets": {
-      "count": 43,
-      "digest": "decefcf9d1aa4bb4397150ba2438dc433e794e422046cd6a2f6ab868ed438817"
+      "count": 44,
+      "digest": "07932dcd83be60933119a9eba0a2b9f27c94b76e4775af8c83f6179394f91efe"
     },
     "native_observation_bindings": {
       "count": 123,
       "digest": "a0418aeefff6bcf51d7e802262923042e9e2ff100bab6166a07b04c5379296d3"
     },
     "test_mode_rows": {
-      "count": 324,
-      "digest": "ad28a27528c1366a57b075ab05f90cabec7a80f68147a8c11dffddabf016dd4d"
+      "count": 336,
+      "digest": "3b4fd738299ecec98164c932c357c92f94249ef268ed2c670b05111a1b2fc205"
     },
     "workflow_mode_bindings": {
       "count": 4,

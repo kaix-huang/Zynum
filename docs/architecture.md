@@ -36,7 +36,10 @@ docs/<module or platform>/
 
 `src/blas/api/views.zig` owns checked vector and matrix views,
 `src/blas/api/aliasing.zig` owns checked-build alias validation, and
-`src/blas/api/operations.zig` translates descriptive operations into the core.
+`src/blas/api/operations.zig` translates descriptive operations through
+`src/blas/core/checked.zig`. This narrow facade exposes only scalar helpers,
+validated operands, and descriptive operations. A compile-time guard rejects
+raw BLAS and scheduling declarations at the API import boundary.
 
 Public names describe operations rather than ABI abbreviations. Default output
 APIs use a no-alias contract. Supported overlap is explicit through an in-place,
@@ -281,8 +284,8 @@ Raw reports and host-specific records remain outside the public repository.
 
 ## Improvement Priorities
 
-The completed item below records the first review follow-up; the remaining
-items are proposed work, not implemented behavior changes. Preserve numerical
+The completed items below record the repository review follow-ups. The
+subsequent boundary work remains proposed. Preserve numerical
 semantics, public imports, ABI symbols, and measured fallback gates while
 addressing them incrementally.
 
@@ -299,27 +302,38 @@ addressing them incrementally.
    profile, all 57 conflicting combinations, and independent controls. It also
    runs through `test-host-tool-smoke`. These are configuration checks, not
    native kernel correctness or performance evidence.
-2. **Remove unreachable tuning rules without enabling new routes.** In
-   `src/blas/kernels/shared/matrix_matrix/tuning.zig`, the f32 branch of
-   `selectAmx` rejects `k > 512` before later rules for `k == 1024` and
-   `k >= 2048`/`4096`. Remove the unreachable conditions while retaining the
-   current safety gate; test selection boundaries such as `K=512/513`.
-   Relaxing that gate is separate performance work requiring native evidence.
-3. **Narrow product/tool build dependencies.** `install-libraries` already
-   exists, but the default non-Windows install also builds benchmark/probe
-   executables, and some benchmark run steps depend on the entire install
-   step. Make tool installation explicit and individual run steps depend only
-   on their required artifacts. Review install compatibility and refresh the
-   build inventory together; split `build.zig` by responsibility only after
-   those dependencies are clear.
+2. **Completed: remove unreachable tuning rules without enabling new routes.** In
+   `src/blas/kernels/shared/matrix_matrix/tuning.zig`, f32 AMX rules now
+   contain only predicates reachable under the retained `K <= 512` cap.
+   The existing registry test covers K=512/513, fringe, partial-N, square
+   exclusions, and an f64 high-K control. No new route is enabled.
+3. **Completed: narrow benchmark run dependencies.** Benchmark runs depend on
+   their emitted probe and shared library instead of the full install graph.
+   The direct GEMM sweep installs only the shared library to create its output
+   prefix, and respects `--prefix` for the default CSV. Default installation
+   remains compatible; explicit tool-only installation is still future work.
+4. **Completed: narrow checked imports.** API views and operations use the
+   checked facade described above. Legacy `core.zig` aliases remain available.
+5. **Completed: make chart statistics explicit.** All three public plotters
+   accept `--stat median`; missing median evidence fails before publication.
+   GEMM reports retain ordered per-process median timings alongside aggregates.
+
+6. **Completed: make persistent-worker generations wrap safely.** Submission
+   and shutdown increment each addressed worker's own atomic counter. The
+   admission lock serializes producers; completion acknowledges that the worker
+   has consumed its generation. This removes checked-build overflow and avoids
+   assigning an idle worker a global generation equal to its stale value.
+   The existing runtime test now covers submission and shutdown rollover,
+   exactly-once indices, inactive workers, alternating helper sets, and restart.
+
+7. **Completed: separate isolated Level 2 worker startup.** The frozen worker
+   parses its own arguments and finishes before controller-only imports are
+   evaluated. It therefore runs from its captured script without repository
+   siblings or a `PYTHONPATH` dependency. Regression coverage executes the
+   captured script, rather than only mocking subprocess results.
 
 ### Subsequent Boundary Work
 
-- **Make checked imports narrower.** API callers use the broad `core.zig`
-  facade; expose a smaller checked-operands/operations boundary and add import
-  direction checks. Public declaration contract tests already exist but do not
-  enforce internal dependency direction. Do not remove public facade aliases
-  merely because they are re-exports.
 - **Separate measured preferences from plan feasibility.**
   `src/blas/core/matrix_matrix/planner.zig` embeds shape/type/thread preferences
   alongside task construction, while kernel preferences also live in
@@ -331,7 +345,9 @@ addressing them incrementally.
   and persistent execution and contains a `count == 3` helper-index special
   case. Establish evidence for that exception; extend lifecycle coverage for
   mixed modes, concurrent callers, shutdown/restart, and thread-cap changes.
-  Existing shutdown/failure tests are useful foundations. Do not merge the
+  The new rollover/restart and existing failure tests are useful foundations.
+  Add simultaneous-caller and mixed ordinary/persistent admission tests before
+  changing that helper mapping. Do not merge the
   two lifecycles or change waiting protocols without independent correctness
   and native performance validation.
 
@@ -340,6 +356,51 @@ infrastructure, not disposable planning metadata. Keep their safety gates and
 shared utilities; delete tools only after checking build, CI, test, and report
 consumers. Complete pending native inventory rows on the exact target systems
 rather than replacing missing evidence with cross-link results.
+
+## Runtime Kernel Selection
+
+The default build emits one library for a single target architecture, OS and ABI.
+The host code uses that target's baseline CPU, while `buildKernelTiers` compiles
+ISA objects separately with LTO disabled. x86 objects are absent from ARM builds
+and vice versa. The same objects serve the checked Zig API and C/Fortran ABI.
+
+`hardware.zig` detects OS-usable features: macOS AArch64 uses sysctl (including
+SME, SME2, SME2p1, FP16 and BF16); Linux AArch64 uses HWCAP/HWCAP2; x86_64 uses
+CPUID plus OSXSAVE/XCR0. Compiler-implied dependencies are also required. Unknown
+ARM OS capabilities fall back conservatively. In particular, Zig identifying an
+M5 as `apple_m1` no longer prevents the dynamic library from using its SME tier.
+
+The admitted tiers are `baseline`, `aarch64_sve2`, `aarch64_sme`,
+`aarch64_sme2`, `aarch64_sme2p1`, `x86_avx`, `x86_avx2_fma`, and `x86_avx512`.
+SME2/2.1 objects additionally require F64F64. The resolver intersects linked
+objects, detected capabilities and optional `ZYNUM_MAX_ISA` ceiling. Unknown or
+wrong-architecture ceiling values select baseline. It publishes one immutable
+selection atomically; each selected object's existing shape, scalar, workspace
+and streaming-vector constraints still choose the actual kernel or fallback.
+A lower ceiling is useful for testing, never for enabling unsupported ISA.
+
+The four kernel dispatch facades route through a generated private operation
+protocol. The generator derives signatures from those facades, including concrete
+scalar variants. Pointer packets stay within one build/compiler/architecture;
+they are not a public ABI. Host scheduling, parameter validation, threading and
+core workspaces remain single instances. Kernel-local caches are freed through
+the same immutable selected object on shutdown. No target-specific initialization
+runs before admission, and private tier entry symbols are hidden.
+
+An explicit `-Ddispatch=dynamic` resets the host CPU/features to baseline, which
+also supports Zig dependencies that implicitly forward CPU options with their
+target. Explicit `-Dcpu` selects specialization in `auto` mode. In a specialized
+build, `dynamic_dispatch=false` removes the generated calls and linked tier
+objects at compile time. The
+ordinary feature constants become valid compile-time facts again. This option
+is a deployment requirement chosen by the caller, not a claim that any machine
+can execute that library. `-Dthread-limit` is a compile-time concurrency ceiling;
+OS capacity, runtime overrides and ordinary operation feasibility still apply.
+
+`test-dynamic-dispatch` exercises native automatic and forced-baseline execution
+in separate processes. It is correctness evidence, not a canonical inventory
+row. Explicit `-Dcpu=baseline` keeps the original inventory test path. Run
+`zig build check-multiversion` to reject stale generated adapters/protocols.
 
 ## Naming Rules
 

@@ -620,6 +620,20 @@ pub fn gemvTransTaskFullUnitComplexC64M512N64(
     beta: scalar.ComplexF64,
     y: [*]scalar.ComplexF64,
 ) void {
+    // The universal object materializes this entry even when FCMLA is absent.
+    // Keep the fixed-shape primitive total rather than emitting an unsupported
+    // instruction in a baseline or SME-only object.
+    if (comptime !features.has_complxnum) {
+        const T = scalar.ComplexF64;
+        for (0..64) |col| {
+            var sum = scalar.zero(T);
+            for (0..512) |row| sum = scalar.add(T, sum, scalar.mul(T, a[col * @as(usize, @intCast(lda)) + row], x[row]));
+            const product = scalar.mul(T, alpha, sum);
+            y[col] = if (scalar.isZero(T, beta)) product else scalar.add(T, product, scalar.mul(T, beta, y[col]));
+        }
+        return;
+    }
+
     const lda_bytes = @as(usize, @intCast(lda)) * @sizeOf(scalar.ComplexF64);
     callZgemvNoTransFcmlaF64M128(matrix_vector_asm.zgemvTransFcmlaF64M512N64TaskBeta, alpha, beta, a, lda_bytes, x, y);
 }

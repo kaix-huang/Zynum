@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 const Io = std.Io;
 const runner_io: Io = Io.Threaded.global_single_threaded.io();
 const maximum_inventory_bytes = 4 * 1024 * 1024;
-const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "fb23230b483a99c73a89175ab4ea984724f6b9b5d28a12a5dc82dc8fa7b47744";
+const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "289af0274a538055ed4ba7c6bd098d4e4c2dfde808c70c69daf247f8db4360ba";
 const NEXT_TEST_INVENTORY_SHA256: ?[]const u8 = null;
 
 const Inventory = struct {
@@ -20,6 +20,7 @@ const Inventory = struct {
     environment_profiles: []const EnvironmentProfile,
     test_enumeration_classes: []const TestEnumerationClass,
     test_roots: std.json.Value,
+    correctness_only_roots: std.json.Value,
     zig_test_files: std.json.Value,
     python_test_modules: std.json.Value,
     python_skip_contracts: std.json.Value,

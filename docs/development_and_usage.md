@@ -22,6 +22,10 @@ zig build --summary failures
 ZYNUM_SMOKE
 ```
 
+For native dynamic-dispatch checks, use `zig build test-dynamic-dispatch`;
+`zig build test` without `-Dcpu` selects that path plus host tooling smoke tests.
+Use explicit `-Dcpu=baseline` for the full canonical inventory suite.
+
 Useful target checks:
 
 ```sh
@@ -49,7 +53,8 @@ feature tier.
 Inventory-dependent tests require an exact `-Dcpu=baseline` query. `native`, an
 explicit CPU model, and feature modifiers are not inventory queries. Use
 `test-native-feature` for correctness on a matching native host; ordinary
-`zig build` remains host-native and unrestricted by the test inventory.
+`zig build` produces a baseline host with runtime-selected ISA objects. Explicit
+`-Dcpu` selects specialization. See the [build-mode table](../README.md#portable-and-specialized-builds).
 
 `tools/test_inventory.json` records the supported test surface: logical roots,
 ordered compiler-enumerated sets, target applicability, optimize modes, and
