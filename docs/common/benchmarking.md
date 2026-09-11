@@ -313,6 +313,78 @@ python3 bench/tools/render_full_benchmark_report.py \
 The renderer is a final evidence filter, not a replacement for family checkers.
 Retain each family summary so aggregate failures map to logical cases.
 
+## Native Windows Local Benchmarks
+
+Build real Windows probes with Zig 0.16 and run the local diagnostic controller
+with Python 3.11 or newer:
+
+```powershell
+zig build -Doptimize=ReleaseFast install build-rank-k-probe build-symm-probe build-triangular-matrix-probe build-rotg-latency-probe
+python bench/tools/run_windows_benchmark.py --output zig-out/windows-local --build-command "zig build -Doptimize=ReleaseFast install build-rank-k-probe build-symm-probe build-triangular-matrix-probe build-rotg-latency-probe"
+python bench/tools/plot_windows_benchmark.py zig-out/windows-local
+```
+
+Windows probes keep loaded DLLs mapped until process exit. They still invoke
+Zynum's shutdown hook where applicable, but Zig 0.16 detached worker epilogues
+can outlive that hook, so immediate `FreeLibrary` is not an unload barrier.
+Fresh-process execution bounds these retained module references.
+
+The plotter requires `matplotlib`. It creates PNG and SVG charts and a local
+HTML index containing every case. The controller writes `records.csv`,
+`records.json`, per-repeat `raw.jsonl`, process transcripts, and `metadata.json`.
+Use a new output directory for every run. `--quick` selects small smoke cases;
+`--families level1,gemm` selects a subset without changing its repeat policy.
+
+The default profile covers all routine families with bounded sizes: Level 1 at
+4096, 262144, and 1048576 elements; Level 2 at 64 and 256; all four GEMM types at
+32 through 1024 square with NN/NT/TN/TT; scalar rotation corpora; and structured
+Level 3 at 64 and 256. It is not the Cartesian product of every shape, stride,
+scalar, and transpose. Each case requires three successful fresh-process
+measurements with checked or sampled-checked output. Failed correctness,
+incomplete repeats, and invalid timing remain failures with no aggregate rate.
+GEMM uses 30 timed batches per process and derives throughput from median
+elapsed time. Level 1 uses one-second windows. Other families retain their
+existing probe metrics. Charts keep unlike units separate.
+
+Zynum's thread and ISA caps are cleared for automatic runtime selection.
+The run records this policy, before/after executable and DLL hashes, source
+hashes, and the supplied build command. It measures Zynum alone. Hash stability
+does not replace immutable artifact snapshots or prove build provenance.
+
+This local controller deliberately does not invoke the POSIX descriptor-based
+snapshot and publication layer. Its results are local diagnostics, not the
+certified full cross-level comparator report described above. The Windows
+canonical inventory still needs POSIX validation infrastructure; native dynamic
+dispatch checks and probe reference checks provide separate correctness
+evidence. A POSIX inventory failure must not be relabeled as a passing gate.
+
+For a local Windows comparator run matching the README's common-operation
+scope, supply each installed LP64 DLL explicitly:
+
+```powershell
+python bench/tools/run_windows_comparison.py --output zig-out/windows-comparison --process-repeats 4 --library Zynum=C:\path\zynum_blas.dll --library MKL=C:\path\mkl_rt.3.dll --library OpenBLAS=C:\path\libopenblas.dll --library BLIS=C:\path\libblis.4.dll
+python bench/tools/plot_windows_comparison.py zig-out/windows-comparison
+```
+
+This default `readme` profile measures 46 Level 1, 60 Level 2, and 168 GEMM
+cases per library. Four repeats balance the four libraries across execution
+positions. Each library's DLL directory is added only to its child process's
+search path; use `--dependency-dir NAME=PATH` for additional runtime directories.
+Use LP64 builds and their required runtime DLLs. Comparator thread caps are 24,
+dynamic thread adjustment is disabled, and Zynum keeps automatic selection.
+Actual worker counts are not instrumented. A missing or failing comparator
+remains a failure in the predeclared plan.
+
+The comparison plotter shares the README's pure SVG renderers and uses
+`resvg-py` for PNG output (`--no-png` needs no raster dependency). Its README
+scope includes only NN GEMM. The runner's separate `--profile full` option
+retains the broader bounded native suite as raw data; the README comparison
+plotter does not render that profile. Level 1/2 use median process rates;
+GEMM uses operation count divided by the median of process-median elapsed
+times. Each process's measurements, aggregate dispersion, exact execution order,
+declared cases, executable/dependency hashes, and failures remain available.
+These local charts do not replace the immutable public README evidence package.
+
 ## Report Publication
 
 Report producers validate complete output in memory before publishing a
@@ -394,6 +466,56 @@ GEMM plots operation count divided by the median of per-process median timings.
 The default `--stat best` remains available for diagnostic compatibility.
 GEMM CSVs retain `median_ns_samples` in process order so median dispersion can
 be inspected without reconstructing discarded worker outputs.
+
+The GEMM probe calibrates a power-of-two call batch to at least 100 microseconds,
+then divides each measured batch duration by its call count. It preserves
+fractional nanoseconds per call and records `batch_calls`; merged CSVs also
+retain `batch_calls_samples` in process order. The 30 repetitions are batches.
+Earlier single-call results that clamped zero clock ticks to one nanosecond
+must be remeasured before comparing very small matrices.
+
+For a build specialized to the current Windows CPU, use
+`zig build install-libraries -Doptimize=ReleaseFast -Dcpu=native --prefix zig-out/native`.
+The resulting `zig-out/native/bin/zynum_blas.dll` can require this CPU's ISA;
+omit `-Dcpu=native` for the portable build. Record this choice in benchmark
+metadata. Native compilation also specializes core fallback loops, beyond
+runtime-dispatched kernels. Complex GEMM now retains up to 128 MiB of workspace
+per precision per calling thread (up to 256 MiB if both precisions are used).
+The existing current-thread cache cleanup hook releases these workspaces.
+
+## WSL and Level 1 diagnostics
+
+The local comparison runner also supports Linux/WSL: it selects ELF probe
+names and supplies comparator dependency directories through `LD_LIBRARY_PATH`.
+Build on the Linux filesystem with `-Doptimize=ReleaseFast -Dcpu=native`, then
+pass `zig-out/native/lib/libzynum_blas.so` and the Linux comparator libraries
+to `bench/tools/run_windows_comparison.py`. The `readme` profile and four
+process repetitions retain the same case plan and rotating library order as
+the Windows workflow. This local workflow does not certify the immutable
+snapshot publication gate.
+
+`level1-probe` and `dcopy-probe` accept fractional `--seconds` values from
+0.001 through 86400. Level 1 allocation, initialization and guard snapshots
+occur before the timed region. Older Level 1 measurements included setup;
+remeasure both sides with the same updated probe for short runs or large
+working sets. Normal comparisons still use one second per Level 1 process.
+The first timed call can include library/thread-pool initialization, so use
+longer repetitions for final comparisons than for parameter screening.
+
+The AVX2/FMA implementation has a large-copy non-temporal path. Its prefix
+and tail preserve arbitrary byte alignment, worker completion follows an
+`SFENCE`, and overlapping public copies retain their `memmove` path. The
+whole-copy size selects streaming policy before partitioning work. Read-only
+norm prefetch is restricted to measured working-set regimes; intermediate
+cache-resident streams retain the non-prefetched loop. Thread ceilings for
+COPY, NRM2 and IAMAX depend on operation and byte working set, while the pool
+continues to honor the caller's lower explicit limit.
+
+Huge-page experiments must identify the allocation policy and verify actual
+huge-page backing. The library does not change caller allocations or global
+huge-page settings. Effective bandwidth for cache-resident data is not DRAM
+bandwidth, and WSL's reported cache topology is not an independently verified
+physical-core/cache map.
 
 ## Regression And Rollback
 

@@ -25,6 +25,8 @@ pub const Config = struct {
     max_stack_pack_bytes: comptime_int = 0,
     pack_tail_columns: bool = false,
     special_low_k_pack: bool = false,
+    pack_a: bool = false,
+    k_block: comptime_int = 0,
 };
 
 fn checkConfig(comptime T: type, comptime cfg: Config) void {
@@ -46,6 +48,8 @@ fn withTile(comptime cfg: Config, comptime tile_n: comptime_int) Config {
         .max_stack_pack_bytes = cfg.max_stack_pack_bytes,
         .pack_tail_columns = cfg.pack_tail_columns,
         .special_low_k_pack = false,
+        .pack_a = cfg.pack_a,
+        .k_block = cfg.k_block,
     };
 }
 
@@ -289,7 +293,62 @@ fn noTransRealWithPack(comptime T: type, comptime cfg: Config, comptime direct_s
     }
 }
 
+// Micro-panel A layout turns the K loop's strided column reads into a
+// contiguous stream. Reuse each packed A panel across all assigned B columns.
+fn withPackedA(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), b_pack: []T) bool {
+    const mr = cfg.lane_count * cfg.row_groups;
+    const blocks = (task.m + mr - 1) / mr;
+    const a_pack = std.heap.c_allocator.alloc(T, blocks * mr * task.k) catch return false;
+    defer std.heap.c_allocator.free(a_pack);
+    for (0..blocks) |block| {
+        const row = block * mr;
+        const count = @min(mr, task.m - row);
+        for (0..task.k) |p| {
+            @memcpy(a_pack[block * mr * task.k + p * mr ..][0..count], task.a[matIndex(task.lda, row, p)..][0..count]);
+        }
+    }
+    var j = task.n0;
+    while (j + cfg.tile_n <= task.n1) : (j += cfg.tile_n) {
+        const panel = preparePanel(T, cfg, task, j, b_pack);
+        for (0..blocks) |block| {
+            var sub = task;
+            sub.m = @min(mr, task.m - block * mr);
+            sub.a = a_pack.ptr + block * mr * task.k;
+            sub.lda = mr;
+            sub.c = task.c + block * mr;
+            runPreparedPanel(T, cfg, direct_store, sub, panel, j);
+        }
+    }
+    if (j < task.n1) {
+        inline for (1..cfg.tile_n) |width| {
+            if (task.n1 - j == width) {
+                const tail_cfg = comptime withTile(cfg, width);
+                const panel = preparePanel(T, tail_cfg, task, j, b_pack);
+                for (0..blocks) |block| {
+                    var sub = task;
+                    sub.m = @min(mr, task.m - block * mr);
+                    sub.a = a_pack.ptr + block * mr * task.k;
+                    sub.lda = mr;
+                    sub.c = task.c + block * mr;
+                    runPreparedPanel(T, tail_cfg, direct_store, sub, panel, j);
+                }
+                break;
+            }
+        }
+    }
+    return true;
+}
+
 fn noTransRealWithPackSelected(comptime T: type, comptime cfg: Config, task: gemm_task.Task(T), b_pack: []T) void {
+    if (comptime cfg.pack_a) {
+        if (task.m >= 64 and task.k >= 256 and task.n1 - task.n0 >= 64) {
+            if (task.alpha == 1 and task.beta == 0) {
+                if (withPackedA(T, cfg, true, task, b_pack)) return;
+            } else {
+                if (withPackedA(T, cfg, false, task, b_pack)) return;
+            }
+        }
+    }
     if (task.alpha == 1 and task.beta == 0) return noTransRealWithPack(T, cfg, true, task, b_pack);
     return noTransRealWithPack(T, cfg, false, task, b_pack);
 }
@@ -304,6 +363,24 @@ fn noTransRealWithHeapPack(comptime T: type, comptime cfg: Config, task: gemm_ta
 }
 
 pub fn noTransReal(comptime T: type, comptime cfg: Config, task: gemm_task.Task(T)) void {
+    if (comptime cfg.k_block != 0) {
+        if (task.m >= 64 and task.n1 - task.n0 >= 24 and task.k > cfg.k_block) {
+            var p: usize = 0;
+            while (p < task.k) : (p += cfg.k_block) {
+                var sub = task;
+                sub.k = @min(cfg.k_block, task.k - p);
+                sub.a = task.a + matIndex(task.lda, 0, p);
+                sub.b = task.b + if (task.b_layout == .no_trans) p else matIndex(task.ldb, 0, p);
+                sub.beta = if (p == 0) task.beta else 1;
+                noTransRealUnblocked(T, cfg, sub);
+            }
+            return;
+        }
+    }
+    noTransRealUnblocked(T, cfg, task);
+}
+
+fn noTransRealUnblocked(comptime T: type, comptime cfg: Config, task: gemm_task.Task(T)) void {
     comptime checkConfig(T, cfg);
     const pack_elems = task.k * cfg.tile_n;
 

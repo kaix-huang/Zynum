@@ -54,6 +54,17 @@ fn gemvRealConfig(comptime T: type) fixed_simd.Config {
     return simd_config.matrixConfig(T);
 }
 
+// Transposed GEMV keeps one accumulator per column and row group.
+// Eight columns times four groups spill on AVX2's sixteen vector registers.
+fn gemvTransRealConfig(comptime T: type) fixed_simd.Config {
+    var cfg = gemvRealConfig(T);
+    if (comptime simd_config.capability == .x86_64_avx2_fma) {
+        cfg.col_unroll = 4;
+        cfg.row_unroll_vectors = 2;
+    }
+    return cfg;
+}
+
 fn gemvComplexConfig(comptime T: type) fixed_simd.Config {
     if (level2_tuning.active.gemv.enable_x86_narrow_width and simd_config.has_avx512_width) {
         return simd_config.matrixComplexNarrowConfig(T);
@@ -117,6 +128,9 @@ fn supportsComplexNoTransTask(comptime T: type, comptime cfg: fixed_simd.Config,
 }
 
 fn supportsComplexTransTask(comptime T: type, comptime cfg: fixed_simd.Config, m: usize, n: usize, lda: BlasInt, do_conj: bool) bool {
+    if (comptime cfg.fuse_complex_updates) {
+        if (m >= 128 and m <= 256 and n >= 64 and lda > 0 and @as(usize, @intCast(lda)) >= m and m *| n >= cfg.min_work and (cfg.max_work == 0 or m *| n <= cfg.max_work)) return true;
+    }
     if (do_conj) return false;
     if (!supportsComplexTaskBase(T, cfg, m, n, lda)) return false;
     return n == 64;
@@ -136,7 +150,7 @@ pub fn gemvTransUnitReal(
     if (comptime isolated_gemv_width_enabled and T == f32) {
         if (isolated_width.tryGemvTransUnit(T, m, n, alpha, a, lda, x, y, false)) return true;
     }
-    return fixed_simd.gemvTransUnitReal(T, gemvRealConfig(T), m, n, alpha, a, lda, x, y);
+    return fixed_simd.gemvTransUnitReal(T, gemvTransRealConfig(T), m, n, alpha, a, lda, x, y);
 }
 
 pub fn gemvTransFullUnitReal(
@@ -154,7 +168,7 @@ pub fn gemvTransFullUnitReal(
     if (comptime isolated_gemv_width_enabled and T == f32) {
         if (isolated_width.tryGemvTransFull(T, m, n, alpha, a, lda, x, beta, y)) return true;
     }
-    return fixed_simd.gemvTransFullUnitReal(T, gemvRealConfig(T), m, n, alpha, a, lda, x, beta, y);
+    return fixed_simd.gemvTransFullUnitReal(T, gemvTransRealConfig(T), m, n, alpha, a, lda, x, beta, y);
 }
 
 pub fn gemvNoTransUnitReal(

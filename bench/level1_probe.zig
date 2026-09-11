@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const BlasInt = i32;
 const C32 = extern struct { re: f32, im: f32 };
@@ -431,7 +432,7 @@ pub fn main(init: std.process.Init) !void {
     var legacy_inc: BlasInt = 1;
     var incx_override: ?BlasInt = null;
     var incy_override: ?BlasInt = null;
-    var seconds: u64 = 10;
+    var seconds: f64 = 10;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--lib")) {
             lib_path = args.next() orelse return error.MissingValue;
@@ -448,7 +449,7 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.eql(u8, arg, "--incy")) {
             incy_override = try std.fmt.parseInt(BlasInt, args.next() orelse return error.MissingValue, 10);
         } else if (std.mem.eql(u8, arg, "--seconds")) {
-            seconds = try std.fmt.parseInt(u64, args.next() orelse return error.MissingValue, 10);
+            seconds = try std.fmt.parseFloat(f64, args.next() orelse return error.MissingValue);
         } else {
             usage();
             return error.InvalidArgument;
@@ -469,7 +470,8 @@ pub fn main(init: std.process.Init) !void {
     const x_layout = try VectorLayout.init(n, incx);
     const y_layout = try VectorLayout.init(n, incy);
 
-    var dyn = try std.DynLib.open(path);
+    if (!std.math.isFinite(seconds) or seconds < 0.001 or seconds > 86400) return error.InvalidDuration;
+    var dyn = try DynLib.open(path);
     defer {
         if (dyn.lookup(ShutdownFn, "zynum_blas_shutdown")) |shutdown| shutdown();
         dyn.close();
@@ -483,14 +485,12 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
-    const pid = std.c.getpid();
+    const pid = @import("dynamic_library.zig").processId();
     if (incx == incy) {
         try stdout_writer.interface.print("pid={d} op={s} variant={s} inc={d} incx={d} incy={d} n={d} seconds={d} lib={s}\n", .{ pid, @tagName(selected), variant, incx, incx, incy, n, seconds, path });
     } else {
         try stdout_writer.interface.print("pid={d} op={s} variant={s} incx={d} incy={d} n={d} seconds={d} lib={s}\n", .{ pid, @tagName(selected), variant, incx, incy, n, seconds, path });
     }
-    const start = std.Io.Clock.awake.now(init.io).nanoseconds;
-    const deadline = start + @as(i128, seconds) * std.time.ns_per_s;
     var iters: u64 = 0;
     var elapsed_ns: i128 = 0;
 
@@ -510,6 +510,8 @@ pub fn main(init: std.process.Init) !void {
             var c: f32 = 0.8;
             var s: f32 = 0.6;
             var param = try rotmParam(f32, variant);
+            const start = std.Io.Clock.awake.now(init.io).nanoseconds;
+            const deadline = start + @as(i128, @intFromFloat(seconds * std.time.ns_per_s));
             switch (selected) {
                 .scopy => {
                     actual_symbol = "scopy_";
@@ -644,6 +646,8 @@ pub fn main(init: std.process.Init) !void {
             var c: f64 = 0.8;
             var s: f64 = 0.6;
             var param = try rotmParam(f64, variant);
+            const start = std.Io.Clock.awake.now(init.io).nanoseconds;
+            const deadline = start + @as(i128, @intFromFloat(seconds * std.time.ns_per_s));
             switch (selected) {
                 .dcopy => {
                     actual_symbol = "dcopy_";
@@ -750,10 +754,14 @@ pub fn main(init: std.process.Init) !void {
             x.capture();
             y.capture();
             var alpha_r: f32 = 1.0000001;
-            var alpha_c: C32 = .{ .re = 1.0000001, .im = 0.125 };
+            // Repeated SCAL must remain in the normal range during timing.
+            // A growing complex multiplier otherwise turns the hot stream into infinities.
+            var alpha_c: C32 = if (selected == .cscal) .{ .re = 0.8, .im = 0.6 } else .{ .re = 1.0000001, .im = 0.125 };
             var beta_c: C32 = .{ .re = 0.875, .im = -0.0625 };
             var c: f32 = 0.8;
             var s: f32 = 0.6;
+            const start = std.Io.Clock.awake.now(init.io).nanoseconds;
+            const deadline = start + @as(i128, @intFromFloat(seconds * std.time.ns_per_s));
             switch (selected) {
                 .ccopy => {
                     actual_symbol = "ccopy_";
@@ -857,10 +865,12 @@ pub fn main(init: std.process.Init) !void {
             x.capture();
             y.capture();
             var alpha_r: f64 = 1.0000000000000002;
-            var alpha_c: C64 = .{ .re = 1.0000000000000002, .im = 0.125 };
+            var alpha_c: C64 = if (selected == .zscal) .{ .re = 0.8, .im = 0.6 } else .{ .re = 1.0000000000000002, .im = 0.125 };
             var beta_c: C64 = .{ .re = 0.875, .im = -0.0625 };
             var c: f64 = 0.8;
             var s: f64 = 0.6;
+            const start = std.Io.Clock.awake.now(init.io).nanoseconds;
+            const deadline = start + @as(i128, @intFromFloat(seconds * std.time.ns_per_s));
             switch (selected) {
                 .zcopy => {
                     actual_symbol = "zcopy_";

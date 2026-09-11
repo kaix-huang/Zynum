@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const BlasInt = i32;
 
@@ -134,7 +135,7 @@ fn checkedDimension(value: []const u8) !usize {
     return result;
 }
 
-fn parseOptions(init: std.process.Init, allocator: std.mem.Allocator) !Options {
+fn parseOptions(args: *std.process.Args.Iterator) !Options {
     var blas_path: ?[]const u8 = null;
     var library: ?[]const u8 = null;
     var shape: ?[]const u8 = null;
@@ -148,8 +149,6 @@ fn parseOptions(init: std.process.Init, allocator: std.mem.Allocator) !Options {
     var alpha: ?ScalarSpec = null;
     var reps: usize = 5;
 
-    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
-    defer args.deinit();
     _ = args.next();
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--blas")) {
@@ -516,6 +515,14 @@ fn benchTriangularMatrix(comptime T: type, function: TriangularMatrixFn(T), allo
     function(&side, &uplo, &trans, &diag, &m, &n, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i);
     const check = checkResult(T, expected, b, options);
 
+    // Reach a steady worker/cache state after correctness checking.
+    // Apply the same untimed warmup to every dynamically loaded library.
+    const warmup_start = std.Io.Clock.awake.now(io).nanoseconds;
+    while (std.Io.Clock.awake.now(io).nanoseconds - warmup_start < 50_000_000) {
+        @memcpy(b, b0);
+        function(&side, &uplo, &trans, &diag, &m, &n, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i);
+    }
+
     for (0..options.reps) |rep| {
         @memcpy(b, b0);
         const start = std.Io.Clock.awake.now(io).nanoseconds;
@@ -601,7 +608,7 @@ fn writeRow(writer: *std.Io.Writer, options: Options, result: BenchResult) !void
     try writer.writeByte('\n');
 }
 
-fn runSelected(dyn: *std.DynLib, allocator: std.mem.Allocator, io: std.Io, options: Options) !BenchResult {
+fn runSelected(dyn: *DynLib, allocator: std.mem.Allocator, io: std.Io, options: Options) !BenchResult {
     return switch (options.routine) {
         .strmm => benchTriangularMatrix(f32, dyn.lookup(TriangularMatrixFn(f32), "strmm_") orelse return error.MissingSymbol, allocator, io, options),
         .dtrmm => benchTriangularMatrix(f64, dyn.lookup(TriangularMatrixFn(f64), "dtrmm_") orelse return error.MissingSymbol, allocator, io, options),
@@ -616,12 +623,16 @@ fn runSelected(dyn: *std.DynLib, allocator: std.mem.Allocator, io: std.Io, optio
 
 pub fn main(init: std.process.Init) !void {
     const allocator = std.heap.page_allocator;
-    const options = parseOptions(init, allocator) catch |err| {
+    // Windows arguments borrow the iterator's UTF-8 conversion buffer.
+    // Keep it alive until all option strings have been consumed.
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    const options = parseOptions(&args) catch |err| {
         usage();
         return err;
     };
     // Keep short-lived threaded BLAS libraries mapped until process exit.
-    var dyn = try std.DynLib.open(options.blas_path);
+    var dyn = try DynLib.open(options.blas_path);
     const result = try runSelected(&dyn, allocator, init.io, options);
 
     var stdout_buffer: [4096]u8 = undefined;

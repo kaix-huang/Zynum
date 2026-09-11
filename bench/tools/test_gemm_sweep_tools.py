@@ -543,6 +543,14 @@ with open(args.csv, "w", newline="") as output:
         )
         self.assertEqual(float(fractional["median_ns"]), 10.5)
 
+    def test_repeat_merge_preserves_calibrated_batch_counts(self):
+        rows = [gemm_row("Zynum", "NN", 1) for _ in range(2)]
+        rows[0]["batch_calls"] = "1024"
+        rows[1]["batch_calls"] = "2048"
+        aggregate = runner.merge_repeat_rows(rows)
+        self.assertEqual(aggregate["batch_calls_samples"], "1024,2048")
+        self.assertIn("batch_calls_samples", runner.CSV_FIELDNAMES)
+
     @mock.patch.object(
         runner,
         "run_controller",

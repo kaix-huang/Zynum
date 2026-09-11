@@ -8,6 +8,9 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const blocked = @import("structured_blocked.zig");
+const gemm_dispatch = @import("../../kernels/dispatch/matrix_matrix.zig");
+const runtime = @import("../../runtime.zig");
 const isolated_structured = @import("../../kernels/isolated/x86_64_structured_bridge.zig");
 const structured_tuning = @import("../../kernels/tuning/structured.zig");
 
@@ -105,6 +108,13 @@ fn runParallelSymm(comptime T: type, tasks: []const SymmTask(T)) bool {
 }
 
 pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    // Use larger updates for multi-thread execution; retain small-kernel fallbacks
+    // for modes that did not improve in the threaded comparison.
+    if (comptime builtin.cpu.arch == .x86_64) {
+        if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.trySymm(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+        }
+    }
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -235,6 +245,13 @@ fn runParallelSyrk(comptime T: type, tasks: []const SyrkTask(T)) bool {
 }
 
 pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    // Use larger updates for multi-thread execution; retain small-kernel fallbacks
+    // for modes that did not improve in the threaded comparison.
+    if (comptime builtin.cpu.arch == .x86_64) {
+        if (n_ >= 128 and k_ >= 64 and (runtime.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.trySyrk(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
+        }
+    }
     if (n_ <= 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -364,6 +381,13 @@ fn runParallelSyr2k(comptime T: type, tasks: []const Syr2kTask(T)) bool {
 }
 
 pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    // Use larger updates for multi-thread execution; retain small-kernel fallbacks
+    // for modes that did not improve in the threaded comparison.
+    if (comptime builtin.cpu.arch == .x86_64) {
+        if (n_ >= 128 and k_ >= 64 and (runtime.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.trySyr2k(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+        }
+    }
     if (n_ <= 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);

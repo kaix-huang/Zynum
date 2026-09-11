@@ -97,6 +97,8 @@ CSV_FIELDNAMES = [
     "reps",
     "process_repeats",
     "median_ns_samples",
+    "batch_calls",
+    "batch_calls_samples",
     "check",
 ]
 
@@ -450,6 +452,7 @@ def merge_repeat_rows(rows):
         format_gemm_evidence(value, "median_ns") for value in median_values
     )
     base["process_repeats"] = str(len(rows))
+    base["batch_calls_samples"] = ",".join(str(row.get("batch_calls", "")) for row in rows)
     base["check"] = merged_check_status(rows)
     validate_gemm_evidence(base)
     return base

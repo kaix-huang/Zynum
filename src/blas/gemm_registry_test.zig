@@ -515,9 +515,9 @@ fn testForcedComplexPaths(comptime T: type) !void {
         try std.testing.expect(result.usedRequested());
     }
     const expanded_epilogue_fallback = try runForcedComplexCase(T, expanded, .{}, layouts[0], 7, 5, 9, arbitrary_alpha, arbitrary_beta);
-    try std.testing.expectEqual(compact, expanded_epilogue_fallback.executed.?);
-    const three_m_epilogue_fallback = try runForcedComplexCase(T, three_m, .{}, layouts[1], 7, 5, 9, one, arbitrary_beta);
-    try std.testing.expectEqual(portable, three_m_epilogue_fallback.executed.?);
+    try std.testing.expectEqual(three_m, expanded_epilogue_fallback.executed.?);
+    const three_m_epilogue = try runForcedComplexCase(T, three_m, .{}, layouts[1], 7, 5, 9, one, arbitrary_beta);
+    try std.testing.expect(three_m_epilogue.usedRequested());
     if (T == complex_gemm.ComplexF64) {
         const rejected_layout = try runForcedComplexCase(T, expanded, .{}, layouts[2], 7, 5, 9, one, zero);
         try std.testing.expect(!rejected_layout.usedRequested());
@@ -574,7 +574,8 @@ test "complex GEMM selection is deterministic across layouts and scalar classes"
         const portable: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .portable_c32 else .portable_c64;
         const compact: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .compact_c32 else .compact_c64;
         const vector_edge: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .vector_edge_c32 else .vector_edge_c64;
-        const materialized_non_nn: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .expanded_real_c32 else .three_m_c64;
+        const three_m: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .three_m_c32 else .three_m_c64;
+        const materialized_non_nn: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32 and builtin.cpu.arch != .x86_64) .expanded_real_c32 else three_m;
         const arbitrary_alpha = complexValue(T, 0.75, -0.25);
         const arbitrary_beta = complexValue(T, -0.375, 0.125);
 
@@ -583,8 +584,8 @@ test "complex GEMM selection is deterministic across layouts and scalar classes"
         try expectComplexSelection(T, portable, nt, 7, 5, 9, scalar.one(T), scalar.zero(T));
         try expectComplexSelection(T, materialized_non_nn, nt, 32, 32, 128, scalar.one(T), scalar.zero(T));
         try expectComplexSelection(T, materialized_non_nn, ct, 32, 32, 128, scalar.one(T), scalar.zero(T));
-        try expectComplexSelection(T, portable, nt, 32, 32, 128, arbitrary_alpha, scalar.zero(T));
-        try expectComplexSelection(T, portable, nt, 32, 32, 128, scalar.one(T), arbitrary_beta);
+        try expectComplexSelection(T, three_m, nt, 32, 32, 128, arbitrary_alpha, scalar.zero(T));
+        try expectComplexSelection(T, three_m, nt, 32, 32, 128, scalar.one(T), arbitrary_beta);
         try expectComplexSelection(T, portable, nn, 32, 32, 128, scalar.zero(T), arbitrary_beta);
     }
 

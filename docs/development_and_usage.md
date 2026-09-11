@@ -91,7 +91,7 @@ authority for inventory and repository-security evidence. Each
 inventory-certified target row runs the dedicated
 `test-host-tool-smoke` aggregate once before its three optimize-mode tests;
 those mode tests explicitly disable host-tool smoke, and link-only rows do not
-request it. The Windows x86_64 job first builds the library and tooling fixtures,
+request it. The Windows x86_64 job first builds the library and probe executables,
 checks installed library layout, and verifies the canonical DLL's 311 manifest
 export names plus exact deterministic results for representative CBLAS Level 1
 `daxpy`, Level 2 `dgemv`, and Level 3 `dgemm` calls through that same loaded DLL.
@@ -150,6 +150,13 @@ Windows installs:
 - `zig-out/bin/zynum_blas.dll`;
 - `zig-out/lib/zynum_blas.lib`, the import library;
 - `zig-out/lib/static/zynum_blas.lib`, the static archive.
+
+Native Windows benchmark executables use a shared Win32 DLL loader, including
+UTF-8 command-line paths converted to UTF-16 for `LoadLibraryW`. The default
+install includes GEMM and Level 1 probes; the structured Level 3 and scalar
+rotation probes have explicit `build-*-probe` steps. See
+[`common/benchmarking.md`](common/benchmarking.md#native-windows-local-benchmarks)
+for the local measurement workflow and its evidence boundary.
 
 Use the library-only install step when probes and benchmarks are unnecessary:
 

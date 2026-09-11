@@ -206,7 +206,6 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
     persistent_active_helpers.store(active_helpers, .release);
 
     const io = persistent_threaded.io();
-    const lazy_wake_helpers = first_helper == 0 and active_helpers == workers;
     for (0..active_helpers) |worker_id| {
         const target_worker = first_helper + worker_id;
         // io_busy serializes jobs, and completion acknowledges each worker's
@@ -214,12 +213,14 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
         // locally so even wraparound differs from an idle worker's last value.
         // The release publishes the task payload to the worker's acquire load.
         _ = persistent_worker_generation[target_worker].fetchAdd(1, .release);
-        if (!lazy_wake_helpers) io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
     }
 
     runtime.configureWorkerThread(null);
     task_fn(tasks, 0);
-    var woke_sleepers = !lazy_wake_helpers;
+    // An automatically selected subset should use the same spin-first path
+    // as an explicitly capped pool. Waking each helper on every short call
+    // otherwise makes reduced task counts pay extra system calls.
+    var woke_sleepers = false;
     while (true) {
         var done = persistent_done_count.load(.acquire);
         const done_target = persistent_done_target.load(.acquire);
@@ -231,7 +232,7 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
         if (done >= done_target) break;
         if (!woke_sleepers) {
             for (0..active_helpers) |worker_id| {
-                io.futexWake(u32, &persistent_worker_generation[worker_id].raw, 1);
+                io.futexWake(u32, &persistent_worker_generation[first_helper + worker_id].raw, 1);
             }
             woke_sleepers = true;
             done = persistent_done_count.load(.acquire);
@@ -279,6 +280,30 @@ pub fn runLowLatency(task_fn: TaskFn, tasks: *const anyopaque, count: usize) boo
     return runGroup(task_fn, tasks, count);
 }
 
+/// Distribute independent output regions without a barrier between tiles.
+/// A false return guarantees that no job has modified caller output.
+pub fn runQueued(task_fn: TaskFn, tasks: *const anyopaque, count: usize, worker_limit: usize) bool {
+    const workers = @min(count, @min(worker_limit, configuredHelperCount() + 1));
+    if (workers <= 1) return false;
+    const Queue = struct {
+        next: std.atomic.Value(usize) = .init(0),
+        count: usize,
+        task_fn: TaskFn,
+        tasks: *const anyopaque,
+
+        fn execute(raw: *const anyopaque, _: usize) void {
+            const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
+            while (true) {
+                const index = self.next.fetchAdd(1, .monotonic);
+                if (index >= self.count) return;
+                self.task_fn(self.tasks, index);
+            }
+        }
+    };
+    var queue = Queue{ .count = count, .task_fn = task_fn, .tasks = tasks };
+    return runLowLatency(Queue.execute, &queue, workers);
+}
+
 pub fn runTyped(comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
     const Adapter = struct {
         fn run(ctx: *const anyopaque, index: usize) void {
@@ -287,6 +312,16 @@ pub fn runTyped(comptime Task: type, comptime task_fn: fn (Task) void, tasks: []
         }
     };
     return run(Adapter.run, @ptrCast(tasks.ptr), tasks.len);
+}
+
+pub fn runTypedLowLatency(comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
+    const Adapter = struct {
+        fn run(ctx: *const anyopaque, index: usize) void {
+            const typed: [*]const Task = @ptrCast(@alignCast(ctx));
+            task_fn(typed[index]);
+        }
+    };
+    return runLowLatency(Adapter.run, @ptrCast(tasks.ptr), tasks.len);
 }
 
 fn waitForInitState(state: *std.atomic.Value(u8)) u8 {
@@ -349,6 +384,33 @@ pub fn shutdown() void {
     shutdownIoThreadedLocked();
 }
 
+test "queued jobs execute exactly once and refusal leaves output untouched" {
+    const Jobs = struct {
+        counters: [257]std.atomic.Value(u32) = [_]std.atomic.Value(u32){.init(0)} ** 257,
+        fn execute(raw: *const anyopaque, index: usize) void {
+            const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
+            _ = self.counters[index].fetchAdd(1, .monotonic);
+        }
+    };
+    var jobs: Jobs = .{};
+    runtime.setMaxThreads(4);
+    defer {
+        shutdown();
+        runtime.setMaxThreads(0);
+    }
+    try std.testing.expect(!runQueued(Jobs.execute, &jobs, 257, 1));
+    io_busy.store(1, .release);
+    const busy_result = runQueued(Jobs.execute, &jobs, 257, 4);
+    io_busy.store(0, .release);
+    try std.testing.expect(!busy_result);
+    for (&jobs.counters) |*counter| try std.testing.expectEqual(@as(u32, 0), counter.load(.monotonic));
+    if (configuredHelperCount() == 0) return;
+    for (1..5) |iteration| {
+        try std.testing.expect(runQueued(Jobs.execute, &jobs, 257, 3));
+        for (&jobs.counters) |*counter| try std.testing.expectEqual(@as(u32, @intCast(iteration)), counter.load(.monotonic));
+    }
+}
+
 test "runLowLatency refuses partial execution when helpers cannot cover tasks" {
     const CounterTask = struct {
         counter: *std.atomic.Value(u32),
@@ -394,6 +456,9 @@ test "runLowLatency refuses partial execution when helpers cannot cover tasks" {
         const counts = [_]usize{ 2, @min(workers + 1, 3), 2, workers + 1 };
         const runs: usize = if (seed == std.math.maxInt(u32) - 1) 1 else counts.len;
         for (counts[0..runs]) |count| {
+            // Exercise a sleeping subset whose first helper is not zero,
+            // as well as the hot generation-wraparound path.
+            if (count == 3 and workers >= 4) try std.Io.sleep(persistent_threaded.io(), .fromMilliseconds(100), .awake);
             var before: [max_tasks]u32 = undefined;
             for (0..workers) |worker_id| before[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
             for (&counters) |*task_counter| task_counter.store(0, .monotonic);

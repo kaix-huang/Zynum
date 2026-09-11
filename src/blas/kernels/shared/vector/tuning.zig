@@ -152,6 +152,9 @@ pub const Aarch64Profile = struct {
     }
 };
 
+// Two disjoint buffers exceed this machine's measured last-level cache regime.
+pub const streaming_copy_min_bytes: usize = 32 * 1024 * 1024;
+
 pub const X86_64Profile = struct {
     enable_fixed_dot_f32_acc_f64: bool,
     enable_fixed_complex_iamax: bool,
@@ -179,6 +182,17 @@ pub const X86_64Profile = struct {
     pub fn preferFixedDotF32AccF64(self: X86_64Profile, n: usize) bool {
         return self.enable_fixed_dot_f32_acc_f64 and
             n >= self.fixed_dot_f32_acc_f64_min_elements;
+    }
+
+    pub fn preferAvx2MixedDot(self: X86_64Profile, n: usize) bool {
+        // The former 64 Ki gate also rejected 32–64 Ki worker partitions
+        // of large vectors, sending the baseline dispatcher to software FMA.
+        return self.enable_fixed_dot_f32_acc_f64 and
+            n >= @min(self.fixed_dot_f32_acc_f64_min_elements, 4096);
+    }
+
+    pub fn preferAvx2Rotm(self: X86_64Profile, n: usize) bool {
+        return self.enable_fixed_rotm or n >= 4096;
     }
 
     pub fn preferFixedComplexIamax(self: X86_64Profile, n: usize) bool {

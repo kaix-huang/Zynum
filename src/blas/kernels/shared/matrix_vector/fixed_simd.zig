@@ -13,6 +13,7 @@ pub const Config = struct {
     col_unroll: comptime_int = 4,
     min_work: usize = 0,
     max_work: usize = 0,
+    fuse_complex_updates: bool = false,
 };
 
 fn checkConfig(comptime T: type, comptime cfg: Config) void {
@@ -137,6 +138,20 @@ inline fn complexScaleVector(
     const swapped = @shuffle(R, values, undefined, pairSwapMask(lanes));
     const re_v: V = @splat(coefficient.re);
     return @mulAdd(V, values, re_v, swapped * pairSignVector(R, lanes, coefficient.im));
+}
+
+inline fn complexUpdateVector(
+    comptime T: type,
+    comptime cfg: Config,
+    values: @Vector(cfg.lane_count, Real(T)),
+    coefficient: T,
+    addend: @Vector(cfg.lane_count, Real(T)),
+) @Vector(cfg.lane_count, Real(T)) {
+    if (comptime !cfg.fuse_complex_updates) return addend + complexScaleVector(T, cfg.lane_count, values, coefficient);
+    const R = Real(T);
+    const V = @Vector(cfg.lane_count, R);
+    const cross = @mulAdd(V, @shuffle(R, values, undefined, pairSwapMask(cfg.lane_count)), pairSignVector(R, cfg.lane_count, coefficient.im), addend);
+    return @mulAdd(V, values, @as(V, @splat(coefficient.re)), cross);
 }
 
 fn rowUnroll(comptime cfg: Config) comptime_int {
@@ -482,7 +497,7 @@ fn complexGemvNoTransCols(
             var yv = loadVec(R, cfg.lane_count, real_y, offset);
             inline for (0..cols) |col| {
                 const av = loadVec(R, cfg.lane_count, col_ptrs[col], offset);
-                yv += complexScaleVector(T, cfg.lane_count, av, coeffs[col]);
+                yv = complexUpdateVector(T, cfg, av, coeffs[col], yv);
             }
             storeVec(R, cfg.lane_count, real_y, offset, yv);
         }
@@ -491,7 +506,7 @@ fn complexGemvNoTransCols(
         var yv = loadVec(R, cfg.lane_count, real_y, i);
         inline for (0..cols) |col| {
             const av = loadVec(R, cfg.lane_count, col_ptrs[col], i);
-            yv += complexScaleVector(T, cfg.lane_count, av, coeffs[col]);
+            yv = complexUpdateVector(T, cfg, av, coeffs[col], yv);
         }
         storeVec(R, cfg.lane_count, real_y, i, yv);
     }
@@ -543,6 +558,16 @@ pub fn gemvNoTransUnitComplex(
     return true;
 }
 
+inline fn signedProductAccumulate(comptime T: type, comptime cfg: Config, a: @Vector(cfg.lane_count, T), b: @Vector(cfg.lane_count, T), sign: @Vector(cfg.lane_count, T), acc: @Vector(cfg.lane_count, T)) @Vector(cfg.lane_count, T) {
+    const V = @Vector(cfg.lane_count, T);
+    if (comptime !cfg.fuse_complex_updates) return @mulAdd(V, a * b, sign, acc);
+    const U = if (T == f32) u32 else u64;
+    const UV = @Vector(cfg.lane_count, U);
+    const sign_mask: UV = @splat(@as(U, 1) << (@bitSizeOf(T) - 1));
+    const signed_a: V = @bitCast(@as(UV, @bitCast(a)) ^ (@as(UV, @bitCast(sign)) & sign_mask));
+    return @mulAdd(V, signed_a, b, acc);
+}
+
 fn complexDotUnit(
     comptime T: type,
     comptime cfg: Config,
@@ -568,8 +593,8 @@ fn complexDotUnit(
             const offset = i + u * cfg.lane_count;
             const av = loadVec(R, cfg.lane_count, real_a, offset);
             const xv = loadVec(R, cfg.lane_count, real_x, offset);
-            re_accs[u] = @mulAdd(V, av * xv, re_sign, re_accs[u]);
-            im_accs[u] = @mulAdd(V, av * @shuffle(R, xv, undefined, swap_mask), im_sign, im_accs[u]);
+            re_accs[u] = signedProductAccumulate(R, cfg, av, xv, re_sign, re_accs[u]);
+            im_accs[u] = signedProductAccumulate(R, cfg, av, @shuffle(R, xv, undefined, swap_mask), im_sign, im_accs[u]);
         }
     }
 
@@ -582,8 +607,8 @@ fn complexDotUnit(
     while (i + cfg.lane_count <= real_m) : (i += cfg.lane_count) {
         const av = loadVec(R, cfg.lane_count, real_a, i);
         const xv = loadVec(R, cfg.lane_count, real_x, i);
-        re_acc = @mulAdd(V, av * xv, re_sign, re_acc);
-        im_acc = @mulAdd(V, av * @shuffle(R, xv, undefined, swap_mask), im_sign, im_acc);
+        re_acc = signedProductAccumulate(R, cfg, av, xv, re_sign, re_acc);
+        im_acc = signedProductAccumulate(R, cfg, av, @shuffle(R, xv, undefined, swap_mask), im_sign, im_acc);
     }
 
     var re_sum: R = @reduce(.Add, re_acc);
@@ -604,6 +629,52 @@ fn complexDotUnit(
     return .{ .re = re_sum, .im = im_sum };
 }
 
+// Share each X load and pair shuffle between two output columns. Two row
+// groups keep eight accumulator vectors live on the AVX2 path.
+fn complexGemvTransPair(comptime T: type, comptime cfg: Config, m: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T, comptime do_conj: bool, j: usize) void {
+    const R = Real(T);
+    const V = @Vector(cfg.lane_count, R);
+    const real_m = 2 * m;
+    const real_x = asConstRealPtr(T, x);
+    const columns = [2][*]const R{ asConstRealPtr(T, a + matIndex(lda, 0, j)), asConstRealPtr(T, a + matIndex(lda, 0, j + 1)) };
+    const re_sign: V = if (do_conj) @splat(1) else pairPatternVector(R, cfg.lane_count, 1, -1);
+    const im_sign: V = if (do_conj) pairPatternVector(R, cfg.lane_count, 1, -1) else @splat(1);
+    var re: [2][2]V = .{ .{ @splat(0), @splat(0) }, .{ @splat(0), @splat(0) } };
+    var im = re;
+    var i: usize = 0;
+    while (i + 2 * cfg.lane_count <= real_m) : (i += 2 * cfg.lane_count) {
+        inline for (0..2) |u| {
+            const offset = i + u * cfg.lane_count;
+            const xv = loadVec(R, cfg.lane_count, real_x, offset);
+            const swapped = @shuffle(R, xv, undefined, pairSwapMask(cfg.lane_count));
+            inline for (0..2) |col| {
+                const av = loadVec(R, cfg.lane_count, columns[col], offset);
+                re[col][u] = signedProductAccumulate(R, cfg, av, xv, re_sign, re[col][u]);
+                im[col][u] = signedProductAccumulate(R, cfg, av, swapped, im_sign, im[col][u]);
+            }
+        }
+    }
+    while (i + cfg.lane_count <= real_m) : (i += cfg.lane_count) {
+        const xv = loadVec(R, cfg.lane_count, real_x, i);
+        const swapped = @shuffle(R, xv, undefined, pairSwapMask(cfg.lane_count));
+        inline for (0..2) |col| {
+            const av = loadVec(R, cfg.lane_count, columns[col], i);
+            re[col][0] = signedProductAccumulate(R, cfg, av, xv, re_sign, re[col][0]);
+            im[col][0] = signedProductAccumulate(R, cfg, av, swapped, im_sign, im[col][0]);
+        }
+    }
+    inline for (0..2) |col| {
+        var sum: T = .{ .re = @reduce(.Add, re[col][0] + re[col][1]), .im = @reduce(.Add, im[col][0] + im[col][1]) };
+        var tail = i / 2;
+        while (tail < m) : (tail += 1) {
+            var av = a[matIndex(lda, tail, j + col)];
+            if (do_conj) av.im = -av.im;
+            sum = complexAdd(T, sum, complexMul(T, av, x[tail]));
+        }
+        y[j + col] = complexAdd(T, y[j + col], complexMul(T, alpha, sum));
+    }
+}
+
 fn complexGemvTransCols(
     comptime T: type,
     comptime cfg: Config,
@@ -617,6 +688,21 @@ fn complexGemvTransCols(
     do_conj: bool,
     j: usize,
 ) void {
+    if (comptime cfg.fuse_complex_updates and cols >= 2) {
+        // Longer column tasks favored the existing single-column kernel.
+        if (m <= 256) {
+            if (do_conj) {
+                inline for (0..cols / 2) |pair| complexGemvTransPair(T, cfg, m, alpha, a, lda, x, y, true, j + pair * 2);
+            } else {
+                inline for (0..cols / 2) |pair| complexGemvTransPair(T, cfg, m, alpha, a, lda, x, y, false, j + pair * 2);
+            }
+            if (comptime cols % 2 != 0) {
+                const col = j + cols - 1;
+                y[col] = complexAdd(T, y[col], complexMul(T, alpha, complexDotUnit(T, cfg, m, a + matIndex(lda, 0, col), x, do_conj)));
+            }
+            return;
+        }
+    }
     inline for (0..cols) |col| {
         const sum = complexDotUnit(T, cfg, m, a + matIndex(lda, 0, j + col), x, do_conj);
         y[j + col] = complexAdd(T, y[j + col], complexMul(T, alpha, sum));
@@ -769,7 +855,7 @@ fn complexGerCols(
             const xv = loadVec(R, cfg.lane_count, real_x, offset);
             inline for (0..cols) |col| {
                 const av = loadVec(R, cfg.lane_count, columns[col], offset);
-                storeVec(R, cfg.lane_count, columns[col], offset, av + complexScaleVector(T, cfg.lane_count, xv, coefficients[col]));
+                storeVec(R, cfg.lane_count, columns[col], offset, complexUpdateVector(T, cfg, xv, coefficients[col], av));
             }
         }
     }
@@ -777,7 +863,7 @@ fn complexGerCols(
         const xv = loadVec(R, cfg.lane_count, real_x, i);
         inline for (0..cols) |col| {
             const av = loadVec(R, cfg.lane_count, columns[col], i);
-            storeVec(R, cfg.lane_count, columns[col], i, av + complexScaleVector(T, cfg.lane_count, xv, coefficients[col]));
+            storeVec(R, cfg.lane_count, columns[col], i, complexUpdateVector(T, cfg, xv, coefficients[col], av));
         }
     }
     while (i < real_m) : (i += 2) {
@@ -862,13 +948,13 @@ pub fn triangularAxpyUnit(
             const offset = i + u * cfg.lane_count;
             const av = loadVec(R, cfg.lane_count, real_a, offset);
             const xv = loadVec(R, cfg.lane_count, real_x, offset);
-            storeVec(R, cfg.lane_count, real_x, offset, xv + complexScaleVector(T, cfg.lane_count, av, alpha));
+            storeVec(R, cfg.lane_count, real_x, offset, complexUpdateVector(T, cfg, av, alpha, xv));
         }
     }
     while (i + cfg.lane_count <= real_n) : (i += cfg.lane_count) {
         const av = loadVec(R, cfg.lane_count, real_a, i);
         const xv = loadVec(R, cfg.lane_count, real_x, i);
-        storeVec(R, cfg.lane_count, real_x, i, xv + complexScaleVector(T, cfg.lane_count, av, alpha));
+        storeVec(R, cfg.lane_count, real_x, i, complexUpdateVector(T, cfg, av, alpha, xv));
     }
     while (i < real_n) : (i += 2) {
         const av: T = .{ .re = real_a[i], .im = real_a[i + 1] };

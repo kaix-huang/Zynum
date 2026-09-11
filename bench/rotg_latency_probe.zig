@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const ComplexF32 = extern struct {
     re: f32,
@@ -151,7 +152,7 @@ fn parsePositive(value: []const u8) !usize {
     return parsed;
 }
 
-fn parseOptions(init: std.process.Init, allocator: std.mem.Allocator) !Options {
+fn parseOptions(args: *std.process.Args.Iterator) !Options {
     var blas_path: ?[]const u8 = null;
     var library: ?[]const u8 = null;
     var routine: ?Routine = null;
@@ -159,8 +160,6 @@ fn parseOptions(init: std.process.Init, allocator: std.mem.Allocator) !Options {
     var samples: usize = 9;
     var calls_per_sample: usize = 100_000;
 
-    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
-    defer args.deinit();
     _ = args.next();
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--blas")) {
@@ -766,7 +765,7 @@ fn benchRotmg(comptime T: type, allocator: std.mem.Allocator, io: std.Io, functi
     return .{ .timing = summarizeTimings(net, full, harness, nonpositive_pairs, checksum), .check = check, .corpus_size = corpus.len };
 }
 
-fn runSelected(dyn: *std.DynLib, allocator: std.mem.Allocator, io: std.Io, options: Options) !ProbeResult {
+fn runSelected(dyn: *DynLib, allocator: std.mem.Allocator, io: std.Io, options: Options) !ProbeResult {
     return switch (options.routine) {
         .srotg => benchRotg(f32, allocator, io, dyn.lookup(RotgFn(f32), "srotg_") orelse return error.MissingSymbol, options),
         .drotg => benchRotg(f64, allocator, io, dyn.lookup(RotgFn(f64), "drotg_") orelse return error.MissingSymbol, options),
@@ -831,13 +830,17 @@ fn writeRow(writer: *std.Io.Writer, options: Options, result: ProbeResult) !void
 
 pub fn main(init: std.process.Init) !void {
     const allocator = std.heap.page_allocator;
-    const options = parseOptions(init, allocator) catch |err| {
+    // Windows arguments borrow the iterator's UTF-8 conversion buffer.
+    // Keep it alive until all option strings have been consumed.
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    const options = parseOptions(&args) catch |err| {
         usage();
         return err;
     };
     // Leave the selected BLAS mapped until this short worker exits. Some BLAS
     // runtimes keep process-global state that is unsafe after an early dlclose.
-    var dyn = try std.DynLib.open(options.blas_path);
+    var dyn = try DynLib.open(options.blas_path);
     const result = try runSelected(&dyn, allocator, init.io, options);
 
     var stdout_buffer: [4096]u8 = undefined;

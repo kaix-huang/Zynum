@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const BlasInt = i32;
 const ComplexF32 = extern struct {
@@ -24,7 +25,7 @@ const ZgemmFn = GemmFn(ComplexF64);
 
 const Lib = struct {
     name: []const u8,
-    dyn: std.DynLib,
+    dyn: DynLib,
     sgemm: SgemmFn,
     dgemm: DgemmFn,
     cgemm: CgemmFn,
@@ -141,7 +142,7 @@ fn parseShape(spec: []const u8) !Shape {
 }
 
 fn loadLib(name: []const u8, path: []const u8) !Lib {
-    var dyn = try std.DynLib.open(path);
+    var dyn = try DynLib.open(path);
     errdefer dyn.close();
     return .{
         .name = name,
@@ -289,21 +290,22 @@ fn nowNs(io: std.Io) i96 {
     return std.Io.Clock.awake.now(io).nanoseconds;
 }
 
-fn gflops(elapsed_ns: i96, flop_factor: f64, m: usize, n: usize, k: usize) f64 {
+fn gflops(elapsed_ns: f64, flop_factor: f64, m: usize, n: usize, k: usize) f64 {
     if (elapsed_ns <= 0) return 0;
     const ops = flop_factor * @as(f64, @floatFromInt(m)) * @as(f64, @floatFromInt(n)) * @as(f64, @floatFromInt(k));
-    return ops / (@as(f64, @floatFromInt(elapsed_ns)) / 1e9) / 1e9;
+    return ops / elapsed_ns;
 }
 
 const BenchResult = struct {
-    best_ns: i96,
-    median_ns: i96,
-    p95_ns: i96,
-    max_ns: i96,
+    best_ns: f64,
+    median_ns: f64,
+    p95_ns: f64,
+    max_ns: f64,
+    batch_calls: usize,
     check: []const u8,
 };
 
-fn sortTimings(values: []i96) void {
+fn sortTimings(values: []f64) void {
     var i: usize = 1;
     while (i < values.len) : (i += 1) {
         const value = values[i];
@@ -343,23 +345,44 @@ fn benchGemm(comptime T: type, gemm: GemmFn(T), allocator: std.mem.Allocator, io
     if (check) try checkGemmSamples(T, a, b, c, shape, pair, lda, ldb, ldc);
 
     if (reps == 0) return error.InvalidRepetitions;
-    const timings = try allocator.alloc(i96, reps);
+    const timings = try allocator.alloc(f64, reps);
     defer allocator.free(timings);
 
+    // QPC-backed clocks can quantize tiny calls to zero or 100 ns. Measure
+    // batches long enough to resolve the work instead of inventing a 1 ns
+    // duration. beta=0 makes repeated calls independent of earlier outputs.
+    var batch_calls: usize = 1;
+    while (true) {
+        const start = nowNs(io);
+        for (0..batch_calls) |_| {
+            gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
+        }
+        const elapsed = nowNs(io) - start;
+        if (elapsed >= 100_000) break;
+        if (batch_calls >= 1 << 20) return error.TimerResolutionTooLow;
+        batch_calls *= 2;
+    }
     for (0..reps) |rep| {
         @memset(c, zero(T));
         const start = nowNs(io);
-        gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
-        const end = nowNs(io);
-        timings[rep] = if (end >= start) @max(@as(i96, 1), end - start) else 1;
+        for (0..batch_calls) |_| {
+            gemm(&ta, &tb, &m_i, &n_i, &k_i, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
+        }
+        const elapsed = nowNs(io) - start;
+        if (elapsed <= 0) return error.InvalidTiming;
+        timings[rep] = @as(f64, @floatFromInt(elapsed)) / @as(f64, @floatFromInt(batch_calls));
     }
     sortTimings(timings);
     const p95_index = @min(timings.len - 1, ((timings.len * 95) + 99) / 100 - 1);
     return .{
         .best_ns = timings[0],
-        .median_ns = timings[timings.len / 2],
+        .median_ns = if (timings.len % 2 == 0)
+            (timings[timings.len / 2 - 1] + timings[timings.len / 2]) / 2
+        else
+            timings[timings.len / 2],
         .p95_ns = timings[p95_index],
         .max_ns = timings[timings.len - 1],
+        .batch_calls = batch_calls,
         .check = if (check) "checked-ok" else "unchecked",
     };
 }
@@ -394,6 +417,7 @@ fn writeCsvRow(writer: *std.Io.Writer, kind: []const u8, pair: TransposePair, sh
         reps,
     });
     try csvEscape(writer, result.check);
+    try writer.print(",{d}", .{result.batch_calls});
     try writer.writeByte('\n');
 }
 
@@ -502,7 +526,7 @@ pub fn main(init: std.process.Init) !void {
     defer csv_file.close(init.io);
     var buf: [8192]u8 = undefined;
     var writer = csv_file.writer(init.io, &buf);
-    try writer.interface.writeAll("kind,transa,transb,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,check\n");
+    try writer.interface.writeAll("kind,transa,transb,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,check,batch_calls\n");
 
     const shapes: []const Shape = if (custom_shape_count == 0) default_shapes[0..] else custom_shapes[0..custom_shape_count];
     const transposes: []const TransposePair = if (custom_transpose_count == 0) default_transposes[0..] else custom_transposes[0..custom_transpose_count];

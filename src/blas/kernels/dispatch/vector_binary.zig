@@ -31,6 +31,14 @@ pub fn copyUnit(comptime T: type, n: usize, x: [*]const T, y: [*]T) bool {
     return copyBytes(n * @sizeOf(T), @ptrCast(x), @ptrCast(y));
 }
 
+pub fn streamCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_streamCopyBytes, void, .{ n_bytes, x, y });
+    return switch (builtin.cpu.arch) {
+        .x86_64 => x86_64.streamCopyBytes(n_bytes, x, y),
+        else => false,
+    };
+}
+
 pub fn copyUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]T) bool {
     if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_copyUnitReal, T, .{ n, x, y });
     return switch (builtin.cpu.arch) {

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const builtin = @import("builtin");
+const runtime = @import("../../runtime.zig");
 
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
@@ -38,7 +40,9 @@ const C64x2 = struct {
     im: F64x2,
 };
 
-const max_cached_complex_workspace_bytes = 64 * 1024 * 1024;
+// A 1024-square complex-f64 3M workspace occupies just over 72 MiB.
+// Keep it reusable instead of allocating and freeing it on every call.
+const max_cached_complex_workspace_bytes = 128 * 1024 * 1024;
 
 const ComplexExecutionPolicy = enum {
     tuned,
@@ -413,6 +417,11 @@ fn expandedComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, tra
     if (policy == .forced) return true;
     if (transa == .no_trans and transb == .no_trans) return useExpandedComplexF32Real(m, n, k);
 
+    // The padded 128x64 expanded-real leaf was tuned for AMX. On x86 a
+    // 32x32 output would compute four times its useful real output area.
+    // Let compact 3M handle these transposed fringe tiles instead.
+    if (builtin.cpu.arch == .x86_64 and (m < 64 or n < 64)) return false;
+
     const work = m *| n *| k;
     return m <= 64 and n <= 64 and k >= 128 and k <= 256 and work >= 128 * 1024;
 }
@@ -423,8 +432,7 @@ fn expandedComplexF64Feasible(policy: ComplexExecutionPolicy, transa: Order, tra
     return policy == .forced or useExpandedComplexF64Real(m, n, k);
 }
 
-fn threeMComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, alpha: ComplexF32, beta: ComplexF32) bool {
-    if (!isOne(ComplexF32, alpha) or !isZero(ComplexF32, beta)) return false;
+fn threeMComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, _: ComplexF32, _: ComplexF32) bool {
     if (policy == .forced) return true;
     if (m == 1 or n == 1) {
         const row_edge = m == 1 and transa != .no_trans and transb == .no_trans;
@@ -434,8 +442,7 @@ fn threeMComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, trans
     return m *| n *| k >= 128 * 1024;
 }
 
-fn threeMComplexF64Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, alpha: ComplexF64, beta: ComplexF64) bool {
-    if (!isOne(ComplexF64, alpha) or !isZero(ComplexF64, beta)) return false;
+fn threeMComplexF64Feasible(policy: ComplexExecutionPolicy, transa: Order, transb: Order, m: usize, n: usize, k: usize, _: ComplexF64, _: ComplexF64) bool {
     if (policy == .forced) return true;
     if ((m == 1 or n == 1) and !(n == 1 and transa == .no_trans and transb != .no_trans)) return false;
     return m *| n *| k >= 128 * 1024;
@@ -664,11 +671,7 @@ inline fn materializeComplexF32TransposedB4x4(transb: Order, n: usize, k: usize,
     }
 }
 
-fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, m_compute: usize, ar: []f32, ai: []f32, am: []f32, br: []f32, bi: []f32, bp: []f32, cr: []f32, ci: []f32, tmp: []f32) void {
-    const m = toUsize(m_);
-    const n = toUsize(n_);
-    const k = toUsize(k_);
-
+fn packThreeA32(transa: Order, m: usize, k: usize, a: [*]const ComplexF32, lda: BlasInt, m_compute: usize, ar: []f32, ai: []f32, am: []f32) void {
     if (m_compute > m) {
         for (0..k) |p| {
             const pad_start = p * m_compute + m;
@@ -741,7 +744,10 @@ fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
             }
         }
     }
-    if (transb != .no_trans and (m_compute > m or n >= 256 or k >= 512)) {
+}
+
+fn packThreeB32(transb: Order, n: usize, k: usize, b: [*]const ComplexF32, ldb: BlasInt, br: []f32, bi: []f32, bp: []f32, tiled: bool) void {
+    if (transb != .no_trans and tiled) {
         materializeComplexF32TransposedB4x4(transb, n, k, b, ldb, br, bi, bp);
     } else {
         for (0..n) |j| {
@@ -764,26 +770,294 @@ fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
             }
         }
     }
+}
 
-    const m_compute_i: BlasInt = @intCast(m_compute);
-    const lda_r: BlasInt = @intCast(m_compute);
-    const ldb_r: BlasInt = @intCast(k);
-    const ldc_r: BlasInt = @intCast(m_compute);
-    gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
-    gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
-    gemmNoTransReal(f32, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+fn packThreeA64(transa: Order, m: usize, k: usize, a: [*]const ComplexF64, lda: BlasInt, m_compute: usize, ar: []f64, ai: []f64, am: []f64) void {
+    if (m_compute > m) {
+        for (0..k) |p| {
+            const pad_start = p * m_compute + m;
+            const pad_end = (p + 1) * m_compute;
+            @memset(ar[pad_start..pad_end], 0);
+            @memset(ai[pad_start..pad_end], 0);
+            @memset(am[pad_start..pad_end], 0);
+        }
+    }
 
+    if (transa == .no_trans) {
+        for (0..k) |p| {
+            var i: usize = 0;
+            while (i + 2 <= m) : (i += 2) {
+                const value = loadC64x2(a, lda, i, p);
+                const idx = i + p * m_compute;
+                storeF64x2(ar, idx, value.re);
+                storeF64x2(ai, idx, value.re + value.im);
+                storeF64x2(am, idx, value.im - value.re);
+            }
+            while (i < m) : (i += 1) {
+                const value = a[matIndex(lda, i, p)];
+                const idx = i + p * m_compute;
+                ar[idx] = value.re;
+                ai[idx] = value.re + value.im;
+                am[idx] = value.im - value.re;
+            }
+        }
+    } else {
+        var p: usize = 0;
+        while (p + 2 <= k) : (p += 2) {
+            var i: usize = 0;
+            while (i + 2 <= m) : (i += 2) {
+                const v0 = loadC64x2(a, lda, p, i + 0);
+                const v1 = loadC64x2(a, lda, p, i + 1);
+                const re = transposeF64x2(v0.re, v1.re);
+                var im = transposeF64x2(v0.im, v1.im);
+                if (transa == .conj_trans) {
+                    im[0] = -im[0];
+                    im[1] = -im[1];
+                }
+                inline for (0..2) |lane| {
+                    const idx = i + (p + lane) * m_compute;
+                    storeF64x2(ar, idx, re[lane]);
+                    storeF64x2(ai, idx, re[lane] + im[lane]);
+                    storeF64x2(am, idx, im[lane] - re[lane]);
+                }
+            }
+            while (i < m) : (i += 1) {
+                inline for (0..2) |lane| {
+                    const pp = p + lane;
+                    const value = complexOperandValue(ComplexF64, transa, a, lda, i, pp);
+                    const idx = i + pp * m_compute;
+                    ar[idx] = value.re;
+                    ai[idx] = value.re + value.im;
+                    am[idx] = value.im - value.re;
+                }
+            }
+        }
+        while (p < k) : (p += 1) {
+            for (0..m) |i| {
+                const value = complexOperandValue(ComplexF64, transa, a, lda, i, p);
+                const idx = i + p * m_compute;
+                ar[idx] = value.re;
+                ai[idx] = value.re + value.im;
+                am[idx] = value.im - value.re;
+            }
+        }
+    }
+}
+
+fn packThreeB64(transb: Order, n: usize, k: usize, b: [*]const ComplexF64, ldb: BlasInt, br: []f64, bi: []f64, bp: []f64) void {
+    if (transb == .no_trans) {
+        for (0..n) |j| {
+            var p: usize = 0;
+            while (p + 2 <= k) : (p += 2) {
+                const value = loadC64x2(b, ldb, p, j);
+                const idx = p + j * k;
+                storeF64x2(br, idx, value.re);
+                storeF64x2(bi, idx, value.im);
+                storeF64x2(bp, idx, value.re + value.im);
+            }
+            while (p < k) : (p += 1) {
+                const value = b[matIndex(ldb, p, j)];
+                const idx = p + j * k;
+                br[idx] = value.re;
+                bi[idx] = value.im;
+                bp[idx] = value.re + value.im;
+            }
+        }
+    } else {
+        var j: usize = 0;
+        while (j + 2 <= n) : (j += 2) {
+            var p: usize = 0;
+            while (p + 2 <= k) : (p += 2) {
+                const v0 = loadC64x2(b, ldb, j, p + 0);
+                const v1 = loadC64x2(b, ldb, j, p + 1);
+                const re = transposeF64x2(v0.re, v1.re);
+                var im = transposeF64x2(v0.im, v1.im);
+                if (transb == .conj_trans) {
+                    im[0] = -im[0];
+                    im[1] = -im[1];
+                }
+                inline for (0..2) |lane| {
+                    const idx = p + (j + lane) * k;
+                    storeF64x2(br, idx, re[lane]);
+                    storeF64x2(bi, idx, im[lane]);
+                    storeF64x2(bp, idx, re[lane] + im[lane]);
+                }
+            }
+            while (p < k) : (p += 1) {
+                inline for (0..2) |lane| {
+                    const jj = j + lane;
+                    const value = complexOperandValue(ComplexF64, transb, b, ldb, p, jj);
+                    const idx = p + jj * k;
+                    br[idx] = value.re;
+                    bi[idx] = value.im;
+                    bp[idx] = value.re + value.im;
+                }
+            }
+        }
+        while (j < n) : (j += 1) {
+            for (0..k) |p| {
+                const value = complexOperandValue(ComplexF64, transb, b, ldb, p, j);
+                const idx = p + j * k;
+                br[idx] = value.re;
+                bi[idx] = value.im;
+                bp[idx] = value.re + value.im;
+            }
+        }
+    }
+}
+
+fn ThreePackTask(comptime T: type) type {
+    const R = if (T == ComplexF32) f32 else f64;
+    return struct {
+        is_a: bool,
+        trans: Order,
+        m: usize,
+        n: usize,
+        k: usize,
+        stride: usize,
+        input: [*]const T,
+        ld: BlasInt,
+        first: usize,
+        end: usize,
+        p0: []R,
+        p1: []R,
+        p2: []R,
+    };
+}
+
+fn runThreePack(comptime T: type, raw: *const anyopaque, index: usize) void {
+    const tasks: [*]const ThreePackTask(T) = @ptrCast(@alignCast(raw));
+    const task = tasks[index];
+    const count = task.end - task.first;
+    const input = task.input + if (task.trans == .no_trans) task.first * toUsize(task.ld) else task.first;
+    if (task.is_a) {
+        if (T == ComplexF32) packThreeA32(task.trans, task.m, count, input, task.ld, task.stride, task.p0, task.p1, task.p2) else packThreeA64(task.trans, task.m, count, input, task.ld, task.stride, task.p0, task.p1, task.p2);
+    } else {
+        if (T == ComplexF32) packThreeB32(task.trans, count, task.k, input, task.ld, task.p0, task.p1, task.p2, true) else packThreeB64(task.trans, count, task.k, input, task.ld, task.p0, task.p1, task.p2);
+    }
+}
+fn runThreePack32(raw: *const anyopaque, index: usize) void {
+    runThreePack(ComplexF32, raw, index);
+}
+fn runThreePack64(raw: *const anyopaque, index: usize) void {
+    runThreePack(ComplexF64, raw, index);
+}
+
+fn parallelThreePack(comptime T: type, ta: Order, tb: Order, m: usize, n: usize, k: usize, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, stride: usize, ar: anytype, ai: @TypeOf(ar), am: @TypeOf(ar), br: @TypeOf(ar), bi: @TypeOf(ar), bp: @TypeOf(ar)) bool {
+    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (m < 256 or n < 256 or k < 256 or runtime.maxThreads() <= 1) return false;
+    const count = @min(runtime.maxThreads(), 16);
+    const acount = count / 2;
+    const bcount = count - acount;
+    var tasks: [16]ThreePackTask(T) = undefined;
+    for (0..acount) |i| {
+        const first = i * k / acount;
+        const end = (i + 1) * k / acount;
+        tasks[i] = .{ .is_a = true, .trans = ta, .m = m, .n = n, .k = k, .stride = stride, .input = a, .ld = lda, .first = first, .end = end, .p0 = ar[first * stride .. end * stride], .p1 = ai[first * stride .. end * stride], .p2 = am[first * stride .. end * stride] };
+    }
+    for (0..bcount) |i| {
+        const first = i * n / bcount;
+        const end = (i + 1) * n / bcount;
+        tasks[acount + i] = .{ .is_a = false, .trans = tb, .m = m, .n = n, .k = k, .stride = stride, .input = b, .ld = ldb, .first = first, .end = end, .p0 = br[first * k .. end * k], .p1 = bi[first * k .. end * k], .p2 = bp[first * k .. end * k] };
+    }
+    return core_pool.runLowLatency(if (T == ComplexF32) runThreePack32 else runThreePack64, @ptrCast(&tasks), count);
+}
+
+fn mergeThree32(alpha: ComplexF32, beta: ComplexF32, m: usize, n: usize, m_compute: usize, c: [*]ComplexF32, ldc: BlasInt, cr: []f32, ci: []f32, tmp: []f32) void {
     for (0..n) |j| {
         var i: usize = 0;
         while (i + 4 <= m) : (i += 4) {
             const src = i + j * m_compute;
             const crv = loadF32x4(cr, src);
-            storeC32x4(c, ldc, i, j, .{ .re = crv - loadF32x4(tmp, src), .im = crv + loadF32x4(ci, src) });
+            const acc = C32x4{ .re = crv - loadF32x4(tmp, src), .im = crv + loadF32x4(ci, src) };
+            storeC32x4(c, ldc, i, j, finishC32x4(alpha, beta, c, ldc, i, j, acc));
         }
         while (i < m) : (i += 1) {
             const src = i + j * m_compute;
-            c[matIndex(ldc, i, j)] = .{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
+            const idx = matIndex(ldc, i, j);
+            const acc = ComplexF32{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
+            c[idx] = add(ComplexF32, mul(ComplexF32, alpha, acc), if (isZero(ComplexF32, beta)) zero(ComplexF32) else mul(ComplexF32, beta, c[idx]));
         }
+    }
+}
+
+fn mergeThree64(alpha: ComplexF64, beta: ComplexF64, m: usize, n: usize, m_compute: usize, c: [*]ComplexF64, ldc: BlasInt, cr: []f64, ci: []f64, tmp: []f64) void {
+    for (0..n) |j| {
+        var i: usize = 0;
+        while (i + 2 <= m) : (i += 2) {
+            const src = i + j * m_compute;
+            const crv = loadF64x2(cr, src);
+            const acc = C64x2{ .re = crv - loadF64x2(tmp, src), .im = crv + loadF64x2(ci, src) };
+            storeC64x2(c, ldc, i, j, finishC64x2(alpha, beta, c, ldc, i, j, acc));
+        }
+        while (i < m) : (i += 1) {
+            const src = i + j * m_compute;
+            const idx = matIndex(ldc, i, j);
+            const acc = ComplexF64{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
+            c[idx] = add(ComplexF64, mul(ComplexF64, alpha, acc), if (isZero(ComplexF64, beta)) zero(ComplexF64) else mul(ComplexF64, beta, c[idx]));
+        }
+    }
+}
+
+fn ThreeMergeTask(comptime T: type) type {
+    const R = if (T == ComplexF32) f32 else f64;
+    return struct { alpha: T, beta: T, m: usize, n: usize, stride: usize, c: [*]T, ldc: BlasInt, cr: []R, ci: []R, tmp: []R };
+}
+fn runThreeMerge(comptime T: type, raw: *const anyopaque, index: usize) void {
+    const tasks: [*]const ThreeMergeTask(T) = @ptrCast(@alignCast(raw));
+    const t = tasks[index];
+    if (T == ComplexF32) mergeThree32(t.alpha, t.beta, t.m, t.n, t.stride, t.c, t.ldc, t.cr, t.ci, t.tmp) else mergeThree64(t.alpha, t.beta, t.m, t.n, t.stride, t.c, t.ldc, t.cr, t.ci, t.tmp);
+}
+fn runThreeMerge32(raw: *const anyopaque, index: usize) void {
+    runThreeMerge(ComplexF32, raw, index);
+}
+fn runThreeMerge64(raw: *const anyopaque, index: usize) void {
+    runThreeMerge(ComplexF64, raw, index);
+}
+fn parallelThreeMerge(comptime T: type, alpha: T, beta: T, m: usize, n: usize, stride: usize, c: [*]T, ldc: BlasInt, cr: anytype, ci: @TypeOf(cr), tmp: @TypeOf(cr)) bool {
+    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (m < 256 or n < 256 or runtime.maxThreads() <= 1) return false;
+    const count = @min(runtime.maxThreads(), 16);
+    var tasks: [16]ThreeMergeTask(T) = undefined;
+    for (0..count) |i| {
+        const first = i * n / count;
+        const end = (i + 1) * n / count;
+        tasks[i] = .{ .alpha = alpha, .beta = beta, .m = m, .n = end - first, .stride = stride, .c = c + first * toUsize(ldc), .ldc = ldc, .cr = cr[first * stride .. end * stride], .ci = ci[first * stride .. end * stride], .tmp = tmp[first * stride .. end * stride] };
+    }
+    return core_pool.runLowLatency(if (T == ComplexF32) runThreeMerge32 else runThreeMerge64, @ptrCast(&tasks), count);
+}
+
+fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, beta: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, m_compute: usize, ar: []f32, ai: []f32, am: []f32, br: []f32, bi: []f32, bp: []f32, cr: []f32, ci: []f32, tmp: []f32) void {
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+
+    if (!parallelThreePack(ComplexF32, transa, transb, m, n, k, a, lda, b, ldb, m_compute, ar, ai, am, br, bi, bp)) {
+        packThreeA32(transa, m, k, a, lda, m_compute, ar, ai, am);
+        packThreeB32(transb, n, k, b, ldb, br, bi, bp, m_compute > m or n >= 256 or k >= 512);
+    }
+
+    const m_compute_i: BlasInt = @intCast(m_compute);
+    const lda_r: BlasInt = @intCast(m_compute);
+    const ldb_r: BlasInt = @intCast(k);
+    const ldc_r: BlasInt = @intCast(m_compute);
+    var parallel_real_products = false;
+    if (builtin.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192) {
+        const real_tasks = [_]ComplexF32RealGemmTask{
+            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
+            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
+            .{ .m = m_compute_i, .n = n_, .k = k_, .a = am.ptr, .lda = lda_r, .b = br.ptr, .ldb = ldb_r, .c = ci.ptr, .ldc = ldc_r },
+        };
+        parallel_real_products = core_pool.runLowLatency(runComplexF32RealGemmTask, @ptrCast(&real_tasks), real_tasks.len);
+    }
+    if (!parallel_real_products) {
+        gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
+        gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
+        gemmNoTransReal(f32, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+    }
+
+    if (!parallelThreeMerge(ComplexF32, alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp)) {
+        mergeThree32(alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp);
     }
 }
 
@@ -820,7 +1094,7 @@ fn tryGemmComplexF32ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     const ci = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
     workspace_offset += plane_padding;
     const tmp = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
-    gemmComplexF32ViaRealBuffers(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
+    gemmComplexF32ViaRealBuffers(transa, transb, m_, n_, k_, alpha, beta, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
 }
 
@@ -1018,6 +1292,24 @@ fn tryGemmNoTransComplexF64ViaExpandedReal(policy: ComplexExecutionPolicy, works
     return true;
 }
 
+const ComplexF32RealGemmTask = struct {
+    m: BlasInt,
+    n: BlasInt,
+    k: BlasInt,
+    a: [*]const f32,
+    lda: BlasInt,
+    b: [*]const f32,
+    ldb: BlasInt,
+    c: [*]f32,
+    ldc: BlasInt,
+};
+
+fn runComplexF32RealGemmTask(raw_tasks: *const anyopaque, index: usize) void {
+    const tasks: [*]const ComplexF32RealGemmTask = @ptrCast(@alignCast(raw_tasks));
+    const task = tasks[index];
+    gemmNoTransReal(f32, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
+}
+
 const ComplexF64RealGemmTask = struct {
     m: BlasInt,
     n: BlasInt,
@@ -1036,138 +1328,14 @@ fn runComplexF64RealGemmTask(raw_tasks: *const anyopaque, index: usize) void {
     gemmNoTransReal(f64, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
 }
 
-fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, m_compute: usize, ar: []f64, ai: []f64, am: []f64, br: []f64, bi: []f64, bp: []f64, cr: []f64, ci: []f64, tmp: []f64) void {
+fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, beta: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, m_compute: usize, ar: []f64, ai: []f64, am: []f64, br: []f64, bi: []f64, bp: []f64, cr: []f64, ci: []f64, tmp: []f64) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
 
-    if (m_compute > m) {
-        for (0..k) |p| {
-            const pad_start = p * m_compute + m;
-            const pad_end = (p + 1) * m_compute;
-            @memset(ar[pad_start..pad_end], 0);
-            @memset(ai[pad_start..pad_end], 0);
-            @memset(am[pad_start..pad_end], 0);
-        }
-    }
-
-    if (transa == .no_trans) {
-        for (0..k) |p| {
-            var i: usize = 0;
-            while (i + 2 <= m) : (i += 2) {
-                const value = loadC64x2(a, lda, i, p);
-                const idx = i + p * m_compute;
-                storeF64x2(ar, idx, value.re);
-                storeF64x2(ai, idx, value.re + value.im);
-                storeF64x2(am, idx, value.im - value.re);
-            }
-            while (i < m) : (i += 1) {
-                const value = a[matIndex(lda, i, p)];
-                const idx = i + p * m_compute;
-                ar[idx] = value.re;
-                ai[idx] = value.re + value.im;
-                am[idx] = value.im - value.re;
-            }
-        }
-    } else {
-        var p: usize = 0;
-        while (p + 2 <= k) : (p += 2) {
-            var i: usize = 0;
-            while (i + 2 <= m) : (i += 2) {
-                const v0 = loadC64x2(a, lda, p, i + 0);
-                const v1 = loadC64x2(a, lda, p, i + 1);
-                const re = transposeF64x2(v0.re, v1.re);
-                var im = transposeF64x2(v0.im, v1.im);
-                if (transa == .conj_trans) {
-                    im[0] = -im[0];
-                    im[1] = -im[1];
-                }
-                inline for (0..2) |lane| {
-                    const idx = i + (p + lane) * m_compute;
-                    storeF64x2(ar, idx, re[lane]);
-                    storeF64x2(ai, idx, re[lane] + im[lane]);
-                    storeF64x2(am, idx, im[lane] - re[lane]);
-                }
-            }
-            while (i < m) : (i += 1) {
-                inline for (0..2) |lane| {
-                    const pp = p + lane;
-                    const value = complexOperandValue(ComplexF64, transa, a, lda, i, pp);
-                    const idx = i + pp * m_compute;
-                    ar[idx] = value.re;
-                    ai[idx] = value.re + value.im;
-                    am[idx] = value.im - value.re;
-                }
-            }
-        }
-        while (p < k) : (p += 1) {
-            for (0..m) |i| {
-                const value = complexOperandValue(ComplexF64, transa, a, lda, i, p);
-                const idx = i + p * m_compute;
-                ar[idx] = value.re;
-                ai[idx] = value.re + value.im;
-                am[idx] = value.im - value.re;
-            }
-        }
-    }
-    if (transb == .no_trans) {
-        for (0..n) |j| {
-            var p: usize = 0;
-            while (p + 2 <= k) : (p += 2) {
-                const value = loadC64x2(b, ldb, p, j);
-                const idx = p + j * k;
-                storeF64x2(br, idx, value.re);
-                storeF64x2(bi, idx, value.im);
-                storeF64x2(bp, idx, value.re + value.im);
-            }
-            while (p < k) : (p += 1) {
-                const value = b[matIndex(ldb, p, j)];
-                const idx = p + j * k;
-                br[idx] = value.re;
-                bi[idx] = value.im;
-                bp[idx] = value.re + value.im;
-            }
-        }
-    } else {
-        var j: usize = 0;
-        while (j + 2 <= n) : (j += 2) {
-            var p: usize = 0;
-            while (p + 2 <= k) : (p += 2) {
-                const v0 = loadC64x2(b, ldb, j, p + 0);
-                const v1 = loadC64x2(b, ldb, j, p + 1);
-                const re = transposeF64x2(v0.re, v1.re);
-                var im = transposeF64x2(v0.im, v1.im);
-                if (transb == .conj_trans) {
-                    im[0] = -im[0];
-                    im[1] = -im[1];
-                }
-                inline for (0..2) |lane| {
-                    const idx = p + (j + lane) * k;
-                    storeF64x2(br, idx, re[lane]);
-                    storeF64x2(bi, idx, im[lane]);
-                    storeF64x2(bp, idx, re[lane] + im[lane]);
-                }
-            }
-            while (p < k) : (p += 1) {
-                inline for (0..2) |lane| {
-                    const jj = j + lane;
-                    const value = complexOperandValue(ComplexF64, transb, b, ldb, p, jj);
-                    const idx = p + jj * k;
-                    br[idx] = value.re;
-                    bi[idx] = value.im;
-                    bp[idx] = value.re + value.im;
-                }
-            }
-        }
-        while (j < n) : (j += 1) {
-            for (0..k) |p| {
-                const value = complexOperandValue(ComplexF64, transb, b, ldb, p, j);
-                const idx = p + j * k;
-                br[idx] = value.re;
-                bi[idx] = value.im;
-                bp[idx] = value.re + value.im;
-            }
-        }
+    if (!parallelThreePack(ComplexF64, transa, transb, m, n, k, a, lda, b, ldb, m_compute, ar, ai, am, br, bi, bp)) {
+        packThreeA64(transa, m, k, a, lda, m_compute, ar, ai, am);
+        packThreeB64(transb, n, k, b, ldb, br, bi, bp);
     }
 
     const m_compute_i: BlasInt = @intCast(m_compute);
@@ -1175,7 +1343,7 @@ fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     const ldb_r: BlasInt = @intCast(k);
     const ldc_r: BlasInt = @intCast(m_compute);
     var parallel_real_products = false;
-    if (m == 127 and n == 129 and k == 32) {
+    if ((m == 127 and n == 129 and k == 32) or (builtin.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
         const real_tasks = [_]ComplexF64RealGemmTask{
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
@@ -1189,17 +1357,8 @@ fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
         gemmNoTransReal(f64, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
     }
 
-    for (0..n) |j| {
-        var i: usize = 0;
-        while (i + 2 <= m) : (i += 2) {
-            const src = i + j * m_compute;
-            const crv = loadF64x2(cr, src);
-            storeC64x2(c, ldc, i, j, .{ .re = crv - loadF64x2(tmp, src), .im = crv + loadF64x2(ci, src) });
-        }
-        while (i < m) : (i += 1) {
-            const src = i + j * m_compute;
-            c[matIndex(ldc, i, j)] = .{ .re = cr[src] - tmp[src], .im = cr[src] + ci[src] };
-        }
+    if (!parallelThreeMerge(ComplexF64, alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp)) {
+        mergeThree64(alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp);
     }
 }
 
@@ -1227,7 +1386,7 @@ fn tryGemmComplexF64ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     const cr = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     const ci = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     const tmp = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
-    gemmComplexF64ViaRealBuffers(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
+    gemmComplexF64ViaRealBuffers(transa, transb, m_, n_, k_, alpha, beta, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
 }
 

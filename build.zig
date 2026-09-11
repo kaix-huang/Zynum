@@ -1221,7 +1221,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    if (target.result.os.tag != .windows) b.installArtifact(bench);
+    b.installArtifact(bench);
 
     const run_bench = b.addRunArtifact(bench);
     run_bench.addArg("--zynum-blas");
@@ -1250,7 +1250,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    if (target.result.os.tag != .windows) b.installArtifact(gemm_sweep);
+    b.installArtifact(gemm_sweep);
 
     const run_gemm_sweep = b.addRunArtifact(gemm_sweep);
     run_gemm_sweep.addArg("--zynum-blas");
@@ -1301,7 +1301,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    if (target.result.os.tag != .windows) b.installArtifact(vector_matrix_sweep);
+    b.installArtifact(vector_matrix_sweep);
 
     const run_vector_matrix_sweep = b.addRunArtifact(vector_matrix_sweep);
     run_vector_matrix_sweep.addArg("--zynum-blas");
@@ -1318,10 +1318,7 @@ pub fn build(b: *std.Build) void {
     const rank_k_probe = b.addExecutable(.{
         .name = "rank-k-probe",
         .root_module = b.createModule(.{
-            .root_source_file = b.path(if (target.result.os.tag == .windows)
-                "test/build/windows_python_tooling_probe_fixture.zig"
-            else
-                "bench/rank_k_probe.zig"),
+            .root_source_file = b.path("bench/rank_k_probe.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -1330,10 +1327,7 @@ pub fn build(b: *std.Build) void {
     const install_rank_k_probe = b.addInstallArtifact(rank_k_probe, .{});
     const build_rank_k_probe_step = b.step(
         "build-rank-k-probe",
-        if (target.result.os.tag == .windows)
-            "Build the Windows Python tooling executable fixture; not benchmark runtime evidence"
-        else
-            "Build the opt-in Level 3 rank-k probe",
+        "Build the opt-in Level 3 rank-k probe",
     );
     build_rank_k_probe_step.dependOn(&install_rank_k_probe.step);
 
@@ -1360,10 +1354,7 @@ pub fn build(b: *std.Build) void {
     const symm_probe = b.addExecutable(.{
         .name = "symm-probe",
         .root_module = b.createModule(.{
-            .root_source_file = b.path(if (target.result.os.tag == .windows)
-                "test/build/windows_python_tooling_probe_fixture.zig"
-            else
-                "bench/symm_probe.zig"),
+            .root_source_file = b.path("bench/symm_probe.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -1372,10 +1363,7 @@ pub fn build(b: *std.Build) void {
     const install_symm_probe = b.addInstallArtifact(symm_probe, .{});
     const build_symm_probe_step = b.step(
         "build-symm-probe",
-        if (target.result.os.tag == .windows)
-            "Build the Windows Python tooling executable fixture; not benchmark runtime evidence"
-        else
-            "Build the opt-in Level 3 SYMM/HEMM probe",
+        "Build the opt-in Level 3 SYMM/HEMM probe",
     );
     build_symm_probe_step.dependOn(&install_symm_probe.step);
 
@@ -1402,10 +1390,7 @@ pub fn build(b: *std.Build) void {
     const triangular_matrix_probe = b.addExecutable(.{
         .name = "triangular-matrix-probe",
         .root_module = b.createModule(.{
-            .root_source_file = b.path(if (target.result.os.tag == .windows)
-                "test/build/windows_python_tooling_probe_fixture.zig"
-            else
-                "bench/triangular_matrix_probe.zig"),
+            .root_source_file = b.path("bench/triangular_matrix_probe.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -1414,10 +1399,7 @@ pub fn build(b: *std.Build) void {
     const install_triangular_matrix_probe = b.addInstallArtifact(triangular_matrix_probe, .{});
     const build_triangular_matrix_probe_step = b.step(
         "build-triangular-matrix-probe",
-        if (target.result.os.tag == .windows)
-            "Build the Windows Python tooling executable fixture; not benchmark runtime evidence"
-        else
-            "Build the opt-in Level 3 TRMM/TRSM probe",
+        "Build the opt-in Level 3 TRMM/TRSM probe",
     );
     build_triangular_matrix_probe_step.dependOn(&install_triangular_matrix_probe.step);
 
@@ -1444,10 +1426,7 @@ pub fn build(b: *std.Build) void {
     const rotg_latency_probe = b.addExecutable(.{
         .name = "rotg-latency-probe",
         .root_module = b.createModule(.{
-            .root_source_file = b.path(if (target.result.os.tag == .windows)
-                "test/build/windows_python_tooling_probe_fixture.zig"
-            else
-                "bench/rotg_latency_probe.zig"),
+            .root_source_file = b.path("bench/rotg_latency_probe.zig"),
             .target = target,
             .optimize = optimize,
             .link_libc = true,
@@ -1456,10 +1435,7 @@ pub fn build(b: *std.Build) void {
     const install_rotg_latency_probe = b.addInstallArtifact(rotg_latency_probe, .{});
     const build_rotg_latency_probe_step = b.step(
         "build-rotg-latency-probe",
-        if (target.result.os.tag == .windows)
-            "Build the Windows Python tooling executable fixture; not benchmark runtime evidence"
-        else
-            "Build the opt-in Level 1 ROTG/ROTMG latency probe",
+        "Build the opt-in Level 1 ROTG/ROTMG latency probe",
     );
     build_rotg_latency_probe_step.dependOn(&install_rotg_latency_probe.step);
 
@@ -1504,7 +1480,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    if (target.result.os.tag != .windows) b.installArtifact(level1_probe);
+    b.installArtifact(level1_probe);
 
     const dcopy_probe = b.addExecutable(.{
         .name = "dcopy-probe",
@@ -1515,7 +1491,7 @@ pub fn build(b: *std.Build) void {
             .link_libc = true,
         }),
     });
-    if (target.result.os.tag != .windows) b.installArtifact(dcopy_probe);
+    b.installArtifact(dcopy_probe);
 }
 
 fn buildKernelTiers(

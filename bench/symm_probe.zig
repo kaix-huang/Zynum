@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const BlasInt = i32;
 
@@ -123,7 +124,7 @@ fn checkedDimension(value: []const u8) !usize {
     return result;
 }
 
-fn parseOptions(init: std.process.Init, allocator: std.mem.Allocator) !Options {
+fn parseOptions(args: *std.process.Args.Iterator) !Options {
     var blas_path: ?[]const u8 = null;
     var library: ?[]const u8 = null;
     var shape: ?[]const u8 = null;
@@ -136,8 +137,6 @@ fn parseOptions(init: std.process.Init, allocator: std.mem.Allocator) !Options {
     var beta: ?ScalarSpec = null;
     var reps: usize = 5;
 
-    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
-    defer args.deinit();
     _ = args.next();
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--blas")) {
@@ -403,6 +402,14 @@ fn benchSymm(comptime T: type, function: SymmFn(T), allocator: std.mem.Allocator
     function(&side, &uplo, &m, &n, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
     const check = checkResult(T, a, b, c0, c, options, lda, ldb, ldc);
 
+    // Reach a steady worker/cache state after correctness checking.
+    // Apply the same untimed warmup to every dynamically loaded library.
+    const warmup_start = std.Io.Clock.awake.now(io).nanoseconds;
+    while (std.Io.Clock.awake.now(io).nanoseconds - warmup_start < 50_000_000) {
+        @memcpy(c, c0);
+        function(&side, &uplo, &m, &n, &alpha, a.ptr, &lda_i, b.ptr, &ldb_i, &beta, c.ptr, &ldc_i);
+    }
+
     for (0..options.reps) |rep| {
         @memcpy(c, c0);
         const start = std.Io.Clock.awake.now(io).nanoseconds;
@@ -487,7 +494,7 @@ fn writeRow(writer: *std.Io.Writer, options: Options, result: BenchResult) !void
     try writer.writeByte('\n');
 }
 
-fn runSelected(dyn: *std.DynLib, allocator: std.mem.Allocator, io: std.Io, options: Options) !BenchResult {
+fn runSelected(dyn: *DynLib, allocator: std.mem.Allocator, io: std.Io, options: Options) !BenchResult {
     return switch (options.routine) {
         .ssymm => benchSymm(f32, dyn.lookup(SymmFn(f32), "ssymm_") orelse return error.MissingSymbol, allocator, io, options),
         .dsymm => benchSymm(f64, dyn.lookup(SymmFn(f64), "dsymm_") orelse return error.MissingSymbol, allocator, io, options),
@@ -500,13 +507,17 @@ fn runSelected(dyn: *std.DynLib, allocator: std.mem.Allocator, io: std.Io, optio
 
 pub fn main(init: std.process.Init) !void {
     const allocator = std.heap.page_allocator;
-    const options = parseOptions(init, allocator) catch |err| {
+    // Windows arguments borrow the iterator's UTF-8 conversion buffer.
+    // Keep it alive until all option strings have been consumed.
+    var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, allocator);
+    defer args.deinit();
+    const options = parseOptions(&args) catch |err| {
         usage();
         return err;
     };
     // A short worker leaves BLAS mapped until process exit. Some threaded BLAS
     // libraries have destructors that are unsafe after an explicit dlclose.
-    var dyn = try std.DynLib.open(options.blas_path);
+    var dyn = try DynLib.open(options.blas_path);
     const result = try runSelected(&dyn, allocator, init.io, options);
 
     var stdout_buffer: [4096]u8 = undefined;

@@ -383,11 +383,12 @@ fn lifecycleFor(
     if (operation == .rotm and
         (implementation == .aarch64_asimd or implementation == .x86_64_fixed_simd))
     {
+        if (implementation == .x86_64_fixed_simd and capability == .x86_64_avx2_fma) return .production;
         return .experimental;
     }
     if (operation == .dot_f32_acc_f64 and implementation == .aarch64_asimd) return .experimental;
     if (operation == .dot_f32_acc_f64 and implementation == .x86_64_fixed_simd and
-        capability != .x86_64_avx512f_fma) return .experimental;
+        capability != .x86_64_avx512f_fma and capability != .x86_64_avx2_fma) return .experimental;
     if (implementation == .x86_64_fixed_simd and operation == .iamax and
         (scalar == .complex_f32 or scalar == .complex_f64) and
         capability != .x86_64_avx512f_fma) return .experimental;
@@ -628,7 +629,9 @@ test "Level 1 architecture contracts expose precise build tiers" {
     const rejected_rot = findCapability(.rot, .f32, .aarch64_asimd, .aarch64_asimd_fma).?;
     try std.testing.expectEqual(Lifecycle.rejected, rejected_rot.lifecycle);
 
-    const experimental_rotm = findCapability(.rotm, .f64, .x86_64_fixed_simd, .x86_64_avx2_fma).?;
+    const production_rotm = findCapability(.rotm, .f64, .x86_64_fixed_simd, .x86_64_avx2_fma).?;
+    try std.testing.expectEqual(Lifecycle.production, production_rotm.lifecycle);
+    const experimental_rotm = findCapability(.rotm, .f64, .x86_64_fixed_simd, .x86_64_avx512f_fma).?;
     try std.testing.expectEqual(Lifecycle.experimental, experimental_rotm.lifecycle);
 }
 

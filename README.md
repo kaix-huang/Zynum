@@ -196,9 +196,10 @@ zig build install-libraries --prefix zig-out/install
 That step installs only the dynamic and static library products. On Windows,
 static consumers must name `lib/static/zynum_blas.lib` explicitly; do not add
 `lib/static` to an ordinary library-search path where it could shadow the import
-library. The default Windows install excludes `bench-zynum-blas`, `gemm-sweep`,
-`vector-matrix-sweep`, `level1-probe`, and `dcopy-probe`; their existing Unix
-install behavior is unchanged.
+library. The default Windows install includes native `bench-zynum-blas`,
+`gemm-sweep`, `vector-matrix-sweep`, `level1-probe`, and `dcopy-probe` executables.
+The structured Level 3 and ROTG probes use their explicit `build-*-probe` steps.
+See the [native Windows local benchmark workflow](docs/common/benchmarking.md#native-windows-local-benchmarks).
 
 The default install also includes:
 

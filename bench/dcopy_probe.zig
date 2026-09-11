@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const BlasInt = i32;
 const CopyFn = *const fn (*const BlasInt, [*]const u8, *const BlasInt, [*]u8, *const BlasInt) callconv(.c) void;
@@ -40,7 +41,7 @@ pub fn main(init: std.process.Init) !void {
     var lib_path: ?[]const u8 = null;
     var kind = try copyKind("d");
     var n: usize = 1024 * 1024;
-    var seconds: u64 = 20;
+    var seconds: f64 = 20;
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--lib")) {
             lib_path = args.next() orelse return error.MissingValue;
@@ -49,7 +50,7 @@ pub fn main(init: std.process.Init) !void {
         } else if (std.mem.eql(u8, arg, "--n")) {
             n = try std.fmt.parseInt(usize, args.next() orelse return error.MissingValue, 10);
         } else if (std.mem.eql(u8, arg, "--seconds")) {
-            seconds = try std.fmt.parseInt(u64, args.next() orelse return error.MissingValue, 10);
+            seconds = try std.fmt.parseFloat(f64, args.next() orelse return error.MissingValue);
         } else {
             usage();
             return error.InvalidArgument;
@@ -60,7 +61,8 @@ pub fn main(init: std.process.Init) !void {
         return error.MissingLib;
     };
 
-    var dyn = try std.DynLib.open(path);
+    if (!std.math.isFinite(seconds) or seconds < 0.001 or seconds > 86400) return error.InvalidDuration;
+    var dyn = try DynLib.open(path);
     defer {
         if (dyn.lookup(ShutdownFn, "zynum_blas_shutdown")) |shutdown| shutdown();
         dyn.close();
@@ -79,10 +81,10 @@ pub fn main(init: std.process.Init) !void {
 
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_writer = std.Io.File.stdout().writerStreaming(init.io, &stdout_buffer);
-    const pid = std.c.getpid();
+    const pid = @import("dynamic_library.zig").processId();
     try stdout_writer.interface.print("pid={d} symbol={s} n={d} elem_size={d} seconds={d} lib={s}\n", .{ pid, kind.symbol, n, kind.elem_size, seconds, path });
     const start = std.Io.Clock.awake.now(init.io).nanoseconds;
-    const deadline = start + @as(i128, seconds) * std.time.ns_per_s;
+    const deadline = start + @as(i128, @intFromFloat(seconds * std.time.ns_per_s));
     var iters: u64 = 0;
     while (std.Io.Clock.awake.now(init.io).nanoseconds < deadline) : (iters += 1) {
         copy_fn(&ni, x.ptr, &inc, y.ptr, &inc);

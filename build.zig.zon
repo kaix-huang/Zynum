@@ -14,6 +14,7 @@
         "include",
         "pkgconfig",
         "bench/bench.zig",
+        "bench/dynamic_library.zig",
         "bench/dcopy_probe.zig",
         "bench/gemm_sweep.zig",
         "bench/vector_matrix_sweep.zig",

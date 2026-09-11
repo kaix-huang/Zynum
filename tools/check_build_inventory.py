@@ -2794,14 +2794,14 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
 WINDOWS_PYTHON_TOOLING_FIXTURE_PATH = (
     "test/build/windows_python_tooling_probe_fixture.zig"
 )
-WINDOWS_PYTHON_TOOLING_FIXTURE_COMPILE_SOURCES = {
+WINDOWS_BENCHMARK_PROBE_COMPILE_SOURCES = {
     "compile:build.zig:build:rank_k_probe": "bench/rank_k_probe.zig",
     "compile:build.zig:build:rotg_latency_probe": "bench/rotg_latency_probe.zig",
     "compile:build.zig:build:symm_probe": "bench/symm_probe.zig",
     "compile:build.zig:build:triangular_matrix_probe": "bench/triangular_matrix_probe.zig",
 }
 INSTALL_DYNAMIC_LIBRARY_ID = "install:build.zig:build:install_dynamic_lib"
-WINDOWS_PYTHON_TOOLING_FIXTURE_INSTALL_IDS = (
+WINDOWS_BENCHMARK_PROBE_INSTALL_IDS = (
     "install:build.zig:build:install_rank_k_probe",
     "install:build.zig:build:install_rotg_latency_probe",
     "install:build.zig:build:install_symm_probe",
@@ -2809,7 +2809,7 @@ WINDOWS_PYTHON_TOOLING_FIXTURE_INSTALL_IDS = (
 )
 WINDOWS_PYTHON_TOOLING_INSTALL_IDS = (
     INSTALL_DYNAMIC_LIBRARY_ID,
-    *WINDOWS_PYTHON_TOOLING_FIXTURE_INSTALL_IDS,
+    *WINDOWS_BENCHMARK_PROBE_INSTALL_IDS,
 )
 WINDOWS_PYTHON_TOOLING_INSTALL_REACHABILITY = {
     INSTALL_DYNAMIC_LIBRARY_ID: (
@@ -2835,7 +2835,7 @@ WINDOWS_PYTHON_TOOLING_INSTALL_REACHABILITY = {
 }
 INSTALL_STATIC_LIBRARY_ID = "install:build.zig:build:install_static_lib"
 INSTALL_LIBRARIES_STEP_ID = "step:build.zig:build:install-libraries"
-WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS = {
+DEFAULT_EXECUTABLE_INSTALL_IDS = {
     "install:build.zig:build:bench",
     "install:build.zig:build:gemm_sweep",
     "install:build.zig:build:vector_matrix_sweep",
@@ -12505,21 +12505,21 @@ def _validate_level2_width_and_windows_artifact_contract(
                 errors,
             )
 
-    for identifier in WINDOWS_PYTHON_TOOLING_FIXTURE_COMPILE_SOURCES:
+    for identifier in WINDOWS_BENCHMARK_PROBE_COMPILE_SOURCES:
         observed = observations.get(identifier)
         if observed is None:
             continue
         for field, value in _reviewed_observation_refresh_fields(identifier).items():
             _require(
                 observed.get(field) == value,
-                f"{identifier}: Windows tooling fixture {field} changed",
+                f"{identifier}: Windows benchmark probe {field} changed",
                 errors,
             )
 
     for identifier in (
         "compile:build.zig:build:lib",
         "compile:build.zig:build:static_lib",
-        *sorted(WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS),
+        *sorted(DEFAULT_EXECUTABLE_INSTALL_IDS),
     ):
         observed = observations.get(identifier)
         if observed is None:
@@ -13245,7 +13245,6 @@ def _validate(
         identifier: (
             "target.result.ofmt == .macho" if identifier == "install:build.zig:build:libzynum_blas.a" else
             "target.result.ofmt != .macho" if identifier == INSTALL_STATIC_LIBRARY_ID else
-            "target.result.os.tag != .windows" if identifier in WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS else
             "compat-headers is true" if "/" in identifier.rsplit(":", 1)[-1] else "always"
         )
         for identifier in root_install_dependencies
@@ -14018,16 +14017,16 @@ def _reviewed_observation_refresh_fields(identifier: str) -> dict[str, Any]:
     install_reachability = WINDOWS_PYTHON_TOOLING_INSTALL_REACHABILITY.get(identifier)
     if install_reachability is not None:
         return {"condition": install_reachability}
-    fixture_source = WINDOWS_PYTHON_TOOLING_FIXTURE_COMPILE_SOURCES.get(identifier)
-    if fixture_source is not None:
+    runtime_source = WINDOWS_BENCHMARK_PROBE_COMPILE_SOURCES.get(identifier)
+    if runtime_source is not None:
         return {
-            "root_source": [fixture_source, WINDOWS_PYTHON_TOOLING_FIXTURE_PATH],
+            "root_source": [runtime_source],
             "root_source_by_target": {
-                "windows": WINDOWS_PYTHON_TOOLING_FIXTURE_PATH,
-                "non-windows": fixture_source,
+                "windows": runtime_source,
+                "non-windows": runtime_source,
             },
             "evidence_role_by_target": {
-                "windows": "python-tooling-fixture-only-not-benchmark-runtime-evidence",
+                "windows": "benchmark-probe-runtime-evidence",
                 "non-windows": "benchmark-probe-runtime-evidence",
             },
         }
@@ -14061,9 +14060,9 @@ def _reviewed_observation_refresh_fields(identifier: str) -> dict[str, Any]:
                 "windows": {"primary": "zig-out/lib/static/zynum_blas.lib"},
             },
         }
-    if identifier in WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS:
+    if identifier in DEFAULT_EXECUTABLE_INSTALL_IDS:
         return {
-            "condition": "requested target OS is not Windows and install step is reached"
+            "condition": "install step is reached"
         }
     return {}
 
@@ -14213,8 +14212,8 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         edge["id"] = identifier
         if identifier == INSTALL_STATIC_LIBRARY_ID:
             edge["condition"] = "target.result.ofmt != .macho"
-        elif identifier in WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS:
-            edge["condition"] = "target.result.os.tag != .windows"
+        elif identifier in DEFAULT_EXECUTABLE_INSTALL_IDS:
+            edge["condition"] = "always"
     install["direct_dependencies"] = list(installation_edges.values())
     drift_gate_ids = [
         "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",

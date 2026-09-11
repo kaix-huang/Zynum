@@ -65,3 +65,12 @@ pub fn x86Shape(comptime T: type, comptime has_avx: bool, comptime has_avx512f: 
     }
     @compileError("x86_64 packed GEMM supports f32 and f64");
 }
+
+/// Two contiguous row vectors reuse each B broadcast while keeping twelve
+/// independent accumulators within AVX2's sixteen architectural registers.
+pub fn x86Avx2FmaShape(comptime T: type) PackedSimdShape {
+    var shape = x86Shape(T, true, false);
+    shape.tile_n = 6;
+    shape.row_groups = 2;
+    return shape;
+}

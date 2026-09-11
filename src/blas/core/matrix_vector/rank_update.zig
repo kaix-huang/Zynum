@@ -172,6 +172,7 @@ fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]con
 
     const runner = if (T == f32) runGerTaskF32 else runGerTaskF64;
     if (tuning.useRealGerLowLatency(T, n)) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 
@@ -445,8 +446,207 @@ const DenseRankOperation = enum {
     her2,
 };
 
+fn preferPackedColumns(n: usize) bool {
+    if (comptime builtin.cpu.arch == .x86_64) return n >= 128;
+    return tuning.preferPackedStructuredParallel(n);
+}
+
+fn rankUpdateTaskLimit(comptime T: type, comptime operation: DenseRankOperation, comptime is_packed: bool, n: usize, requested: usize) usize {
+    if (comptime builtin.cpu.arch != .x86_64) return requested;
+    var limit = requested;
+    if (n >= 4096) {
+        if (comptime T == scalar.ComplexF64 and operation == .her2) limit = @min(limit, 8);
+        if (comptime is_packed and T == scalar.ComplexF64 and operation == .her) limit = @min(limit, 8);
+        if (comptime is_packed and T == f32 and operation == .syr2) limit = @min(limit, 8);
+        if (comptime is_packed and T == f64 and operation == .syr2) limit = @min(limit, 16);
+        if (comptime !is_packed and T == scalar.ComplexF32 and operation == .her2) limit = @min(limit, 16);
+    }
+    return limit;
+}
+
+// Rank-two updates share one read/modify/write of the destination column.
+// In particular, avoid a second pass over a column larger than L1.
+fn rankTwoColumn(comptime T: type, n: usize, cx: T, x: [*]const T, cy: T, y: [*]const T, dest: [*]T) void {
+    if (comptime builtin.cpu.arch != .x86_64) {
+        if (!isZero(T, cx)) vector_ops.axpy(T, @intCast(n), cx, x, 1, dest, 1);
+        if (!isZero(T, cy)) vector_ops.axpy(T, @intCast(n), cy, y, 1, dest, 1);
+        return;
+    }
+    if (isZero(T, cx)) return vector_ops.axpy(T, @intCast(n), cy, y, 1, dest, 1);
+    if (isZero(T, cy)) return vector_ops.axpy(T, @intCast(n), cx, x, 1, dest, 1);
+    const R = if (T == f32 or T == scalar.ComplexF32) f32 else f64;
+    const width = 32 / @sizeOf(R);
+    const V = @Vector(width, R);
+    const xp: [*]const R = @ptrCast(x);
+    const yp: [*]const R = @ptrCast(y);
+    const dp: [*]R = @ptrCast(dest);
+    const components = if (comptime isReal(T)) 1 else 2;
+    const limit = n * components;
+    var i: usize = 0;
+    while (i + width <= limit) : (i += width) {
+        const xv = loadVec(R, width, xp, i);
+        const yv = loadVec(R, width, yp, i);
+        var acc = loadVec(R, width, dp, i);
+        if (comptime isReal(T)) {
+            acc = @mulAdd(V, xv, @as(V, @splat(cx)), acc);
+            acc = @mulAdd(V, yv, @as(V, @splat(cy)), acc);
+        } else {
+            const swap: @Vector(width, i32) = comptime blk: {
+                var mask: @Vector(width, i32) = undefined;
+                for (0..width) |lane| mask[lane] = @intCast(lane ^ 1);
+                break :blk mask;
+            };
+            var xi: V = @splat(cx.im);
+            var yi: V = @splat(cy.im);
+            inline for (0..width / 2) |pair| {
+                xi[2 * pair] = -cx.im;
+                yi[2 * pair] = -cy.im;
+            }
+            acc = @mulAdd(V, xv, @as(V, @splat(cx.re)), acc);
+            acc = @mulAdd(V, @shuffle(R, xv, undefined, swap), xi, acc);
+            acc = @mulAdd(V, yv, @as(V, @splat(cy.re)), acc);
+            acc = @mulAdd(V, @shuffle(R, yv, undefined, swap), yi, acc);
+        }
+        storeVec(R, width, dp, i, acc);
+    }
+    var row = i / components;
+    while (row < n) : (row += 1) {
+        dest[row] = if (comptime isReal(T))
+            @mulAdd(T, cy, y[row], @mulAdd(T, cx, x[row], dest[row]))
+        else
+            add(T, add(T, dest[row], mul(T, cx, x[row])), mul(T, cy, y[row]));
+    }
+}
+
+// Reuse x/y across four real or two complex destination columns. The complex
+// tile is narrower so that its real/imaginary coefficients fit AVX2 registers.
+inline fn rankTwoPanel(comptime T: type, comptime columns: usize, comptime is_packed: bool, n: usize, cx: [columns]T, x: [*]const T, cy: [columns]T, y: [*]const T, dest: [columns][*]T) void {
+    const R = if (T == f32 or T == scalar.ComplexF32) f32 else f64;
+    const width = 32 / @sizeOf(R);
+    const V = @Vector(width, R);
+    const components = if (comptime isReal(T)) 1 else 2;
+    const xp: [*]const R = @ptrCast(x);
+    const yp: [*]const R = @ptrCast(y);
+    var i: usize = 0;
+    // Narrow tiles leave enough registers for a longer row loop. Dense f64
+    // four-column panels retain the shorter loop after the large-size holdout.
+    if (comptime isReal(T) and (columns == 2 or (T == f64 and is_packed))) {
+        const row_vectors = if (columns == 2) 4 else 2;
+        while (i + row_vectors * width <= n) : (i += row_vectors * width) {
+            inline for (0..row_vectors) |step| {
+                const offset = i + step * width;
+                const xv = loadVec(R, width, xp, offset);
+                const yv = loadVec(R, width, yp, offset);
+                inline for (0..columns) |col| {
+                    var acc = loadVec(R, width, dest[col], offset);
+                    acc = @mulAdd(V, xv, @as(V, @splat(cx[col])), acc);
+                    acc = @mulAdd(V, yv, @as(V, @splat(cy[col])), acc);
+                    storeVec(R, width, dest[col], offset, acc);
+                }
+            }
+        }
+    }
+    while (i + width <= n * components) : (i += width) {
+        const xv = loadVec(R, width, xp, i);
+        const yv = loadVec(R, width, yp, i);
+        inline for (0..columns) |col| {
+            const dp: [*]R = @ptrCast(dest[col]);
+            var acc = loadVec(R, width, dp, i);
+            if (comptime isReal(T)) {
+                acc = @mulAdd(V, xv, @as(V, @splat(cx[col])), acc);
+                acc = @mulAdd(V, yv, @as(V, @splat(cy[col])), acc);
+            } else {
+                const swap: @Vector(width, i32) = comptime blk: {
+                    var mask: @Vector(width, i32) = undefined;
+                    for (0..width) |lane| mask[lane] = @intCast(lane ^ 1);
+                    break :blk mask;
+                };
+                var xi: V = @splat(cx[col].im);
+                var yi: V = @splat(cy[col].im);
+                inline for (0..width / 2) |pair| {
+                    xi[2 * pair] = -cx[col].im;
+                    yi[2 * pair] = -cy[col].im;
+                }
+                acc = @mulAdd(V, xv, @as(V, @splat(cx[col].re)), acc);
+                acc = @mulAdd(V, @shuffle(R, xv, undefined, swap), xi, acc);
+                acc = @mulAdd(V, yv, @as(V, @splat(cy[col].re)), acc);
+                acc = @mulAdd(V, @shuffle(R, yv, undefined, swap), yi, acc);
+            }
+            storeVec(R, width, dp, i, acc);
+        }
+    }
+    if (comptime T == f32) {
+        const half = width / 2;
+        const H = @Vector(half, R);
+        if (i + half <= n) {
+            const xv = loadVec(R, half, xp, i);
+            const yv = loadVec(R, half, yp, i);
+            inline for (0..columns) |col| {
+                const dp: [*]R = @ptrCast(dest[col]);
+                var acc = loadVec(R, half, dp, i);
+                acc = @mulAdd(H, xv, @as(H, @splat(cx[col])), acc);
+                acc = @mulAdd(H, yv, @as(H, @splat(cy[col])), acc);
+                storeVec(R, half, dp, i, acc);
+            }
+            i += half;
+        }
+    }
+    var row = i / components;
+    while (row < n) : (row += 1) {
+        inline for (0..columns) |col| {
+            dest[col][row] = if (comptime isReal(T))
+                @mulAdd(T, cy[col], y[row], @mulAdd(T, cx[col], x[row], dest[col][row]))
+            else
+                add(T, add(T, dest[col][row], mul(T, cx[col], x[row])), mul(T, cy[col], y[row]));
+        }
+    }
+}
+
+fn tiledRankTwoColumns(comptime T: type, comptime is_packed: bool, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) usize {
+    if (comptime isReal(T) and (!is_packed or T == f32)) {
+        if (n <= 256) return tiledRankTwoColumnsImpl(T, is_packed, 2, uplo, n, j0, j1, alpha, x, y, a, lda);
+    }
+    return tiledRankTwoColumnsImpl(T, is_packed, if (isReal(T)) 4 else 2, uplo, n, j0, j1, alpha, x, y, a, lda);
+}
+
+fn tiledRankTwoColumnsImpl(comptime T: type, comptime is_packed: bool, comptime columns: usize, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) usize {
+    var j = j0;
+    while (j + columns <= j1) : (j += columns) {
+        const row0 = if (uplo == .upper) 0 else j + columns - 1;
+        const count = if (uplo == .upper) j + 1 else n - row0;
+        var cx: [columns]T = undefined;
+        var cy: [columns]T = undefined;
+        var dest: [columns][*]T = undefined;
+        inline for (0..columns) |col| {
+            const jj = j + col;
+            cx[col] = mul(T, alpha, conj(T, y[jj]));
+            cy[col] = mul(T, conj(T, alpha), conj(T, x[jj]));
+            dest[col] = a + if (is_packed) packedIndex(uplo, n, row0, jj) else matIndex(lda, row0, jj);
+        }
+        rankTwoPanel(T, columns, is_packed, count, cx, x + row0, cy, y + row0, dest);
+        inline for (0..columns) |col| {
+            const jj = j + col;
+            const fringe_row = if (uplo == .upper) j + 1 else jj;
+            const fringe_count = if (uplo == .upper) col else columns - 1 - col;
+            if (fringe_count > 0) {
+                const fringe = a + if (is_packed) packedIndex(uplo, n, fringe_row, jj) else matIndex(lda, fringe_row, jj);
+                rankTwoColumn(T, fringe_count, cx[col], x + fringe_row, cy[col], y + fringe_row, fringe);
+            }
+            if (comptime !isReal(T)) {
+                const diag = if (is_packed) packedIndex(uplo, n, jj, jj) else matIndex(lda, jj, jj);
+                a[diag].im = 0;
+            }
+        }
+    }
+    return j;
+}
+
 fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) void {
-    for (j0..j1) |j| {
+    const first = if (comptime builtin.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
+        tiledRankTwoColumns(T, false, uplo, n, j0, j1, alpha, x, y, a, lda)
+    else
+        j0;
+    for (first..j1) |j| {
         const row0: usize = if (uplo == .upper) 0 else j;
         const row1: usize = if (uplo == .upper) j + 1 else n;
         const count = row1 - row0;
@@ -465,14 +665,12 @@ fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, up
             .syr2 => {
                 const temp1 = alpha * y[j];
                 const temp2 = alpha * x[j];
-                if (temp1 != 0) vector_ops.axpyUnitReal(T, count, temp1, x + row0, column);
-                if (temp2 != 0) vector_ops.axpyUnitReal(T, count, temp2, y + row0, column);
+                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, column);
             },
             .her2 => {
                 const temp1 = mul(T, alpha, conj(T, y[j]));
                 const temp2 = mul(T, conj(T, alpha), conj(T, x[j]));
-                if (!isZero(T, temp1)) vector_ops.axpy(T, @intCast(count), temp1, x + row0, 1, column, 1);
-                if (!isZero(T, temp2)) vector_ops.axpy(T, @intCast(count), temp2, y + row0, 1, column, 1);
+                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, column);
                 a[matIndex(lda, j, j)].im = 0;
             },
         }
@@ -549,7 +747,7 @@ fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperat
     if (comptime builtin.cpu.arch == .x86_64) {
         task_count = level2_tuning.capTaskCountByWork(task_count, n *| n, 64 * 1024);
     }
-    task_count = tuning.capStructuredTasks(n, task_count);
+    task_count = rankUpdateTaskLimit(T, operation, false, n, tuning.capStructuredTasks(n, task_count));
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]DenseRankTask(T) = undefined;
@@ -573,11 +771,16 @@ fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperat
         .syr2 => if (T == f32) runSyr2TaskF32 else runSyr2TaskF64,
         .her2 => if (T == scalar.ComplexF32) runHer2TaskC32 else runHer2TaskC64,
     };
+    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 
 fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) void {
-    for (j0..j1) |j| {
+    const first = if (comptime builtin.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
+        tiledRankTwoColumns(T, true, uplo, n, j0, j1, alpha, x, y, ap, 0)
+    else
+        j0;
+    for (first..j1) |j| {
         const row0: usize = if (uplo == .upper) 0 else j;
         const count: usize = if (uplo == .upper) j + 1 else n - j;
         const segment = ap + packedIndex(uplo, n, row0, j);
@@ -595,14 +798,12 @@ fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, u
             .syr2 => {
                 const temp1 = alpha * y[j];
                 const temp2 = alpha * x[j];
-                if (temp1 != 0) vector_ops.axpyUnitReal(T, count, temp1, x + row0, segment);
-                if (temp2 != 0) vector_ops.axpyUnitReal(T, count, temp2, y + row0, segment);
+                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, segment);
             },
             .her2 => {
                 const temp1 = mul(T, alpha, conj(T, y[j]));
                 const temp2 = mul(T, conj(T, alpha), conj(T, x[j]));
-                if (!isZero(T, temp1)) vector_ops.axpy(T, @intCast(count), temp1, x + row0, 1, segment, 1);
-                if (!isZero(T, temp2)) vector_ops.axpy(T, @intCast(count), temp2, y + row0, 1, segment, 1);
+                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, segment);
                 ap[packedIndex(uplo, n, j, j)].im = 0;
             },
         }
@@ -672,7 +873,7 @@ noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: Dense
     if (comptime builtin.cpu.arch == .x86_64) {
         task_count = level2_tuning.capTaskCountByWork(task_count, packedRankElementCount(n), 64 * 1024);
     }
-    task_count = tuning.capStructuredTasks(n, task_count);
+    task_count = rankUpdateTaskLimit(T, operation, true, n, tuning.capStructuredTasks(n, task_count));
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]PackedRankTask(T) = undefined;
@@ -695,6 +896,7 @@ noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: Dense
         .syr2 => if (T == f32) runPackedSyr2TaskF32 else runPackedSyr2TaskF64,
         .her2 => if (T == scalar.ComplexF32) runPackedHer2TaskC32 else runPackedHer2TaskC64,
     };
+    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 
@@ -725,9 +927,9 @@ pub fn spr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (level2_tuning.coreUnitSelected(T, .spr, .{ .m = n, .n = n, .incx = incx_ }) and
-            tuning.preferPackedStructuredParallel(n))
+            preferPackedColumns(n))
         {
-            if (parallelPackedRankUpdate(T, .syr, uplo, n, alpha, x, x, ap)) return;
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .syr, uplo, n, alpha, x, x, ap)) return;
             return packedRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, ap);
         }
     }
@@ -773,9 +975,9 @@ pub fn spr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (level2_tuning.coreUnitSelected(T, .spr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ }) and
-            tuning.preferPackedStructuredParallel(n))
+            preferPackedColumns(n))
         {
-            if (parallelPackedRankUpdate(T, .syr2, uplo, n, alpha, x, y, ap)) return;
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .syr2, uplo, n, alpha, x, y, ap)) return;
             return packedRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, ap);
         }
     }
@@ -822,10 +1024,10 @@ pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
         if (level2_tuning.coreUnitSelected(T, .hpr, .{ .m = n, .n = n, .incx = incx_ }) and
-            tuning.preferPackedStructuredParallel(n))
+            preferPackedColumns(n))
         {
             const complex_alpha = realScalar(T, alpha);
-            if (parallelPackedRankUpdate(T, .her, uplo, n, complex_alpha, x, x, ap)) return;
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .her, uplo, n, complex_alpha, x, x, ap)) return;
             return packedRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, ap);
         }
     }
@@ -872,9 +1074,9 @@ pub fn hpr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
         if (level2_tuning.coreUnitSelected(T, .hpr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ }) and
-            tuning.preferPackedStructuredParallel(n))
+            preferPackedColumns(n))
         {
-            if (parallelPackedRankUpdate(T, .her2, uplo, n, alpha, x, y, ap)) return;
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .her2, uplo, n, alpha, x, y, ap)) return;
             return packedRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, ap);
         }
     }
@@ -991,5 +1193,28 @@ test "packed rank update parallel columns match the single-task body" {
         try expectParallelPackedRankMatchesSingle(f64, .syr2, uplo);
         try expectParallelPackedRankMatchesSingle(scalar.ComplexF32, .her2, uplo);
         try expectParallelPackedRankMatchesSingle(scalar.ComplexF64, .her2, uplo);
+    }
+}
+
+test "fused rank-two columns preserve tails guards and zero coefficients" {
+    inline for (.{ f32, f64, scalar.ComplexF32, scalar.ComplexF64 }) |T| {
+        var x: [34]T = undefined;
+        var y: [34]T = undefined;
+        for (&x, &y, 0..) |*xv, *yv, i| {
+            xv.* = packedRankTestValue(T, i, 1);
+            yv.* = packedRankTestValue(T, i, 2);
+        }
+        for ([_]usize{ 0, 1, 2, 3, 7, 8, 9, 16, 17, 31, 33 }) |n| {
+            for (0..4) |coefficient_case| {
+                const cx = if (coefficient_case & 1 == 0) packedRankTestValue(T, 2, 4) else scalar.zero(T);
+                const cy = if (coefficient_case & 2 == 0) packedRankTestValue(T, 3, 5) else scalar.zero(T);
+                var expected: [34]T = undefined;
+                for (&expected, 0..) |*v, i| v.* = packedRankTestValue(T, i, 3);
+                var actual = expected;
+                for (0..n) |i| expected[i] = add(T, add(T, expected[i], mul(T, cx, x[i])), mul(T, cy, y[i]));
+                rankTwoColumn(T, n, cx, &x, cy, &y, &actual);
+                try expectPackedRankApprox(T, &expected, &actual);
+            }
+        }
     }
 }

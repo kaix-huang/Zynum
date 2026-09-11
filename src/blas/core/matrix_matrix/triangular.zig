@@ -9,6 +9,8 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const blocked = @import("structured_blocked.zig");
+const gemm_dispatch = @import("../../kernels/dispatch/matrix_matrix.zig");
 const runtime = @import("../../runtime.zig");
 const isolated_structured = @import("../../kernels/isolated/x86_64_structured_bridge.zig");
 const structured_tuning = @import("../../kernels/tuning/structured.zig");
@@ -200,6 +202,12 @@ fn runLeft(comptime T: type, operation: LeftOperation, uplo: Uplo, trans_: Order
 }
 
 pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    // Large parallel updates need enough work per GEMM to amortize dispatch.
+    if (comptime builtin.cpu.arch == .x86_64) {
+        if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.tryTrmm(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+        }
+    }
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -231,6 +239,12 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
 }
 
 pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    // Shared diagonal solves and trailing GEMM updates amortize work across RHS.
+    if (comptime builtin.cpu.arch == .x86_64) {
+        if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.tryTrsm(T, .{}, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+        }
+    }
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);

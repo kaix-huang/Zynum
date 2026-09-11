@@ -29,6 +29,7 @@ pub fn tierAvailable(comptime tier: Tier) bool {
 }
 
 fn shape(comptime T: type, comptime tier: Tier) packed_params.PackedSimdShape {
+    if (tier == .avx2_fma) return packed_params.x86Avx2FmaShape(T);
     return packed_params.x86Shape(T, tier != .sse2, tier == .avx512f_fma);
 }
 
@@ -42,6 +43,8 @@ fn config(comptime T: type, comptime tier: Tier) packed_simd.Config {
         .tail_vector_lanes = s.tail_vector_lanes,
         .max_stack_pack_bytes = s.max_stack_pack_bytes,
         .pack_tail_columns = true,
+        .pack_a = tier == .avx2_fma,
+        .k_block = if (tier == .avx2_fma) 256 else 0,
     };
 }
 

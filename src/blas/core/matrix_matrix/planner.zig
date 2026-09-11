@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const builtin = @import("builtin");
 const types = @import("../../types.zig");
 const runtime = @import("../../runtime.zig");
 const core_pool = @import("../execution/thread_pool.zig");
@@ -284,6 +285,10 @@ fn makeTask(comptime T: type, plan: Plan, m: usize, n0: usize, n1: usize, k: usi
 }
 
 fn runSharedTasks(comptime T: type, tasks: []const gemm_kernels.Task(T)) bool {
+    if (comptime builtin.cpu.arch == .x86_64) {
+        if (T == f32) return core_pool.runTypedLowLatency(gemm_kernels.Task(f32), gemm_kernels.noTransRealF32, tasks);
+        if (T == f64) return core_pool.runTypedLowLatency(gemm_kernels.Task(f64), gemm_kernels.noTransRealF64, tasks);
+    }
     if (T == f32) return core_pool.runTyped(gemm_kernels.Task(f32), gemm_kernels.noTransRealF32, tasks);
     if (T == f64) return core_pool.runTyped(gemm_kernels.Task(f64), gemm_kernels.noTransRealF64, tasks);
     @compileError("GEMM planner supports f32 and f64");

@@ -610,7 +610,9 @@ fn nrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     if (scale == 0) return 0;
     if (!std.math.isFinite(scale)) return null;
 
-    const inv_scale_v: V = @splat(1 / scale);
+    const inv_scale = 1 / scale;
+    if (!std.math.isFinite(inv_scale)) return null;
+    const inv_scale_v: V = @splat(inv_scale);
     var acc0: V = @splat(0);
     var acc1: V = @splat(0);
     var acc2: V = @splat(0);
@@ -670,7 +672,9 @@ fn nrm2Stride2Real(comptime T: type, n: usize, x: [*]const T) ?T {
     if (scale == 0) return 0;
     if (!std.math.isFinite(scale)) return null;
 
-    const inv_scale_v: V = @splat(1 / scale);
+    const inv_scale = 1 / scale;
+    if (!std.math.isFinite(inv_scale)) return null;
+    const inv_scale_v: V = @splat(inv_scale);
     var acc0: V = @splat(0);
     var acc1: V = @splat(0);
     var acc2: V = @splat(0);
@@ -723,7 +727,9 @@ fn nrm2Stride2Complex(comptime T: type, n: usize, x: [*]const T) ?Real(T) {
     if (scale == 0) return 0;
     if (!std.math.isFinite(scale)) return null;
 
-    const inv_scale_v: V = @splat(1 / scale);
+    const inv_scale = 1 / scale;
+    if (!std.math.isFinite(inv_scale)) return null;
+    const inv_scale_v: V = @splat(inv_scale);
     var acc0: V = @splat(0);
     var acc1: V = @splat(0);
     var acc2: V = @splat(0);
@@ -1757,10 +1763,36 @@ fn parallelTaskCount(n: usize, min_items_per_task: usize, max_task_count: usize)
     return @min(core_pool.taskCount(n, min_items_per_task), max_task_count);
 }
 
+fn x86ReadTaskLimit(comptime norm: bool, comptime T: type, n_bytes: usize) usize {
+    // Cache-resident partitions can use more aggregate cache bandwidth, but
+    // a DRAM stream saturates before all logical CPUs are useful. Limits are
+    // derived from single-kernel byte working sets; the pool still honors the
+    // caller's explicit thread ceiling and available processors.
+    if (n_bytes >= 128 * 1024 * 1024) return 8;
+    if (n_bytes >= 64 * 1024 * 1024) return 16;
+    if (norm) {
+        if (n_bytes < 4 * 1024 * 1024) return 8;
+        if (n_bytes <= 8 * 1024 * 1024) return 16;
+        return 24;
+    }
+    const small_bytes: usize = if (isReal(T)) 8 * 1024 * 1024 else 16 * 1024 * 1024;
+    return if (n_bytes <= small_bytes) 8 else 24;
+}
+
+// Shared streaming regimes measured after single-thread kernel tuning.
+// Working-set bytes count each distinct vector once, not read+write traffic.
+fn x86StreamTaskLimit(working_bytes: usize, cache_limit: usize) usize {
+    if (working_bytes >= 128 * 1024 * 1024) return 8;
+    if (working_bytes >= 64 * 1024 * 1024) return 16;
+    if (working_bytes >= 4 * 1024 * 1024) return cache_limit;
+    return 24;
+}
+
 fn parallelCopyTaskCount(n_bytes: usize) usize {
     if (comptime builtin.cpu.arch == .x86_64) {
         const min_bytes_per_task: usize = if (n_bytes < 1024 * 1024) 64 * 1024 else 256 * 1024;
-        return @min(core_pool.taskCount(n_bytes, min_bytes_per_task), 32);
+        const limit: usize = if (n_bytes < 32 * 1024 * 1024) 32 else if (n_bytes >= 64 * 1024 * 1024 and n_bytes < 128 * 1024 * 1024) 16 else 8;
+        return @min(core_pool.taskCount(n_bytes, min_bytes_per_task), limit);
     }
     return parallelTaskCount(n_bytes, if (n_bytes == 8 * 1024 * 1024) 2 * 1024 * 1024 else 512 * 1024, 10);
 }
@@ -1770,8 +1802,8 @@ fn runLevel1Tasks(task_fn: core_pool.TaskFn, tasks: *const anyopaque, count: usi
     return core_pool.run(task_fn, tasks, count);
 }
 
-fn parallelScalTaskCount(n: usize) usize {
-    if (comptime builtin.cpu.arch == .x86_64) return parallelTaskCount(n, 32 * 1024, 32);
+fn parallelScalTaskCount(comptime T: type, n: usize) usize {
+    if (comptime builtin.cpu.arch == .x86_64) return parallelTaskCount(n, 32 * 1024, x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16));
     if (n < 2 * 1024 * 1024) return 1;
     return parallelTaskCount(n, 170 * 1024, 6);
 }
@@ -1860,7 +1892,7 @@ fn parallelSwapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, if (T == f32) 24 else 16) else 32)
     else if (comptime builtin.cpu.arch == .aarch64) task_count: {
         if (n_bytes < 4 * 1024 * 1024 or n_bytes > 16 * 1024 * 1024) return false;
         const max_task_count: usize = if (n_bytes <= 8 * 1024 * 1024) 4 else 2;
@@ -1935,7 +1967,7 @@ fn parallelRotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T)
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else if (comptime builtin.cpu.arch == .aarch64) task_count: {
         if (n_bytes < 4 * 1024 * 1024 or n_bytes > 16 * 1024 * 1024) return false;
         const max_task_count: usize = if (n_bytes <= 8 * 1024 * 1024) 4 else 2;
@@ -1976,7 +2008,7 @@ fn parallelRotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else if (comptime builtin.cpu.arch == .aarch64) task_count: {
         if (n_bytes < 4 * 1024 * 1024 or n_bytes > 8 * 1024 * 1024) return false;
         break :task_count @min(core_pool.taskCount(n, 128 * 1024), 4);
@@ -2039,7 +2071,7 @@ fn parallelScalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
     if (comptime builtin.cpu.arch != .x86_64) {
         if (T == f32 and n <= 2 * 1024 * 1024) return false;
     }
-    const task_count = parallelScalTaskCount(n);
+    const task_count = parallelScalTaskCount(T, n);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]RangeTask(T) = undefined;
@@ -2065,7 +2097,7 @@ fn parallelComplexScalUnit(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
         if (n < 512 * 1024) return false;
     }
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16) else 32)
     else
         parallelTaskCount(n, 128 * 1024, 10);
     if (task_count <= 1) return false;
@@ -2112,12 +2144,14 @@ const ByteCopyTask = struct {
     x: [*]const u8,
     y: [*]u8,
     use_fixed: bool,
+    use_streaming: bool = false,
 };
 
 fn runCopyBytesTask(raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const ByteCopyTask = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
     const n_bytes = task.n1 - task.n0;
+    if (task.use_streaming and vector_binary_kernels.streamCopyBytes(n_bytes, task.x + task.n0, task.y + task.n0)) return;
     if (task.use_fixed and vector_binary_kernels.fixedCopyBytes(n_bytes, task.x + task.n0, task.y + task.n0)) return;
     copyBytes(n_bytes, task.x + task.n0, task.y + task.n0);
 }
@@ -2163,6 +2197,7 @@ fn parallelCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
             .x = x,
             .y = y,
             .use_fixed = builtin.cpu.arch == .aarch64 and n_bytes == 8 * 1024 * 1024,
+            .use_streaming = builtin.cpu.arch == .x86_64 and n_bytes >= @import("../../kernels/shared/vector/tuning.zig").streaming_copy_min_bytes,
         };
     }
     if (comptime builtin.cpu.arch == .aarch64) return core_pool.runLowLatency(runCopyBytesTask, @ptrCast(&tasks), task_count);
@@ -2228,7 +2263,7 @@ fn parallelAxpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: 
         if (T == f32 and n < 2 * 1024 * 1024) return false;
     }
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else
         parallelTaskCount(n, 170 * 1024, 6);
     if (task_count <= 1) return false;
@@ -2274,7 +2309,7 @@ fn parallelAxpyStride2Real(comptime T: type, n: usize, alpha: T, x: [*]const T, 
 
 fn parallelComplexAxpyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
     if (comptime builtin.cpu.arch != .x86_64 and builtin.cpu.arch != .aarch64) return false;
-    const task_count = parallelTaskCount(n, 32 * 1024, 32);
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]RangeTask(T) = undefined;
@@ -2366,7 +2401,7 @@ fn runComplexAxpbyTaskC64(raw_tasks: *const anyopaque, index: usize) void {
 fn parallelAxpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n * @sizeOf(T))) return false;
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else if (comptime builtin.cpu.arch == .aarch64)
         parallelTaskCount(n, 128 * 1024, 4)
     else
@@ -2392,7 +2427,7 @@ fn parallelAxpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, be
 
 fn parallelComplexAxpbyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
     if (comptime builtin.cpu.arch != .x86_64) return false;
-    const task_count = parallelTaskCount(n, 32 * 1024, 32);
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]RangeTask(T) = undefined;
@@ -2451,7 +2486,7 @@ fn runDotF32AccF64Task(raw_tasks: *const anyopaque, index: usize) void {
 
 fn parallelDotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
     if (comptime builtin.cpu.arch != .x86_64) return null;
-    const task_count = parallelTaskCount(n, 32 * 1024, 32);
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(f32) * 2, 16) else 32);
     if (task_count <= 1) return null;
 
     var partial: [core_pool.max_tasks]f64 = undefined;
@@ -2478,7 +2513,7 @@ fn parallelDotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T)
         if (T == f32 and n <= 2 * 1024 * 1024) return null;
     }
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else
         parallelTaskCount(n, 128 * 1024, 10);
     if (task_count <= 1) return null;
@@ -2533,7 +2568,7 @@ fn parallelDotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const
         if (T == ComplexF32) return null;
     }
     if (n < 512 * 1024) return null;
-    const task_count = parallelTaskCount(n, 32 * 1024, 32);
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 24) else 32);
     if (task_count <= 1) return null;
 
     var partial: [core_pool.max_tasks]T = undefined;
@@ -2581,13 +2616,13 @@ fn runAsumComplexComponentsTaskF64(raw_tasks: *const anyopaque, index: usize) vo
 
 fn parallelAsumUnit(comptime T: type, comptime category: AsumOperandCategory, n: usize, x: [*]const T) ?T {
     if (comptime builtin.cpu.arch == .x86_64) {
-        if (n < 512 * 1024) return null;
+        if (n < 128 * 1024) return null;
     } else {
         if (T == f32 and n <= 2 * 1024 * 1024) return null;
         if (n < 2 * 1024 * 1024) return null;
     }
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        @min(core_pool.taskCount(n, 32 * 1024), x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16))
     else
         parallelTaskCount(n, 96 * 1024, 10);
     if (task_count <= 1) return null;
@@ -2667,7 +2702,7 @@ fn combineNrm2Partials(comptime T: type, partial: []const T) T {
 fn parallelNrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     if (n < 512 * 1024) return null;
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        parallelTaskCount(n, 32 * 1024, x86ReadTaskLimit(true, T, n * @sizeOf(T)))
     else
         parallelTaskCount(n, 128 * 1024, 10);
     if (task_count <= 1) return null;
@@ -3087,7 +3122,7 @@ fn runIamaxTaskC64(raw_tasks: *const anyopaque, index: usize) void {
 
 fn parallelIamaxUnit(comptime T: type, n: usize, x: [*]const T) ?BlasInt {
     const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, 32)
+        (if (n < 128 * 1024) 1 else @min(core_pool.taskCount(n, 32 * 1024), x86ReadTaskLimit(false, T, n * @sizeOf(T))))
     else if (comptime builtin.cpu.arch == .aarch64 and isComplex(T)) task_count: {
         if (n < 256 * 1024) return null;
         const min_items_per_task: usize = if (T == ComplexF32) 64 * 1024 else 128 * 1024;

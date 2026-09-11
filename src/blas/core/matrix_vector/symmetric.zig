@@ -4,6 +4,7 @@
 //! Symmetric, Hermitian, banded, and packed matrix-vector BLAS Level 2 kernels.
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
@@ -464,7 +465,7 @@ fn parallelSymvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]
     }
 
     const runner = if (T == f32) runSymvTaskF32 else runSymvTaskF64;
-    const ran = if (tuning.useRealLowLatency(T, n))
+    const ran = if (builtin.cpu.arch == .x86_64 or tuning.useRealLowLatency(T, n))
         core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)
     else
         core_pool.run(runner, @ptrCast(&tasks), task_count);
@@ -494,11 +495,11 @@ fn hermDiag(comptime T: type, value: T) T {
     return .{ .re = value.re, .im = 0 };
 }
 
-inline fn c32HermAxpyTerm(xv: @Vector(8, f32), coeff: scalar.ComplexF32) @Vector(8, f32) {
+inline fn c32HermAxpyTerm(xv: @Vector(8, f32), coeff: scalar.ComplexF32, yv: @Vector(8, f32)) @Vector(8, f32) {
     const swap_mask: @Vector(8, i32) = .{ 1, 0, 3, 2, 5, 4, 7, 6 };
     const re_v: @Vector(8, f32) = @splat(coeff.re);
     const im_v: @Vector(8, f32) = .{ -coeff.im, coeff.im, -coeff.im, coeff.im, -coeff.im, coeff.im, -coeff.im, coeff.im };
-    return @mulAdd(@Vector(8, f32), xv, re_v, @shuffle(f32, xv, undefined, swap_mask) * im_v);
+    return @mulAdd(@Vector(8, f32), xv, re_v, @mulAdd(@Vector(8, f32), @shuffle(f32, xv, undefined, swap_mask), im_v, yv));
 }
 
 inline fn c32HermDotAccumulate(
@@ -532,8 +533,8 @@ fn hermvUpperColumnC32(j: usize, alpha: scalar.ComplexF32, col: [*]const scalar.
         var yv1 = loadVec(f32, 8, y_real, i + 8);
         const av0 = loadVec(f32, 8, col_real, i);
         const av1 = loadVec(f32, 8, col_real, i + 8);
-        yv0 += c32HermAxpyTerm(av0, xj);
-        yv1 += c32HermAxpyTerm(av1, xj);
+        yv0 = c32HermAxpyTerm(av0, xj, yv0);
+        yv1 = c32HermAxpyTerm(av1, xj, yv1);
         storeVec(f32, 8, y_real, i, yv0);
         storeVec(f32, 8, y_real, i + 8, yv1);
         c32HermDotAccumulate(col_real, x_real, i, &re_acc0, &im_acc0);
@@ -543,7 +544,7 @@ fn hermvUpperColumnC32(j: usize, alpha: scalar.ComplexF32, col: [*]const scalar.
     var im_acc = im_acc0 + im_acc1;
     while (i + 8 <= real_n) : (i += 8) {
         const av = loadVec(f32, 8, col_real, i);
-        const yv = loadVec(f32, 8, y_real, i) + c32HermAxpyTerm(av, xj);
+        const yv = c32HermAxpyTerm(av, xj, loadVec(f32, 8, y_real, i));
         storeVec(f32, 8, y_real, i, yv);
         c32HermDotAccumulate(col_real, x_real, i, &re_acc, &im_acc);
     }
@@ -562,11 +563,11 @@ fn hermvUpperColumnC32(j: usize, alpha: scalar.ComplexF32, col: [*]const scalar.
     y_delta[j] = add(scalar.ComplexF32, y_delta[j], mul(scalar.ComplexF32, xj, hermDiag(scalar.ComplexF32, col[j])));
 }
 
-inline fn c64HermAxpyTerm(xv: @Vector(4, f64), coeff: scalar.ComplexF64) @Vector(4, f64) {
+inline fn c64HermAxpyTerm(xv: @Vector(4, f64), coeff: scalar.ComplexF64, yv: @Vector(4, f64)) @Vector(4, f64) {
     const swap_mask: @Vector(4, i32) = .{ 1, 0, 3, 2 };
     const re_v: @Vector(4, f64) = @splat(coeff.re);
     const im_v: @Vector(4, f64) = .{ -coeff.im, coeff.im, -coeff.im, coeff.im };
-    return @mulAdd(@Vector(4, f64), xv, re_v, @shuffle(f64, xv, undefined, swap_mask) * im_v);
+    return @mulAdd(@Vector(4, f64), xv, re_v, @mulAdd(@Vector(4, f64), @shuffle(f64, xv, undefined, swap_mask), im_v, yv));
 }
 
 inline fn c64HermDotAccumulate(
@@ -600,8 +601,8 @@ fn hermvUpperColumnC64(j: usize, alpha: scalar.ComplexF64, col: [*]const scalar.
         var yv1 = loadVec(f64, 4, y_real, i + 4);
         const av0 = loadVec(f64, 4, col_real, i);
         const av1 = loadVec(f64, 4, col_real, i + 4);
-        yv0 += c64HermAxpyTerm(av0, xj);
-        yv1 += c64HermAxpyTerm(av1, xj);
+        yv0 = c64HermAxpyTerm(av0, xj, yv0);
+        yv1 = c64HermAxpyTerm(av1, xj, yv1);
         storeVec(f64, 4, y_real, i, yv0);
         storeVec(f64, 4, y_real, i + 4, yv1);
         c64HermDotAccumulate(col_real, x_real, i, &re_acc0, &im_acc0);
@@ -611,7 +612,7 @@ fn hermvUpperColumnC64(j: usize, alpha: scalar.ComplexF64, col: [*]const scalar.
     var im_acc = im_acc0 + im_acc1;
     while (i + 4 <= real_n) : (i += 4) {
         const av = loadVec(f64, 4, col_real, i);
-        const yv = loadVec(f64, 4, y_real, i) + c64HermAxpyTerm(av, xj);
+        const yv = c64HermAxpyTerm(av, xj, loadVec(f64, 4, y_real, i));
         storeVec(f64, 4, y_real, i, yv);
         c64HermDotAccumulate(col_real, x_real, i, &re_acc, &im_acc);
     }
@@ -630,6 +631,63 @@ fn hermvUpperColumnC64(j: usize, alpha: scalar.ComplexF64, col: [*]const scalar.
     y_delta[j] = add(scalar.ComplexF64, y_delta[j], mul(scalar.ComplexF64, xj, hermDiag(scalar.ComplexF64, col[j])));
 }
 
+fn hermvUpperPair(comptime T: type, j: usize, alpha: T, a0: [*]const T, a1: [*]const T, x: [*]const T, y: [*]T) void {
+    const F = if (T == scalar.ComplexF32) f32 else f64;
+    const lane_count = if (F == f32) 8 else 4;
+    const V = @Vector(lane_count, F);
+    const swap: @Vector(lane_count, i32) = comptime blk: {
+        var v: @Vector(lane_count, i32) = undefined;
+        for (0..lane_count) |k| v[k] = @intCast(k ^ 1);
+        break :blk v;
+    };
+    const signs: V = comptime blk: {
+        var v: V = undefined;
+        for (0..lane_count) |k| v[k] = if (k % 2 == 0) 1 else -1;
+        break :blk v;
+    };
+    const c0 = mul(T, alpha, x[j]);
+    const c1 = mul(T, alpha, x[j + 1]);
+    const ar0: [*]const F = @ptrCast(a0);
+    const ar1: [*]const F = @ptrCast(a1);
+    const xr: [*]const F = @ptrCast(x);
+    const yr: [*]F = @ptrCast(y);
+    var r0: V = @splat(0);
+    var imag0: V = @splat(0);
+    var r1: V = @splat(0);
+    var imag1: V = @splat(0);
+    var k: usize = 0;
+    while (k + lane_count <= 2 * j) : (k += lane_count) {
+        const av0 = loadVec(F, lane_count, ar0, k);
+        const av1 = loadVec(F, lane_count, ar1, k);
+        const xv = loadVec(F, lane_count, xr, k);
+        const xi = @shuffle(F, xv, undefined, swap) * signs;
+        r0 = @mulAdd(V, av0, xv, r0);
+        imag0 = @mulAdd(V, av0, xi, imag0);
+        r1 = @mulAdd(V, av1, xv, r1);
+        imag1 = @mulAdd(V, av1, xi, imag1);
+        var yv = loadVec(F, lane_count, yr, k);
+        if (F == f32) {
+            yv = c32HermAxpyTerm(av0, c0, yv);
+            yv = c32HermAxpyTerm(av1, c1, yv);
+        } else {
+            yv = c64HermAxpyTerm(av0, c0, yv);
+            yv = c64HermAxpyTerm(av1, c1, yv);
+        }
+        storeVec(F, lane_count, yr, k, yv);
+    }
+    var sum0 = T{ .re = @reduce(.Add, r0), .im = @reduce(.Add, imag0) };
+    var sum1 = T{ .re = @reduce(.Add, r1), .im = @reduce(.Add, imag1) };
+    var row = k / 2;
+    while (row < j) : (row += 1) {
+        y[row] = add(T, y[row], add(T, mul(T, a0[row], c0), mul(T, a1[row], c1)));
+        sum0 = add(T, sum0, mul(T, .{ .re = a0[row].re, .im = -a0[row].im }, x[row]));
+        sum1 = add(T, sum1, mul(T, .{ .re = a1[row].re, .im = -a1[row].im }, x[row]));
+    }
+    sum1 = add(T, sum1, mul(T, .{ .re = a1[j].re, .im = -a1[j].im }, x[j]));
+    y[j] = add(T, y[j], add(T, mul(T, alpha, sum0), add(T, mul(T, c0, hermDiag(T, a0[j])), mul(T, c1, a1[j]))));
+    y[j + 1] = add(T, y[j + 1], add(T, mul(T, alpha, sum1), mul(T, c1, hermDiag(T, a1[j + 1]))));
+}
+
 fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y_delta: [*]T) void {
     if (tuning.enable_fixed_columns and matrix_vector_kernels.symmetricColumnsUnit(
         T,
@@ -645,7 +703,13 @@ fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1
         y_delta,
     )) return;
     if (uplo == .upper) {
-        for (j0..j1) |j| {
+        var first = j0;
+        if (builtin.cpu.arch == .x86_64 and n >= 128) {
+            while (first + 1 < j1) : (first += 2) {
+                hermvUpperPair(T, first, alpha, a + indexing.matIndex(lda, 0, first), a + indexing.matIndex(lda, 0, first + 1), x, y_delta);
+            }
+        }
+        for (first..j1) |j| {
             const col = a + indexing.matIndex(lda, 0, j);
             if (T == scalar.ComplexF32) {
                 hermvUpperColumnC32(j, alpha, @ptrCast(col), @ptrCast(x), @ptrCast(y_delta));

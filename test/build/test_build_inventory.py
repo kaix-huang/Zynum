@@ -32,6 +32,47 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
+class WindowsBenchmarkPolicyTests(unittest.TestCase):
+    """Pure policy checks; these do not claim POSIX inventory validation."""
+
+    def _updated_contract(self) -> dict[str, Any]:
+        inventory = json.loads(
+            (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
+        )
+        identifiers = (
+            set(CHECKER.WINDOWS_BENCHMARK_PROBE_COMPILE_SOURCES)
+            | CHECKER.DEFAULT_EXECUTABLE_INSTALL_IDS
+        )
+        for item in inventory["build_observations"]:
+            if item["id"] in identifiers:
+                item.update(CHECKER._reviewed_observation_refresh_fields(item["id"]))
+        errors: list[str] = []
+        CHECKER._validate_level2_width_and_windows_artifact_contract(inventory, errors)
+        self.assertEqual([], errors)
+        return inventory
+
+    def test_windows_probe_fixture_substitution_is_rejected(self) -> None:
+        inventory = self._updated_contract()
+        identifier = "compile:build.zig:build:rank_k_probe"
+        item = next(x for x in inventory["build_observations"] if x["id"] == identifier)
+        self.assertEqual(["bench/rank_k_probe.zig"], item["root_source"])
+        item["root_source_by_target"]["windows"] = CHECKER.WINDOWS_PYTHON_TOOLING_FIXTURE_PATH
+        errors: list[str] = []
+        CHECKER._validate_level2_width_and_windows_artifact_contract(inventory, errors)
+        self.assertIn(
+            f"{identifier}: Windows benchmark probe root_source_by_target changed", errors
+        )
+
+    def test_windows_default_install_exclusion_is_rejected(self) -> None:
+        inventory = self._updated_contract()
+        identifier = "install:build.zig:build:gemm_sweep"
+        item = next(x for x in inventory["build_observations"] if x["id"] == identifier)
+        item["condition"] = "requested target OS is not Windows and install step is reached"
+        errors: list[str] = []
+        CHECKER._validate_level2_width_and_windows_artifact_contract(inventory, errors)
+        self.assertTrue(any(identifier in error and "condition" in error for error in errors))
+
+
 class BuildInventoryTests(unittest.TestCase):
     maxDiff = 2000
 
@@ -1559,18 +1600,18 @@ class BuildInventoryTests(unittest.TestCase):
         for (
             identifier,
             runtime_source,
-        ) in CHECKER.WINDOWS_PYTHON_TOOLING_FIXTURE_COMPILE_SOURCES.items():
-            fixture_fields = CHECKER._reviewed_observation_refresh_fields(identifier)
+        ) in CHECKER.WINDOWS_BENCHMARK_PROBE_COMPILE_SOURCES.items():
+            runtime_fields = CHECKER._reviewed_observation_refresh_fields(identifier)
             self.assertEqual(
                 {
-                    "windows": CHECKER.WINDOWS_PYTHON_TOOLING_FIXTURE_PATH,
+                    "windows": runtime_source,
                     "non-windows": runtime_source,
                 },
-                fixture_fields["root_source_by_target"],
+                runtime_fields["root_source_by_target"],
             )
             self.assertEqual(
-                "python-tooling-fixture-only-not-benchmark-runtime-evidence",
-                fixture_fields["evidence_role_by_target"]["windows"],
+                "benchmark-probe-runtime-evidence",
+                runtime_fields["evidence_role_by_target"]["windows"],
             )
         race_launch = CHECKER._new_test_inventory_python_launch(
             CHECKER.TEST_INVENTORY_RUNNER_RACE_PYTHON_LAUNCH_ID
@@ -1729,14 +1770,14 @@ class BuildInventoryTests(unittest.TestCase):
                 "install_destinations_by_target"
             ]["windows"]["primary"],
         )
-        for identifier in CHECKER.WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS:
+        for identifier in CHECKER.DEFAULT_EXECUTABLE_INSTALL_IDS:
             self.assertEqual(
-                "requested target OS is not Windows and install step is reached",
+                "install step is reached",
                 candidate_observations[identifier]["condition"],
             )
-        for identifier in CHECKER.WINDOWS_PYTHON_TOOLING_FIXTURE_COMPILE_SOURCES:
+        for identifier in CHECKER.WINDOWS_BENCHMARK_PROBE_COMPILE_SOURCES:
             self.assertEqual(
-                "python-tooling-fixture-only-not-benchmark-runtime-evidence",
+                "benchmark-probe-runtime-evidence",
                 candidate_observations[identifier]["evidence_role_by_target"][
                     "windows"
                 ],
@@ -9874,9 +9915,9 @@ class BuildInventoryTests(unittest.TestCase):
             "zig-out/lib/static/zynum_blas.lib",
             observations[CHECKER.INSTALL_STATIC_LIBRARY_ID]["destination"],
         )
-        for identifier in CHECKER.WINDOWS_EXCLUDED_DEFAULT_EXECUTABLE_INSTALL_IDS:
+        for identifier in CHECKER.DEFAULT_EXECUTABLE_INSTALL_IDS:
             self.assertEqual(
-                "requested target OS is not Windows and install step is reached",
+                "install step is reached",
                 observations[identifier]["condition"],
             )
 

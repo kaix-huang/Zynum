@@ -158,9 +158,7 @@ def draw_panel(
     return out
 
 
-def main(argv=None):
-    args = parse_args(argv)
-    csv_path, svg_path = args.csv, args.svg
+def read_rows(csv_path, stat="best"):
     rows = []
     with open(csv_path, newline="") as f:
         for raw in csv.DictReader(f):
@@ -177,10 +175,16 @@ def main(argv=None):
                     "n": int(raw["n"]),
                     "k": int(raw["k"]),
                     "library": raw["library"],
-                    "gflops": row_gflops(raw, args.stat),
+                    "gflops": row_gflops(raw, stat),
                 }
             )
 
+    return rows
+
+
+def render_svg(rows, stat="best"):
+    """Build the chart in memory; publication remains the caller's responsibility."""
+    rows = [dict(row) for row in rows]
     shapes_by_index = {}
     seen_libs = []
     for row in rows:
@@ -252,7 +256,7 @@ def main(argv=None):
 </style>
 """
     )
-    title, subtitle = plot_heading(kinds, libs, args.stat)
+    title, subtitle = plot_heading(kinds, libs, stat)
     subtitle = (
         "Higher is better. Shapes are ordered by m*n*k so smaller cases stay at the front. "
         + subtitle
@@ -298,8 +302,13 @@ def main(argv=None):
         svg.append("</g>")
 
     svg.append("</svg>")
-    contents = "\n".join(svg).encode("utf-8")
-    publish_outputs([ReportOutput(Path(svg_path), contents)])
+    return "\n".join(svg).encode("utf-8")
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    contents = render_svg(read_rows(args.csv, args.stat), args.stat)
+    publish_outputs([ReportOutput(Path(args.svg), contents)])
     return 0
 
 

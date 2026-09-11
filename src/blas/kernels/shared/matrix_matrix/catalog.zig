@@ -632,7 +632,10 @@ pub fn x86Descriptor(comptime T: type, comptime capability: IsaCapability) Descr
     }
     const is_avx = capability != .x86_64_sse2;
     const is_avx512 = capability == .x86_64_avx512f_fma;
-    const shape = packed_params.x86Shape(T, is_avx, is_avx512);
+    const shape = if (capability == .x86_64_avx2_fma)
+        packed_params.x86Avx2FmaShape(T)
+    else
+        packed_params.x86Shape(T, is_avx, is_avx512);
     if (T == f32) {
         const kernel: KernelId = switch (capability) {
             .x86_64_avx512f_fma => .x86_64_avx512f_fma_f32_packed,

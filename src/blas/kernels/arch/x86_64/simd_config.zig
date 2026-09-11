@@ -78,6 +78,7 @@ pub fn vectorConfig(comptime T: type) vector_simd.Config {
         .lane_count = lanes(T),
         .unroll_vectors = vectorUnrollVectors(),
         .copy_lane_count = copyLaneCount(),
+        .fuse_complex_affine = capability == .x86_64_avx2_fma,
     };
 }
 
@@ -120,6 +121,7 @@ pub fn matrixRowUnrollVectors() comptime_int {
 pub fn matrixConfig(comptime T: type) matrix_vector_simd.Config {
     return .{
         .lane_count = lanes(T),
+        .fuse_complex_updates = capability == .x86_64_avx2_fma,
         .row_unroll_vectors = matrixRowUnrollVectors(),
         .col_unroll = matrixColumnUnroll(T),
         .min_work = 0,
@@ -131,6 +133,7 @@ pub fn matrixNarrowConfig(comptime T: type) matrix_vector_simd.Config {
     const R = realType(T);
     return .{
         .lane_count = if (R == f32) 8 else 4,
+        .fuse_complex_updates = capability == .x86_64_avx2_fma,
         .row_unroll_vectors = 4,
         .col_unroll = 8,
         .min_work = 0,
@@ -141,6 +144,7 @@ pub fn matrixNarrowConfig(comptime T: type) matrix_vector_simd.Config {
 pub fn matrixPackedRowsConfig(comptime T: type) matrix_vector_simd.Config {
     return .{
         .lane_count = lanes(T),
+        .fuse_complex_updates = capability == .x86_64_avx2_fma,
         .row_unroll_vectors = matrixRowUnrollVectors(),
         .col_unroll = matrixColumnUnroll(T),
     };
@@ -153,6 +157,7 @@ pub fn matrixComplexConfig(comptime T: type) matrix_vector_simd.Config {
     }
     return .{
         .lane_count = lanes(R),
+        .fuse_complex_updates = capability == .x86_64_avx2_fma,
         .row_unroll_vectors = matrixRowUnrollVectors(),
         .col_unroll = if (R == f32) 4 else 2,
         .min_work = 128 * 128,
@@ -167,6 +172,7 @@ pub fn matrixComplexNarrowConfig(comptime T: type) matrix_vector_simd.Config {
     }
     return .{
         .lane_count = if (R == f32) 8 else 4,
+        .fuse_complex_updates = capability == .x86_64_avx2_fma,
         .row_unroll_vectors = 4,
         .col_unroll = if (R == f32) 4 else 2,
         .min_work = 128 * 128,
@@ -177,7 +183,16 @@ pub fn matrixComplexNarrowConfig(comptime T: type) matrix_vector_simd.Config {
 pub fn matrixBodyConfig(comptime T: type) matrix_vector_simd.Config {
     return .{
         .lane_count = lanes(T),
+        .fuse_complex_updates = capability == .x86_64_avx2_fma,
         .row_unroll_vectors = matrixRowUnrollVectors(),
         .col_unroll = 1,
     };
+}
+
+/// Eight independent accumulators cover the AVX2 reduction dependency latency.
+/// Store kernels and complex DOT keep their separate register budgets.
+pub fn reductionVectorConfig(comptime T: type) vector_simd.Config {
+    var cfg = vectorConfig(T);
+    if (comptime capability == .x86_64_avx2_fma) cfg.unroll_vectors = 8;
+    return cfg;
 }

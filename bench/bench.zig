@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const DynLib = @import("dynamic_library.zig").DynLib;
 
 const BlasInt = i32;
 const DgemmFn = *const fn ([*]const u8, [*]const u8, *const BlasInt, *const BlasInt, *const BlasInt, *const f64, [*]const f64, *const BlasInt, [*]const f64, *const BlasInt, *const f64, [*]f64, *const BlasInt) callconv(.c) void;
@@ -11,7 +12,7 @@ const DaxpyFn = *const fn (*const BlasInt, *const f64, [*]const f64, *const Blas
 const Lib = struct {
     name: []const u8,
     path: []const u8,
-    dyn: std.DynLib,
+    dyn: DynLib,
     dgemm: DgemmFn,
     sgemm: SgemmFn,
     daxpy: DaxpyFn,
@@ -22,7 +23,7 @@ fn usage() void {
 }
 
 fn loadLib(name: []const u8, path: []const u8) !Lib {
-    var dyn = try std.DynLib.open(path);
+    var dyn = try DynLib.open(path);
     errdefer dyn.close();
     return .{
         .name = name,

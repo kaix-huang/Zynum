@@ -15,7 +15,17 @@ pub const Config = struct {
     unroll_vectors: comptime_int = 4,
     copy_lane_count: comptime_int = 64,
     min_len: usize = 0,
+    fuse_complex_dot: bool = false,
+    fuse_complex_affine: bool = false,
+    prefetch_bytes: usize = 0,
 };
+
+inline fn prefetchAhead(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T, i: usize) void {
+    if (comptime cfg.prefetch_bytes != 0) {
+        const distance = cfg.prefetch_bytes / @sizeOf(T);
+        if (i + distance < n) @prefetch(x + i + distance, .{ .rw = .read, .locality = 3, .cache = .data });
+    }
+}
 
 const RealAffineMode = enum { scal, axpy, axpby };
 const ComplexAffineMode = enum { scal, axpy, axpby };
@@ -160,6 +170,7 @@ inline fn complexAffineVec(
     comptime R: type,
     comptime lanes: comptime_int,
     comptime mode: ComplexAffineMode,
+    comptime fused: bool,
     xv: @Vector(lanes, R),
     yv: @Vector(lanes, R),
     alpha_re_v: @Vector(lanes, R),
@@ -168,6 +179,12 @@ inline fn complexAffineVec(
     beta_im_sign_v: @Vector(lanes, R),
     comptime swap_mask: @Vector(lanes, i32),
 ) @Vector(lanes, R) {
+    if (comptime fused and mode != .scal) {
+        const V = @Vector(lanes, R);
+        const base = if (comptime mode == .axpy) yv else complexScaleVec(R, lanes, yv, beta_re_v, beta_im_sign_v, swap_mask);
+        const cross = @mulAdd(V, @shuffle(R, xv, undefined, swap_mask), alpha_im_sign_v, base);
+        return @mulAdd(V, xv, alpha_re_v, cross);
+    }
     const x_term = complexScaleVec(R, lanes, xv, alpha_re_v, alpha_im_sign_v, swap_mask);
     return switch (mode) {
         .scal => x_term,
@@ -318,7 +335,7 @@ inline fn rotVecBlock(
     const xv = loadVec(T, lanes, x, index);
     const yv = loadVec(T, lanes, y, index);
     storeVec(T, lanes, x, index, @mulAdd(V, xv, c_v, yv * s_v));
-    storeVec(T, lanes, y, index, @mulAdd(V, -xv, s_v, yv * c_v));
+    storeVec(T, lanes, y, index, @mulAdd(V, xv, -s_v, yv * c_v));
 }
 
 inline fn rotmVecBlock(
@@ -577,6 +594,7 @@ pub fn asumUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]cons
     var accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
     var i: usize = 0;
     while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        prefetchAhead(T, cfg, n, x, i);
         inline for (0..cfg.unroll_vectors) |k| {
             accs[k] += @abs(loadVec(T, cfg.lane_count, x, i + k * cfg.lane_count));
         }
@@ -630,7 +648,9 @@ pub fn nrm2UnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]cons
     if (scale == 0) return 0;
     if (!std.math.isFinite(scale)) return null;
 
-    const inv_scale_v: V = @splat(1 / scale);
+    const inv_scale = 1 / scale;
+    if (!std.math.isFinite(inv_scale)) return null;
+    const inv_scale_v: V = @splat(inv_scale);
     var accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
     i = 0;
     while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
@@ -670,50 +690,200 @@ pub fn nrm2UnitRealFastF32(comptime cfg: Config, n: usize, x: [*]const f32) ?f32
     if (n < vectorThreshold(cfg)) return null;
 
     const V = @Vector(cfg.lane_count, f32);
-    var max_v: V = @splat(0);
     var accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
     var i: usize = 0;
     while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        prefetchAhead(f32, cfg, n, x, i);
         inline for (0..cfg.unroll_vectors) |k| {
-            const ax = @abs(loadVec(f32, cfg.lane_count, x, i + k * cfg.lane_count));
-            max_v = @max(max_v, ax);
-            accs[k] = @mulAdd(V, ax, ax, accs[k]);
+            const v = loadVec(f32, cfg.lane_count, x, i + k * cfg.lane_count);
+            accs[k] = @mulAdd(V, v, v, accs[k]);
         }
     }
     var acc: V = @splat(0);
     inline for (0..cfg.unroll_vectors) |k| acc += accs[k];
     while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
-        const ax = @abs(loadVec(f32, cfg.lane_count, x, i));
-        max_v = @max(max_v, ax);
-        acc = @mulAdd(V, ax, ax, acc);
+        const v = loadVec(f32, cfg.lane_count, x, i);
+        acc = @mulAdd(V, v, v, acc);
     }
-    var max_abs = @reduce(.Max, max_v);
     var ssq = @reduce(.Add, acc);
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1 and tail_lanes * @sizeOf(f32) >= 16) {
             const TailV = @Vector(tail_lanes, f32);
-            var tail_max: TailV = @splat(0);
             var tail_acc: TailV = @splat(0);
             while (i + tail_lanes <= n) : (i += tail_lanes) {
-                const ax = @abs(loadVec(f32, tail_lanes, x, i));
-                tail_max = @max(tail_max, ax);
-                tail_acc = @mulAdd(TailV, ax, ax, tail_acc);
+                const v = loadVec(f32, tail_lanes, x, i);
+                tail_acc = @mulAdd(TailV, v, v, tail_acc);
             }
-            max_abs = @max(max_abs, @reduce(.Max, tail_max));
             ssq += @reduce(.Add, tail_acc);
         }
     }
     while (i < n) : (i += 1) {
-        const ax = @abs(x[i]);
-        max_abs = @max(max_abs, ax);
-        ssq = @mulAdd(f32, ax, ax, ssq);
+        ssq = @mulAdd(f32, x[i], x[i], ssq);
     }
-    if (max_abs == 0) return 0;
-    if (!std.math.isFinite(max_abs) or !std.math.isFinite(ssq)) return null;
+    // A finite sum rules out overflowing squares. This conservative floor
+    // bounds lost subnormal squares to roughly one f32 ulp of the sum, even
+    // when the caller enables flush-to-zero. Do not accept a zero sum: it may
+    // represent nonzero inputs whose squares underflowed.
+    const floor = (std.math.floatMin(f32) / std.math.floatEps(f32)) * @as(f32, @floatFromInt(n));
+    if (std.math.isFinite(ssq) and ssq >= floor) return @sqrt(ssq);
 
-    const safe_limit = @sqrt(std.math.floatMax(f32) / @as(f32, @floatFromInt(n)));
-    if (max_abs > safe_limit) return null;
+    // Every finite f32 square and their sum (BLAS-sized n) fit in f64, including
+    // f32 subnormals. Widening also naturally propagates infinities and NaNs.
+    const Wide = @Vector(cfg.lane_count, f64);
+    var wide_accs: [cfg.unroll_vectors]Wide = [_]Wide{@splat(0)} ** cfg.unroll_vectors;
+    i = 0;
+    while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        inline for (0..cfg.unroll_vectors) |k| {
+            const v: Wide = @floatCast(loadVec(f32, cfg.lane_count, x, i + k * cfg.lane_count));
+            wide_accs[k] = @mulAdd(Wide, v, v, wide_accs[k]);
+        }
+    }
+    var wide_sum: Wide = @splat(0);
+    inline for (0..cfg.unroll_vectors) |k| wide_sum += wide_accs[k];
+    var sum = @reduce(.Add, wide_sum);
+    while (i < n) : (i += 1) {
+        const v: f64 = x[i];
+        sum = @mulAdd(f64, v, v, sum);
+    }
+    return @floatCast(@sqrt(sum));
+}
+
+/// Normal-range f64 norm without a separate maximum/scale pass. Exceptional
+/// ranges return to the scaled implementation; no fast-math assumptions.
+pub fn nrm2UnitRealFastF64(comptime cfg: Config, n: usize, x: [*]const f64) ?f64 {
+    comptime checkRealConfig(f64, cfg);
+    if (n < vectorThreshold(cfg)) return null;
+    const V = @Vector(cfg.lane_count, f64);
+    var accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
+    var i: usize = 0;
+    while (i + unrollCount(cfg) <= n) : (i += unrollCount(cfg)) {
+        prefetchAhead(f64, cfg, n, x, i);
+        inline for (0..cfg.unroll_vectors) |k| {
+            const v = loadVec(f64, cfg.lane_count, x, i + k * cfg.lane_count);
+            accs[k] = @mulAdd(V, v, v, accs[k]);
+        }
+    }
+    var acc: V = @splat(0);
+    inline for (0..cfg.unroll_vectors) |k| acc += accs[k];
+    while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
+        const v = loadVec(f64, cfg.lane_count, x, i);
+        acc = @mulAdd(V, v, v, acc);
+    }
+    var ssq = @reduce(.Add, acc);
+    while (i < n) : (i += 1) ssq = @mulAdd(f64, x[i], x[i], ssq);
+    if (std.math.isNan(ssq)) return ssq;
+    const floor = (std.math.floatMin(f64) / std.math.floatEps(f64)) * @as(f64, @floatFromInt(n));
+    if (!std.math.isFinite(ssq) or ssq < floor) return null;
     return @sqrt(ssq);
+}
+
+fn iamaxMagnitudes(comptime T: type, comptime count: comptime_int, x: [*]const T, i: usize) @Vector(if (isReal(T)) count else count * 2, Real(T)) {
+    const R = Real(T);
+    if (comptime isReal(T)) return @abs(loadVec(R, count, x, i));
+    const ax = @abs(loadVec(R, count * 2, asConstRealPtr(T, x), i * 2));
+    // Keep each pair sum duplicated: a lane-local swap avoids extract+hadd.
+    const swapped = @shuffle(R, ax, undefined, pairSwapMask(count * 2));
+    return ax + swapped;
+}
+
+fn iamaxMagnitudeBits(comptime T: type, comptime count: comptime_int, x: [*]const T, i: usize) @Vector(if (isReal(T)) count else count * 2, std.meta.Int(.unsigned, @bitSizeOf(Real(T)))) {
+    return @bitCast(iamaxMagnitudes(T, count, x, i));
+}
+
+// Inputs are already nonnegative with NaNs removed by ordered selection.
+// Keep horizontal comparisons in floating point: AVX2 lacks a u64 maximum.
+fn positiveMaximumBits(comptime R: type, comptime lanes: comptime_int, values: @Vector(lanes, R)) std.meta.Int(.unsigned, @bitSizeOf(R)) {
+    if (comptime R == f32) return @reduce(.Max, @as(@Vector(lanes, u32), @bitCast(values)));
+    var reduced = values;
+    comptime var distance = lanes / 2;
+    inline while (distance > 0) : (distance /= 2) {
+        const mask = comptime blk: {
+            var indices: [lanes]i32 = undefined;
+            for (0..lanes) |i| indices[i] = @intCast((i + distance) % lanes);
+            break :blk indices;
+        };
+        const other = @shuffle(R, reduced, undefined, mask);
+        reduced = @select(R, other > reduced, other, reduced);
+    }
+    return @bitCast(reduced[0]);
+}
+
+/// Amortize the horizontal reduction over four unrolled groups. Locate an
+/// improved maximum with vector equality masks, preserving the first tie.
+pub fn iamaxUnitBatched(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T) ?types.BlasInt {
+    const R = Real(T);
+    const U = std.meta.Int(.unsigned, @bitSizeOf(R));
+    const compact = comptime !isReal(T) and R == f64 and cfg.lane_count == 4;
+    const count = if (comptime isReal(T) or compact) cfg.lane_count else cfg.lane_count / 2;
+    const search_count = if (compact) count / 2 else count;
+    const UV = @Vector(cfg.lane_count, U);
+    const V = @Vector(cfg.lane_count, R);
+    const Mask = std.meta.Int(.unsigned, cfg.lane_count);
+    const components = if (comptime isReal(T)) 1 else 2;
+    const batch = count * cfg.unroll_vectors * 4;
+    if (n < batch) return null;
+    const first = if (comptime isReal(T)) @abs(x[0]) else @abs(x[0].re) + @abs(x[0].im);
+    if (std.math.isNan(first)) return 1;
+    var best_bits: U = @bitCast(first);
+    var best: usize = 0;
+    var i: usize = 0;
+    while (i + batch <= n) : (i += batch) {
+        var maxima: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
+        inline for (0..4) |round| {
+            inline for (0..cfg.unroll_vectors) |k| {
+                const offset = i + (round * cfg.unroll_vectors + k) * count;
+                const next = if (comptime compact) blk: {
+                    const ax = @abs(loadVec(R, 4, asConstRealPtr(T, x), offset * 2));
+                    const bx = @abs(loadVec(R, 4, asConstRealPtr(T, x), offset * 2 + 4));
+                    // Lane-local shuffles produce four distinct magnitudes
+                    // instead of computing and comparing every pair twice.
+                    const reals = @shuffle(R, ax, bx, @Vector(4, i32){ 0, -1, 2, -3 });
+                    const imags = @shuffle(R, ax, bx, @Vector(4, i32){ 1, -2, 3, -4 });
+                    break :blk reals + imags;
+                } else iamaxMagnitudes(T, count, x, offset);
+                // Ordered selection lowers to one VMAX, without maxNum's
+                // extra NaN-recovery chain. The accumulator starts at zero,
+                // so later NaNs remain ignored and it stays nonnegative.
+                maxima[k] = @select(R, next > maxima[k], next, maxima[k]);
+            }
+        }
+        var max_v: V = @splat(0);
+        inline for (0..cfg.unroll_vectors) |k| max_v = @select(R, maxima[k] > max_v, maxima[k], max_v);
+        // Integer encoding order is needed only once per batch, not for
+        // every load (AVX2 has no native 64-bit integer maximum).
+        const maximum = positiveMaximumBits(R, cfg.lane_count, max_v);
+        if (maximum > best_bits) {
+            best_bits = maximum;
+            var offset: usize = 0;
+            while (offset < batch) : (offset += search_count) {
+                const matches = iamaxMagnitudeBits(T, search_count, x, i + offset) == @as(UV, @splat(maximum));
+                const mask: Mask = @bitCast(matches);
+                if (mask != 0) {
+                    best = i + offset + (@ctz(mask) / components);
+                    break;
+                }
+            }
+        }
+    }
+    while (i + search_count <= n) : (i += search_count) {
+        const magnitudes = iamaxMagnitudes(T, search_count, x, i);
+        const positive = @select(R, magnitudes > @as(V, @splat(0)), magnitudes, @as(V, @splat(0)));
+        const bits: UV = @bitCast(positive);
+        const maximum = positiveMaximumBits(R, cfg.lane_count, positive);
+        if (maximum > best_bits) {
+            best_bits = maximum;
+            const mask: Mask = @bitCast(bits == @as(UV, @splat(maximum)));
+            best = i + (@ctz(mask) / components);
+        }
+    }
+    while (i < n) : (i += 1) {
+        const ax = if (comptime isReal(T)) @abs(x[i]) else @abs(x[i].re) + @abs(x[i].im);
+        if (ax > @as(R, @bitCast(best_bits))) {
+            best_bits = @bitCast(ax);
+            best = i;
+        }
+    }
+    return @intCast(best + 1);
 }
 
 pub fn iamaxUnitReal(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T) ?types.BlasInt {
@@ -900,13 +1070,13 @@ fn complexAffineUnit(
             const offset = i + k * cfg.lane_count;
             const xv = loadVec(R, cfg.lane_count, real_x, offset);
             const yv: V = if (comptime mode == .scal) @splat(0) else loadVec(R, cfg.lane_count, real_y, offset);
-            storeVec(R, cfg.lane_count, real_y, offset, complexAffineVec(R, cfg.lane_count, mode, xv, yv, alpha_re_v, alpha_im_sign_v, beta_re_v, beta_im_sign_v, swap_mask));
+            storeVec(R, cfg.lane_count, real_y, offset, complexAffineVec(R, cfg.lane_count, mode, cfg.fuse_complex_affine, xv, yv, alpha_re_v, alpha_im_sign_v, beta_re_v, beta_im_sign_v, swap_mask));
         }
     }
     while (i + cfg.lane_count <= real_n) : (i += cfg.lane_count) {
         const xv = loadVec(R, cfg.lane_count, real_x, i);
         const yv: V = if (comptime mode == .scal) @splat(0) else loadVec(R, cfg.lane_count, real_y, i);
-        storeVec(R, cfg.lane_count, real_y, i, complexAffineVec(R, cfg.lane_count, mode, xv, yv, alpha_re_v, alpha_im_sign_v, beta_re_v, beta_im_sign_v, swap_mask));
+        storeVec(R, cfg.lane_count, real_y, i, complexAffineVec(R, cfg.lane_count, mode, cfg.fuse_complex_affine, xv, yv, alpha_re_v, alpha_im_sign_v, beta_re_v, beta_im_sign_v, swap_mask));
     }
     inline for (tailLaneCounts(cfg.lane_count)) |tail_lanes| {
         if (comptime tail_lanes > 1 and tail_lanes % 2 == 0 and tail_lanes * @sizeOf(R) >= 16) {
@@ -919,7 +1089,7 @@ fn complexAffineUnit(
             while (i + tail_lanes <= real_n) : (i += tail_lanes) {
                 const xv = loadVec(R, tail_lanes, real_x, i);
                 const yv: TailV = if (comptime mode == .scal) @splat(0) else loadVec(R, tail_lanes, real_y, i);
-                storeVec(R, tail_lanes, real_y, i, complexAffineVec(R, tail_lanes, mode, xv, yv, tail_alpha_re_v, tail_alpha_im_sign_v, tail_beta_re_v, tail_beta_im_sign_v, tail_swap_mask));
+                storeVec(R, tail_lanes, real_y, i, complexAffineVec(R, tail_lanes, mode, cfg.fuse_complex_affine, xv, yv, tail_alpha_re_v, tail_alpha_im_sign_v, tail_beta_re_v, tail_beta_im_sign_v, tail_swap_mask));
             }
         }
     }
@@ -943,6 +1113,7 @@ fn complexAffineUnit(
 inline fn complexDotAccumulateVec(
     comptime R: type,
     comptime lanes: comptime_int,
+    comptime fuse_product: bool,
     x: [*]const R,
     y: [*]const R,
     offset: usize,
@@ -956,8 +1127,19 @@ inline fn complexDotAccumulateVec(
     const xv = loadVec(R, lanes, x, offset);
     const yv = loadVec(R, lanes, y, offset);
     const y_swap = @shuffle(R, yv, undefined, swap_mask);
-    re_acc.* = @mulAdd(V, xv * yv, re_sign, re_acc.*);
-    im_acc.* = @mulAdd(V, xv * y_swap, im_sign, im_acc.*);
+    if (comptime fuse_product) {
+        const U = std.meta.Int(.unsigned, @bitSizeOf(R));
+        const UV = @Vector(lanes, U);
+        const sign_bit: UV = @splat(@as(U, 1) << (@bitSizeOf(R) - 1));
+        const x_bits: UV = @bitCast(xv);
+        const re_x: V = @bitCast(x_bits ^ (@as(UV, @bitCast(re_sign)) & sign_bit));
+        const im_x: V = @bitCast(x_bits ^ (@as(UV, @bitCast(im_sign)) & sign_bit));
+        re_acc.* = @mulAdd(V, re_x, yv, re_acc.*);
+        im_acc.* = @mulAdd(V, im_x, y_swap, im_acc.*);
+    } else {
+        re_acc.* = @mulAdd(V, xv * yv, re_sign, re_acc.*);
+        im_acc.* = @mulAdd(V, xv * y_swap, im_sign, im_acc.*);
+    }
 }
 
 pub fn dotUnitComplex(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
@@ -979,7 +1161,7 @@ pub fn dotUnitComplex(comptime T: type, comptime cfg: Config, n: usize, x: [*]co
     var i: usize = 0;
     while (i + unrollCount(cfg) <= real_n) : (i += unrollCount(cfg)) {
         inline for (0..cfg.unroll_vectors) |k| {
-            complexDotAccumulateVec(R, cfg.lane_count, real_x, real_y, i + k * cfg.lane_count, swap_mask, re_sign, im_sign, &re_accs[k], &im_accs[k]);
+            complexDotAccumulateVec(R, cfg.lane_count, cfg.fuse_complex_dot, real_x, real_y, i + k * cfg.lane_count, swap_mask, re_sign, im_sign, &re_accs[k], &im_accs[k]);
         }
     }
     var re_acc: V = @splat(0);
@@ -989,10 +1171,69 @@ pub fn dotUnitComplex(comptime T: type, comptime cfg: Config, n: usize, x: [*]co
         im_acc += im_accs[k];
     }
     while (i + cfg.lane_count <= real_n) : (i += cfg.lane_count) {
-        complexDotAccumulateVec(R, cfg.lane_count, real_x, real_y, i, swap_mask, re_sign, im_sign, &re_acc, &im_acc);
+        complexDotAccumulateVec(R, cfg.lane_count, cfg.fuse_complex_dot, real_x, real_y, i, swap_mask, re_sign, im_sign, &re_acc, &im_acc);
     }
     var re_sum: R = @reduce(.Add, re_acc);
     var im_sum: R = @reduce(.Add, im_acc);
+    while (i < real_n) : (i += 2) {
+        const xr = real_x[i];
+        const xi = real_x[i + 1];
+        const yr = real_y[i];
+        const yi = real_y[i + 1];
+        if (conjx) {
+            re_sum = @mulAdd(R, xi, yi, @mulAdd(R, xr, yr, re_sum));
+            im_sum = @mulAdd(R, -xi, yr, @mulAdd(R, xr, yi, im_sum));
+        } else {
+            re_sum = @mulAdd(R, -xi, yi, @mulAdd(R, xr, yr, re_sum));
+            im_sum = @mulAdd(R, xi, yr, @mulAdd(R, xr, yi, im_sum));
+        }
+    }
+    return .{ .re = re_sum, .im = im_sum };
+}
+
+// Long double-complex DOT keeps product signs outside the accumulation loop.
+// The established short/single-precision function is kept separate.
+inline fn complexDotDeferredAccumulate(comptime R: type, comptime lanes: comptime_int, x: [*]const R, y: [*]const R, offset: usize, comptime swap_mask: @Vector(lanes, i32), re_acc: *@Vector(lanes, R), im_acc: *@Vector(lanes, R)) void {
+    const V = @Vector(lanes, R);
+    const xv = loadVec(R, lanes, x, offset);
+    const yv = loadVec(R, lanes, y, offset);
+    re_acc.* = @mulAdd(V, xv, yv, re_acc.*);
+    im_acc.* = @mulAdd(V, xv, @shuffle(R, yv, undefined, swap_mask), im_acc.*);
+}
+
+pub fn dotUnitComplexDeferred(comptime T: type, comptime cfg: Config, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
+    if (comptime !isComplex(T)) return null;
+    comptime checkComplexConfig(T, cfg);
+    if (n * 2 < vectorThreshold(cfg)) return null;
+
+    const R = Real(T);
+    const V = @Vector(cfg.lane_count, R);
+    const real_n = 2 * n;
+    const real_x = asConstRealPtr(T, x);
+    const real_y = asConstRealPtr(T, y);
+    const swap_mask = comptime pairSwapMask(cfg.lane_count);
+    const re_sign: V = if (conjx) @splat(1) else pairPatternVector(R, cfg.lane_count, 1, -1);
+    const im_sign: V = if (conjx) pairPatternVector(R, cfg.lane_count, 1, -1) else @splat(1);
+
+    var re_accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
+    var im_accs: [cfg.unroll_vectors]V = [_]V{@splat(0)} ** cfg.unroll_vectors;
+    var i: usize = 0;
+    while (i + unrollCount(cfg) <= real_n) : (i += unrollCount(cfg)) {
+        inline for (0..cfg.unroll_vectors) |k| {
+            complexDotDeferredAccumulate(R, cfg.lane_count, real_x, real_y, i + k * cfg.lane_count, swap_mask, &re_accs[k], &im_accs[k]);
+        }
+    }
+    var re_acc: V = @splat(0);
+    var im_acc: V = @splat(0);
+    inline for (0..cfg.unroll_vectors) |k| {
+        re_acc += re_accs[k];
+        im_acc += im_accs[k];
+    }
+    while (i + cfg.lane_count <= real_n) : (i += cfg.lane_count) {
+        complexDotDeferredAccumulate(R, cfg.lane_count, real_x, real_y, i, swap_mask, &re_acc, &im_acc);
+    }
+    var re_sum: R = @reduce(.Add, re_acc * re_sign);
+    var im_sum: R = @reduce(.Add, im_acc * im_sign);
     while (i < real_n) : (i += 2) {
         const xr = real_x[i];
         const xi = real_x[i + 1];
