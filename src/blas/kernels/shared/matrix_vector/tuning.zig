@@ -265,6 +265,10 @@ pub const GemvProfile = struct {
 };
 
 pub const SymmetricProfile = struct {
+    // Generic fused band body; native AArch64 preference is selected below.
+    enable_fused_real_band: bool = false,
+    enable_fused_real_packed: bool = false,
+    enable_fused_real_packed_single: bool = false,
     enable_fixed_columns: bool,
     private_workspace_max_bytes: usize,
     real_parallel_min_work: usize,
@@ -330,8 +334,31 @@ pub const SymmetricProfile = struct {
         return n *| n >= self.hermitian_parallel_min_work;
     }
 
+    pub fn selectRealBandImplementation(self: SymmetricProfile, comptime T: type, n: usize, k: usize) catalog.Implementation {
+        if (comptime T == f32 or T == f64) {
+            if (self.enable_fused_real_band and builtin.cpu.arch == .aarch64 and self.preferBandUnit(n, k)) {
+                return .compact_symmetric_band_fused;
+            }
+        }
+        return .compact_symmetric_band;
+    }
+
     pub fn preferBandUnit(self: SymmetricProfile, n: usize, k: usize) bool {
         return n >= self.band_min_n and k >= self.band_min_k;
+    }
+
+    pub fn selectRealPackedSingleImplementation(self: SymmetricProfile, comptime T: type) catalog.Implementation {
+        if (comptime T == f32 or T == f64) {
+            if (self.enable_fused_real_packed_single and builtin.cpu.arch == .aarch64) return .compact_symmetric_packed_fused;
+        }
+        return .compact_symmetric_packed;
+    }
+
+    pub fn selectRealPackedImplementation(self: SymmetricProfile, comptime T: type) catalog.Implementation {
+        if (comptime T == f32 or T == f64) {
+            if (self.enable_fused_real_packed and builtin.cpu.arch == .aarch64) return .compact_symmetric_packed_fused;
+        }
+        return .compact_symmetric_packed;
     }
 
     pub fn preferPackedParallel(self: SymmetricProfile, n: usize) bool {
@@ -435,12 +462,34 @@ pub const RankUpdateProfile = struct {
 };
 
 pub const TriangularProfile = struct {
+    // Experimental private-workspace real band solve, independently selectable.
+    enable_finite_tpmv: bool = false,
+    finite_tpmv_min_n: usize = 64,
+    finite_tpmv_workspace_max_bytes: usize = 64 * 1024 * 1024,
+    enable_finite_tbsv: bool = false,
+    finite_tbsv_min_n: usize = 128,
+    finite_tbsv_workspace_max_bytes: usize = 64 * 1024 * 1024,
+
     enable_fixed_bodies: bool,
     dense_vector_min: usize,
     complex_vector_parallel_min: usize,
     band_window_min_n: usize,
     band_window_max_fraction_denominator: usize,
     packed_x86_min_n: usize,
+
+    pub fn selectFiniteTpmv(self: TriangularProfile, comptime T: type, n: types.BlasInt) catalog.Implementation {
+        if (comptime T != f32 and T != f64) return .portable_scalar;
+        if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and self.enable_finite_tpmv and n >= 64 and
+            @as(usize, @intCast(n)) >= self.finite_tpmv_min_n) return .compact_triangular_packed_finite;
+        return .portable_scalar;
+    }
+
+    pub fn selectFiniteTbsv(self: TriangularProfile, comptime T: type, n: types.BlasInt, k: types.BlasInt) catalog.Implementation {
+        if (comptime T != f32 and T != f64) return .portable_scalar;
+        if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and self.enable_finite_tbsv and n >= 128 and k >= 0 and
+            @as(usize, @intCast(n)) >= self.finite_tbsv_min_n and k <= @divTrunc(n, 4)) return .compact_triangular_band_finite;
+        return .portable_scalar;
+    }
 
     pub fn preferDenseVector(self: TriangularProfile, n: usize) bool {
         return n >= self.dense_vector_min;
@@ -494,6 +543,9 @@ pub const production_2026_07_17: Profile = .{
         .gbmv_c32_conjugate_min_dimension = 1024,
     },
     .symmetric = .{
+        .enable_fused_real_band = true,
+        .enable_fused_real_packed = true,
+        .enable_fused_real_packed_single = true,
         .enable_fixed_columns = false,
         .private_workspace_max_bytes = 64 * 1024 * 1024,
         .real_parallel_min_work = 512 * 512,
@@ -512,6 +564,8 @@ pub const production_2026_07_17: Profile = .{
         .packed_structured_parallel_min_n = 2048,
     },
     .triangular = .{
+        .enable_finite_tpmv = true, // Measured Mac finite path; descriptor remains experimental.
+        .enable_finite_tbsv = true, // Measured Mac finite path; descriptor remains experimental.
         .enable_fixed_bodies = false,
         .dense_vector_min = 64,
         .complex_vector_parallel_min = 512 * 1024,
@@ -525,6 +579,7 @@ fn enableFixedCandidates(base: Profile) Profile {
     var result = base;
     result.rank_update.enable_fixed_complex_ger = true;
     result.symmetric.enable_fixed_columns = true;
+    result.symmetric.enable_fused_real_packed = true;
     result.triangular.enable_fixed_bodies = true;
     return result;
 }
@@ -580,6 +635,7 @@ test "experimental Level 2 fixed profile changes only its candidate switch" {
     var restored = candidate;
     restored.rank_update.enable_fixed_complex_ger = false;
     restored.symmetric.enable_fixed_columns = false;
+    restored.symmetric.enable_fused_real_packed = production_2026_07_17.symmetric.enable_fused_real_packed;
     restored.triangular.enable_fixed_bodies = false;
     try std.testing.expectEqualDeep(production_2026_07_17, restored);
 }

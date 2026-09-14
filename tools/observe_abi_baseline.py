@@ -944,7 +944,21 @@ def scan_zig_exports(source_root: Path, repository_root: Path) -> list[dict[str,
             visibility_match = re.search(
                 r"\.visibility\s*=\s*\.([A-Za-z0-9_]+)", expression
             )
-            if not target_match or not name_match:
+            # A hidden export may receive its name from build options. Account
+            # for the source site without inventing an observed linker symbol.
+            dynamic_hidden_name = (
+                target_match is not None
+                and name_match is None
+                and visibility_match is not None
+                and visibility_match.group(1) == "hidden"
+                and re.fullmatch(
+                    r"\s*&\s*[A-Za-z_][A-Za-z0-9_]*\s*,\s*\.\{\s*"
+                    r"\.name\s*=\s*options\.kernel_entry\s*,\s*"
+                    r"\.visibility\s*=\s*\.hidden\s*,?\s*\}\s*",
+                    expression,
+                ) is not None
+            )
+            if not target_match or (not name_match and not dynamic_hidden_name):
                 declarations.append(
                     {
                         "source_path": display,
@@ -960,7 +974,7 @@ def scan_zig_exports(source_root: Path, repository_root: Path) -> list[dict[str,
                 )
                 continue
             target = target_match.group(1)
-            name = name_match.group(1)
+            name = name_match.group(1) if name_match else "not_observed"
             visibility = visibility_match.group(1) if visibility_match else "default"
             fn_match = re.search(
                 r"\bfn\s+" + re.escape(target) + r"\s*\([^)]*\)[^{;]*", text
@@ -982,6 +996,9 @@ def scan_zig_exports(source_root: Path, repository_root: Path) -> list[dict[str,
                 "declaration_kind": "at_export",
             }
             entry["category"] = classify_symbol(name, display, visibility)
+            if dynamic_hidden_name:
+                entry["name_expression"] = "options.kernel_entry"
+                entry["reason"] = "hidden linker name is supplied by build options"
             declarations.append(entry)
     return sorted(
         declarations,

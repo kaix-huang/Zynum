@@ -96,14 +96,32 @@ class LocalBenchmarkTests(unittest.TestCase):
                 runner.log.close()
 
     def test_exception_does_not_mark_run_completed(self):
+        modules = (bench.l1, bench.l2, bench.rank, bench.rotg, bench.symm, bench.triangular)
+        original_bindings = [module.subprocess for module in modules]
+        result = SimpleNamespace(returncode=0, stdout="ok", stderr="")
+        with patch.object(bench.subprocess, "run", return_value=result) as process:
+            captured = bench.run_probe_process(
+                ["probe"], capture_output=True, text=True, env={"A": "B"}, timeout=9
+            )
+            self.assertIs(captured, result)
+            self.assertEqual(process.call_args.kwargs["timeout"], 9)
+            self.assertEqual(process.call_args.kwargs["env"], {"A": "B"})
+            self.assertTrue(process.call_args.kwargs["capture_output"])
+            self.assertTrue(process.call_args.kwargs["text"])
+
+        def interrupt(*args, **kwargs):
+            self.assertTrue(all(module.subprocess is not bench.subprocess for module in modules))
+            raise RuntimeError("interrupted")
+
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "run"
             with patch.object(bench, "command_text", return_value={}), \
                  patch.dict(bench.os.environ), \
-                 patch.object(bench.Runner, "group", side_effect=RuntimeError("interrupted")):
+                 patch.object(bench.Runner, "group", side_effect=interrupt):
                 with self.assertRaisesRegex(RuntimeError, "interrupted"):
                     bench.main(["--output", str(output), "--quick", "--families", "gemm",
                                 "--bin-dir", temp, "--library", str(Path(temp) / "missing.dll")])
+            self.assertEqual(original_bindings, [module.subprocess for module in modules])
             metadata = json.loads((output / "metadata.json").read_text())
             self.assertFalse(metadata["run_completed"])
             self.assertEqual(metadata["completed_families"], [])

@@ -183,13 +183,12 @@ class Comparison:
         self.raw = (self.output / "raw.jsonl").open("w", encoding="utf-8")
         self.processes = (self.output / "processes.jsonl").open("w", encoding="utf-8")
         self.schedule_log = (self.output / "schedule.jsonl").open("w", encoding="utf-8")
-        self.real_run = subprocess.run
         self.active_library = None
 
     def exe(self, name):
         return str(Path(self.args.bin_dir).resolve() / (name + (".exe" if sys.platform == "win32" else "")))
 
-    def capture_run(self, command, *pos, **kw):
+    def capture_run(self, command, **kw):
         command = list(map(str, command))
         dirs = self.args.dependency_dirs[self.active_library]
         env = dict(kw.pop("env", os.environ))
@@ -211,7 +210,7 @@ class Comparison:
         event = {"library": self.active_library, "command": command, "started": start,
                  "dependency_dirs": dirs}
         try:
-            result = self.real_run(command, *pos, **kw)
+            result = base.run_probe_process(command, **kw)
             event.update(returncode=result.returncode, stdout=result.stdout, stderr=result.stderr)
             return result
         except Exception as exc:
@@ -255,7 +254,7 @@ class Comparison:
         elif kind == "gemm":
             routine, trans, shape = job["payload"]
             outfile = self.output / f"gemm-{job_index}-{list(self.args.libraries).index(library)}-{repeat}.csv"
-            result = subprocess.run([self.exe("gemm-sweep"), "--zynum-blas", path,
+            result = self.capture_run([self.exe("gemm-sweep"), "--zynum-blas", path,
                 "--kind", routine, "--trans", trans, "--shape", shape, "--check", "--reps",
                 "9" if self.args.quick else "30", "--csv", str(outfile)], capture_output=True, text=True)
             if result.returncode: raise RuntimeError(f"exit={result.returncode}: {result.stdout} {result.stderr}")
@@ -371,13 +370,12 @@ def main(argv=None):
     meta_path = runner.output / "metadata.json"
     meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     try:
-        subprocess.run = runner.capture_run
-        for index, job in enumerate(jobs):
-            runner.run_job(job, index)
-            metadata["completed_jobs"] = index + 1
-        metadata["run_completed"] = True
+        with base.capture_probe_processes(runner.capture_run):
+            for index, job in enumerate(jobs):
+                runner.run_job(job, index)
+                metadata["completed_jobs"] = index + 1
+            metadata["run_completed"] = True
     finally:
-        subprocess.run = runner.real_run
         runner.raw.close(); runner.processes.close(); runner.schedule_log.close()
         runner.save()
         metadata["artifacts_after"] = [base.digest(path) for path in artifacts]

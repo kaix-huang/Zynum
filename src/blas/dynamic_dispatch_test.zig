@@ -22,7 +22,7 @@ test "prefetched reductions preserve ordinary values across cache-policy boundar
     inline for (.{ f32, f64 }) |T| {
         const norm = if (T == f32) fortran.snrm2_ else fortran.dnrm2_;
         const abs_sum = if (T == f32) fortran.sasum_ else fortran.dasum_;
-        for ([_]usize{ 256 * 1024, 2 * 1024 * 1024, 32 * 1024 * 1024 }) |bytes| {
+        for ([_]usize{ 4 * 1024, 8 * 1024, 256 * 1024, 2 * 1024 * 1024, 32 * 1024 * 1024 }) |bytes| {
             for ([_]isize{ -1, 0, 1 }) |offset| {
                 const count: usize = @intCast(@as(isize, @intCast(bytes / @sizeOf(T))) + offset);
                 const x = try std.testing.allocator.alloc(T, count);
@@ -32,6 +32,12 @@ test "prefetched reductions preserve ordinary values across cache-policy boundar
                 const expected = @sqrt(@as(f64, @floatFromInt(count)));
                 try std.testing.expectApproxEqRel(expected, @as(f64, norm(&n, x.ptr, &inc)), 1e-6);
                 try std.testing.expectEqual(@as(T, @floatFromInt(count)), abs_sum(&n, x.ptr, &inc));
+                if (count <= 4096) {
+                    x[count / 2] = std.math.nan(T);
+                    try std.testing.expect(std.math.isNan(abs_sum(&n, x.ptr, &inc)));
+                    x[count / 2] = std.math.inf(T);
+                    try std.testing.expectEqual(std.math.inf(T), abs_sum(&n, x.ptr, &inc));
+                }
             }
         }
     }
@@ -168,7 +174,7 @@ test "NRM2 preserves finite tiny and huge inputs across vector and task boundari
         const complex = T == api.ComplexF32 or T == api.ComplexF64;
         const norm = if (T == f32) fortran.snrm2_ else if (T == f64) fortran.dnrm2_ else if (T == api.ComplexF32) fortran.scnrm2_ else fortran.dznrm2_;
         const magnitudes = if (R == f32) [_]R{ 0, 1e-40, 1e-30, 1e-20, 1, 1e30 } else [_]R{ 0, 1e-310, 1e-200, 1e-150, 1, 1e300 };
-        for ([_]usize{ 8, 31, 32, 33, 4096, 524289 }) |n| {
+        for ([_]usize{ 1, 2, 3, 7, 8, 9, 15, 16, 17, 31, 32, 33, 4096, 524289 }) |n| {
             const x = try std.testing.allocator.alloc(T, n);
             defer std.testing.allocator.free(x);
             for (magnitudes) |magnitude| {
@@ -178,6 +184,30 @@ test "NRM2 preserves finite tiny and huge inputs across vector and task boundari
                 const expected: R = @floatCast(@as(f64, magnitude) * @sqrt(@as(f64, @floatFromInt(n * (if (complex) @as(usize, 2) else 1)))));
                 const tolerance = @max(@abs(expected) * 0.00003, 2 * std.math.floatTrueMin(R));
                 try std.testing.expectApproxEqAbs(expected, norm(&ni, x.ptr, &inc), tolerance);
+            }
+        }
+    }
+}
+
+test "NRM2 exceptional lanes preserve NaN and infinity across ASIMD tails" {
+    runtime.setMaxThreads(1);
+    defer runtime.setMaxThreads(0);
+    defer fortran.zynum_blas_shutdown();
+    const inc: i32 = 1;
+    inline for (scalars) |T| {
+        const R = if (T == f32 or T == api.ComplexF32) f32 else f64;
+        const complex = T == api.ComplexF32 or T == api.ComplexF64;
+        const norm = if (T == f32) fortran.snrm2_ else if (T == f64) fortran.dnrm2_ else if (T == api.ComplexF32) fortran.scnrm2_ else fortran.dznrm2_;
+        for ([_]usize{ 7, 8, 9, 15, 16, 17, 33 }) |count| {
+            const x = try std.testing.allocator.alloc(T, count);
+            defer std.testing.allocator.free(x);
+            const n: i32 = @intCast(count);
+            for (0..count) |lane| {
+                @memset(x, if (complex) .{ .re = 1, .im = -1 } else 1);
+                x[lane] = if (complex) .{ .re = 1, .im = std.math.inf(R) } else std.math.inf(R);
+                try std.testing.expectEqual(std.math.inf(R), norm(&n, x.ptr, &inc));
+                x[lane] = if (complex) .{ .re = 1, .im = std.math.nan(R) } else std.math.nan(R);
+                try std.testing.expect(std.math.isNan(norm(&n, x.ptr, &inc)));
             }
         }
     }
@@ -388,7 +418,81 @@ test "ABI scaling and checked dot preserve vector tails for every scalar" {
     }
 }
 
+const ComplexGemvCalleeSavedProbe = struct {
+    // Use an assembly caller so LLVM cannot hide a callee violation by
+    // spilling these registers around an ordinary numerical assertion.
+    noinline fn invoke(target: usize, args: *const [8]usize) callconv(.naked) usize {
+        _ = target;
+        _ = args;
+        asm volatile (
+            \\stp x29, x30, [sp, #-48]!
+            \\stp d8, d9, [sp, #16]
+            \\stp d10, d11, [sp, #32]
+            \\mov x16, x0
+            \\mov x17, x1
+            \\mov x9, #0x5a58
+            \\fmov d8, x9
+            \\mov x9, #0x5a59
+            \\fmov d9, x9
+            \\mov x9, #0x5a5a
+            \\fmov d10, x9
+            \\mov x9, #0x5a5b
+            \\fmov d11, x9
+            \\ldp x0, x1, [x17]
+            \\ldp x2, x3, [x17, #16]
+            \\ldp x4, x5, [x17, #32]
+            \\ldp x6, x7, [x17, #48]
+            \\blr x16
+            \\fmov x10, d8
+            \\mov x9, #0x5a58
+            \\cmp x10, x9
+            \\b.ne 1f
+            \\fmov x10, d9
+            \\mov x9, #0x5a59
+            \\cmp x10, x9
+            \\b.ne 1f
+            \\fmov x10, d10
+            \\mov x9, #0x5a5a
+            \\cmp x10, x9
+            \\b.ne 1f
+            \\fmov x10, d11
+            \\mov x9, #0x5a5b
+            \\cmp x10, x9
+            \\b.ne 1f
+            \\mov x0, #0
+            \\b 2f
+            \\1:
+            \\mov x0, #1
+            \\2:
+            \\ldp d10, d11, [sp, #32]
+            \\ldp d8, d9, [sp, #16]
+            \\ldp x29, x30, [sp], #48
+            \\ret
+            ::: .{ .memory = true });
+    }
+
+    fn check() !void {
+        if (comptime builtin.cpu.arch != .aarch64) return;
+        if (comptime !builtin.cpu.has(.aarch64, .complxnum)) return;
+        const kernels = @import("kernels/arch/aarch64/asm/matrix_vector.zig");
+        const T = api.ComplexF64;
+        var a = [_]T{.{ .re = 1, .im = 2 }} ** (259 * 128);
+        var x = [_]T{.{ .re = 1, .im = -1 }} ** 128;
+        var y = [_]T{.{ .re = 0, .im = 0 }} ** 128;
+        const args = [8]usize{
+            @bitCast(@as(f64, 1)), 0,                0,               0,
+            @intFromPtr(&a),       259 * @sizeOf(T), @intFromPtr(&x), @intFromPtr(&y),
+        };
+        const Probe = *const fn (usize, *const [8]usize) callconv(.c) usize;
+        const probe: Probe = @ptrCast(&invoke);
+        inline for (.{ kernels.zgemvTransFcmlaF64M128Cols8, kernels.zgemvConjTransFcmlaF64M128Cols8 }) |kernel| {
+            try std.testing.expectEqual(@as(usize, 0), probe(@intFromPtr(&kernel), &args));
+        }
+    }
+};
+
 test "paired complex transposed GEMV preserves odd rows columns and unaligned guards" {
+    try ComplexGemvCalleeSavedProbe.check();
     const scalar = @import("core/shared/scalar.zig");
     defer runtime.setMaxThreads(0);
     defer fortran.zynum_blas_shutdown();

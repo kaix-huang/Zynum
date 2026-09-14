@@ -31,6 +31,7 @@ var persistent_worker_count = std.atomic.Value(u32).init(0);
 var persistent_ready_count = std.atomic.Value(u32).init(0);
 var persistent_exited_count = std.atomic.Value(u32).init(0);
 var persistent_worker_generation = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** max_tasks;
+var persistent_worker_waiting = [_]std.atomic.Value(u8){std.atomic.Value(u8).init(0)} ** max_tasks;
 var persistent_active_helpers = std.atomic.Value(u32).init(0);
 var persistent_first_helper = std.atomic.Value(u32).init(0);
 var persistent_done_target = std.atomic.Value(u32).init(0);
@@ -105,9 +106,14 @@ fn runPersistentWorker(worker_id: usize) void {
             std.atomic.spinLoopHint();
             current = persistent_worker_generation[worker_id].load(.acquire);
         }
-        while (current == seen) {
-            io.futexWaitUncancelable(u32, &persistent_worker_generation[worker_id].raw, seen);
+        if (current == seen) {
+            if (comptime @import("builtin").os.tag == .macos) persistent_worker_waiting[worker_id].store(1, .release);
             current = persistent_worker_generation[worker_id].load(.acquire);
+            while (current == seen) {
+                io.futexWaitUncancelable(u32, &persistent_worker_generation[worker_id].raw, seen);
+                current = persistent_worker_generation[worker_id].load(.acquire);
+            }
+            if (comptime @import("builtin").os.tag == .macos) persistent_worker_waiting[worker_id].store(0, .release);
         }
         seen = current;
         if (persistent_shutdown_requested.load(.acquire) != 0) break;
@@ -206,6 +212,11 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
     persistent_active_helpers.store(active_helpers, .release);
 
     const io = persistent_threaded.io();
+    // Wake sleeping macOS subset helpers before the caller starts its tile,
+    // but avoid a syscall for hot helpers. This flag is only a latency hint:
+    // the unconditional late wake below also covers a stale or racing hint.
+    const wake_waiting_helpers = @import("builtin").os.tag == .macos and
+        (first_helper != 0 or active_helpers != workers);
     for (0..active_helpers) |worker_id| {
         const target_worker = first_helper + worker_id;
         // io_busy serializes jobs, and completion acknowledges each worker's
@@ -213,13 +224,12 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
         // locally so even wraparound differs from an idle worker's last value.
         // The release publishes the task payload to the worker's acquire load.
         _ = persistent_worker_generation[target_worker].fetchAdd(1, .release);
+        if (wake_waiting_helpers and persistent_worker_waiting[target_worker].load(.acquire) != 0)
+            io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
     }
 
     runtime.configureWorkerThread(null);
     task_fn(tasks, 0);
-    // An automatically selected subset should use the same spin-first path
-    // as an explicitly capped pool. Waking each helper on every short call
-    // otherwise makes reduced task counts pay extra system calls.
     var woke_sleepers = false;
     while (true) {
         var done = persistent_done_count.load(.acquire);

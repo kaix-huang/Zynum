@@ -38,7 +38,7 @@ const triValue = matrix_vector_ops.triValue;
 const trmv = matrix_vector_ops.trmv;
 const trsv = matrix_vector_ops.trsv;
 
-const parallel_left_min_work = 8 * 1024 * 1024;
+const parallel_left_min_work = structured_tuning.triangular_parallel_left_min_work;
 const parallel_left_max_tasks = 32;
 const parallel_left_min_columns_per_task = 4;
 
@@ -62,6 +62,10 @@ fn scaleDenseColumns(comptime T: type, m: usize, first_col: usize, end_col: usiz
 
 fn scaleDenseMatrix(comptime T: type, m: usize, n: usize, alpha: T, b: [*]T, ldb: BlasInt) void {
     scaleDenseColumns(T, m, 0, n, alpha, b, ldb);
+}
+
+fn clearDenseMatrix(comptime T: type, m: usize, n: usize, b: [*]T, ldb: BlasInt) void {
+    for (0..n) |j| @memset(b[matIndex(ldb, 0, j)..][0..m], zero(T));
 }
 
 fn conjugateDenseRow(comptime T: type, n: usize, row: usize, b: [*]T, ldb: BlasInt) void {
@@ -201,7 +205,35 @@ fn runLeft(comptime T: type, operation: LeftOperation, uplo: Uplo, trans_: Order
     });
 }
 
+noinline fn tryMacTrmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+    const profile = structured_tuning.aarch64_macos_trmm_candidate;
+    return blocked.tryTrmm(T, .{ .block_size = profile.block_size }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+noinline fn tryMacTrsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+    const profile = structured_tuning.aarch64_macos_trsm_candidate;
+    return blocked.tryTrsm(T, .{ .block_size = profile.block_size }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
 pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    if (m_ <= 0 or n_ <= 0) return;
+    if (scalar.isZero(T, alpha)) {
+        // BLAS alpha-zero semantics do not read A or the old contents of B.
+        clearDenseMatrix(T, toUsize(m_), toUsize(n_), b, ldb);
+        return;
+    }
+
+    // Candidate: bounded panels preserve the original in-place dependency
+    // order. AArch64 never enters the queued x86 workspace branch.
+    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+        const profile = structured_tuning.aarch64_macos_trmm_candidate;
+        if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, runtime.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
+            const capability = gemm_dispatch.activeCapability();
+            if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
+                if (tryMacTrmm(T, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+            }
+        }
+    }
     // Large parallel updates need enough work per GEMM to amortize dispatch.
     if (comptime builtin.cpu.arch == .x86_64) {
         if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
@@ -239,6 +271,24 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
 }
 
 pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    if (m_ <= 0 or n_ <= 0) return;
+    if (scalar.isZero(T, alpha)) {
+        // BLAS alpha-zero semantics do not read A or the old contents of B.
+        clearDenseMatrix(T, toUsize(m_), toUsize(n_), b, ldb);
+        return;
+    }
+
+    // Candidate: bounded panels preserve the original in-place dependency
+    // order. AArch64 never enters the queued x86 workspace branch.
+    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+        const profile = structured_tuning.aarch64_macos_trsm_candidate;
+        if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, runtime.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
+            const capability = gemm_dispatch.activeCapability();
+            if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
+                if (tryMacTrsm(T, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+            }
+        }
+    }
     // Shared diagonal solves and trailing GEMM updates amortize work across RHS.
     if (comptime builtin.cpu.arch == .x86_64) {
         if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
@@ -383,7 +433,29 @@ fn expectPublicLeftGateMatchesSingle(comptime T: type) !void {
         } else {
             trsm(T, .left, .lower, .trans, .non_unit, m, n, alpha, a.ptr, lda, actual.ptr, ldb);
         }
-        try std.testing.expectEqualSlices(T, expected, actual);
+        // The public path may use blocked GEMM and a different summation order.
+        // Keep padding exact and check both the scalar reference and an independent
+        // f64 product/residual rather than requiring identical rounded bits.
+        const epsilon: f64 = std.math.floatEps(T);
+        for (0..n) |j| {
+            for (0..m) |i| {
+                const got: f64 = actual[i + j * ldb];
+                const wanted: f64 = expected[i + j * ldb];
+                try std.testing.expect(@abs(got - wanted) <= 16 * epsilon * (1 + @abs(wanted)));
+                var product: f64 = 0;
+                var magnitude: f64 = 0;
+                for (i..m) |k| {
+                    const av: f64 = a[k + i * lda];
+                    const bv: f64 = if (operation == .multiply) initial_b[k + j * ldb] else actual[k + j * ldb];
+                    product += av * bv;
+                    magnitude += @abs(av * bv);
+                }
+                const target: f64 = if (operation == .multiply) got else @as(f64, alpha) * initial_b[i + j * ldb];
+                const factor: f64 = if (operation == .multiply) alpha else 1;
+                try std.testing.expect(@abs(factor * product - target) <= m * epsilon * (1 + @abs(factor) * magnitude));
+            }
+            try std.testing.expectEqualSlices(T, expected[j * ldb + m .. (j + 1) * ldb], actual[j * ldb + m .. (j + 1) * ldb]);
+        }
     }
 }
 

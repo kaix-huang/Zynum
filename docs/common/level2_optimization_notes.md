@@ -113,6 +113,63 @@ Hermitian kernels need separate tests for upper/lower storage, diagonal handling
 conjugated off-diagonal values, and complex beta. Reusing a symmetric real-lane
 loop without these checks is invalid.
 
+### Real banded symmetric products
+
+The production profile selects `compact_symmetric_band_fused` for f32/f64
+SBMV on AArch64 when `n >= 512`, `k >= 8`, and both vector increments are one.
+The stable identities use the `generic` capability: the shared fixed-width body
+is portable vector code, while the architecture preference belongs to the named
+profile. Both upper and lower storage retain their existing band traversal.
+
+Each contiguous off-diagonal segment uses `symmetricAxpyDotUnitReal` to load its
+matrix values once, update the direct output region, and accumulate the reflected
+dot product with independent accumulators. The core still owns beta scaling,
+alpha-zero handling, diagonal contributions, and the final reflected update.
+The fused segment requires no workspace and does not change task scheduling.
+
+A zero segment coefficient computes only the dot product, preserving the existing
+SBMV rule that skips the direct AXPY update. Nonzero-coefficient segments reject
+matrix/output or input/output overlap before any segment write; the same column
+then uses the original AXPY followed by DOT. This is a segment-level rejection:
+the enclosing traversal may already have scaled beta or completed earlier
+columns, and must not restart the whole operation. Non-unit strides, other scalar
+families, and unselected profiles keep their existing implementations. The
+registered fallback remains `compact_symmetric_band`.
+
+### Real packed symmetric products
+
+For AArch64 f32/f64 SPMV, the production
+`enable_fused_real_packed_single` preference applies only inside the existing
+`n >= 512`, unit-increment route when the shared runtime selects exactly one
+task. It does not increase the thread limit or turn a multi-task request into a
+single-task request. The separate multi-task `enable_fused_real_packed` preference is also enabled
+in production after same-source on/off validation. It reuses the existing
+private-output task partition and merge; the runtime thread limits and packed
+storage layout remain unchanged.
+
+`singlePackedMvUnit` acquires an n-element private delta from the existing
+thread-local workspace, initializes it, executes the same
+`compact_symmetric_packed_fused` column body, and applies beta during the existing
+merge. Storage stays packed; no dense matrix is materialized. The descriptor
+covers an output-region contribution with a merge obligation, not a complete
+standalone SPMV entrypoint. Its fallback is `compact_symmetric_packed`; production
+eligibility covers the validated single-task and existing private-output
+multi-task compositions; other compositions still require independent evidence.
+
+The single-task executor rejects caller Y overlapping X or packed A, byte-count
+overflow, workspace over-budget, or allocation failure before modifying caller
+output. The public operation then retains its serial fallback. Workspace remains
+bounded by the existing 64 MiB profile budget and participates in normal cache
+cleanup. Alpha zero scales Y without reading A or X; beta zero in the merge does
+not read the old Y value.
+
+Packed columns differ from banded columns for a zero scaled X coefficient: their
+existing scalar expression still evaluates `A * 0`. Such segments retain the
+scalar loop so NaN/Inf behavior is not replaced by the banded AXPY skip. Segment
+alias rejection likewise retains the scalar column fallback. Complex packed
+products, non-unit strides, and multi-task production paths retain their prior
+composition.
+
 ## Triangular Operations
 
 For `trmv` and `trsv`, derive loop direction from upper/lower storage and
@@ -134,6 +191,17 @@ state, or data-layout difference cannot be expressed in the shared skeleton.
 
 Sub-operation descriptors must declare their output ownership and merge
 obligation. Tuning cannot promote a leaf whose executor lacks that composition.
+
+### AArch64 assembly call preservation
+
+The eight-column f64 complex transpose GEMV FCMLA body borrows v8-v11. Its naked
+entry has no compiler-generated prologue, so
+`zgemvTransFcmlaF64M128Cols8BodyAsm` explicitly saves d8-d11 in a 32-byte stack
+frame and restores them before returning. These are the ABI-preserved low halves
+of the vector registers; both transpose and conjugate-transpose instantiations
+must retain the save/restore sequence and stack alignment. Numerical output
+checks alone cannot establish this contract: caller register-preservation checks
+must accompany changes to the assembly body or its entrypoint.
 
 ## Registry And Tuning
 
@@ -229,3 +297,55 @@ Rollback or narrow the route when:
 
 Public notes should keep the mechanism and decision boundary, not individual run
 chronology. Detailed raw evidence belongs in ignored private storage.
+
+### Ordered finite compact triangular paths on macOS AArch64
+
+Real TBSV with n >= 128 and k <= n/4 can solve only the stored band instead of
+scanning structural zeros across the full triangle. A bounded private vector
+retains the original ascending dependency terms and multiply/subtract/divide
+order. Previously solved finite values contribute structural signed-zero terms
+through sign representatives when the accumulator is zero. Non-finite results
+refuse the candidate before caller writes. Effective lower-triangular solves
+with k >= 16 use a four-term unrolled leaf; other cases retain a separate scalar
+leaf so they do not inherit its register pressure.
+
+Real TPMV with n >= 64 computes stored triangular rows using recurrent packed
+offsets. It checks logical input finiteness and stages output before committing.
+Zero or non-finite results use the original implementation. Both candidates
+retain arbitrary nonzero strides, avoid reading unit diagonals, check overlap and
+workspace bounds, and fall back on allocation failure. Workspace is at most
+64 MiB per call. Refusal preserves caller memory, not floating-point trap/flag
+atomicity. Their catalog lifecycle remains experimental.
+
+The scalar TPMV fallback is kept in a separate noinline leaf. This prevents the
+finite-candidate call from extending register lifetimes and stack saves across
+the old triangular loop, including calls below the candidate's size gate.
+On macOS AArch64, the real TPMV dispatch entry returns directly to either that
+leaf or a separate candidate-attempt helper with the same argument ABI. The
+helper owns candidate failure and fallback, so calls below the size gate do not
+retain arguments across a candidate attempt, allocate workspace, or scan input.
+The x86 isolated dispatch remains unchanged.
+
+The finite TPMV leaf peels the diagonal from each row: first for an effective
+upper triangle, last for an effective lower triangle. The remaining loop needs
+neither a diagonal test nor a final-offset test. Keep the initial positive-zero
+addition, unit-diagonal multiply, and ascending term order; do not replace this
+with reassociated partial sums. The unused final packed offset is bounded by
+the already checked packed storage size plus n.
+
+Non-transposed packed rows can be processed in adjacent pairs. Each packed
+column supplies two adjacent matrix elements and one shared vector element,
+with a separate ordered accumulator for each output row. Peel the differing
+diagonal boundaries before or after the common column interval; never use a
+horizontal reduction across the two outputs. Stage both results privately and
+retain the single-row path for an odd tail and for transposed operations.
+
+The macOS AArch64 real legacy TPMV leaf has an explicit 64-byte entry alignment
+so changes in the finite leaf do not shift its loop instructions within cache
+lines. A compile-time choice retains an unannotated leaf for other types and
+platforms. Check off-gate real and complex calls after layout changes, even when
+their arithmetic instructions are
+unchanged; use long interleaved batches with a same-library control to separate
+layout regressions from timing variability. For microsecond-scale calls, also
+measure continuous native batches with input resets; more trials of a minimum
+single-call timer do not remove its quantization or foreign-call overhead.

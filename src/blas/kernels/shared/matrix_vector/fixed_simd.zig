@@ -1002,6 +1002,61 @@ fn realDotUnit(
     return result;
 }
 
+/// One stored real symmetric segment: update its direct output and return the
+/// reflected dot product. Reject overlapping output before any write, preserving
+/// the caller's two-pass fallback for aliasing inputs.
+pub fn symmetricAxpyDotUnitReal(
+    comptime T: type,
+    comptime cfg: Config,
+    n: usize,
+    coefficient: T,
+    a: [*]const T,
+    x: [*]const T,
+    y: [*]T,
+) ?T {
+    comptime checkConfig(T, cfg);
+    if (n == 0) return 0;
+    // A zero coefficient must not read or write Y, including when A contains NaN.
+    if (coefficient == 0) return realDotUnit(T, cfg, n, a, x);
+    const bytes = n * @sizeOf(T);
+    const output = @intFromPtr(y);
+    inline for (.{ a, x }) |input| {
+        const address = @intFromPtr(input);
+        const distance = if (address < output) output - address else address - output;
+        if (distance < bytes) return null;
+    }
+
+    const V = @Vector(cfg.lane_count, T);
+    const scale: V = @splat(coefficient);
+    var accs: [cfg.row_unroll_vectors]V = [_]V{@splat(0)} ** cfg.row_unroll_vectors;
+    var i: usize = 0;
+    while (i + rowUnroll(cfg) <= n) : (i += rowUnroll(cfg)) {
+        inline for (0..cfg.row_unroll_vectors) |u| {
+            const offset = i + u * cfg.lane_count;
+            const av = loadVec(T, cfg.lane_count, a, offset);
+            const xv = loadVec(T, cfg.lane_count, x, offset);
+            storeVec(T, cfg.lane_count, y, offset, @mulAdd(V, av, scale, loadVec(T, cfg.lane_count, y, offset)));
+            accs[u] = @mulAdd(V, av, xv, accs[u]);
+        }
+    }
+    var acc: V = @splat(0);
+    inline for (0..cfg.row_unroll_vectors) |u| acc += accs[u];
+    while (i + cfg.lane_count <= n) : (i += cfg.lane_count) {
+        const av = loadVec(T, cfg.lane_count, a, i);
+        const xv = loadVec(T, cfg.lane_count, x, i);
+        storeVec(T, cfg.lane_count, y, i, @mulAdd(V, av, scale, loadVec(T, cfg.lane_count, y, i)));
+        acc = @mulAdd(V, av, xv, acc);
+    }
+    var sum = @reduce(.Add, acc);
+    while (i < n) : (i += 1) {
+        const av = a[i];
+        const xv = x[i];
+        y[i] = @mulAdd(T, av, coefficient, y[i]);
+        sum = @mulAdd(T, av, xv, sum);
+    }
+    return sum;
+}
+
 pub fn triangularDotUnit(
     comptime T: type,
     comptime cfg: Config,

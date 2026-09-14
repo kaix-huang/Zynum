@@ -106,6 +106,31 @@ pub const StructuredKernelId = enum {
     ctrsm_right_row_parallel_isolated,
     ztrsm_right_row_parallel_isolated,
 
+    ssyrk_packed_nn_panels,
+    dsyrk_packed_nn_panels,
+    csyrk_packed_nn_panels,
+    zsyrk_packed_nn_panels,
+    cherk_packed_nn_panels,
+    zherk_packed_nn_panels,
+    ssyr2k_packed_nn_panels,
+    dsyr2k_packed_nn_panels,
+    csyr2k_packed_nn_panels,
+    zsyr2k_packed_nn_panels,
+    cher2k_packed_nn_panels,
+    zher2k_packed_nn_panels,
+    ssyrk_packed_nn_parallel,
+    dsyrk_packed_nn_parallel,
+    csyrk_packed_nn_parallel,
+    zsyrk_packed_nn_parallel,
+    cherk_packed_nn_parallel,
+    zherk_packed_nn_parallel,
+    ssyr2k_packed_nn_parallel,
+    dsyr2k_packed_nn_parallel,
+    csyr2k_packed_nn_parallel,
+    zsyr2k_packed_nn_parallel,
+    cher2k_packed_nn_parallel,
+    zher2k_packed_nn_parallel,
+
     ssyrk_blocked,
     dsyrk_blocked,
     csyrk_blocked,
@@ -150,6 +175,8 @@ pub const Implementation = enum {
     rejected_right_row_parallel,
     isolated_dense_gemm,
     isolated_right_row_parallel,
+    packed_nn_rank_update,
+    parallel_packed_nn_rank_update,
     blocked_rank_update,
     blocked_symmetric_multiply,
     blocked_triangular_left,
@@ -190,13 +217,18 @@ pub const PackingKind = enum {
     dense_structured_materialization,
     structured_block_panels,
     private_output_tiles,
+    private_output_and_operand_panels,
 };
+
+pub const parallel_rank_max_workers: usize = 8;
 
 pub const WorkspaceFormula = enum {
     none,
     dense_order_squared_plus_optional_output,
     one_block,
     two_blocks,
+    three_blocks,
+    three_blocks_per_worker,
 };
 
 pub const TaskTopology = enum {
@@ -207,6 +239,7 @@ pub const TaskTopology = enum {
     contiguous_output_rows,
     gemm_owned,
     gemm_blocked,
+    cyclic_stored_tiles,
 };
 
 pub const Entrypoint = enum {
@@ -219,9 +252,12 @@ pub const Entrypoint = enum {
     symmetric_dense_gemm_isolated,
     triangular_right_parallel_isolated,
     structured_blocked_experimental,
+    structured_packed_rank_experimental,
+    structured_parallel_packed_rank_experimental,
 };
 
 pub const Descriptor = struct {
+    max_workers: ?usize = null,
     name: []const u8,
     kernel: StructuredKernelId,
     fallback: ?StructuredKernelId,
@@ -343,6 +379,31 @@ pub const registry = [_]Descriptor{
     make(.ctrsm_right_row_parallel_isolated, .ctrsm_serial, .trsm, .complex_f32, .isolated_right_row_parallel),
     make(.ztrsm_right_row_parallel_isolated, .ztrsm_serial, .trsm, .complex_f64, .isolated_right_row_parallel),
 
+    make(.ssyrk_packed_nn_panels, .ssyrk_blocked, .syrk, .f32, .packed_nn_rank_update),
+    make(.dsyrk_packed_nn_panels, .dsyrk_blocked, .syrk, .f64, .packed_nn_rank_update),
+    make(.csyrk_packed_nn_panels, .csyrk_blocked, .syrk, .complex_f32, .packed_nn_rank_update),
+    make(.zsyrk_packed_nn_panels, .zsyrk_blocked, .syrk, .complex_f64, .packed_nn_rank_update),
+    make(.cherk_packed_nn_panels, .cherk_blocked, .herk, .complex_f32, .packed_nn_rank_update),
+    make(.zherk_packed_nn_panels, .zherk_blocked, .herk, .complex_f64, .packed_nn_rank_update),
+    make(.ssyr2k_packed_nn_panels, .ssyr2k_blocked, .syr2k, .f32, .packed_nn_rank_update),
+    make(.dsyr2k_packed_nn_panels, .dsyr2k_blocked, .syr2k, .f64, .packed_nn_rank_update),
+    make(.csyr2k_packed_nn_panels, .csyr2k_blocked, .syr2k, .complex_f32, .packed_nn_rank_update),
+    make(.zsyr2k_packed_nn_panels, .zsyr2k_blocked, .syr2k, .complex_f64, .packed_nn_rank_update),
+    make(.cher2k_packed_nn_panels, .cher2k_blocked, .her2k, .complex_f32, .packed_nn_rank_update),
+    make(.zher2k_packed_nn_panels, .zher2k_blocked, .her2k, .complex_f64, .packed_nn_rank_update),
+    make(.ssyrk_packed_nn_parallel, .ssyrk_packed_nn_panels, .syrk, .f32, .parallel_packed_nn_rank_update),
+    make(.dsyrk_packed_nn_parallel, .dsyrk_packed_nn_panels, .syrk, .f64, .parallel_packed_nn_rank_update),
+    make(.csyrk_packed_nn_parallel, .csyrk_packed_nn_panels, .syrk, .complex_f32, .parallel_packed_nn_rank_update),
+    make(.zsyrk_packed_nn_parallel, .zsyrk_packed_nn_panels, .syrk, .complex_f64, .parallel_packed_nn_rank_update),
+    make(.cherk_packed_nn_parallel, .cherk_packed_nn_panels, .herk, .complex_f32, .parallel_packed_nn_rank_update),
+    make(.zherk_packed_nn_parallel, .zherk_packed_nn_panels, .herk, .complex_f64, .parallel_packed_nn_rank_update),
+    make(.ssyr2k_packed_nn_parallel, .ssyr2k_packed_nn_panels, .syr2k, .f32, .parallel_packed_nn_rank_update),
+    make(.dsyr2k_packed_nn_parallel, .dsyr2k_packed_nn_panels, .syr2k, .f64, .parallel_packed_nn_rank_update),
+    make(.csyr2k_packed_nn_parallel, .csyr2k_packed_nn_panels, .syr2k, .complex_f32, .parallel_packed_nn_rank_update),
+    make(.zsyr2k_packed_nn_parallel, .zsyr2k_packed_nn_panels, .syr2k, .complex_f64, .parallel_packed_nn_rank_update),
+    make(.cher2k_packed_nn_parallel, .cher2k_packed_nn_panels, .her2k, .complex_f32, .parallel_packed_nn_rank_update),
+    make(.zher2k_packed_nn_parallel, .zher2k_packed_nn_panels, .her2k, .complex_f64, .parallel_packed_nn_rank_update),
+
     make(.ssyrk_blocked, .ssyrk_column_parallel, .syrk, .f32, .blocked_rank_update),
     make(.dsyrk_blocked, .dsyrk_column_parallel, .syrk, .f64, .blocked_rank_update),
     make(.csyrk_blocked, .csyrk_column_parallel, .syrk, .complex_f32, .blocked_rank_update),
@@ -384,18 +445,21 @@ fn make(comptime kernel: StructuredKernelId, comptime fallback: ?StructuredKerne
     const rank = operation == .syrk or operation == .herk or operation == .syr2k or operation == .her2k;
     const triangular = operation == .trmm or operation == .trsm;
     const hermitian = operation == .herk or operation == .her2k or operation == .hemm;
-    const task_parallel = implementation == .retained_column_parallel or
+    const task_parallel = implementation == .parallel_packed_nn_rank_update or implementation == .retained_column_parallel or
         implementation == .retained_left_column_parallel or
         implementation == .rejected_right_row_parallel or
         implementation == .isolated_right_row_parallel;
     const dense_gemm = implementation == .rejected_dense_gemm or implementation == .isolated_dense_gemm;
-    const blocked_rank = implementation == .blocked_rank_update;
+    const parallel_rank = implementation == .parallel_packed_nn_rank_update;
+    const packed_rank = implementation == .packed_nn_rank_update or parallel_rank;
+    const blocked_rank = implementation == .blocked_rank_update or packed_rank;
     const blocked_symmetric = implementation == .blocked_symmetric_multiply;
     const blocked_triangular = implementation == .blocked_triangular_left or implementation == .blocked_triangular_right;
     const blocked = blocked_rank or blocked_symmetric or blocked_triangular;
-    const blocked_buffers: usize = if (operation == .trmm and blocked_triangular) 2 else 1;
+    const blocked_buffers: usize = if (packed_rank) 3 else if (operation == .trmm and blocked_triangular) 2 else 1;
 
     return .{
+        .max_workers = if (parallel_rank) parallel_rank_max_workers else null,
         .name = @tagName(kernel),
         .kernel = kernel,
         .fallback = fallback,
@@ -458,6 +522,8 @@ fn make(comptime kernel: StructuredKernelId, comptime fallback: ?StructuredKerne
         .tails = .{ .m = .native, .n = .native, .k = .native },
         .packing = if (dense_gemm)
             .dense_structured_materialization
+        else if (packed_rank)
+            .private_output_and_operand_panels
         else if (blocked_rank)
             .private_output_tiles
         else if (blocked)
@@ -466,6 +532,10 @@ fn make(comptime kernel: StructuredKernelId, comptime fallback: ?StructuredKerne
             .none,
         .workspace_formula = if (dense_gemm)
             .dense_order_squared_plus_optional_output
+        else if (parallel_rank)
+            .three_blocks_per_worker
+        else if (blocked_buffers == 3)
+            .three_blocks
         else if (blocked_buffers == 2)
             .two_blocks
         else if (blocked)
@@ -475,7 +545,7 @@ fn make(comptime kernel: StructuredKernelId, comptime fallback: ?StructuredKerne
         .max_workspace_bytes = if (dense_gemm)
             64 * 1024 * 1024
         else if (blocked)
-            64 * 64 * scalarBytes(scalar) * blocked_buffers
+            64 * 64 * scalarBytes(scalar) * blocked_buffers * (if (parallel_rank) parallel_rank_max_workers else 1)
         else
             0,
         .block_size = if (blocked) 64 else 0,
@@ -497,6 +567,8 @@ fn entrypointFor(operation: StructuredOperation, implementation: Implementation)
         .rejected_right_row_parallel => .triangular_right_parallel_rejected,
         .isolated_dense_gemm => .symmetric_dense_gemm_isolated,
         .isolated_right_row_parallel => .triangular_right_parallel_isolated,
+        .parallel_packed_nn_rank_update => .structured_parallel_packed_rank_experimental,
+        .packed_nn_rank_update => .structured_packed_rank_experimental,
         .blocked_rank_update, .blocked_symmetric_multiply, .blocked_triangular_left, .blocked_triangular_right => .structured_blocked_experimental,
     };
 }
@@ -519,7 +591,8 @@ fn taskTopology(operation: StructuredOperation, implementation: Implementation) 
         .rejected_right_row_parallel => .contiguous_output_rows,
         .isolated_dense_gemm => .gemm_owned,
         .isolated_right_row_parallel => .contiguous_output_rows,
-        .blocked_rank_update, .blocked_symmetric_multiply, .blocked_triangular_left, .blocked_triangular_right => .gemm_blocked,
+        .parallel_packed_nn_rank_update => .cyclic_stored_tiles,
+        .packed_nn_rank_update, .blocked_rank_update, .blocked_symmetric_multiply, .blocked_triangular_left, .blocked_triangular_right => .gemm_blocked,
     };
 }
 
@@ -575,10 +648,20 @@ fn validateRegistry() void {
         if (has_workspace != (descriptor.packing != .none) or has_workspace != (descriptor.max_workspace_bytes != 0)) {
             @compileError("structured packing and workspace contracts disagree");
         }
-        const blocked = descriptor.implementation == .blocked_rank_update or
+        const blocked = descriptor.implementation == .parallel_packed_nn_rank_update or descriptor.implementation == .packed_nn_rank_update or descriptor.implementation == .blocked_rank_update or
             descriptor.implementation == .blocked_symmetric_multiply or
             descriptor.implementation == .blocked_triangular_left or
             descriptor.implementation == .blocked_triangular_right;
+        if (descriptor.implementation == .packed_nn_rank_update) {
+            if (descriptor.workspace_formula != .three_blocks or descriptor.block_size != 64 or descriptor.max_workspace_bytes != 3 * 64 * 64 * scalarBytes(descriptor.scalar)) @compileError("packed rank lost its fixed three-block workspace");
+            const fallback = descriptorForKernel(descriptor.fallback orelse @compileError("packed rank requires old blocked fallback")).?;
+            if (fallback.implementation != .blocked_rank_update) @compileError("packed rank must fall back to the old single-output-block route");
+        }
+        if (descriptor.implementation == .parallel_packed_nn_rank_update) {
+            if (descriptor.max_workers != parallel_rank_max_workers or descriptor.workspace_formula != .three_blocks_per_worker or descriptor.block_size != 64 or descriptor.max_workspace_bytes != parallel_rank_max_workers * 3 * 64 * 64 * scalarBytes(descriptor.scalar)) @compileError("parallel rank workspace must be eight independent three-block workers");
+            const fallback = descriptorForKernel(descriptor.fallback orelse @compileError("parallel rank requires serial packed fallback")).?;
+            if (fallback.implementation != .packed_nn_rank_update) @compileError("parallel rank must fall back to serial packed identity");
+        }
         if (blocked != (descriptor.block_size != 0)) @compileError("blocked structured descriptor lost block geometry");
         if (blocked and descriptor.lifecycle != .experimental) @compileError("unbenchmarked blocked structured path cannot be default eligible");
         if (descriptor.implementation == .rejected_dense_gemm and descriptor.lifecycle != .rejected) {
@@ -610,7 +693,7 @@ fn validateRegistry() void {
 }
 
 comptime {
-    @setEvalBranchQuota(30_000);
+    @setEvalBranchQuota(60_000);
     validateRegistry();
 }
 
@@ -620,7 +703,7 @@ pub fn descriptorForKernel(kernel: StructuredKernelId) ?Descriptor {
 }
 
 test "structured Level 3 registry preserves storage output and lifecycle boundaries" {
-    try std.testing.expectEqual(@as(usize, 114), registry.len);
+    try std.testing.expectEqual(@as(usize, 138), registry.len);
     var default_eligible: usize = 0;
     var rejected: usize = 0;
     var experimental: usize = 0;
@@ -631,7 +714,18 @@ test "structured Level 3 registry preserves storage output and lifecycle boundar
     }
     try std.testing.expectEqual(@as(usize, 52), default_eligible);
     try std.testing.expectEqual(@as(usize, 14), rejected);
-    try std.testing.expectEqual(@as(usize, 48), experimental);
+    try std.testing.expectEqual(@as(usize, 72), experimental);
+
+    var packed_count: usize = 0;
+    for (registry) |descriptor| {
+        if (descriptor.implementation != .packed_nn_rank_update) continue;
+        packed_count += 1;
+        try std.testing.expectEqual(contract.Lifecycle.experimental, descriptor.lifecycle);
+        try std.testing.expectEqual(WorkspaceFormula.three_blocks, descriptor.workspace_formula);
+        try std.testing.expectEqual(@as(usize, 3 * 64 * 64) * scalarBytes(descriptor.scalar), descriptor.max_workspace_bytes);
+        try std.testing.expectEqual(Implementation.blocked_rank_update, descriptorForKernel(descriptor.fallback.?).?.implementation);
+    }
+    try std.testing.expectEqual(@as(usize, 12), packed_count);
 
     const herk = descriptorForKernel(.cherk_column_parallel).?;
     try std.testing.expectEqual(StructuredKind.hermitian, herk.structure);

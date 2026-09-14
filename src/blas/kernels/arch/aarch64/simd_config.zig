@@ -25,6 +25,12 @@ pub fn vectorConfig(comptime T: type) vector_simd.Config {
     };
 }
 
+/// Four independent ASIMD vectors per logical accumulator keep cache-resident
+/// absolute sums from depending on only four vector-add chains.
+pub fn wideAsumConfig(comptime T: type) vector_simd.Config {
+    return .{ .lane_count = asimdLanes(T) * 4, .unroll_vectors = 4 };
+}
+
 pub const byte_config = vector_simd.Config{
     .lane_count = 4,
     .unroll_vectors = 4,

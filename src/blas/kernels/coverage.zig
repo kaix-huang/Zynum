@@ -339,8 +339,8 @@ fn complexGemmExecutorMapped(entry: RegistryEntry) bool {
 /// evidence.
 pub fn matchesExecutorBindingBaseline(summary: RegistrySummary) bool {
     return summary.bound_default == 26 and
-        summary.unbound_default_eligible == 820 and
-        summary.unbound_experimental == 368 and
+        summary.unbound_default_eligible == 827 and
+        summary.unbound_experimental == 393 and
         summary.rejected_records == 20 and
         summary.executor_binding_legal and
         !summary.overall_executor_complete and
@@ -454,6 +454,8 @@ fn copyEvidence(source: anytype) Evidence {
 
 fn structuredSpecialization(implementation: structured.Implementation) []const u8 {
     return switch (implementation) {
+        .parallel_packed_nn_rank_update => "parallel_packed_nn_rank_experimental",
+        .packed_nn_rank_update => "packed_nn_rank_experimental",
         .serial, .retained_column_parallel, .retained_left_column_parallel => "runtime_entrypoint",
         .rejected_dense_gemm, .rejected_right_row_parallel => "source_experiment",
         .isolated_dense_gemm, .isolated_right_row_parallel => "isolated_object",
@@ -467,6 +469,7 @@ fn structuredSpecialization(implementation: structured.Implementation) []const u
 
 fn structuredEvidence(implementation: structured.Implementation) Evidence {
     return switch (implementation) {
+        .parallel_packed_nn_rank_update, .packed_nn_rank_update => .{},
         .blocked_rank_update,
         .blocked_symmetric_multiply,
         .blocked_triangular_left,
@@ -482,6 +485,8 @@ fn structuredEvidence(implementation: structured.Implementation) Evidence {
 
 fn structuredEvidenceNote(implementation: structured.Implementation) []const u8 {
     return switch (implementation) {
+        .parallel_packed_nn_rank_update => "new bounded per-worker NN packed rank plan; independent build, native correctness and performance evidence pending",
+        .packed_nn_rank_update => "new three-block NN packed rank plan; build, forced native correctness and performance evidence pending",
         .serial, .retained_column_parallel, .retained_left_column_parallel => "native correctness and fresh-process structured Level 3 sweeps cover the retained implementation",
         .rejected_dense_gemm, .rejected_right_row_parallel => "native correctness and regression evidence retained for the reverted in-graph experiment",
         .isolated_dense_gemm, .isolated_right_row_parallel => "same-layout isolated-object/control correctness and focused fresh-process performance evidence passed; lifecycle remains experimental",

@@ -13,12 +13,13 @@ const catalog = @import("kernels/shared/matrix_vector/catalog.zig");
 
 fn value(comptime T: type, index: usize, phase: usize) T {
     const re = @as(f64, @floatFromInt((index * 17 + phase * 11) % 41)) / 29.0 - 0.65;
-    if (T == f64) return re;
+    if (T == f32 or T == f64) return @floatCast(re);
     const im = @as(f64, @floatFromInt((index * 13 + phase * 7) % 37)) / 31.0 - 0.55;
     return .{ .re = re, .im = im };
 }
 
 fn expectClose(comptime T: type, expected: T, actual: T) !void {
+    if (T == f32) return std.testing.expectApproxEqAbs(expected, actual, 3e-5);
     if (T == f64) return std.testing.expectApproxEqAbs(expected, actual, 2e-10);
     try std.testing.expectApproxEqAbs(expected.re, actual.re, 4e-10);
     try std.testing.expectApproxEqAbs(expected.im, actual.im, 4e-10);
@@ -153,14 +154,84 @@ fn differentialSymmetricBand(comptime T: type, uplo: scalar.Uplo, hermitian: boo
 
     symmetric.sbmv(T, uplo, n, k, alpha, a.ptr, lda, x.ptr, 1, beta, actual.ptr, 1, hermitian);
     for (expected, actual) |want, got| try expectClose(T, want, got);
+    if (comptime T == f32 or T == f64) {
+        inline for (.{ catalog.Implementation.compact_symmetric_band, catalog.Implementation.compact_symmetric_band_fused }) |implementation| {
+            for (actual, 0..) |*item, i| item.* = value(T, i, 11);
+            try std.testing.expect(symmetric.testing.symmetricBandImplementation(T, implementation, uplo, n, k, alpha, a.ptr, lda, x.ptr, 1, beta, actual.ptr, 1));
+            for (expected, actual) |want, got| try expectClose(T, want, got);
+            const snapshot = try allocator.dupe(T, actual);
+            defer allocator.free(snapshot);
+            try std.testing.expect(!symmetric.testing.symmetricBandImplementation(T, implementation, uplo, n, k, alpha, a.ptr, lda, x.ptr, 2, beta, actual.ptr, 1));
+            try std.testing.expectEqualSlices(T, snapshot, actual);
+        }
+    }
+}
+
+fn differentialFusedSymmetricSegment(comptime T: type) !void {
+    const fixed = @import("kernels/shared/matrix_vector/fixed_simd.zig");
+    const cfg = fixed.Config{ .lane_count = if (T == f32) 4 else 2 };
+    var a: [35]T = undefined;
+    var x: [35]T = undefined;
+    var y: [35]T = undefined;
+    for (&a, 0..) |*item, i| item.* = value(T, i, 17);
+    for (&x, 0..) |*item, i| item.* = value(T, i, 18);
+    for (0..34) |n| {
+        inline for (.{ @as(T, 0), @as(T, -0.625) }) |coefficient| {
+            for (&y, 0..) |*item, i| item.* = value(T, i, 19);
+            const before = y;
+            var expected: T = 0;
+            for (0..n) |i| expected += a[i] * x[i];
+            const result = fixed.symmetricAxpyDotUnitReal(T, cfg, n, coefficient, &a, &x, &y).?;
+            try expectClose(T, expected, result);
+            for (0..y.len) |i| {
+                const wanted = if (i < n) before[i] + coefficient * a[i] else before[i];
+                try expectClose(T, wanted, y[i]);
+            }
+        }
+    }
+    // Partially overlapping inputs must reject without changing any output.
+    const before = y;
+    try std.testing.expect(fixed.symmetricAxpyDotUnitReal(T, cfg, 17, 1, &a, &y, y[1..].ptr) == null);
+    try std.testing.expectEqualSlices(T, &before, &y);
+    try std.testing.expect(fixed.symmetricAxpyDotUnitReal(T, cfg, 17, 1, &y, &x, y[1..].ptr) == null);
+    try std.testing.expectEqualSlices(T, &before, &y);
+    // Zero AXPY coefficient cannot contaminate Y from a non-finite matrix lane.
+    a[0] = std.math.nan(T);
+    const result = fixed.symmetricAxpyDotUnitReal(T, cfg, 17, 0, &a, &x, &y).?;
+    try std.testing.expect(std.math.isNan(result));
+    try std.testing.expectEqualSlices(T, &before, &y);
 }
 
 test "compact SBMV and HBMV boundary gates preserve exact stored windows" {
+    try differentialFusedSymmetricSegment(f32);
+    try differentialFusedSymmetricSegment(f64);
+    try differentialSymmetricBand(f32, .upper, false);
+    try differentialSymmetricBand(f32, .lower, false);
     try differentialSymmetricBand(f64, .upper, false);
+    try differentialSymmetricBand(f64, .lower, false);
     try differentialSymmetricBand(types.ComplexF64, .lower, true);
 }
 
 test "compact registry cells remain explicit execution leaves" {
+    const tuning = @import("kernels/shared/matrix_vector/tuning.zig");
+    inline for (.{ f32, f64 }) |T| {
+        const fused = catalog.findImplementation(.sbmv, tuning.scalarKind(T), .compact_symmetric_band_fused).?;
+        try std.testing.expectEqual(catalog.Lifecycle.production, fused.lifecycle);
+        try std.testing.expectEqual(catalog.IsaCapability.generic, fused.kernel.capability);
+        try std.testing.expectEqual(catalog.Implementation.compact_symmetric_band, fused.fallback.?.implementation);
+        try std.testing.expectEqual(catalog.CompletionScope.whole_operation, fused.completion);
+        var profile = tuning.production_2026_07_17.symmetric;
+        try std.testing.expect(fused.lifecycle.defaultEligible());
+        try std.testing.expect(profile.enable_fused_real_band);
+        const expected = if (@import("builtin").cpu.arch == .aarch64) catalog.Implementation.compact_symmetric_band_fused else catalog.Implementation.compact_symmetric_band;
+        try std.testing.expectEqual(expected, profile.selectRealBandImplementation(T, 512, 8));
+        try std.testing.expectEqual(catalog.Implementation.compact_symmetric_band, profile.selectRealBandImplementation(T, 511, 8));
+        try std.testing.expectEqual(catalog.Implementation.compact_symmetric_band, profile.selectRealBandImplementation(T, 512, 7));
+        profile.enable_fused_real_band = false;
+        try std.testing.expectEqual(catalog.Implementation.compact_symmetric_band, profile.selectRealBandImplementation(T, 512, 8));
+    }
+    try std.testing.expect(catalog.findImplementation(.hbmv, .complex_f64, .compact_symmetric_band_fused) == null);
+
     const gbmv = catalog.findImplementation(.gbmv, .f64, .compact_general_band).?;
     try std.testing.expectEqual(catalog.StoredWindow.exact_band, gbmv.stored_window);
     const hpmv = catalog.findImplementation(.hpmv, .complex_f64, .compact_symmetric_packed).?;

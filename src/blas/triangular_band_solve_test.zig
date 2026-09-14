@@ -280,6 +280,8 @@ fn checkGateMisses(comptime T: type) !void {
 }
 
 test "TBSV band-window solve matches independent s/d/c/z references" {
+    try runFiniteCandidate(f32);
+    try runFiniteCandidate(f64);
     inline for (.{ f32, f64, ComplexF32, ComplexF64 }) |T| try checkType(T);
     inline for (.{ ComplexF32, ComplexF64 }) |T| try checkComplexVectorHelpers(T);
 }
@@ -290,4 +292,195 @@ test "matrix-vector facade routes compact TBSV" {
 
 test "TBSV band-window gate misses leave x unchanged" {
     inline for (.{ f32, f64, ComplexF32, ComplexF64 }) |T| try checkGateMisses(T);
+}
+
+fn candidateReference(comptime T: type, uplo: Uplo, trans: Order, diag: Diag, n: usize, k: usize, a: [*]const T, lda: usize, x: [*]T, inc: i32) void {
+    @setFloatMode(.strict);
+    const stride: usize = @intCast(if (inc < 0) -inc else inc);
+    const upper = (trans == .no_trans and uplo == .upper) or (trans != .no_trans and uplo == .lower);
+    for (0..n) |iteration| {
+        const i = if (upper) n - iteration - 1 else iteration;
+        const pi = if (inc > 0) i * stride else (n - i - 1) * stride;
+        var result = x[pi];
+        const begin = if (upper) i + 1 else 0;
+        const end = if (upper) n else i;
+        for (begin..end) |j| {
+            const row = if (trans == .no_trans) i else j;
+            const col = if (trans == .no_trans) j else i;
+            const stored = if (uplo == .upper) row <= col and col - row <= k else row >= col and row - col <= k;
+            const av: T = if (!stored) 0 else if (uplo == .upper) a[k + row - col + col * lda] else a[row - col + col * lda];
+            const pj = if (inc > 0) j * stride else (n - j - 1) * stride;
+            const product = av * x[pj];
+            result = result - product;
+        }
+        if (diag == .non_unit) result = result / a[i * lda + (if (uplo == .upper) k else @as(usize, 0))];
+        x[pi] = result;
+    }
+}
+
+fn runFiniteCandidate(comptime T: type) !void {
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    const catalog = @import("kernels/shared/matrix_vector/catalog.zig");
+    const tuning = @import("kernels/shared/matrix_vector/tuning.zig");
+    const id = catalog.Implementation.compact_triangular_band_finite;
+    const scalar_kind: catalog.ScalarKind = if (T == f32) .f32 else .f64;
+    const descriptor = catalog.findImplementation(.tbsv, scalar_kind, id).?;
+    try std.testing.expectEqual(catalog.Lifecycle.experimental, descriptor.lifecycle);
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, descriptor.fallback.?.implementation);
+    try std.testing.expectEqual(catalog.CompletionScope.whole_operation, descriptor.completion);
+    try std.testing.expect(descriptor.workspace.private_output);
+    var profile = tuning.production_2026_07_17.triangular;
+    profile.enable_finite_tbsv = true;
+    try std.testing.expectEqual(if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) id else .portable_scalar, profile.selectFiniteTbsv(T, 128, 32));
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTbsv(T, 127, 8));
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTbsv(T, 128, 33));
+    profile.enable_finite_tbsv = false;
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTbsv(T, 128, 8));
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    var a: [5000]T = undefined;
+    var x: [260]T = undefined;
+    for ([_]usize{ 128, 129 }) |n| {
+        for ([_]usize{ 0, 1, 8, 15, 16, 17, 32 }) |k| {
+            const lda = k + 3;
+            for ([_]Uplo{ .upper, .lower }) |uplo| {
+                for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                    for ([_]Diag{ .non_unit, .unit }) |diag| {
+                        @memset(&a, std.math.nan(T));
+                        for (0..n) |col| {
+                            const first = if (uplo == .upper) col - @min(col, k) else col;
+                            const last = if (uplo == .upper) col + 1 else @min(n, col + k + 1);
+                            for (first..last) |row| {
+                                const pos = if (uplo == .upper) k + row - col + col * lda else row - col + col * lda;
+                                a[pos] = if (row == col) (if (diag == .unit) std.math.nan(T) else 2) else @as(T, 1.0 / 128.0);
+                            }
+                        }
+                        for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                            @memset(&x, -123);
+                            const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                            for (0..n) |i| x[1 + i * stride] = 1 + @as(T, @floatFromInt(i % 5)) / 8;
+                            var expected = x;
+                            candidateReference(T, uplo, trans, diag, n, k, &a, lda, expected[1..].ptr, inc);
+                            try std.testing.expect(entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, uplo, trans, diag, @intCast(n), @intCast(k), &a, @intCast(lda), x[1..].ptr, inc));
+                            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // A finite nonzero subnormal solution is eligible; poisoned unit diagonals stay unread.
+    @memset(&a, std.math.nan(T));
+    @memset(&x, std.math.floatMin(T) / 2);
+    const subnormal_before = x;
+    try std.testing.expect(entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, 0, &a, 1, x[1..].ptr, 1));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&subnormal_before), std.mem.asBytes(&x));
+    // Every zero case must complete through the O(n*k) candidate, bit for bit.
+    // Vary sign representatives across skipped-prefix/suffix boundaries.
+    for ([_]usize{ 0, 1, 8 }) |k| {
+        const lda = k + 3;
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                for ([_]Diag{ .non_unit, .unit }) |diag| {
+                    @memset(&a, std.math.nan(T));
+                    for (0..128) |col| {
+                        const begin = if (uplo == .upper) col - @min(col, k) else col;
+                        const end = if (uplo == .upper) col + 1 else @min(@as(usize, 128), col + k + 1);
+                        for (begin..end) |row| {
+                            const pos = if (uplo == .upper) k + row - col + col * lda else row - col + col * lda;
+                            a[pos] = if (row == col)
+                                (if (diag == .unit) std.math.nan(T) else if (row % 2 == 0) @as(T, 2) else -@as(T, 2))
+                            else if ((row + col) % 2 == 0) @as(T, 0) else -@as(T, 0);
+                        }
+                    }
+                    for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                        const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                        for (0..8) |mode| {
+                            @memset(&x, std.math.nan(T));
+                            for (0..128) |j| {
+                                const v: T = switch (mode) {
+                                    0 => 0,
+                                    1 => -@as(T, 0),
+                                    2 => if (j % 2 == 0) @as(T, 0) else -@as(T, 0),
+                                    3 => if (j <= k) -@as(T, 0) else @as(T, 0),
+                                    4 => if (j == k) @as(T, 1) else -@as(T, 0),
+                                    5 => if (j == 127 - k) -@as(T, 1) else @as(T, 0),
+                                    6 => if (j == k or j == k + 1) @as(T, 1) else if (j == 126 - k or j == 127 - k) -@as(T, 1) else @as(T, 0),
+                                    else => if (j % 3 == 0) @as(T, 1) else if (j % 3 == 1) -@as(T, 1) else -@as(T, 0),
+                                };
+                                x[1 + (if (inc > 0) j else 127 - j) * stride] = v;
+                            }
+                            var expected = x;
+                            candidateReference(T, uplo, trans, diag, 128, k, &a, lda, expected[1..].ptr, inc);
+                            try std.testing.expect(entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, uplo, trans, diag, 128, @intCast(k), &a, @intCast(lda), x[1..].ptr, inc));
+                            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Refusals and accepted exceptional finite zeros compare every byte.
+    for (0..13) |mode| {
+        @memset(&a, 0);
+        @memset(&x, 1);
+        for (0..128) |i| a[i * 3] = 2;
+        switch (mode) {
+            0 => x[128] = std.math.nan(T), // fails after earlier private rows succeeded
+            1 => x[128] = std.math.inf(T),
+            2 => a[127 * 3] = 0,
+            3 => a[127 * 3] = std.math.inf(T),
+            4 => x[128] = 0,
+            5 => a[127 * 3] = std.math.nan(T),
+            6 => {
+                a[126 * 3 + 1] = std.math.floatMax(T);
+                x[127] = std.math.floatMax(T);
+            },
+            7 => {
+                a[127 * 3] = std.math.floatMax(T);
+                x[128] = std.math.floatMin(T);
+            },
+            8 => x[128] = -@as(T, 0),
+            9 => {
+                a[126 * 3 + 1] = 1;
+                x[128] = 0.5;
+            },
+            10 => a[126 * 3 + 1] = std.math.inf(T),
+            11 => {
+                @memset(&x, 0);
+                x[128] = std.math.nan(T);
+            },
+            else => {
+                @memset(&x, 0);
+                x[128] = std.math.inf(T);
+            },
+        }
+        const before = x;
+        const accepts_zero = mode == 3 or mode == 4 or mode == 7 or mode == 8 or mode == 9;
+        try std.testing.expectEqual(accepts_zero, entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .non_unit, 128, 1, &a, 3, x[1..].ptr, 1));
+        var expected = before;
+        candidateReference(T, .lower, .no_trans, .non_unit, 128, 1, &a, 3, expected[1..].ptr, 1);
+        if (accepts_zero) {
+            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+        } else {
+            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&x));
+        }
+        x = before;
+        try std.testing.expect(entry.testing.forceTbsv(T, .portable_scalar, std.testing.allocator, 0, .lower, .no_trans, .non_unit, 128, 1, &a, 3, x[1..].ptr, 1));
+        for (expected, x) |want, got| {
+            if (std.math.isNan(want)) try std.testing.expect(std.math.isNan(got)) else try std.testing.expectEqualSlices(u8, std.mem.asBytes(&want), std.mem.asBytes(&got));
+        }
+    }
+    @memset(&a, 1);
+    @memset(&x, 1);
+    const before = x;
+    var empty: [0]u8 = .{};
+    var failing = std.heap.FixedBufferAllocator.init(&empty);
+    try std.testing.expect(!entry.testing.forceTbsv(T, id, failing.allocator(), 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, 1, &a, 3, x[1..].ptr, 1));
+    try std.testing.expect(!entry.testing.forceTbsv(T, id, std.testing.allocator, 0, .lower, .no_trans, .unit, 128, 1, &a, 3, x[1..].ptr, 1));
+    try std.testing.expect(!entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 127, 1, &a, 3, x[1..].ptr, 1));
+    try std.testing.expect(!entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, 33, &a, 35, x[1..].ptr, 1));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&x));
+    const matrix_before = a;
+    try std.testing.expect(!entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, 1, &a, 3, &a, 1));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&matrix_before), std.mem.asBytes(&a));
 }

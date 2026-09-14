@@ -87,7 +87,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_gemm_sweep_tools.py",
-        "adb54c89ed176fb9034a6464374824982a1a723ac98e79db40ea523571fb6a98",
+        "a5a319a8c561a9507b8d7fbd8635c0d86c21b5b886aef576bb3813625d1f53b4",
     ),
     (
         "bench/tools/test_level1_report.py",
@@ -128,6 +128,18 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     (
         "bench/tools/test_triangular_matrix_report.py",
         "50f818b9aa7ccef69c8881459c720a7e0206b9f779364e76b316cad540fb7f87",
+    ),
+    (
+        "bench/tools/test_windows_benchmark.py",
+        "ae57182bf5eb9746ba65ecc93a4db17054f983e40812d1c108bf82dee304d177",
+    ),
+    (
+        "bench/tools/test_windows_comparison.py",
+        "e25be7997b556bc0d9bacb887c885f06afb1a8ac45462efcfc20b7c282e8697e",
+    ),
+    (
+        "bench/tools/test_windows_comparison_plot.py",
+        "d5e0623582cb7b327ee8065fc79df17cf6631d195f06552f95c66d75d18b2b39",
     ),
 )
 _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
@@ -145,7 +157,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_gemm_sweep_tools.py",
-        "adb54c89ed176fb9034a6464374824982a1a723ac98e79db40ea523571fb6a98",
+        "a5a319a8c561a9507b8d7fbd8635c0d86c21b5b886aef576bb3813625d1f53b4",
     ),
     (
         "bench/tools/test_level1_report.py",
@@ -186,6 +198,18 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     (
         "bench/tools/test_triangular_matrix_report.py",
         "50f818b9aa7ccef69c8881459c720a7e0206b9f779364e76b316cad540fb7f87",
+    ),
+    (
+        "bench/tools/test_windows_benchmark.py",
+        "ae57182bf5eb9746ba65ecc93a4db17054f983e40812d1c108bf82dee304d177",
+    ),
+    (
+        "bench/tools/test_windows_comparison.py",
+        "e25be7997b556bc0d9bacb887c885f06afb1a8ac45462efcfc20b7c282e8697e",
+    ),
+    (
+        "bench/tools/test_windows_comparison_plot.py",
+        "d5e0623582cb7b327ee8065fc79df17cf6631d195f06552f95c66d75d18b2b39",
     ),
     (
         "bench/tools/benchmark_artifacts.py",
@@ -225,7 +249,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/plot_gemm_sweep.py",
-        "b138d2a4187f7ed154db50ae32c164aa7bc846b9cd7dcb1413e44a83d3f769cc",
+        "c7f6dbf74b706951153de4262b23d804379bda931e1981d79f2b3bfff0b6db29",
     ),
     (
         "bench/tools/plot_level1_report.py",
@@ -253,7 +277,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/run_gemm_sweep_isolated.py",
-        "414a9364179fb0a317bc7a1ff6a8157bf6399edc533365c137b4cde6e0aaa2d5",
+        "350c5d47310cde887af91c5ccc6b3d5932e192c46fed416bf3a1413ca9a26961",
     ),
     (
         "bench/tools/run_level1_report.py",
@@ -286,6 +310,18 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     (
         "tools/repository_snapshot.py",
         "5ce200930baaa090170b65c393f04eab786e8c831eb72d5120c9344b465aff35",
+    ),
+    (
+        "bench/tools/run_windows_benchmark.py",
+        "0f95907fa2f6640dc7ee459b068085170f90968bdbbcefc52b8b05e0e42a6206",
+    ),
+    (
+        "bench/tools/run_windows_comparison.py",
+        "c6ded4ba4595c49bcedb61145ca5bb69f2d175c5363e2dbd122db3509e22e908",
+    ),
+    (
+        "bench/tools/plot_windows_comparison.py",
+        "496f6b52dd9934173703644caefda544cbc2dc3e0ecfecbd4489a4af450d2608",
     ),
 )
 _PYTHON_TOOLING_EXECUTION_MODULES = (
@@ -342,12 +378,36 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (
     ),
     ("_zynum_benchmark_repository_snapshot", "tools/repository_snapshot.py"),
     ("_zynum_report_repository_snapshot", "tools/repository_snapshot.py"),
+    (
+        "test_windows_benchmark",
+        "bench/tools/test_windows_benchmark.py",
+    ),
+    (
+        "test_windows_comparison",
+        "bench/tools/test_windows_comparison.py",
+    ),
+    (
+        "test_windows_comparison_plot",
+        "bench/tools/test_windows_comparison_plot.py",
+    ),
+    (
+        "run_windows_benchmark",
+        "bench/tools/run_windows_benchmark.py",
+    ),
+    (
+        "run_windows_comparison",
+        "bench/tools/run_windows_comparison.py",
+    ),
+    (
+        "plot_windows_comparison",
+        "bench/tools/plot_windows_comparison.py",
+    ),
 )
 _PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
-    "62f43121525714829033f134d4447c8cc2cc151459b217ca33d7a6add6a9825d"
+    "87cd7d83dd4134cbc96337bed743614485978c5e81c965d7a24fadc2af5d4117"
 )
 _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
-    "fe47ceff1b1520d52339b694168560d4eafa6754b71349365a355ecaf1d6f5a6"
+    "a4b328fc2834a8120f988f28809f74130949a3f565cd0a5934b591d4663b0469"
 )
 _PYTHON_TOOLING_CAPSULE_MAGIC = b"ZYNUM-PYTHON-CAPSULE-V1\0"
 _PYTHON_TOOLING_CAPSULE_MAX_BYTES = 16 * 1024 * 1024
@@ -386,7 +446,7 @@ _PYTHON_TOOLING_BOOTSTRAP_SOURCE = (
     "root=frame().decode('utf-8')\n"
     "if not os.path.isabs(root): raise SystemExit(126)\n"
     "source_count=int.from_bytes(body[pos:pos+8],'big');pos+=8\n"
-    "if source_count!=39: raise SystemExit(127)\n"
+    "if source_count!=45: raise SystemExit(127)\n"
     "sources={}\n"
     "for _ in range(source_count):\n"
     " path=frame().decode('utf-8');digest=frame().decode('ascii');payload=frame()\n"
@@ -394,7 +454,7 @@ _PYTHON_TOOLING_BOOTSTRAP_SOURCE = (
     " if hashlib.sha256(payload).hexdigest()!=digest: raise SystemExit(129)\n"
     " sources[path]=(digest,payload)\n"
     "module_count=int.from_bytes(body[pos:pos+8],'big');pos+=8\n"
-    "if module_count!=41: raise SystemExit(130)\n"
+    "if module_count!=47: raise SystemExit(130)\n"
     "modules={}\n"
     "for _ in range(module_count):\n"
     " name=frame().decode('utf-8');path=frame().decode('utf-8')\n"
@@ -516,7 +576,7 @@ _PYTHON_TOOLING_BOOTSTRAP_SOURCE = (
     "if mode=='probe': sys.stdout.write('zynum-capsule-target-ok|'+main.__name__+'|'+main.__file__+'|'+repr(sys.argv)+'|'+repr(sys.orig_argv)+'\\n')\n"
 )
 _PYTHON_TOOLING_BOOTSTRAP_SHA256 = (
-    "83b807444228d772b60a7b1c4b140d356d8b580fb7842fc01cf99490573b033e"
+    "7531ce10270f8fd150765f7ad57e5cea9a172f6b955b9de15f6527669db8678b"
 )
 
 
@@ -850,16 +910,16 @@ def _decode_python_tooling_execution_capsule(
         raise InventoryError("Python tooling execution capsule is invalid") from exc
     if (
         cursor != len(body)
-        or source_count != 39
-        or module_count != 41
+        or source_count != 45
+        or module_count != 47
         or tuple((path, digest) for path, digest, _ in sources)
         != _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256
         or modules != _PYTHON_TOOLING_EXECUTION_MODULES
         or any(
             hashlib.sha256(data).hexdigest() != digest for _, digest, data in sources
         )
-        or len({path for path, _, _ in sources}) != 39
-        or len({name for name, _ in modules}) != 41
+        or len({path for path, _, _ in sources}) != 45
+        or len({name for name, _ in modules}) != 47
         or any(
             PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts
             for path, _, _ in sources
@@ -958,11 +1018,11 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "289af0274a538055ed4ba7c6bd098d4e4c2dfde808c70c69daf247f8db4360ba"
+    "e09655ff0ecd88ce0b5edb4d8f49d9fb7a04b4f76e34aa2cff850edec45a3701"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
-    "26d980fc23a6ee4b45e1f3a2fe11cdf9fbecf7a974ec04e683c8a89bdd677bd2"
+    "2e5ad120466a9b6fda8cfd0ba33324c6e5368896e1b79c949f95c38e78718c6d"
 )
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 TOP_LEVEL_KEYS = {
@@ -2645,16 +2705,16 @@ def discover(
         if PurePosixPath(path).suffix == ".py"
         and PurePosixPath(path).name.startswith("test_")
     )
-    if len(python_paths) != 21:
+    if len(python_paths) != 24:
         raise InventoryError(
-            f"expected exactly 21 Python test candidates, found {len(python_paths)}"
+            f"expected exactly 24 Python test candidates, found {len(python_paths)}"
         )
     benchmark_paths = tuple(
         path for path in python_paths if path.startswith("bench/tools/")
     )
-    if len(benchmark_paths) != 14:
+    if len(benchmark_paths) != 17:
         raise InventoryError(
-            f"expected exactly 14 benchmark Python test candidates, found {len(benchmark_paths)}"
+            f"expected exactly 17 benchmark Python test candidates, found {len(benchmark_paths)}"
         )
     python_root_specs: list[dict[str, Any]] = []
     host_tool_dependency_ids = {
@@ -6491,7 +6551,7 @@ def _reviewed_python_tooling_source_modules(
     discovery_pattern: str,
 ) -> tuple[_PythonReviewedSourceModule, ...]:
     admission = _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256
-    if type(admission) is not tuple or len(admission) != 14:
+    if type(admission) is not tuple or len(admission) != 17:
         raise InventoryError("Python tooling source admission registry is noncanonical")
     expected_paths: list[str] = []
     expected_digests: list[str] = []
@@ -6542,9 +6602,9 @@ def _freeze_python_tooling_execution_closure(
     instance_manifest = _PYTHON_TOOLING_EXECUTION_MODULES
     if (
         type(source_manifest) is not tuple
-        or len(source_manifest) != 39
+        or len(source_manifest) != 45
         or type(instance_manifest) is not tuple
-        or len(instance_manifest) != 41
+        or len(instance_manifest) != 47
         or tuple(module_paths)
         != tuple(path for path, _ in _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256)
     ):
@@ -6949,6 +7009,8 @@ def _python_tooling_execution_imports(
 
 _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES = frozenset(
     {
+        ("bench/tools/run_windows_benchmark.py", 56, "subprocess.run"),
+        ("bench/tools/run_windows_benchmark.py", 154, "subprocess.run"),
         *(
             ("bench/tools/test_level2_report.py", line, "subprocess.run")
             for line in (454, 1583, 1650, 1714, 1826, 1877, 2370, 2420, 2469, 2522)
@@ -6970,8 +7032,8 @@ _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
         ("bench/tools/test_symm_report.py", 1218, "subprocess.run"),
         ("bench/tools/test_triangular_matrix_report.py", 1229, "subprocess.run"),
         ("bench/tools/benchmark_metadata.py", 287, "subprocess.run"),
-        ("bench/tools/run_gemm_sweep_isolated.py", 259, "subprocess.run"),
-        ("bench/tools/run_gemm_sweep_isolated.py", 506, "subprocess.run"),
+        ("bench/tools/run_gemm_sweep_isolated.py", 261, "subprocess.run"),
+        ("bench/tools/run_gemm_sweep_isolated.py", 509, "subprocess.run"),
         ("bench/tools/run_level1_report.py", 445, "subprocess.run"),
         ("bench/tools/run_level1_report.py", 1429, "subprocess.run"),
         ("bench/tools/run_level2_report.py", 834, "subprocess.run"),
@@ -7531,6 +7593,12 @@ def _python_windows_blas_source_audit(
         return None
 
     allowed_import_shapes: set[tuple[Any, ...]] = {
+        ('from', 'collections', 0, (('Counter', None),)),
+        ('from', 'types', 0, (('SimpleNamespace', None),)),
+        ('from', 'unittest.mock', 0, (('patch', None),)),
+        ('import', (('plot_windows_comparison', 'plot'),)),
+        ('import', (('run_windows_benchmark', 'bench'),)),
+        ('import', (('run_windows_comparison', 'bench'),)),
         ("import", (("argparse", None),)),
         ("import", (("benchmark_artifacts", None),)),
         ("import", (("benchmark_metadata", None),)),
@@ -11317,8 +11385,8 @@ def _python_tooling_runtime_order_projection(
                 )
     projection = tuple(runtime_ids)
     if (
-        len(projection) != 465
-        or len(set(projection)) != 465
+        len(projection) != 486
+        or len(set(projection)) != 486
         or _python_tooling_runtime_order_digest(projection)
         != _PYTHON_TOOLING_RUNTIME_ORDER_SHA256
     ):

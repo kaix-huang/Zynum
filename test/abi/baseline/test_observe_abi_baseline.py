@@ -280,7 +280,7 @@ class PolicyTests(unittest.TestCase):
 class SourceTests(unittest.TestCase):
     def test_real_repository_counts_and_cross_map(self) -> None:
         declarations = observer.scan_zig_exports(ROOT / "src", ROOT)
-        self.assertEqual(334, len(declarations))
+        self.assertEqual(335, len(declarations))
         self.assertEqual(
             161,
             sum(
@@ -303,8 +303,16 @@ class SourceTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            15, sum(item["visibility"] == "hidden" for item in declarations)
+            16, sum(item["visibility"] == "hidden" for item in declarations)
         )
+        dynamic_export = next(
+            item for item in declarations
+            if item["source_path"] == "src/blas/kernels/multiversion/object.zig"
+        )
+        self.assertEqual("execute", dynamic_export["source_target"])
+        self.assertEqual("not_observed", dynamic_export["exported_name"])
+        self.assertEqual("options.kernel_entry", dynamic_export["name_expression"])
+        self.assertEqual("internal_bridge", dynamic_export["category"])
         self.assertFalse(
             [item for item in declarations if item["category"] == "unclassified"]
         )
@@ -359,6 +367,26 @@ class SourceTests(unittest.TestCase):
             ]
             self.assertEqual(2, len(duplicates))
             self.assertTrue(all(item["visibility"] == "hidden" for item in duplicates))
+
+            (source / "dynamic.zig").write_text(
+                "fn execute() callconv(.c) void {}\n"
+                "comptime {\n"
+                "@export(&execute, .{ .name = options.kernel_entry, .visibility = .hidden });\n"
+                "@export(&execute, .{ .name = options.kernel_entry, .visibility = .default });\n"
+                "@export(&execute, .{ .name = unknown_name, .visibility = .hidden });\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            dynamic = [
+                item for item in observer.scan_zig_exports(source, root)
+                if item["source_path"] == "src/dynamic.zig"
+            ]
+            self.assertEqual(3, len(dynamic))
+            self.assertEqual("internal_bridge", dynamic[0]["category"])
+            self.assertEqual("not_observed", dynamic[0]["exported_name"])
+            self.assertEqual("c", dynamic[0]["callconv"])
+            self.assertEqual("unclassified", dynamic[1]["category"])
+            self.assertEqual("unclassified", dynamic[2]["category"])
 
     def test_projection_preserves_type_and_fortran_details(self) -> None:
         projection, _, _ = observer.observe_projections(ROOT)

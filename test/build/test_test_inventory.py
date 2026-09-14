@@ -58,6 +58,7 @@ class TestInventoryTests(unittest.TestCase):
         }
         files.update(row["path"] for row in cls.inventory["zig_test_files"])
         files.update(row["path"] for row in cls.inventory["python_test_modules"])
+        files.update(path for path, _ in CHECKER._PYTHON_TOOLING_EXECUTION_SOURCE_SHA256)
         build_inventory = json.loads(
             (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
         )
@@ -420,12 +421,39 @@ class TestInventoryTests(unittest.TestCase):
                 or (row_ids is not None and row["id"] not in row_ids)
             ):
                 continue
-            set_id = reference_sets[(row["root_id"], row["optimize_mode_id"])]
+            reference_key = (row["root_id"], row["optimize_mode_id"])
+            set_id = reference_sets.get(reference_key)
+            if set_id is None:
+                # Deliberate forgery fixture for roots with no remaining native
+                # evidence (for example, x86-only roots after source changes).
+                declaration = next(
+                    declaration
+                    for source in candidate["zig_test_files"]
+                    if row["root_id"] in source["reaching_root_ids"]
+                    for declaration in source["declarations"]
+                    if declaration["kind"] == "named"
+                )
+                tests = CHECKER._expected_test_rows(
+                    row["root_id"],
+                    [f"synthetic_fixture.test.{declaration['name']}"],
+                )
+                set_id = CHECKER._content_set_id(row["root_id"], tests)
+                if not any(item["id"] == set_id for item in candidate["expected_test_sets"]):
+                    candidate["expected_test_sets"].append({
+                        "id": set_id,
+                        "root_id": row["root_id"],
+                        "tests": tests,
+                        "count": len(tests),
+                        "digest": CHECKER._fact_digest(tests),
+                        "enumeration_source": CHECKER.ZIG_ENUMERATION_SOURCE,
+                    })
+                reference_sets[reference_key] = set_id
             row["expected_test_set_id"] = set_id
             row["expectation_state"] = CHECKER.FROZEN_STATE
             bindings_by_row[row["id"]] = CHECKER._native_observation_binding(
                 row, set_id
             )
+        candidate["expected_test_sets"].sort(key=lambda item: item["id"])
         candidate["native_observation_bindings"] = sorted(
             bindings_by_row.values(), key=lambda row: row["id"]
         )
@@ -556,9 +584,9 @@ class TestInventoryTests(unittest.TestCase):
             else:
                 environment["GIT_PAGER"] = ambient_git_pager
         self.assertEqual(336, len(self.inventory["test_mode_rows"]))
-        self.assertEqual(44, len(self.inventory["expected_test_sets"]))
-        self.assertEqual(123, len(self.inventory["native_observation_bindings"]))
-        self.assertEqual(123, CHECKER._matrix_incomplete_count(self.inventory))
+        self.assertEqual(28, len(self.inventory["expected_test_sets"]))
+        self.assertEqual(63, len(self.inventory["native_observation_bindings"]))
+        self.assertEqual(183, CHECKER._matrix_incomplete_count(self.inventory))
 
     def test_fixture_positive_validation(self) -> None:
         correctness_roots = self.inventory["correctness_only_roots"]
@@ -700,10 +728,10 @@ class TestInventoryTests(unittest.TestCase):
         rows = self.inventory["test_mode_rows"]
         rows_by_id = {row["id"]: row for row in rows}
         bindings = self.inventory["native_observation_bindings"]
-        self.assertEqual(123, CHECKER._matrix_incomplete_count(self.inventory))
+        self.assertEqual(183, CHECKER._matrix_incomplete_count(self.inventory))
         self.assertEqual(bindings, sorted(bindings, key=lambda row: row["id"]))
-        self.assertEqual(123, len(bindings))
-        self.assertEqual(123, len({row["row_id"] for row in bindings}))
+        self.assertEqual(63, len(bindings))
+        self.assertEqual(63, len({row["row_id"] for row in bindings}))
         for binding in bindings:
             with self.subTest(binding=binding["row_id"]):
                 row = rows_by_id[binding["row_id"]]
@@ -725,7 +753,7 @@ class TestInventoryTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            63,
+            3,
             sum(
                 row["environment_id"] == "env:x86-64-linux-gnu-baseline"
                 and row["root_id"].startswith("zig-root:")
@@ -741,6 +769,7 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(
             {
                 "gap:native-test-enumeration:env-aarch64-linux-gnu-baseline": 60,
+                "gap:native-test-enumeration:env-x86-64-linux-gnu-baseline": 60,
                 "gap:native-test-enumeration:env-x86-64-windows-gnu-baseline": 63,
             },
             pending_gaps,
@@ -957,7 +986,7 @@ class TestInventoryTests(unittest.TestCase):
             "import unittest\nclass Added(unittest.TestCase):\n    def test_added(self): pass\n",
             encoding="utf-8",
         )
-        self.assertIn("21 Python test candidates", self._errors())
+        self.assertIn("24 Python test candidates", self._errors())
 
         added.unlink()
         source = self.root / "test/build/test_test_inventory.py"
@@ -1011,7 +1040,7 @@ class TestInventoryTests(unittest.TestCase):
         )
         admitted_sources = CHECKER._PYTHON_TOOLING_REVIEWED_SOURCE_SHA256
         self.assertIs(type(admitted_sources), tuple)
-        self.assertEqual(14, len(admitted_sources))
+        self.assertEqual(17, len(admitted_sources))
         self.assertEqual(
             tuple(tooling_root["module_paths"]),
             tuple(path for path, _ in admitted_sources),
@@ -1030,13 +1059,13 @@ class TestInventoryTests(unittest.TestCase):
         execution_instances = CHECKER._PYTHON_TOOLING_EXECUTION_MODULES
         self.assertIs(type(execution_sources), tuple)
         self.assertIs(type(execution_instances), tuple)
-        self.assertEqual((39, 41), (len(execution_sources), len(execution_instances)))
-        self.assertEqual(admitted_sources, execution_sources[:14])
+        self.assertEqual((45, 47), (len(execution_sources), len(execution_instances)))
+        self.assertEqual(admitted_sources, execution_sources[:17])
         self.assertEqual(
             set(path for path, _ in execution_sources),
             set(path for _, path in execution_instances),
         )
-        self.assertEqual(41, len({name for name, _ in execution_instances}))
+        self.assertEqual(47, len({name for name, _ in execution_instances}))
         for path, digest in execution_sources:
             self.assertRegex(digest, r"\A[0-9a-f]{64}\Z")
             self.assertEqual(
@@ -1050,8 +1079,8 @@ class TestInventoryTests(unittest.TestCase):
         execution_closure = CHECKER._freeze_python_tooling_execution_closure(
             self.root, execution_context, tooling_root["module_paths"]
         )
-        self.assertEqual(39, len(execution_closure.sources))
-        self.assertEqual(41, len(execution_closure.module_paths))
+        self.assertEqual(45, len(execution_closure.sources))
+        self.assertEqual(47, len(execution_closure.module_paths))
         self.assertEqual(execution_context.root, execution_closure.root)
         for path, source in execution_closure.sources.items():
             expected_source_path = execution_context.root / path
@@ -1064,8 +1093,8 @@ class TestInventoryTests(unittest.TestCase):
             CHECKER._decode_python_tooling_execution_capsule(execution_capsule)
         )
         self.assertEqual(str(execution_closure.root), capsule_root)
-        self.assertEqual(39, len(capsule_sources))
-        self.assertEqual(41, len(capsule_modules))
+        self.assertEqual(45, len(capsule_sources))
+        self.assertEqual(47, len(capsule_modules))
         if os.name == "posix":
             capsule_probe = CHECKER._python_tooling_posix_capsule_probe(
                 execution_capsule
@@ -2123,7 +2152,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in self.inventory["expected_test_sets"]
             if row["root_id"] == CHECKER.PYTHON_TOOLING_ROOT_ID
         )
-        self.assertEqual(465, tooling_set["count"])
+        self.assertEqual(486, tooling_set["count"])
 
         fixture_paths = tuple(
             self.root / relative_path
@@ -4088,7 +4117,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in source_current["python_test_modules"]
             if CHECKER.PYTHON_TOOLING_ROOT_ID in row["root_ids"]
         ]
-        self.assertEqual(14, len(tooling_modules))
+        self.assertEqual(17, len(tooling_modules))
         self.assertTrue(
             all(
                 row["launch_observation_ids"] == [CHECKER.PYTHON_TOOLING_LAUNCH_ID]
@@ -4105,7 +4134,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in self.inventory["expected_test_sets"]
             if row["root_id"] == CHECKER.PYTHON_TOOLING_ROOT_ID
         )
-        self.assertEqual(465, tooling_set["count"])
+        self.assertEqual(486, tooling_set["count"])
         self.assertEqual(prior_tooling_set, tooling_set)
 
         real_wrapped_binding_counts: list[int] = []
@@ -4134,7 +4163,7 @@ class TestInventoryTests(unittest.TestCase):
         finally:
             for name in legacy_module_names:
                 sys.modules.pop(name, None)
-        self.assertEqual(465, len(legacy_runtime_ids))
+        self.assertEqual(486, len(legacy_runtime_ids))
 
         def execute_stub(
             suite: unittest.TestSuite,
@@ -4190,13 +4219,13 @@ class TestInventoryTests(unittest.TestCase):
             )
         stubbed_execution.assert_called_once()
         rejected_live_discovery.assert_not_called()
-        self.assertEqual(465, real_binding_summary.discovered)
-        self.assertEqual(465, real_binding_summary.outcome.executed)
+        self.assertEqual(486, real_binding_summary.discovered)
+        self.assertEqual(486, real_binding_summary.outcome.executed)
         self.assertEqual(1, len(real_wrapped_binding_counts))
         self.assertEqual(1, len(real_suites))
         self.assertEqual(1, len(real_suite_contracts))
         projected_runtime_ids = real_suite_contracts[0].runtime_order
-        self.assertEqual(465, len(projected_runtime_ids))
+        self.assertEqual(486, len(projected_runtime_ids))
         self.assertEqual(tuple(legacy_runtime_ids), projected_runtime_ids)
         self.assertEqual(
             projected_runtime_ids, tuple(flattened_runtime_ids(real_suites[0]))
@@ -4209,10 +4238,10 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(0, real_binding_summary.artifact_platform_skips)
         self.assertEqual(0, real_binding_summary.publication_platform_skips)
         self.assertEqual(0, real_binding_summary.platform_skips)
-        self.assertEqual(44, len(source_current["expected_test_sets"]))
+        self.assertEqual(28, len(source_current["expected_test_sets"]))
         self.assertEqual(336, len(source_current["test_mode_rows"]))
-        self.assertEqual(123, len(source_current["native_observation_bindings"]))
-        self.assertEqual(123, CHECKER._matrix_incomplete_count(source_current))
+        self.assertEqual(63, len(source_current["native_observation_bindings"]))
+        self.assertEqual(183, CHECKER._matrix_incomplete_count(source_current))
         self.assertEqual(
             CHECKER.CURRENT_NATIVE_PROJECTION_SHA256,
             CHECKER._native_projection_digest(source_current),
@@ -7215,7 +7244,7 @@ class TestInventoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(1, default.returncode)
-        self.assertIn("matrix incomplete: 123 rows", default.stderr)
+        self.assertIn("matrix incomplete: 183 rows", default.stderr)
 
         structure = subprocess.run(
             [
@@ -7235,7 +7264,7 @@ class TestInventoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(0, structure.returncode, structure.stderr)
-        self.assertIn("matrix incomplete: 123 rows", structure.stdout)
+        self.assertIn("matrix incomplete: 183 rows", structure.stdout)
 
     def test_explicit_test_optimize_and_mode_mismatch_fail(self) -> None:
         workflow = self.root / ".github/workflows/ci.yml"
@@ -8109,7 +8138,7 @@ class TestInventoryTests(unittest.TestCase):
             CHECKER.NATIVE_PROJECTION_SCHEMA_VERSION, projection["schema_version"]
         )
         self.assertEqual(246, len(projection["native_execution_rows"]))
-        self.assertEqual(123, len(projection["native_observation_bindings"]))
+        self.assertEqual(63, len(projection["native_observation_bindings"]))
         current_digest = CHECKER._native_projection_digest(baseline)
         self.assertEqual(CHECKER.CURRENT_NATIVE_PROJECTION_SHA256, current_digest)
         self.assertIsNone(CHECKER.NEXT_NATIVE_PROJECTION_SHA256)

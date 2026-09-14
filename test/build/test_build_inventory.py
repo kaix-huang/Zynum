@@ -1817,9 +1817,9 @@ class BuildInventoryTests(unittest.TestCase):
         }
         fixture_observations["compile:build.zig:build:rank_k_probe"][
             "evidence_role_by_target"
-        ]["windows"] = "benchmark-probe-runtime-evidence"
+        ]["windows"] = "python-tooling-fixture-only"
         artifact_contract_mutations.append(
-            (fixture_runtime, "Windows tooling fixture evidence_role_by_target changed")
+            (fixture_runtime, "Windows benchmark probe evidence_role_by_target changed")
         )
         enabled_link = copy.deepcopy(publication_candidate.inventory)
         enabled_observations = {
@@ -3238,7 +3238,7 @@ class BuildInventoryTests(unittest.TestCase):
         }
         runner_paths = set(runner_functions)
         inventory_launches = self.inventory["python_launches"]
-        self.assertEqual(77, len(inventory_launches))
+        self.assertEqual(79, len(inventory_launches))
         self.assertEqual(
             {
                 "python-launch:tools/generate_multiversion.py:formatted:subprocess.run:1",
@@ -3269,6 +3269,16 @@ class BuildInventoryTests(unittest.TestCase):
         }
         self.assertEqual(15, len(expected_runner_ids))
         self.assertEqual(expected_runner_ids, actual_runner_ids)
+        self.assertEqual(
+            {
+                "python-launch:bench/tools/run_windows_benchmark.py:command_text:subprocess.run:1",
+                "python-launch:bench/tools/run_windows_benchmark.py:run_probe_process:subprocess.run:1",
+            },
+            {
+                item["id"] for item in inventory_launches
+                if item["anchor"]["file"] == "bench/tools/run_windows_benchmark.py"
+            },
+        )
 
         expected_test_inventory_runner_launches = {
             CHECKER.TEST_INVENTORY_RUNNER_COMPILE_PYTHON_LAUNCH_ID: (
@@ -14347,7 +14357,7 @@ class BuildInventoryTests(unittest.TestCase):
             "tools/test_inventory.json": "json-data",
             "tools/test_inventory_runner.zig": "zig-source",
         }
-        self.assertEqual(303, len(rows))
+        self.assertEqual(311, len(rows))
         for path, kind in expected.items():
             with self.subTest(path=path):
                 self.assertEqual(kind, rows[path]["kind"])

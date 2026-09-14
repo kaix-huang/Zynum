@@ -74,10 +74,14 @@ pub const Implementation = enum {
     triangular_dot,
     compact_general_band,
     compact_symmetric_band,
+    compact_symmetric_band_fused,
     compact_symmetric_packed,
+    compact_symmetric_packed_fused,
     compact_rank_packed,
     compact_triangular_band,
+    compact_triangular_band_finite,
     compact_triangular_packed,
+    compact_triangular_packed_finite,
 };
 
 pub const BodyKind = enum {
@@ -165,7 +169,7 @@ const isolated_width_implementations = [_]Implementation{
     .fused_rank_update_narrow,
 };
 
-pub const semantic_descriptor_count = 204;
+pub const semantic_descriptor_count = 212;
 pub const fixed_architecture_descriptor_count = fixed_architecture_capabilities.len * 36;
 pub const isolated_width_descriptor_count = 13;
 pub const descriptor_count = semantic_descriptor_count + fixed_architecture_descriptor_count + isolated_width_descriptor_count;
@@ -273,11 +277,15 @@ fn implementationApplicable(
         .triangular_axpy, .triangular_dot => operation == .trmv or operation == .trsv,
         .compact_general_band => operation == .gbmv,
         .compact_symmetric_band => operation == .sbmv or operation == .hbmv,
+        .compact_symmetric_band_fused => operation == .sbmv,
         .compact_symmetric_packed => operation == .spmv or operation == .hpmv,
+        .compact_symmetric_packed_fused => operation == .spmv,
         .compact_rank_packed => operation == .spr or operation == .hpr or
             operation == .spr2 or operation == .hpr2,
         .compact_triangular_band => operation == .tbmv or operation == .tbsv,
+        .compact_triangular_band_finite => operation == .tbsv and (scalar == .f32 or scalar == .f64),
         .compact_triangular_packed => operation == .tpmv or operation == .tpsv,
+        .compact_triangular_packed_finite => operation == .tpmv and (scalar == .f32 or scalar == .f64),
     };
 }
 
@@ -332,7 +340,7 @@ fn makeDescriptorWithCapability(
         .storage = storageFor(operation),
         .stored_window = storedWindowFor(operation),
         .strides = strideContract(operation, implementation),
-        .aliasing = .blas_valid,
+        .aliasing = if (implementation == .compact_triangular_band_finite or implementation == .compact_triangular_packed_finite) .non_overlapping else .blas_valid,
         .layouts = layoutSupport(operation, scalar, implementation),
         .epilogue = epilogueSupport(operation, implementation),
         .output = outputOwnership(operation, implementation),
@@ -353,7 +361,10 @@ fn lifecycleFor(
     capability: IsaCapability,
 ) Lifecycle {
     _ = operation;
+    if (implementation == .compact_triangular_band_finite or implementation == .compact_triangular_packed_finite) return .experimental;
     if (implementation == .portable_scalar) return .portable_fallback;
+    if (implementation == .compact_symmetric_band_fused) return .production;
+    if (implementation == .compact_symmetric_packed_fused) return .production;
     if (capability != .generic and
         (((implementation == .fused_rank_update or implementation == .fused_rank_update_narrow) and
             (scalar == .complex_f32 or scalar == .complex_f64)) or
@@ -379,6 +390,8 @@ fn tailSupport(implementation: Implementation, capability: IsaCapability) TailSu
         .fused_symmetric,
         .triangular_axpy,
         .triangular_dot,
+        .compact_symmetric_band_fused,
+        .compact_symmetric_packed_fused,
         => true,
         else => false,
     };
@@ -408,6 +421,7 @@ fn isPartialBody(implementation: Implementation) bool {
         .triangular_axpy,
         .triangular_dot,
         .compact_symmetric_packed,
+        .compact_symmetric_packed_fused,
         .compact_rank_packed,
         => true,
         else => false,
@@ -420,7 +434,25 @@ fn fallbackFor(
     implementation: Implementation,
     capability: IsaCapability,
 ) ?KernelId {
+    if (implementation == .compact_triangular_band_finite or implementation == .compact_triangular_packed_finite) return .{
+        .operation = operation,
+        .scalar = scalar,
+        .implementation = .portable_scalar,
+        .capability = .generic,
+    };
     if (implementation == .portable_scalar) return null;
+    if (implementation == .compact_symmetric_band_fused) return .{
+        .operation = operation,
+        .scalar = scalar,
+        .implementation = .compact_symmetric_band,
+        .capability = .generic,
+    };
+    if (implementation == .compact_symmetric_packed_fused) return .{
+        .operation = operation,
+        .scalar = scalar,
+        .implementation = .compact_symmetric_packed,
+        .capability = .generic,
+    };
     if (capability != .generic) return .{
         .operation = operation,
         .scalar = scalar,
@@ -446,11 +478,11 @@ fn bodyKind(implementation: Implementation) BodyKind {
         .triangular_axpy => .triangular_axpy_step,
         .triangular_dot => .triangular_dot_step,
         .compact_general_band => .general_band_window,
-        .compact_symmetric_band => .symmetric_band_window,
-        .compact_symmetric_packed => .packed_symmetric_columns,
+        .compact_symmetric_band, .compact_symmetric_band_fused => .symmetric_band_window,
+        .compact_symmetric_packed, .compact_symmetric_packed_fused => .packed_symmetric_columns,
         .compact_rank_packed => .packed_rank_columns,
-        .compact_triangular_band => .triangular_band_operation,
-        .compact_triangular_packed => .triangular_packed_operation,
+        .compact_triangular_band, .compact_triangular_band_finite => .triangular_band_operation,
+        .compact_triangular_packed, .compact_triangular_packed_finite => .triangular_packed_operation,
     };
 }
 
@@ -466,6 +498,7 @@ fn completionScope(operation: Level2Operation, implementation: Implementation) C
         .fused_gemv_conj_trans_narrow,
         .fused_symmetric,
         .compact_symmetric_packed,
+        .compact_symmetric_packed_fused,
         => .output_region,
         .fused_rank_update, .fused_rank_update_narrow, .compact_rank_packed => .stored_columns,
         .triangular_axpy, .triangular_dot => .dependency_step,
@@ -529,7 +562,7 @@ fn storedWindowFor(operation: Level2Operation) StoredWindow {
 fn strideContract(operation: Level2Operation, implementation: Implementation) VectorStrideContract {
     const unary_rank = operation == .syr or operation == .her or operation == .spr or operation == .hpr;
     const triangular = isTriangular(operation);
-    const stride_rule: contract.VectorStrideRule = if (implementation == .portable_scalar) .any_nonzero else .unit;
+    const stride_rule: contract.VectorStrideRule = if (implementation == .portable_scalar or implementation == .compact_triangular_band_finite or implementation == .compact_triangular_packed_finite) .any_nonzero else .unit;
     return .{
         .x = stride_rule,
         .y = if (unary_rank or triangular) .not_applicable else stride_rule,
@@ -586,6 +619,7 @@ fn epilogueSupport(operation: Level2Operation, implementation: Implementation) E
 }
 
 fn outputOwnership(operation: Level2Operation, implementation: Implementation) OutputOwnership {
+    if (implementation == .compact_triangular_band_finite or implementation == .compact_triangular_packed_finite) return .final_vector;
     if (isTriangular(operation)) return .in_place_dependency_vector;
     switch (implementation) {
         .fused_gemv_no_trans,
@@ -595,7 +629,7 @@ fn outputOwnership(operation: Level2Operation, implementation: Implementation) O
         .fused_gemv_trans_narrow,
         .fused_gemv_conj_trans_narrow,
         => return .additive_vector_region,
-        .fused_symmetric, .compact_symmetric_packed => return .private_vector_delta,
+        .fused_symmetric, .compact_symmetric_packed, .compact_symmetric_packed_fused => return .private_vector_delta,
         .fused_rank_update, .fused_rank_update_narrow, .compact_rank_packed => return .stored_matrix_columns,
         else => {},
     }
@@ -614,8 +648,9 @@ fn traversalDependency(operation: Level2Operation) TraversalDependency {
 }
 
 fn workspaceContract(operation: Level2Operation, implementation: Implementation) WorkspaceContract {
+    if (implementation == .compact_triangular_band_finite or implementation == .compact_triangular_packed_finite) return .{ .private_output = true };
     if (implementation == .portable_scalar) return .{};
-    if (implementation == .fused_symmetric or implementation == .compact_symmetric_packed) return .{
+    if (implementation == .fused_symmetric or implementation == .compact_symmetric_packed or implementation == .compact_symmetric_packed_fused) return .{
         .private_output = true,
         .merge_required = true,
     };
@@ -631,7 +666,7 @@ fn workspaceContract(operation: Level2Operation, implementation: Implementation)
 
 fn taskFallbackContract(implementation: Implementation) TaskFallbackContract {
     return switch (implementation) {
-        .compact_symmetric_packed => .private_results_commit_after_all_tasks,
+        .compact_symmetric_packed, .compact_symmetric_packed_fused => .private_results_commit_after_all_tasks,
         .compact_rank_packed => .disjoint_outputs_all_tasks_required,
         else => .not_applicable,
     };
@@ -756,7 +791,7 @@ fn containsKernel(items: [descriptor_count]Descriptor, kernel: KernelId) bool {
 }
 
 test "Level 2 terminal catalog covers every public operation and scalar cell" {
-    try std.testing.expectEqual(@as(usize, 505), registry.len);
+    try std.testing.expectEqual(@as(usize, 513), registry.len);
     inline for (operations) |operation| {
         inline for (scalars) |scalar| {
             try std.testing.expectEqual(applicable(operation, scalar), findImplementation(operation, scalar, .portable_scalar) != null);

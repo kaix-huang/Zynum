@@ -12,6 +12,8 @@ const access = @import("access.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
+const level2_catalog = @import("../../kernels/shared/matrix_vector/catalog.zig");
+const fixed_matrix_vector = @import("../../kernels/shared/matrix_vector/fixed_simd.zig");
 const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 
 const BlasInt = scalar.BlasInt;
@@ -882,10 +884,15 @@ pub fn symv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, 
 }
 
 pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    sbmvImpl(T, uplo, n_, k_, alpha, a, lda, x, incx_, beta, y, incy_, herm, null);
+}
+
+fn sbmvImpl(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool, forced: ?level2_catalog.Implementation) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);
-    if (incx_ == 1 and incy_ == 1 and tuning.preferBandUnit(n, k)) {
+    if (incx_ == 1 and incy_ == 1 and (forced != null or tuning.preferBandUnit(n, k))) {
+        const implementation = forced orelse tuning.selectRealBandImplementation(T, n, k);
         if (comptime isReal(T)) {
             scaleUnitReal(T, n, beta, y);
         } else {
@@ -904,17 +911,28 @@ pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
                 a + j * lda_u + 1;
             const xj = mul(T, alpha, x[j]);
             if (len != 0) {
-                if (!isZero(T, xj)) {
+                const sum = fused: {
                     if (comptime isReal(T)) {
-                        vector_ops.axpyUnitReal(T, len, xj, col, y + row0);
-                    } else {
-                        vector_ops.axpy(T, @intCast(len), xj, col, 1, y + row0, 1);
+                        if (implementation == .compact_symmetric_band_fused) {
+                            // The band traversal already exposes a contiguous stored
+                            // segment. Share its load between both symmetric updates.
+                            if (fixed_matrix_vector.symmetricAxpyDotUnitReal(T, .{
+                                .lane_count = if (T == f32) 4 else 2,
+                            }, len, xj, col, x + row0, y + row0)) |result| break :fused result;
+                        }
                     }
-                }
-                const sum = if (comptime isReal(T))
-                    vector_ops.dotUnitReal(T, len, col, x + row0)
-                else
-                    vector_ops.dot(T, @intCast(len), col, 1, x + row0, 1, herm);
+                    if (!isZero(T, xj)) {
+                        if (comptime isReal(T)) {
+                            vector_ops.axpyUnitReal(T, len, xj, col, y + row0);
+                        } else {
+                            vector_ops.axpy(T, @intCast(len), xj, col, 1, y + row0, 1);
+                        }
+                    }
+                    break :fused if (comptime isReal(T))
+                        vector_ops.dotUnitReal(T, len, col, x + row0)
+                    else
+                        vector_ops.dot(T, @intCast(len), col, 1, x + row0, 1, herm);
+                };
                 y[j] = add(T, y[j], mul(T, alpha, sum));
             }
 
@@ -952,6 +970,10 @@ pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
 }
 
 fn packedMvColumnsUnit(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, ap: [*]const T, x: [*]const T, y_delta: [*]T, herm: bool) void {
+    packedMvColumnsUnitImpl(T, uplo, n, j0, j1, alpha, ap, x, y_delta, herm, tuning.selectRealPackedImplementation(T));
+}
+
+fn packedMvColumnsUnitImpl(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, ap: [*]const T, x: [*]const T, y_delta: [*]T, herm: bool, implementation: level2_catalog.Implementation) void {
     for (j0..j1) |j| {
         const xj = x[j];
         const scaled_xj = mul(T, alpha, xj);
@@ -960,22 +982,42 @@ fn packedMvColumnsUnit(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: us
 
         if (uplo == .upper) {
             const column_start = j * (j + 1) / 2;
-            for (0..j) |i| {
-                const value = ap[column_start + i];
-                y_delta[i] = add(T, y_delta[i], mul(T, value, scaled_xj));
-                const mirrored = if (herm) conj(T, value) else value;
-                mirrored_sum = add(T, mirrored_sum, mul(T, mirrored, x[i]));
-            }
+            mirrored_sum = segment: {
+                if (comptime isReal(T)) {
+                    if (implementation == .compact_symmetric_packed_fused and scaled_xj != 0) {
+                        if (fixed_matrix_vector.symmetricAxpyDotUnitReal(T, .{ .lane_count = if (T == f32) 4 else 2 }, j, scaled_xj, ap + column_start, x, y_delta)) |sum| break :segment sum;
+                    }
+                }
+                // Unlike SBMV, the original packed loop evaluates A * 0.
+                // Preserve that behavior for zero coefficients and all aliases.
+                var sum = zero(T);
+                for (0..j) |i| {
+                    const value = ap[column_start + i];
+                    y_delta[i] = add(T, y_delta[i], mul(T, value, scaled_xj));
+                    const mirrored = if (herm) conj(T, value) else value;
+                    sum = add(T, sum, mul(T, mirrored, x[i]));
+                }
+                break :segment sum;
+            };
             diag_value = ap[column_start + j];
         } else {
             const column_start = j * (2 * n - j + 1) / 2;
             diag_value = ap[column_start];
-            for (j + 1..n) |i| {
-                const value = ap[column_start + (i - j)];
-                y_delta[i] = add(T, y_delta[i], mul(T, value, scaled_xj));
-                const mirrored = if (herm) conj(T, value) else value;
-                mirrored_sum = add(T, mirrored_sum, mul(T, mirrored, x[i]));
-            }
+            mirrored_sum = segment: {
+                if (comptime isReal(T)) {
+                    if (implementation == .compact_symmetric_packed_fused and scaled_xj != 0) {
+                        if (fixed_matrix_vector.symmetricAxpyDotUnitReal(T, .{ .lane_count = if (T == f32) 4 else 2 }, n - j - 1, scaled_xj, ap + column_start + 1, x + j + 1, y_delta + j + 1)) |sum| break :segment sum;
+                    }
+                }
+                var sum = zero(T);
+                for (j + 1..n) |i| {
+                    const value = ap[column_start + (i - j)];
+                    y_delta[i] = add(T, y_delta[i], mul(T, value, scaled_xj));
+                    const mirrored = if (herm) conj(T, value) else value;
+                    sum = add(T, sum, mul(T, mirrored, x[i]));
+                }
+                break :segment sum;
+            };
         }
 
         if (herm and comptime isComplex(T)) diag_value.im = 0;
@@ -1034,10 +1076,40 @@ fn mergePackedMvWorkspacesUnit(comptime T: type, n: usize, task_count: usize, be
     }
 }
 
+fn singlePackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T) bool {
+    if (comptime !isReal(T)) return false;
+    if (!tuning.preferPackedParallel(n)) return false;
+    // The alpha-zero semantic shortcut must not inspect either input matrix or X.
+    if (isZero(T, alpha)) {
+        scaleUnitReal(T, n, beta, y);
+        return true;
+    }
+    // Preserve the former serial fallback's behavior for overlapping caller data.
+    const vector_bytes = std.math.mul(usize, n, @sizeOf(T)) catch return false;
+    const packed_count = (std.math.mul(usize, n, n + 1) catch return false) / 2;
+    const packed_bytes = std.math.mul(usize, packed_count, @sizeOf(T)) catch return false;
+    const output = @intFromPtr(y);
+    const input = @intFromPtr(x);
+    const matrix = @intFromPtr(ap);
+    const vector_distance = if (output < input) input - output else output - input;
+    if (vector_distance < vector_bytes) return false;
+    if (output >= matrix) {
+        if (output - matrix < packed_bytes) return false;
+    } else if (matrix - output < vector_bytes) return false;
+    if (!tuning.workspaceAllowed(n, @sizeOf(T))) return false;
+    const workspace = symvWorkspace(T, n) orelse return false;
+    @memset(workspace, zero(T));
+    packedMvColumnsUnitImpl(T, uplo, n, 0, n, alpha, ap, x, workspace.ptr, false, .compact_symmetric_packed_fused);
+    mergePackedMvWorkspacesUnit(T, n, 1, beta, workspace.ptr, y);
+    return true;
+}
+
 noinline fn parallelPackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T, herm: bool) bool {
     const task_count = core_pool.taskCount(n, tuning.packedMinColumns());
+    if (task_count == 1 and tuning.selectRealPackedSingleImplementation(T) == .compact_symmetric_packed_fused) {
+        return singlePackedMvUnit(T, uplo, n, alpha, ap, x, beta, y);
+    }
     if (task_count <= 1) return false;
-
     if (!tuning.workspaceAllowed(task_count *| n, @sizeOf(T))) return false;
     const workspace_len = task_count * n;
     const workspace = symvWorkspace(T, workspace_len) orelse return false;
@@ -1110,6 +1182,30 @@ pub fn spmv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T,
 }
 
 pub const testing = struct {
+    /// Force the same one-workspace executor used by the selected cap-one route.
+    pub fn singlePackedSymmetricImplementation(comptime T: type, uplo: Uplo, n: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx: BlasInt, beta: T, y: [*]T, incy: BlasInt) bool {
+        if (n <= 0 or incx != 1 or incy != 1) return false;
+        return singlePackedMvUnit(T, uplo, @intCast(n), alpha, ap, x, beta, y);
+    }
+
+    pub fn packedSymmetricColumnsImplementation(comptime T: type, implementation: level2_catalog.Implementation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, ap: [*]const T, x: [*]const T, y_delta: [*]T) bool {
+        if (comptime !isReal(T)) return false;
+        if (implementation != .compact_symmetric_packed and implementation != .compact_symmetric_packed_fused) return false;
+        if (n == 0 or j0 >= j1 or j1 > n) return false;
+        packedMvColumnsUnitImpl(T, uplo, n, j0, j1, alpha, ap, x, y_delta, false, implementation);
+        return true;
+    }
+
+    /// Execute either stable whole-band identity through the same traversal.
+    /// Forced selection bypasses preference thresholds, never hard constraints.
+    pub fn symmetricBandImplementation(comptime T: type, implementation: level2_catalog.Implementation, uplo: Uplo, n: BlasInt, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx: BlasInt, beta: T, y: [*]T, incy: BlasInt) bool {
+        if (comptime !isReal(T)) return false;
+        if (implementation != .compact_symmetric_band and implementation != .compact_symmetric_band_fused) return false;
+        if (n <= 0 or k < 0 or lda <= k or incx != 1 or incy != 1) return false;
+        sbmvImpl(T, uplo, n, k, alpha, a, lda, x, incx, beta, y, incy, false, implementation);
+        return true;
+    }
+
     pub fn symmetricColumns(
         comptime T: type,
         uplo: Uplo,

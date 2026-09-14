@@ -108,6 +108,29 @@ fn runParallelSymm(comptime T: type, tasks: []const SymmTask(T)) bool {
 }
 
 pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    if (m_ <= 0 or n_ <= 0) return;
+    if (isZero(T, alpha)) {
+        if (scalar.isOne(T, beta)) return;
+        for (0..toUsize(n_)) |j| {
+            for (0..toUsize(m_)) |i| {
+                const index = matIndex(ldc, i, j);
+                c[index] = if (isZero(T, beta)) zero(T) else mul(T, beta, c[index]);
+            }
+        }
+        return;
+    }
+    // Candidate: reuse bounded structured panels once both output dimensions
+    // amortize a 64-wide GEMM update. The AArch64 blocked route never expands
+    // the whole structured operand, and acquires its panel before any writes.
+    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+        const profile = structured_tuning.aarch64_macos_active_panel_candidate;
+        if (m_ > 0 and n_ > 0 and profile.candidate(toUsize(m_), toUsize(n_))) {
+            const capability = gemm_dispatch.activeCapability();
+            if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
+                if (blocked.trySymm(T, .{ .block_size = profile.block_size }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+            }
+        }
+    }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
     if (comptime builtin.cpu.arch == .x86_64) {
@@ -187,7 +210,66 @@ fn SyrkTask(comptime T: type) type {
     };
 }
 
+fn scaledStoredValue(comptime T: type, beta: T, source: *const T, hermitian_diagonal: bool) T {
+    if (scalar.isZero(T, beta)) return scalar.zero(T);
+    if (comptime scalar.isComplex(T)) {
+        if (hermitian_diagonal) return scalar.realScalar(T, beta.re * source.re);
+    }
+    if (scalar.isOne(T, beta)) return source.*;
+    return scalar.mul(T, beta, source.*);
+}
+
+fn scaleStoredRank(comptime T: type, uplo: Uplo, n: usize, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    for (0..n) |j| {
+        const first = if (uplo == .upper) 0 else j;
+        const end = if (uplo == .upper) j + 1 else n;
+        for (first..end) |i| {
+            const index = matIndex(ldc, i, j);
+            c[index] = scaledStoredValue(T, beta, &c[index], herm and i == j);
+        }
+    }
+}
+
+noinline fn runSyrkColumnsC32Mode(comptime trans: Order, comptime herm: bool, task: SyrkTask(scalar.ComplexF32)) void {
+    const T = scalar.ComplexF32;
+    var j = task.task_index;
+    while (j < task.n) : (j += task.task_count) {
+        const row0: usize = if (task.uplo == .upper) 0 else j;
+        const row1: usize = if (task.uplo == .upper) j + 1 else task.n;
+        for (row0..row1) |i| {
+            var sum = zero(T);
+            for (0..task.k) |p| {
+                const ai = if (trans == .no_trans) task.a[matIndex(task.lda, i, p)] else matrixValue(T, trans, task.a, task.lda, i, p);
+                var aj = if (trans == .no_trans) task.a[matIndex(task.lda, j, p)] else matrixValue(T, trans, task.a, task.lda, j, p);
+                if (herm) aj = conj(T, aj);
+                sum = add(T, sum, mul(T, ai, aj));
+            }
+            const idxc = matIndex(task.ldc, i, j);
+            task.c[idxc] = add(T, mul(T, task.alpha, sum), scaledStoredValue(T, task.beta, &task.c[idxc], herm and i == j));
+            if (herm and i == j) {
+                if (comptime isComplex(T)) task.c[idxc].im = 0;
+            }
+        }
+    }
+}
+
 fn runSyrkColumns(comptime T: type, task: SyrkTask(T)) void {
+    if (T == scalar.ComplexF32) {
+        switch (task.trans) {
+            .no_trans => {
+                if (task.herm) return runSyrkColumnsC32Mode(.no_trans, true, task);
+                return runSyrkColumnsC32Mode(.no_trans, false, task);
+            },
+            .trans => {
+                if (task.herm) return runSyrkColumnsC32Mode(.trans, true, task);
+                return runSyrkColumnsC32Mode(.trans, false, task);
+            },
+            .conj_trans => {
+                if (task.herm) return runSyrkColumnsC32Mode(.conj_trans, true, task);
+                return runSyrkColumnsC32Mode(.conj_trans, false, task);
+            },
+        }
+    }
     var j = task.task_index;
     while (j < task.n) : (j += task.task_count) {
         const row0: usize = if (task.uplo == .upper) 0 else j;
@@ -201,7 +283,7 @@ fn runSyrkColumns(comptime T: type, task: SyrkTask(T)) void {
                 sum = add(T, sum, mul(T, ai, aj));
             }
             const idxc = matIndex(task.ldc, i, j);
-            task.c[idxc] = add(T, mul(T, task.alpha, sum), if (isZero(T, task.beta)) zero(T) else mul(T, task.beta, task.c[idxc]));
+            task.c[idxc] = add(T, mul(T, task.alpha, sum), scaledStoredValue(T, task.beta, &task.c[idxc], task.herm and i == j));
             if (task.herm and i == j) {
                 if (comptime isComplex(T)) task.c[idxc].im = 0;
             }
@@ -244,7 +326,29 @@ fn runParallelSyrk(comptime T: type, tasks: []const SyrkTask(T)) bool {
     return core_pool.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
 }
 
+// Keep the macOS candidate implementation out of the public fallback body.
+noinline fn tryMacSyrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) bool {
+    const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
+    return blocked.trySyrk(T, .{ .block_size = profile.block_size, .direct_rank_panels = profile.direct_panels, .packed_rank_panels = profile.packed_panels, .parallel_packed_rank_panels = profile.parallel_packed_panels }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm);
+}
+
 pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    if (n_ <= 0) return;
+    if (k_ == 0 or isZero(T, alpha)) {
+        scaleStoredRank(T, uplo, toUsize(n_), beta, c, ldc, herm);
+        return;
+    }
+    // Candidate: compute one private output tile, then commit only its stored
+    // triangle. All workspace is acquired before changing caller output.
+    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+        const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
+        if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (runtime.maxThreads() == 1 or (profile.candidate(toUsize(n_), toUsize(k_), true) and (T != scalar.ComplexF64 or n_ >= 128 or k_ >= 64)))) {
+            const capability = gemm_dispatch.activeCapability();
+            if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
+                if (tryMacSyrk(T, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
+            }
+        }
+    }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
     if (comptime builtin.cpu.arch == .x86_64) {
@@ -337,7 +441,7 @@ fn runSyr2kColumns(comptime T: type, task: Syr2kTask(T)) void {
             }
             const idxc = matIndex(task.ldc, i, j);
             const prod = if (task.herm) sum else mul(T, task.alpha, sum);
-            task.c[idxc] = add(T, prod, if (isZero(T, task.beta)) zero(T) else mul(T, task.beta, task.c[idxc]));
+            task.c[idxc] = add(T, prod, scaledStoredValue(T, task.beta, &task.c[idxc], task.herm and i == j));
             if (task.herm and i == j) {
                 if (comptime isComplex(T)) task.c[idxc].im = 0;
             }
@@ -380,7 +484,29 @@ fn runParallelSyr2k(comptime T: type, tasks: []const Syr2kTask(T)) bool {
     return core_pool.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
 }
 
+// Keep the macOS candidate implementation out of the public fallback body.
+noinline fn tryMacSyr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) bool {
+    const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
+    return blocked.trySyr2k(T, .{ .block_size = profile.block_size, .direct_rank_panels = profile.direct_panels, .packed_rank_panels = profile.packed_panels, .parallel_packed_rank_panels = profile.parallel_packed_panels }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
+}
+
 pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    if (n_ <= 0) return;
+    if (k_ == 0 or isZero(T, alpha)) {
+        scaleStoredRank(T, uplo, toUsize(n_), beta, c, ldc, herm);
+        return;
+    }
+    // Candidate: combine both products in one private tile, then apply beta
+    // once while committing only the stored triangle.
+    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+        const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
+        if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (runtime.maxThreads() == 1 or profile.candidate(toUsize(n_), toUsize(k_), true))) {
+            const capability = gemm_dispatch.activeCapability();
+            if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
+                if (tryMacSyr2k(T, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+            }
+        }
+    }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
     if (comptime builtin.cpu.arch == .x86_64) {

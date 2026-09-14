@@ -664,7 +664,67 @@ fn checkScalarStride(comptime increment: types.BlasInt) !void {
     }
 }
 
+noinline fn checkRealIamaxStrides(comptime T: type) !void {
+    var storage: [257 * 16 + 3]T = undefined;
+    const x = storage[1..].ptr;
+    for ([_]usize{ 1, 2, 17, 31, 32, 33, 34, 35, 36, 63, 64, 65, 127, 257 }) |n| {
+        for ([_]usize{ 2, 3, 4, 7, 16 }) |stride| {
+            for (0..7) |special| {
+                @memset(&storage, std.math.inf(T));
+                for (0..n) |i| x[i * stride] = @as(T, @floatFromInt(i % 13)) - 6;
+                switch (special) {
+                    0 => {
+                        x[(n - 1) * stride] = -99;
+                    },
+                    1 => {
+                        x[0] = std.math.nan(T);
+                    },
+                    2 => {
+                        x[(n / 2) * stride] = std.math.nan(T);
+                    },
+                    3 => {
+                        x[(n / 3) * stride] = -std.math.inf(T);
+                        x[(n - 1) * stride] = std.math.inf(T);
+                    },
+                    4 => {
+                        for (0..n) |i| x[i * stride] = if (i % 2 == 0) -0.0 else 0.0;
+                    },
+                    5 => {
+                        for (0..n) |i| x[i * stride] = if (i % 2 == 0) std.math.floatTrueMin(T) else -std.math.floatTrueMin(T);
+                    },
+                    else => {
+                        x[(n / 3) * stride] = 99;
+                        x[(n - 1) * stride] = -99;
+                    },
+                }
+                var expected: usize = 0;
+                var magnitude = @abs(x[0]);
+                for (1..n) |i| {
+                    const value = @abs(x[i * stride]);
+                    if (value > magnitude) {
+                        magnitude = value;
+                        expected = i;
+                    }
+                }
+                try std.testing.expectEqual(@as(types.BlasInt, @intCast(expected + 1)), ops.iamax(T, @intCast(n), x, @intCast(stride)));
+            }
+            // Every possible winning lane and tail; padding is deliberately larger.
+            for (0..n) |winner| {
+                @memset(&storage, std.math.inf(T));
+                for (0..n) |i| x[i * stride] = 1;
+                x[winner * stride] = -2;
+                try std.testing.expectEqual(@as(types.BlasInt, @intCast(winner + 1)), ops.iamax(T, @intCast(n), x, @intCast(stride)));
+            }
+        }
+    }
+    try std.testing.expectEqual(@as(types.BlasInt, 0), ops.iamax(T, 257, x, -2));
+    try std.testing.expectEqual(@as(types.BlasInt, 0), ops.iamax(T, 257, x, 0));
+    try std.testing.expectEqual(@as(types.BlasInt, 0), ops.iamax(T, 0, x, 2));
+}
+
 test "terminal scalar fallback covers positive and negative non-unit strides" {
+    try checkRealIamaxStrides(f32);
+    try checkRealIamaxStrides(f64);
     try checkScalarStride(3);
     try checkScalarStride(-3);
 

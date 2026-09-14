@@ -1343,7 +1343,16 @@ fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     const ldb_r: BlasInt = @intCast(k);
     const ldc_r: BlasInt = @intCast(m_compute);
     var parallel_real_products = false;
-    if ((m == 127 and n == 129 and k == 32) or (builtin.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
+    // Keep each real product below the planner's lowest non-vector parallel
+    // threshold, including padded rows, so task scheduling cannot change its
+    // reduction topology. This experimental range excludes square and skinny GEMM.
+    const small_k_min_work: usize = 256 * 1024;
+    const single_real_parallel_floor: usize = 96 * 96 * 96;
+    const mac_small_k_products = builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and
+        m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 24 and k <= 64 and
+        m *| n *| k >= small_k_min_work and m_compute *| n *| k < single_real_parallel_floor and
+        runtime.maxThreads() >= 3;
+    if (mac_small_k_products or (m == 127 and n == 129 and k == 32) or (builtin.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
         const real_tasks = [_]ComplexF64RealGemmTask{
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
@@ -1390,7 +1399,65 @@ fn tryGemmComplexF64ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     return true;
 }
 
+noinline fn gemmComplexF64PortableMode(comptime transa: Order, comptime transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) void {
+    const T = ComplexF64;
+    const m = toUsize(m_);
+    const n = toUsize(n_);
+    const k = toUsize(k_);
+    // Share A loads and adjacent physical B rows without changing each dot product's order.
+    if (transb != .no_trans and m == 1) {
+        var j: usize = 0;
+        while (n - j >= 4) : (j += 4) {
+            var sums = [_]T{zero(T)} ** 4;
+            for (0..k) |p| {
+                const av = matrixValue(T, transa, a, lda, 0, p);
+                inline for (0..4) |lane| {
+                    sums[lane] = add(T, sums[lane], mul(T, av, matrixValue(T, transb, b, ldb, p, j + lane)));
+                }
+            }
+            inline for (0..4) |lane| {
+                const idxc = matIndex(ldc, 0, j + lane);
+                c[idxc] = add(T, mul(T, alpha, sums[lane]), if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]));
+            }
+        }
+        while (j < n) : (j += 1) {
+            var sum = zero(T);
+            for (0..k) |p| sum = add(T, sum, mul(T, matrixValue(T, transa, a, lda, 0, p), matrixValue(T, transb, b, ldb, p, j)));
+            const idxc = matIndex(ldc, 0, j);
+            c[idxc] = add(T, mul(T, alpha, sum), if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]));
+        }
+        return;
+    }
+    for (0..n) |j| {
+        for (0..m) |i| {
+            var sum = zero(T);
+            for (0..k) |p| sum = add(T, sum, mul(T, matrixValue(T, transa, a, lda, i, p), matrixValue(T, transb, b, ldb, p, j)));
+            const idxc = matIndex(ldc, i, j);
+            c[idxc] = add(T, mul(T, alpha, sum), if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]));
+        }
+    }
+}
+
 fn gemmComplexPortable(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    if (T == ComplexF64) {
+        switch (transa) {
+            .no_trans => switch (transb) {
+                .no_trans => return gemmComplexF64PortableMode(.no_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+                .trans => return gemmComplexF64PortableMode(.no_trans, .trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+                .conj_trans => return gemmComplexF64PortableMode(.no_trans, .conj_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+            },
+            .trans => switch (transb) {
+                .no_trans => return gemmComplexF64PortableMode(.trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+                .trans => return gemmComplexF64PortableMode(.trans, .trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+                .conj_trans => return gemmComplexF64PortableMode(.trans, .conj_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+            },
+            .conj_trans => switch (transb) {
+                .no_trans => return gemmComplexF64PortableMode(.conj_trans, .no_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+                .trans => return gemmComplexF64PortableMode(.conj_trans, .trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+                .conj_trans => return gemmComplexF64PortableMode(.conj_trans, .conj_trans, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+            },
+        }
+    }
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);

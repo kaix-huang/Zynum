@@ -393,14 +393,14 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "485ef09187deabe19f07d619acfc8d463d8c16cf0b9fb1293ef2831c1f84de40"
+    "5b2a216ecf44474e55329e3a17e8721af2c85e071450777459f51dee445de584"
 )
 NEXT_SOURCE_PROJECTION_SHA256: str | None = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
-    "13a9325ebba955bd1cb3742de59f741c9a24661df9c5db2850c30c42efda884e"
+    "90302fecf2769f7beaccdd8ddd91feeb0d27674546d89dab710ff3cc8d42093d"
 )
 REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = (
-    "83b807444228d772b60a7b1c4b140d356d8b580fb7842fc01cf99490573b033e"
+    "7531ce10270f8fd150765f7ad57e5cea9a172f6b955b9de15f6527669db8678b"
 )
 REVIEWED_TEST_INVENTORY_CAPSULE_LAUNCHER_SHA256 = (
     "094f9c5d4bcb0cde833acb2172dad3f9702579058aea99831a5e479f5889aba4"
@@ -535,7 +535,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
 }
 REQUIRED_SECTION_FACT_DIGESTS = {
     "option_surfaces": "68a5942b5d4b1621d4822e0e832d0f3508c6d107eeb5d2d998c3bc0b2a8bfe1d",
-    "repository_file_classifications": "8aacc0997bd93e5dd17203fa9d434e870352442dc13b4ba33babdf90564cc7ad",
+    "repository_file_classifications": "f6b8a381ef8bf50907efaa8ca12af71949d16396ff7207c8e825601272b8e7f1",
     "derived_candidates": "465e698b3e28ae8201766cc259d867ec3de214e1c92ef83e44a3a9aff5b2a670",
     "current_gaps": "781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd"
 }
@@ -14080,6 +14080,22 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         item["path"]: item for item in inventory["repository_file_classifications"]
     }
     classifications.pop("COPYING.LESSER", None)
+    for path in (
+        "bench/dynamic_library.zig",
+        "bench/tools/plot_windows_benchmark.py",
+        "bench/tools/plot_windows_comparison.py",
+        "bench/tools/run_windows_benchmark.py",
+        "bench/tools/run_windows_comparison.py",
+        "bench/tools/test_windows_benchmark.py",
+        "bench/tools/test_windows_comparison.py",
+        "bench/tools/test_windows_comparison_plot.py",
+    ):
+        classifications[path] = {
+            "path": path,
+            "kind": "zig-source" if path.endswith(".zig") else "python-source",
+            "class": "non-generated-source",
+            "owner": "benchmark-maintainers",
+        }
     classifications["src/blas/core/checked.zig"] = {
         "path": "src/blas/core/checked.zig",
         "kind": "zig-source",
@@ -14747,6 +14763,19 @@ def _new_test_inventory_observation(
 
 
 def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
+    windows_diagnostic_launches = {
+        "python-launch:bench/tools/run_windows_benchmark.py:command_text:subprocess.run:1",
+        "python-launch:bench/tools/run_windows_benchmark.py:run_probe_process:subprocess.run:1",
+    }
+    if identifier in windows_diagnostic_launches:
+        return {
+            "owner": "benchmark-maintainers",
+            "detail_status": "process-lifecycle-out-of-scope",
+            "compile_for": "host",
+            "execute_on": "host",
+            "cwd_shape": "repository-root",
+            "launch_class": "benchmark-diagnostic-process-transport",
+        }
     repack_launches = {
         "python-launch:tools/repack_darwin_archive.py:ar:subprocess.run:1": ["<resolved Zig executable>", "ar", "<trusted archive operation and flat members>"],
         "python-launch:test/build/test_repack_darwin_archive.py:test_real_macho_members_are_eight_byte_aligned:subprocess.run:1": ["zig", "cc", "-target", "aarch64-macos", "-c", "<tiny C fixture>", "-o", "<object>"],

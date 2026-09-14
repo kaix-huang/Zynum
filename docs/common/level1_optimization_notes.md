@@ -76,6 +76,23 @@ wider ISA: width is an operation-and-type tuning decision.
 For `nrm2`, preserve the scaled sum-of-squares strategy or another overflow-safe
 equivalent. A direct sum of squares is not an acceptable optimization.
 
+The ASIMD norm path reuses the shared guarded single-pass reduction. It accepts
+an ordinary sum only when finite and above the length-dependent underflow
+floor. Exceptional f32 inputs are recomputed in f64; unsafe f64 sums fall back
+to scaled accumulation. This removes the maximum scan for ordinary inputs
+without assuming that their squares are representable. Real-component reuse
+also applies this policy to contiguous complex norms. Validate SIMD tails,
+subnormal and huge inputs, NaN and infinity, and both direct and threaded calls
+when changing this path.
+
+Contiguous AArch64 ASUM uses sixteen independent ASIMD accumulators from
+1,024 real components, while shorter inputs take the compact reduction before
+streaming-dispatch checks. Complex ASUM counts its real and imaginary
+components separately. The existing SME threshold and experimental SVE policy
+remain independent. Wider accumulation is specific to ASUM: it does not widen
+IAMAX or other reductions automatically, and boundary, NaN, infinity and
+large-memory controls remain part of acceptance.
+
 ### Tails
 
 Predicated targets should express tails with native predicates when doing so
@@ -194,3 +211,12 @@ Rejected experiments should leave behind only the durable reason: for example,
 submission overhead dominated, the wider vector reduced frequency, a hot
 function grew enough to perturb layout, or a partial semantic body was mistaken
 for a complete operation. Do not preserve a public diary of individual runs.
+
+### Real IAMAX with a positive non-unit stride
+
+On AArch64, real IAMAX uses four independent scalar magnitude/index chains for
+positive non-unit strides when n >= 32. The final merge resolves equal maxima
+to the first logical index. All chains are seeded from the first element, so a
+first-element NaN retains the scalar result while later NaNs remain ignored.
+The unit-stride, complex, invalid-argument and small-vector routes are unchanged;
+no gather buffers or vector-width assumptions are added.

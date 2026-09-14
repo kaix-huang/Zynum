@@ -23,6 +23,9 @@ import subprocess
 import sys
 import time
 from collections import Counter
+from contextlib import ExitStack, contextmanager
+from types import SimpleNamespace
+from unittest.mock import patch
 from pathlib import Path
 
 import run_level1_report as l1
@@ -144,6 +147,25 @@ def coverage_evidence(planned, records):
             "missing": missing, "unexpected": unexpected, "duplicates": duplicates}
 
 
+def run_probe_process(command, *, capture_output=False, text=None, check=False,
+                      env=None, stdout=None, stderr=None, universal_newlines=None,
+                      timeout=None):
+    """Forward the explicit subprocess options used by the shared probes."""
+    return subprocess.run(command, capture_output=capture_output, text=text,
+        check=check, env=env, stdout=stdout, stderr=stderr,
+        universal_newlines=universal_newlines, timeout=timeout)
+
+
+@contextmanager
+def capture_probe_processes(capture):
+    """Scope instrumentation to probe modules without replacing subprocess.run."""
+    proxy = SimpleNamespace(run=capture, PIPE=subprocess.PIPE)
+    with ExitStack() as stack:
+        for module in (l1, l2, rank, rotg, symm, triangular):
+            stack.enter_context(patch.object(module, "subprocess", proxy))
+        yield
+
+
 class Runner:
     def __init__(self, args):
         self.args = args
@@ -152,14 +174,13 @@ class Runner:
         self.records = []
         self.raw = (self.output / "raw.jsonl").open("w", encoding="utf-8")
         self.log = (self.output / "processes.jsonl").open("w", encoding="utf-8")
-        self.real_run = subprocess.run
         self.library = str(Path(args.library).resolve())
 
-    def capture_run(self, command, *pos, **kw):
+    def capture_run(self, command, **kw):
         kw.setdefault("timeout", self.args.timeout)
         start = time.time()
         try:
-            result = self.real_run(command, *pos, **kw)
+            result = run_probe_process(command, **kw)
             self.log.write(json.dumps({"command": list(map(str, command)),
                 "started": start, "elapsed_seconds": time.time() - start,
                 "returncode": result.returncode, "stdout": result.stdout,
@@ -304,7 +325,7 @@ class Runner:
                             "--check", "--kind", kind, "--trans", trans,
                             "--shape", f"sq{n}:{n}:{n}:{n}", "--reps",
                             "9" if self.args.quick else "30", "--csv", str(output)]
-                        p = subprocess.run(command, capture_output=True, text=True)
+                        p = self.capture_run(command, capture_output=True, text=True)
                         if p.returncode: raise RuntimeError(f"exit={p.returncode}: {p.stdout} {p.stderr}")
                         with output.open(newline="", encoding="utf-8") as f: rows = list(csv.DictReader(f))
                         if len(rows) != 1: raise ValueError(f"GEMM returned {len(rows)} rows")
@@ -375,15 +396,12 @@ def main(argv=None):
     meta_path = runner.output / "metadata.json"
     meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     try:
-        # Existing helpers share the subprocess module. Instrument calls only for
-        # this sequential diagnostic run; restore it even on interruption.
-        subprocess.run = runner.capture_run
-        for family in args.families:
-            runner.run_family(family)
-            metadata["completed_families"].append(family)
-        metadata["run_completed"] = True
+        with capture_probe_processes(runner.capture_run):
+            for family in args.families:
+                runner.run_family(family)
+                metadata["completed_families"].append(family)
+            metadata["run_completed"] = True
     finally:
-        subprocess.run = runner.real_run
         runner.raw.close()
         runner.log.close()
         runner.save()

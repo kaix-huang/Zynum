@@ -469,7 +469,7 @@ test "coverage contracts expose every descriptor without executor inspection" {
 }
 
 test "structured Level 3 registry is reachable from the matrix-matrix catalog" {
-    try std.testing.expectEqual(@as(usize, 114), catalog.structured.registry.len);
+    try std.testing.expectEqual(@as(usize, 138), catalog.structured.registry.len);
     try std.testing.expectEqual(
         catalog.structured.StructuredOperation.trsm,
         catalog.structured.descriptorForKernel(.ztrsm_left_column_parallel).?.operation,
@@ -499,6 +499,16 @@ fn testForcedComplexPaths(comptime T: type) !void {
     for (layouts) |layout| {
         const result = try runForcedComplexCase(T, portable, .{}, layout, 7, 5, 9, arbitrary_alpha, arbitrary_beta);
         try std.testing.expect(result.usedRequested());
+        if (T == complex_gemm.ComplexF64) {
+            for ([_]usize{ 3, 4, 5, 7 }) |wide_n| {
+                const wide = try runForcedComplexCase(T, portable, .{}, layout, 1, wide_n, 9, arbitrary_alpha, arbitrary_beta);
+                try std.testing.expect(wide.usedRequested());
+                const wide_zero_beta = try runForcedComplexCase(T, portable, .{}, layout, 1, wide_n, 9, one, zero);
+                try std.testing.expect(wide_zero_beta.usedRequested());
+                const wide_zero_alpha = try runForcedComplexCase(T, portable, .{}, layout, 1, wide_n, 9, zero, arbitrary_beta);
+                try std.testing.expect(wide_zero_alpha.usedRequested());
+            }
+        }
     }
 
     const compact_result = try runForcedComplexCase(T, compact, .{}, layouts[0], 7, 5, 9, arbitrary_alpha, arbitrary_beta);
@@ -534,6 +544,49 @@ test "forced complex GEMM stable IDs cover layouts epilogues vector edges and od
     defer complex_gemm.freeCurrentThreadCaches();
     try testForcedComplexPaths(complex_gemm.ComplexF32);
     try testForcedComplexPaths(complex_gemm.ComplexF64);
+    const T = complex_gemm.ComplexF64;
+    // Three independent real products share the original 3M reduction and
+    // epilogue; cover padded and unpadded small-K panels in every layout.
+    for ([_]scalar.Order{ .no_trans, .trans, .conj_trans }) |ta| {
+        for ([_]scalar.Order{ .no_trans, .trans, .conj_trans }) |tb| {
+            for ([_][3]usize{ .{ 96, 96, 32 }, .{ 127, 129, 31 }, .{ 127, 129, 33 } }) |shape| {
+                const result = try runForcedComplexCase(T, .three_m_c64, .{}, .{ .transa = ta, .transb = tb }, shape[0], shape[1], shape[2], complexValue(T, 0.75, -0.25), complexValue(T, -0.375, 0.125));
+                try std.testing.expect(result.usedRequested());
+            }
+        }
+    }
+    const nan = complexValue(T, std.math.nan(f64), std.math.nan(f64));
+    const guard = complexValue(T, 73, -19);
+    const one = scalar.one(T);
+    const zero = scalar.zero(T);
+    for ([_]scalar.Order{ .trans, .conj_trans }) |ta| {
+        for ([_]scalar.Order{ .trans, .conj_trans }) |tb| {
+            for (0..3) |special_case| {
+                var a = [_]T{nan} ** 4;
+                var b = [_]T{nan} ** 14;
+                var c = [_]T{guard} ** 15;
+                a[0] = if (special_case == 0) complexValue(T, std.math.inf(f64), 0) else complexValue(T, 2, 0);
+                a[1] = complexValue(T, 3, 0);
+                for (0..2) |p_index| {
+                    for (0..5) |j| b[p_index * 7 + j] = if (special_case == 0) zero else one;
+                }
+                for (0..5) |j| c[j * 3] = if (special_case == 1) nan else complexValue(T, 4, 0);
+                const beta = if (special_case == 2) complexValue(T, 2, 0) else zero;
+                const result = complex_gemm.executeForcedComplexKernel(T, .portable_c64, .{}, ta, tb, 1, 5, 2, one, &a, 4, &b, 7, beta, &c, 3);
+                try std.testing.expect(result.usedRequested());
+                for (0..5) |j| {
+                    if (special_case == 0) {
+                        try std.testing.expect(std.math.isNan(c[j * 3].re));
+                        try std.testing.expect(std.math.isNan(c[j * 3].im));
+                    } else {
+                        try expectComplexClose(T, complexValue(T, if (special_case == 2) 13 else 5, 0), c[j * 3]);
+                    }
+                    try std.testing.expectEqual(guard, c[j * 3 + 1]);
+                    try std.testing.expectEqual(guard, c[j * 3 + 2]);
+                }
+            }
+        }
+    }
 }
 
 fn testComplexWorkspaceFallback(comptime T: type) !void {

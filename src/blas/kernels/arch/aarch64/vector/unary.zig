@@ -189,6 +189,13 @@ pub fn scalUnitComplex(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
 }
 
 pub fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
+    // Short production inputs need only one threshold check. Keep experimental
+    // SVE preferences ahead of ASIMD when that profile is explicitly selected.
+    if (comptime features.has_asimd and !profile.enable_sve_asum and
+        profile.wide_asum_min_elements <= profile.streaming_min_elements)
+    {
+        if (!profile.preferWideAsimdAsum(n)) return fixed_simd.asumUnitReal(T, simd_config.vectorConfig(T), n, x);
+    }
     if (comptime !features.has_asimd and !(profile.enable_sme_asum and features.has_sme) and !(profile.enable_sve_asum and features.has_sve)) {
         return asumUnitRealDisabled(T, n, x);
     }
@@ -222,7 +229,10 @@ pub fn asumUnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
             return @bitCast(result_bits);
         }
     }
-    if (comptime features.has_asimd) return fixed_simd.asumUnitReal(T, simd_config.vectorConfig(T), n, x);
+    if (comptime features.has_asimd) {
+        if (profile.preferWideAsimdAsum(n)) return fixed_simd.asumUnitReal(T, simd_config.wideAsumConfig(T), n, x);
+        return fixed_simd.asumUnitReal(T, simd_config.vectorConfig(T), n, x);
+    }
     return null;
 }
 
@@ -283,7 +293,12 @@ pub fn sveIamaxUnitComplexCandidate(comptime T: type, n: usize, x: [*]const T) ?
 
 pub fn nrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     if (comptime !features.has_asimd) return null;
-    return fixed_simd.nrm2UnitReal(T, simd_config.vectorConfig(T), n, x);
+    const cfg = simd_config.vectorConfig(T);
+    // Normal-range inputs need only one memory pass. The shared fast leaves
+    // widen f32 exceptional ranges and reject unsafe f64 sums for scaling.
+    if (T == f32) return fixed_simd.nrm2UnitRealFastF32(cfg, n, x);
+    return fixed_simd.nrm2UnitRealFastF64(cfg, n, x) orelse
+        fixed_simd.nrm2UnitReal(T, cfg, n, x);
 }
 
 pub fn iamaxUnitReal(comptime T: type, n: usize, x: [*]const T) ?types.BlasInt {

@@ -38,6 +38,7 @@ pub const Aarch64Profile = struct {
 
     short_vector_min_elements: usize,
     streaming_min_elements: usize,
+    wide_asum_min_elements: usize,
     sve_complex_dot_min_elements: usize,
     asimd_swap_min_bytes: usize,
     sme_copy_exact_bytes: usize,
@@ -65,6 +66,10 @@ pub const Aarch64Profile = struct {
 
     pub fn preferSmeAsum(self: Aarch64Profile, comptime T: type, n: usize) bool {
         return self.enable_sme_asum and (T == f32 or T == f64) and n >= self.streaming_min_elements;
+    }
+
+    pub fn preferWideAsimdAsum(self: Aarch64Profile, n: usize) bool {
+        return n >= self.wide_asum_min_elements;
     }
 
     pub fn preferSveAsum(self: Aarch64Profile, comptime T: type, n: usize) bool {
@@ -255,6 +260,7 @@ pub const production_2026_07_17: Profile = .{
         .enable_fixed_rotm = false,
         .short_vector_min_elements = 16,
         .streaming_min_elements = 64 * 1024,
+        .wide_asum_min_elements = 1024,
         .sve_complex_dot_min_elements = 64,
         .asimd_swap_min_bytes = 128,
         .sme_copy_exact_bytes = 8 * 1024,
@@ -373,6 +379,8 @@ test "named Level 1 production profile preserves boundary behavior" {
     try std.testing.expect(!arm.enable_sve_dot_complex_f32);
     try std.testing.expect(!arm.enable_sve_dot_complex_f64);
 
+    try std.testing.expect(!arm.preferWideAsimdAsum(1023));
+    try std.testing.expect(arm.preferWideAsimdAsum(1024));
     const x86 = production_2026_07_17.x86_64;
     try std.testing.expect(x86.enable_fixed_dot_f32_acc_f64);
     try std.testing.expect(x86.enable_fixed_complex_iamax);

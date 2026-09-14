@@ -3166,11 +3166,49 @@ fn parallelIamaxUnit(comptime T: type, n: usize, x: [*]const T) ?BlasInt {
     return @intCast(best + 1);
 }
 
+// Independent chains hide scalar compare/select latency for arbitrary strides.
+// Seed every chain from x[0], so later NaNs are ignored just as in the scalar loop.
+noinline fn iamaxStridedReal(comptime T: type, n: usize, x: [*]const T, stride: usize) BlasInt {
+    const first = @abs(x[0]);
+    if (std.math.isNan(first)) return 1;
+    var magnitudes = [_]T{first} ** 4;
+    var indices = [_]usize{0} ** 4;
+    var i: usize = 1;
+    while (n - i >= 4) : (i += 4) {
+        inline for (0..4) |lane| {
+            const value = @abs(x[(i + lane) * stride]);
+            if (value > magnitudes[lane]) {
+                magnitudes[lane] = value;
+                indices[lane] = i + lane;
+            }
+        }
+    }
+    var best: usize = 0;
+    var magnitude = first;
+    inline for (0..4) |lane| {
+        if (magnitudes[lane] > magnitude or (magnitudes[lane] == magnitude and indices[lane] < best)) {
+            magnitude = magnitudes[lane];
+            best = indices[lane];
+        }
+    }
+    while (i < n) : (i += 1) {
+        const value = @abs(x[i * stride]);
+        if (value > magnitude) {
+            magnitude = value;
+            best = i;
+        }
+    }
+    return @intCast(best + 1);
+}
+
 pub fn iamax(comptime T: type, n_: BlasInt, x: [*]const T, incx_: BlasInt) BlasInt {
     if (n_ < 1 or incx_ <= 0) return 0;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (incx_ == 1) return parallelIamaxUnit(T, n, x) orelse iamaxUnitReal(T, n, x);
+        if (comptime builtin.cpu.arch == .aarch64) {
+            if (n >= 32) return iamaxStridedReal(T, n, x, @intCast(incx_));
+        }
     } else if (comptime isComplex(T)) {
         if (incx_ == 1) return parallelIamaxUnit(T, n, x) orelse iamaxUnitComplex(T, n, x);
         if (incx_ == 2) return iamaxStride2Complex(T, n, x);

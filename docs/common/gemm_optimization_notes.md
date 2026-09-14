@@ -187,12 +187,41 @@ proves that the extra work and memory are worthwhile.
 Hermitian updates preserve a real diagonal and the correct conjugation. Beta is
 applied exactly once to the selected triangle.
 
+The packed-NN rank implementation uses three 64-by-64 buffers: two operand
+panels and one private output tile. It packs transpose or conjugate-transpose
+semantics into the operands, accumulates reduction chunks into the private tile,
+then commits only the stored triangle. Rank-2k adds its second product before
+that commit; HER2K conjugates alpha for the second product. Padding and the
+unstored triangle remain untouched. The serial allocation is at most 192 KiB.
+
+The parallel packed identity assigns substantial tiles and thin edge tiles in
+separate cyclic sequences to at most eight logical tasks. This keeps a thin
+remainder from concentrating full tiles on one task. Each task has three
+independent buffers (at most 1.5 MiB across all tasks).
+Workspace acquisition and pool acceptance precede output writes. Rejection
+falls back to the exact serial packed identity, then to the existing blocked
+implementation if serial workspace is unavailable. A forced parallel test must
+verify the parallel body itself, as wrapper success can legitimately mean that
+the serial fallback completed. Single-thread gains do not establish default
+thread performance; the two topologies require separate measurements.
+
+The macOS AArch64 preference starts at order 64 and reduction 32. With
+multiple threads, it also requires order 96 and `n*n*k >= 512*1024`; complex
+f64 rank-1 updates below order 128 additionally require reduction 64. Small
+rejected shapes bypass the thread-count query. Complex f32 column fallbacks
+specialize transpose and Hermitian modes while preserving each dot product
+and stored-triangle epilogue.
+
 ### Symmetric and Hermitian matrix multiply
 
 SYMM/HEMM produce a full general `C` while reading one structured operand. A
 blocked implementation may pack one active symmetric or Hermitian panel, but it
 must not expand the complete operand. Side, triangle, scalar domain, and
 Hermitian diagonal behavior are hard descriptor constraints.
+
+For alpha zero, skip both input matrices. Beta zero clears only valid output
+rows without reading old C; beta one returns without touching C. The same
+scaling rules apply to rank updates, with Hermitian diagonals made real.
 
 Dense-GEMM transformation is experimental unless materialization, workspace,
 and code-layout effects have been isolated and the complete call wins across
@@ -208,6 +237,21 @@ valid.
 Blocked solves must complete diagonal work and trailing updates in the required
 order. Workspace denial, a rejected shape, or a capability mismatch must fall
 back before any element of `B` changes.
+
+Unit-diagonal packing must synthesize one before reading the stored diagonal.
+Unit solves skip redundant multiplication or division by one. Alpha zero clears
+valid B rows without reading A or old B. A diagonal TRMM tile containing
+non-finite operands uses its actual triangular traversal: expanding structural
+zeros into dense GEMM would introduce spurious zero-times-infinity NaNs.
+
+The macOS AArch64 multiply and solve preferences are independent. Right-side
+multiply starts at 64 rows and columns; right-side solve and left-side
+preferences start at 128. Right-side candidates retain their blocked
+traversal; left-side calls with multiple threads keep the existing parallel
+executor once `m*m*n` reaches 8 Mi elements of work. Below that boundary, the
+left blocked solve preference is limited to complex f64. Candidate helpers are
+kept out of the public fallback body, with shape and capability checks before
+the helper call, so rejected shapes do not pay packing-call overhead.
 
 ### Isolated experimental objects
 
@@ -292,3 +336,23 @@ Rollback or narrow it when:
 
 Public documentation records the surviving contract and rejection mechanism,
 not the chronology of individual experiments.
+
+### Portable complex f64 GEMM
+
+Portable complex f64 GEMM dispatches transpose modes once into specialized
+leaf functions. For a single output row with a transposed right operand, four
+adjacent outputs share A loads and adjacent physical B rows. Each dot product
+keeps its original reduction order; incomplete output groups use the scalar
+tail. This route allocates no workspace and preserves beta-zero behavior and
+leading-dimension padding.
+
+### Small-K complex f64 3M scheduling
+
+On macOS AArch64, a bounded small-K range can run the three independent real
+products concurrently through the existing low-latency pool. Packing, each
+product's reduction and final recombination remain unchanged. The range requires
+at least three available threads, m/n in [96,192], k in [24,64], logical work
+at least 256 Ki, and actual padded-row work below 96 cubed. The last condition
+keeps each product below the real planner's lowest non-vector parallel threshold.
+A pool refusal retains the original serial sequence. Square and vector-shaped
+GEMM do not enter this additional range.

@@ -256,6 +256,8 @@ fn expectGateMissUnchanged(comptime T: type, n: usize, incx: scalar.BlasInt) !vo
 }
 
 test "packed-column unit TPMV and TPSV match independent references" {
+    try finitePackedCases(f32);
+    try finitePackedCases(f64);
     inline for (.{ f32, f64, ComplexF32, ComplexF64 }) |T| try runAllCases(T);
 }
 
@@ -271,4 +273,145 @@ test "packed-column production gates fail without modifying x" {
         try expectGateMissUnchanged(T, 127, 1);
         try expectGateMissUnchanged(T, 128, 2);
     }
+}
+
+fn finitePackedReference(comptime T: type, uplo: Uplo, trans: Order, diag: Diag, n: usize, ap: [*]const T, x: [*]T, inc: i32) void {
+    @setFloatMode(.strict);
+    const stride: usize = @intCast(if (inc < 0) -inc else inc);
+    const upper = (trans == .no_trans and uplo == .upper) or (trans != .no_trans and uplo == .lower);
+    for (0..n) |iteration| {
+        const i = if (upper) iteration else n - iteration - 1;
+        var sum: T = 0;
+        for (0..n) |j| {
+            const row = if (trans == .no_trans) i else j;
+            const col = if (trans == .no_trans) j else i;
+            const av: T = if (row == col and diag == .unit) 1 else if (uplo == .upper)
+                (if (row > col) 0 else ap[col * (col + 1) / 2 + row])
+            else
+                (if (row < col) 0 else ap[col * (2 * n - col + 1) / 2 + row - col]);
+            const product = av * x[if (inc > 0) j * stride else (n - j - 1) * stride];
+            sum = sum + product;
+        }
+        x[if (inc > 0) i * stride else (n - i - 1) * stride] = sum;
+    }
+}
+
+fn finitePackedCases(comptime T: type) !void {
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    const catalog = @import("kernels/shared/matrix_vector/catalog.zig");
+    const tuning = @import("kernels/shared/matrix_vector/tuning.zig");
+    const id = catalog.Implementation.compact_triangular_packed_finite;
+    const descriptor = catalog.findImplementation(.tpmv, if (T == f32) .f32 else .f64, id).?;
+    try std.testing.expectEqual(catalog.Lifecycle.experimental, descriptor.lifecycle);
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, descriptor.fallback.?.implementation);
+    try std.testing.expectEqual(catalog.CompletionScope.whole_operation, descriptor.completion);
+    try std.testing.expect(descriptor.workspace.private_output);
+    var profile = tuning.production_2026_07_17.triangular;
+    profile.enable_finite_tpmv = true;
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTpmv(T, 63));
+    try std.testing.expectEqual(if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) id else .portable_scalar, profile.selectFiniteTpmv(T, 64));
+    profile.enable_finite_tpmv = false;
+    try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTpmv(T, 128));
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    var ap: [34000]T = undefined;
+    var x: [516]T = undefined;
+    for ([_]usize{ 64, 65, 66, 67, 96, 97, 127, 128, 129, 257 }) |n| {
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                for ([_]Diag{ .non_unit, .unit }) |diag| {
+                    @memset(&ap, std.math.nan(T));
+                    for (0..n) |col| {
+                        const begin = if (uplo == .upper) 0 else col;
+                        const end = if (uplo == .upper) col + 1 else n;
+                        for (begin..end) |row| {
+                            const pos = if (uplo == .upper) col * (col + 1) / 2 + row else col * (2 * n - col + 1) / 2 + row - col;
+                            // Mixed signs and nonbinary fractions expose an
+                            // accidental reassociation when peeling diagonals.
+                            const off_diagonal = @as(T, @floatFromInt(1 + row % 3)) / 997;
+                            ap[pos] = if (row == col) (if (diag == .unit) std.math.nan(T) else 2) else if ((row + col) % 2 == 0) off_diagonal else -off_diagonal;
+                        }
+                    }
+                    for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                        @memset(&x, std.math.nan(T));
+                        const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                        for (0..n) |j| {
+                            const magnitude: T = switch (j % 3) {
+                                0 => 1.0 / 16.0,
+                                1 => 1,
+                                else => 16,
+                            };
+                            const value_ = magnitude * (1 + @as(T, @floatFromInt(j % 5)) / 8);
+                            x[1 + j * stride] = if (j % 2 == 0) value_ else -value_;
+                        }
+                        var expected = x;
+                        finitePackedReference(T, uplo, trans, diag, n, &ap, expected[1..].ptr, inc);
+                        try std.testing.expect(entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, uplo, trans, diag, @intCast(n), &ap, x[1..].ptr, inc));
+                        try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+                    }
+                }
+            }
+        }
+    }
+    // Nonzero subnormal outputs remain eligible; unit diagonals never load AP.
+    @memset(&ap, 0);
+    for (0..128) |i| ap[i * (257 - i) / 2] = std.math.nan(T);
+    @memset(&x, std.math.floatMin(T) / 2);
+    const small_before = x;
+    try std.testing.expect(entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, &ap, x[1..].ptr, 1));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&small_before), std.mem.asBytes(&x));
+    for (0..10) |mode| {
+        @memset(&ap, 0);
+        @memset(&x, 1);
+        for (0..128) |i| ap[i * (257 - i) / 2] = 2;
+        switch (mode) {
+            0 => x[1] = std.math.nan(T),
+            1 => x[1] = std.math.inf(T),
+            2 => ap[0] = std.math.nan(T), // last private row fails after earlier rows succeed
+            3 => ap[0] = std.math.inf(T),
+            4 => {
+                ap[0] = std.math.inf(T);
+                x[1] = 0;
+            },
+            5 => {
+                ap[0] = std.math.floatMax(T);
+                x[1] = 2;
+            },
+            6 => x[1] = -@as(T, 0),
+            7 => {
+                ap[1] = -2;
+            }, // row1 cancels its diagonal
+            8 => {
+                ap[0] = std.math.floatMin(T);
+                x[1] = std.math.floatMin(T);
+            },
+            else => {
+                ap[0] = std.math.floatMax(T);
+                ap[1] = std.math.floatMax(T);
+                x[1] = 1;
+                ap[128] = std.math.floatMax(T);
+                x[2] = 1;
+            },
+        }
+        const before = x;
+        try std.testing.expect(!entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .non_unit, 128, &ap, x[1..].ptr, 1));
+        try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&x));
+        var expected = before;
+        finitePackedReference(T, .lower, .no_trans, .non_unit, 128, &ap, expected[1..].ptr, 1);
+        try std.testing.expect(entry.testing.forceTpmv(T, .portable_scalar, std.testing.allocator, 0, .lower, .no_trans, .non_unit, 128, &ap, x[1..].ptr, 1));
+        for (expected, x) |want, got| {
+            if (std.math.isNan(want)) try std.testing.expect(std.math.isNan(got)) else try std.testing.expectEqualSlices(u8, std.mem.asBytes(&want), std.mem.asBytes(&got));
+        }
+    }
+    @memset(&ap, 1);
+    @memset(&x, 1);
+    const before = x;
+    var empty: [0]u8 = .{};
+    var failing = std.heap.FixedBufferAllocator.init(&empty);
+    try std.testing.expect(!entry.testing.forceTpmv(T, id, failing.allocator(), 64 * 1024 * 1024, .upper, .no_trans, .unit, 128, &ap, x[1..].ptr, 1));
+    try std.testing.expect(!entry.testing.forceTpmv(T, id, std.testing.allocator, 0, .upper, .no_trans, .unit, 128, &ap, x[1..].ptr, 1));
+    try std.testing.expect(!entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, .upper, .no_trans, .unit, 63, &ap, x[1..].ptr, 1));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&x));
+    const matrix_before = ap;
+    try std.testing.expect(!entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, .upper, .no_trans, .unit, 128, &ap, &ap, 1));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&matrix_before), std.mem.asBytes(&ap));
 }

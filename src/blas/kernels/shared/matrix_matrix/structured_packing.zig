@@ -65,6 +65,30 @@ inline fn sourceIndex(ld: BlasInt, row: usize, col: usize) usize {
     return gemm_task.matIndex(ld, row, col);
 }
 
+/// Packs one logical general op(A) rectangle. This works for real and
+/// complex scalars; conjugation is performed exactly once after indexing.
+pub fn packGeneralOpBlock(comptime T: type, transpose: Transpose, source: [*]const T, ld: BlasInt, row0: usize, col0: usize, rows: usize, cols: usize, buffer: []T) void {
+    std.debug.assert(buffer.len >= rows * cols);
+    if (rows == 0 or cols == 0) return;
+    if (transpose == .no_trans) {
+        // All current callers allocate operand panels separately from input.
+        // Contiguous columns need no per-element indexing or conjugation.
+        for (0..cols) |j| {
+            const source_start = sourceIndex(ld, row0, col0 + j);
+            @memcpy(buffer[j * rows .. (j + 1) * rows], source[source_start .. source_start + rows]);
+        }
+        return;
+    }
+    for (0..cols) |j| {
+        for (0..rows) |i| {
+            const row = row0 + i;
+            const col = col0 + j;
+            const item = source[sourceIndex(ld, col, row)];
+            buffer[i + j * rows] = if (transpose == .conj_trans) conjugate(T, item) else item;
+        }
+    }
+}
+
 /// Packs a logical block of a symmetric or Hermitian matrix into column-major
 /// dense storage with leading dimension `rows`.
 pub fn packSymmetricBlock(comptime T: type, triangle: Triangle, hermitian: bool, source: [*]const T, ld: BlasInt, row0: usize, col0: usize, rows: usize, cols: usize, buffer: []T) void {
@@ -96,8 +120,13 @@ pub fn packTriangularOpBlock(comptime T: type, triangle: Triangle, transpose: Tr
             const source_row = if (transpose == .no_trans) op_row else op_col;
             const source_col = if (transpose == .no_trans) op_col else op_row;
             const stored = if (triangle == .upper) source_row <= source_col else source_row >= source_col;
-            var value = if (stored) source[sourceIndex(ld, source_row, source_col)] else zero(T);
-            if (stored and source_row == source_col and diagonal == .unit) value = one(T);
+            // Unit diagonals are synthesized before touching source storage.
+            var value = if (!stored)
+                zero(T)
+            else if (source_row == source_col and diagonal == .unit)
+                one(T)
+            else
+                source[sourceIndex(ld, source_row, source_col)];
             if (stored and transpose == .conj_trans) value = conjugate(T, value);
             buffer[i + j * rows] = value;
         }
@@ -110,6 +139,37 @@ pub fn effectiveTriangle(triangle: Triangle, transpose: Transpose) Triangle {
 }
 
 test "structured block packers ignore poisoned unstored values" {
+    inline for (.{ f32, f64, types.ComplexF32, types.ComplexF64 }) |T| {
+        const ld: usize = 72;
+        var input: [ld * ld]T = undefined;
+        for (&input, 0..) |*entry, index| {
+            if (comptime T == types.ComplexF32 or T == types.ComplexF64) {
+                entry.* = .{ .re = @floatFromInt(index), .im = -@as(if (T == types.ComplexF32) f32 else f64, @floatFromInt(index + 1)) };
+            } else entry.* = @floatFromInt(index);
+        }
+        const sentinel = one(T);
+        var output: [65 * 65 + 2]T = undefined;
+        const shapes = [_][2]usize{ .{ 0, 65 }, .{ 65, 0 }, .{ 1, 1 }, .{ 15, 17 }, .{ 17, 15 }, .{ 63, 65 }, .{ 65, 63 }, .{ 64, 64 }, .{ 65, 65 } };
+        for ([_]Transpose{ .no_trans, .trans, .conj_trans }) |transpose| {
+            for (shapes) |shape| {
+                @memset(&output, sentinel);
+                const rows = shape[0];
+                const cols = shape[1];
+                const count = rows * cols;
+                packGeneralOpBlock(T, transpose, &input, ld, 2, 3, rows, cols, output[1 .. 1 + count]);
+                for (0..cols) |j| {
+                    for (0..rows) |i| {
+                        const row = 2 + i;
+                        const col = 3 + j;
+                        const item = input[if (transpose == .no_trans) row + col * ld else col + row * ld];
+                        try std.testing.expectEqual(if (transpose == .conj_trans) conjugate(T, item) else item, output[1 + i + j * rows]);
+                    }
+                }
+                try std.testing.expectEqual(sentinel, output[0]);
+                for (output[1 + count ..]) |item| try std.testing.expectEqual(sentinel, item);
+            }
+        }
+    }
     const C = types.ComplexF32;
     const source = [_]C{
         .{ .re = 1, .im = 9 },   .{ .re = 2, .im = 3 },   .{ .re = 5, .im = 6 },

@@ -1614,6 +1614,8 @@ fn zgemvTransFcmlaStep8Asm(comptime acc_first: comptime_int, comptime do_conj: b
 }
 
 fn zgemvTransFcmlaF64M128Cols8BodyAsm(comptime do_conj: bool) []const u8 {
+    // The eight-column body borrows v8-v11; preserve their ABI-owned low
+    // halves because the naked entry has no compiler-generated prologue.
     const inner = zgemvTransFcmlaStep8Asm(16, do_conj) ++ zgemvTransFcmlaStep8Asm(24, do_conj);
     const store_tail = zgemvTransFcmlaReduceStoreAsm(16, 0) ++
         zgemvTransFcmlaReduceStoreAsm(17, 16) ++
@@ -1625,6 +1627,8 @@ fn zgemvTransFcmlaF64M128Cols8BodyAsm(comptime do_conj: bool) []const u8 {
         zgemvTransFcmlaReduceStoreAsm(23, 112);
     return
     \\
+    \\stp d8, d9, [sp, #-32]!
+    \\stp d10, d11, [sp, #16]
     \\fmov d6, x0
     \\fmov d5, x1
     \\fmov d7, x2
@@ -1683,6 +1687,8 @@ fn zgemvTransFcmlaF64M128Cols8BodyAsm(comptime do_conj: bool) []const u8 {
         \\add x7, x7, #128
         \\subs x14, x14, #1
         \\b.ne 1b
+        \\ldp d10, d11, [sp, #16]
+        \\ldp d8, d9, [sp], #32
         \\ret
     ;
 }
