@@ -22,3 +22,6 @@ test/**/*.py linguist-detectable=false
 *.jpeg binary
 *.gif binary
 *.pdf binary
+
+# Preserve the bytes recorded in dated benchmark artifact hashes.
+docs/assets/benchmarks/2026-09-14/*.csv -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

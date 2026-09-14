@@ -10980,6 +10980,66 @@
       "owner": "documentation-maintainers"
     },
     {
+      "path": "docs/assets/benchmarks/2026-09-14/gemm.csv",
+      "kind": "other-public-file",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/gemm.svg",
+      "kind": "visual-asset",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/level1.csv",
+      "kind": "other-public-file",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/level1.csv.meta.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/level1.svg",
+      "kind": "visual-asset",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/level2.csv",
+      "kind": "other-public-file",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/level2.csv.meta.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/level2.svg",
+      "kind": "visual-asset",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-14/source.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
       "path": "docs/common/benchmarking.md",
       "kind": "documentation",
       "class": "non-generated-source",
@@ -12300,185 +12360,8 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "f6b8a381ef8bf50907efaa8ca12af71949d16396ff7207c8e825601272b8e7f1",
+  "repository_file_classifications_digest": "e4da82345a93d9fe398c6e951bfffaae0b4193ce7e681948e7ea6c31a2b5fc6e",
   "derived_candidates": [
-    {
-      "id": "derived:include/zynum/blas/blas.h",
-      "path": "include/zynum/blas/blas.h",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "abi-compatibility",
-      "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_compat_headers.zig",
-        "src/blas/abi/fortran.zig",
-        "src/blas/abi/cblas.zig"
-      ],
-      "canonical_command": "zig build generate-headers --summary failures",
-      "deterministic_drift_gate": [
-        "CI source-checks regenerates and rejects changes under include/zynum/blas"
-      ],
-      "deterministic_drift_gate_ids": [
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
-      ],
-      "consumer_gates": [
-        "header smoke tests",
-        "ABI manifest symbol validation",
-        "whole-artifact ABI parity validation"
-      ],
-      "consumer_gate_ids": [
-        "launch:build.zig:build:run_header_smoke_tests",
-        "launch:build.zig:build:c_header_smoke_test",
-        "launch:build.zig:build:cpp_header_smoke_test",
-        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
-      ],
-      "source_package_disposition": "included",
-      "binary_package_disposition": "installed under include/zynum/blas"
-    },
-    {
-      "id": "derived:include/zynum/blas/cblas.h",
-      "path": "include/zynum/blas/cblas.h",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "abi-compatibility",
-      "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_compat_headers.zig",
-        "src/blas/abi/fortran.zig",
-        "src/blas/abi/cblas.zig"
-      ],
-      "canonical_command": "zig build generate-headers --summary failures",
-      "deterministic_drift_gate": [
-        "CI source-checks regenerates and rejects changes under include/zynum/blas"
-      ],
-      "deterministic_drift_gate_ids": [
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
-      ],
-      "consumer_gates": [
-        "header smoke tests",
-        "ABI manifest symbol validation",
-        "whole-artifact ABI parity validation"
-      ],
-      "consumer_gate_ids": [
-        "launch:build.zig:build:run_header_smoke_tests",
-        "launch:build.zig:build:c_header_smoke_test",
-        "launch:build.zig:build:cpp_header_smoke_test",
-        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
-      ],
-      "source_package_disposition": "included",
-      "binary_package_disposition": "installed under include/zynum/blas"
-    },
-    {
-      "id": "derived:include/zynum/blas/blas.f90",
-      "path": "include/zynum/blas/blas.f90",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "abi-compatibility",
-      "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_compat_headers.zig",
-        "src/blas/abi/fortran.zig",
-        "src/blas/abi/cblas.zig"
-      ],
-      "canonical_command": "zig build generate-headers --summary failures",
-      "deterministic_drift_gate": [
-        "CI source-checks regenerates and rejects changes under include/zynum/blas"
-      ],
-      "deterministic_drift_gate_ids": [
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
-      ],
-      "consumer_gates": [
-        "header smoke tests",
-        "ABI manifest symbol validation",
-        "whole-artifact ABI parity validation"
-      ],
-      "consumer_gate_ids": [
-        "launch:build.zig:build:fortran_module_smoke_test",
-        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
-      ],
-      "source_package_disposition": "included",
-      "binary_package_disposition": "installed under include/zynum/blas"
-    },
-    {
-      "id": "derived:include/zynum/blas/abi_manifest.json",
-      "path": "include/zynum/blas/abi_manifest.json",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "abi-compatibility",
-      "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_compat_headers.zig",
-        "src/blas/abi/fortran.zig",
-        "src/blas/abi/cblas.zig"
-      ],
-      "canonical_command": "zig build generate-headers --summary failures",
-      "deterministic_drift_gate": [
-        "CI source-checks regenerates and rejects changes under include/zynum/blas"
-      ],
-      "deterministic_drift_gate_ids": [
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
-      ],
-      "consumer_gates": [
-        "header smoke tests",
-        "ABI manifest symbol validation",
-        "whole-artifact ABI parity validation"
-      ],
-      "consumer_gate_ids": [
-        "launch:build.zig:build:abi_manifest_smoke_test",
-        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
-      ],
-      "source_package_disposition": "included",
-      "binary_package_disposition": "installed under include/zynum/blas"
-    },
-    {
-      "id": "derived:docs/kernel_coverage.json",
-      "path": "docs/kernel_coverage.json",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "kernel-coverage",
-      "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_kernel_coverage.zig",
-        "src/blas/kernel_coverage_root.zig",
-        "src/blas/kernels/coverage.zig",
-        "kernel registry and coverage declarations"
-      ],
-      "canonical_command": "zig build generate-kernel-coverage --summary failures",
-      "deterministic_drift_gate": [
-        "CI source-checks regenerates and rejects changes to docs/kernel_coverage.json"
-      ],
-      "deterministic_drift_gate_ids": [
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
-      ],
-      "consumer_gates": [
-        "CI generated-file drift validation"
-      ],
-      "consumer_gate_ids": [
-        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
-      ],
-      "source_package_disposition": "included",
-      "binary_package_disposition": "not installed"
-    },
-    {
-      "id": "derived:pkgconfig/zynum_blas.pc",
-      "path": "pkgconfig/zynum_blas.pc",
-      "class": "non-generated-source",
-      "owner": "package-metadata",
-      "tracking_status": "tracked",
-      "authorship": "handwritten package metadata source",
-      "package_disposition": "included in source package",
-      "install_disposition": "installed as lib/pkgconfig/zynum_blas.pc when compat-headers is true"
-    },
-    {
-      "id": "derived:tools/abi_baseline_observation.json",
-      "path": "tools/abi_baseline_observation.json",
-      "class": "non-generated-source",
-      "owner": "abi-compatibility",
-      "tracking_status": "tracked",
-      "authorship": "observed ABI baseline policy source; not a generator output",
-      "package_disposition": "included",
-      "install_disposition": "not installed"
-    },
     {
       "id": "derived:docs/assets/benchmarks/2026-09-09/gemm.csv",
       "path": "docs/assets/benchmarks/2026-09-09/gemm.csv",
@@ -12634,37 +12517,315 @@
       "raw_inputs_disposition": "Public source snapshot, per-case CSV and metadata are retained alongside the charts: docs/assets/benchmarks/2026-09-09/source.json and docs/assets/benchmarks/2026-09-09/source.patch. Timing values are observations, not deterministically regenerable."
     },
     {
-      "id": "derived:src/blas/kernels/dispatch/vector_unary.zig",
-      "path": "src/blas/kernels/dispatch/vector_unary.zig",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "library-source",
+      "id": "derived:docs/assets/benchmarks/2026-09-14/gemm.csv",
+      "path": "docs/assets/benchmarks/2026-09-14/gemm.csv",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
       "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_multiversion.py",
-        "src/blas/kernels/dispatch/vector_unary.zig",
-        "src/blas/kernels/dispatch/vector_binary.zig",
-        "src/blas/kernels/dispatch/matrix_vector.zig",
-        "src/blas/kernels/dispatch/matrix_matrix.zig",
-        "build.zig.zon"
-      ],
-      "canonical_command": "python3 tools/generate_multiversion.py",
-      "deterministic_drift_gate": "python3 tools/generate_multiversion.py --check",
-      "deterministic_drift_gate_ids": [
-        "step:build.zig:build:check-multiversion",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage"
-      ],
-      "consumer_gates": [
-        "zig build test-dynamic-dispatch -Dhost-tool-smoke=false"
-      ],
-      "consumer_gate_ids": [
-        "step:build.zig:build:test-dynamic-dispatch"
-      ],
-      "source_package_disposition": "Ship source and generator. Dispatch bodies/signatures remain authoritative; generator strips only its own injected client-return adapter and deterministically restores adapters and protocol/object with the pinned Zig formatter.",
-      "binary_package_disposition": "Private compiled ISA tier protocol only; generated source is not a public C ABI artifact."
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 7dc565cee4179099bcf991e9ea9ca72a5a0f53225ddc7b204318059e30c3fda2.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
     },
     {
-      "id": "derived:src/blas/kernels/dispatch/vector_binary.zig",
-      "path": "src/blas/kernels/dispatch/vector_binary.zig",
+      "id": "derived:docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json",
+      "path": "docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 5e5f0c02ab25f4290f857a752da818b28bda59ff23620c706532c0973acf51e4.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/gemm.svg",
+      "path": "docs/assets/benchmarks/2026-09-14/gemm.svg",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 935b5254284a2e3033e7589469340db5725a820baecb16919b4a95d3a6ca914f.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/level1.csv",
+      "path": "docs/assets/benchmarks/2026-09-14/level1.csv",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: b8ceb3df33a9b312e966f5e7a1f0a38e74b8dbb294ae1d749c0690e5a45f048e.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/level1.csv.meta.json",
+      "path": "docs/assets/benchmarks/2026-09-14/level1.csv.meta.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 2e38314a04771124d47036c8675c169221d56c869ca72ce47303b6d1bb6cab0c.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/level1.svg",
+      "path": "docs/assets/benchmarks/2026-09-14/level1.svg",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: e32552779268d8adda58ce37c06e4672fdcf2bba64e0cb30cf05a3e3ad48b355.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/level2.csv",
+      "path": "docs/assets/benchmarks/2026-09-14/level2.csv",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 75d6a8b36acda39005be9e9b68ce7181e86f72820155a99ac915c07ce927255b.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/level2.csv.meta.json",
+      "path": "docs/assets/benchmarks/2026-09-14/level2.csv.meta.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 44016364d0fd66268a1c0faf0d45b44cb133b1f62df295d2a876ec9f024bafcc.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/level2.svg",
+      "path": "docs/assets/benchmarks/2026-09-14/level2.svg",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: bc792c6317a6fe077a5ce0b3f528cfc9a251159334d2276e08925aaa5fc0dcef.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-14/source.json",
+      "path": "docs/assets/benchmarks/2026-09-14/source.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 4650d14c4dbe92489f3b37fb167a62df0bfa0ce4; Apple M5, 10 logical CPUs, macOS 26.6.2 (25G83), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Asset SHA-256: 79427fc4f54a18bb328d9943c9d0c8babdd486257da46ce1d1e97de160968297.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-14",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/kernel_coverage.json",
+      "path": "docs/kernel_coverage.json",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "kernel-coverage",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_kernel_coverage.zig",
+        "src/blas/kernel_coverage_root.zig",
+        "src/blas/kernels/coverage.zig",
+        "kernel registry and coverage declarations"
+      ],
+      "canonical_command": "zig build generate-kernel-coverage --summary failures",
+      "deterministic_drift_gate": [
+        "CI source-checks regenerates and rejects changes to docs/kernel_coverage.json"
+      ],
+      "deterministic_drift_gate_ids": [
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
+      ],
+      "consumer_gates": [
+        "CI generated-file drift validation"
+      ],
+      "consumer_gate_ids": [
+        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
+      ],
+      "source_package_disposition": "included",
+      "binary_package_disposition": "not installed"
+    },
+    {
+      "id": "derived:include/zynum/blas/abi_manifest.json",
+      "path": "include/zynum/blas/abi_manifest.json",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "abi-compatibility",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_compat_headers.zig",
+        "src/blas/abi/fortran.zig",
+        "src/blas/abi/cblas.zig"
+      ],
+      "canonical_command": "zig build generate-headers --summary failures",
+      "deterministic_drift_gate": [
+        "CI source-checks regenerates and rejects changes under include/zynum/blas"
+      ],
+      "deterministic_drift_gate_ids": [
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
+      ],
+      "consumer_gates": [
+        "header smoke tests",
+        "ABI manifest symbol validation",
+        "whole-artifact ABI parity validation"
+      ],
+      "consumer_gate_ids": [
+        "launch:build.zig:build:abi_manifest_smoke_test",
+        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
+      ],
+      "source_package_disposition": "included",
+      "binary_package_disposition": "installed under include/zynum/blas"
+    },
+    {
+      "id": "derived:include/zynum/blas/blas.f90",
+      "path": "include/zynum/blas/blas.f90",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "abi-compatibility",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_compat_headers.zig",
+        "src/blas/abi/fortran.zig",
+        "src/blas/abi/cblas.zig"
+      ],
+      "canonical_command": "zig build generate-headers --summary failures",
+      "deterministic_drift_gate": [
+        "CI source-checks regenerates and rejects changes under include/zynum/blas"
+      ],
+      "deterministic_drift_gate_ids": [
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
+      ],
+      "consumer_gates": [
+        "header smoke tests",
+        "ABI manifest symbol validation",
+        "whole-artifact ABI parity validation"
+      ],
+      "consumer_gate_ids": [
+        "launch:build.zig:build:fortran_module_smoke_test",
+        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
+      ],
+      "source_package_disposition": "included",
+      "binary_package_disposition": "installed under include/zynum/blas"
+    },
+    {
+      "id": "derived:include/zynum/blas/blas.h",
+      "path": "include/zynum/blas/blas.h",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "abi-compatibility",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_compat_headers.zig",
+        "src/blas/abi/fortran.zig",
+        "src/blas/abi/cblas.zig"
+      ],
+      "canonical_command": "zig build generate-headers --summary failures",
+      "deterministic_drift_gate": [
+        "CI source-checks regenerates and rejects changes under include/zynum/blas"
+      ],
+      "deterministic_drift_gate_ids": [
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
+      ],
+      "consumer_gates": [
+        "header smoke tests",
+        "ABI manifest symbol validation",
+        "whole-artifact ABI parity validation"
+      ],
+      "consumer_gate_ids": [
+        "launch:build.zig:build:run_header_smoke_tests",
+        "launch:build.zig:build:c_header_smoke_test",
+        "launch:build.zig:build:cpp_header_smoke_test",
+        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
+      ],
+      "source_package_disposition": "included",
+      "binary_package_disposition": "installed under include/zynum/blas"
+    },
+    {
+      "id": "derived:include/zynum/blas/cblas.h",
+      "path": "include/zynum/blas/cblas.h",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "abi-compatibility",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_compat_headers.zig",
+        "src/blas/abi/fortran.zig",
+        "src/blas/abi/cblas.zig"
+      ],
+      "canonical_command": "zig build generate-headers --summary failures",
+      "deterministic_drift_gate": [
+        "CI source-checks regenerates and rejects changes under include/zynum/blas"
+      ],
+      "deterministic_drift_gate_ids": [
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"
+      ],
+      "consumer_gates": [
+        "header smoke tests",
+        "ABI manifest symbol validation",
+        "whole-artifact ABI parity validation"
+      ],
+      "consumer_gate_ids": [
+        "launch:build.zig:build:run_header_smoke_tests",
+        "launch:build.zig:build:c_header_smoke_test",
+        "launch:build.zig:build:cpp_header_smoke_test",
+        "launch:build.zig:build:abi_artifact_parity_verifier_tests"
+      ],
+      "source_package_disposition": "included",
+      "binary_package_disposition": "installed under include/zynum/blas"
+    },
+    {
+      "id": "derived:pkgconfig/zynum_blas.pc",
+      "path": "pkgconfig/zynum_blas.pc",
+      "class": "non-generated-source",
+      "owner": "package-metadata",
+      "tracking_status": "tracked",
+      "authorship": "handwritten package metadata source",
+      "package_disposition": "included in source package",
+      "install_disposition": "installed as lib/pkgconfig/zynum_blas.pc when compat-headers is true"
+    },
+    {
+      "id": "derived:src/blas/kernels/dispatch/matrix_matrix.zig",
+      "path": "src/blas/kernels/dispatch/matrix_matrix.zig",
       "class": "designated-reproducible-contract-reference",
       "owner": "library-source",
       "tracking_status": "tracked",
@@ -12721,8 +12882,66 @@
       "binary_package_disposition": "Private compiled ISA tier protocol only; generated source is not a public C ABI artifact."
     },
     {
-      "id": "derived:src/blas/kernels/dispatch/matrix_matrix.zig",
-      "path": "src/blas/kernels/dispatch/matrix_matrix.zig",
+      "id": "derived:src/blas/kernels/dispatch/vector_binary.zig",
+      "path": "src/blas/kernels/dispatch/vector_binary.zig",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "library-source",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_multiversion.py",
+        "src/blas/kernels/dispatch/vector_unary.zig",
+        "src/blas/kernels/dispatch/vector_binary.zig",
+        "src/blas/kernels/dispatch/matrix_vector.zig",
+        "src/blas/kernels/dispatch/matrix_matrix.zig",
+        "build.zig.zon"
+      ],
+      "canonical_command": "python3 tools/generate_multiversion.py",
+      "deterministic_drift_gate": "python3 tools/generate_multiversion.py --check",
+      "deterministic_drift_gate_ids": [
+        "step:build.zig:build:check-multiversion",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage"
+      ],
+      "consumer_gates": [
+        "zig build test-dynamic-dispatch -Dhost-tool-smoke=false"
+      ],
+      "consumer_gate_ids": [
+        "step:build.zig:build:test-dynamic-dispatch"
+      ],
+      "source_package_disposition": "Ship source and generator. Dispatch bodies/signatures remain authoritative; generator strips only its own injected client-return adapter and deterministically restores adapters and protocol/object with the pinned Zig formatter.",
+      "binary_package_disposition": "Private compiled ISA tier protocol only; generated source is not a public C ABI artifact."
+    },
+    {
+      "id": "derived:src/blas/kernels/dispatch/vector_unary.zig",
+      "path": "src/blas/kernels/dispatch/vector_unary.zig",
+      "class": "designated-reproducible-contract-reference",
+      "owner": "library-source",
+      "tracking_status": "tracked",
+      "authoritative_inputs": [
+        "tools/generate_multiversion.py",
+        "src/blas/kernels/dispatch/vector_unary.zig",
+        "src/blas/kernels/dispatch/vector_binary.zig",
+        "src/blas/kernels/dispatch/matrix_vector.zig",
+        "src/blas/kernels/dispatch/matrix_matrix.zig",
+        "build.zig.zon"
+      ],
+      "canonical_command": "python3 tools/generate_multiversion.py",
+      "deterministic_drift_gate": "python3 tools/generate_multiversion.py --check",
+      "deterministic_drift_gate_ids": [
+        "step:build.zig:build:check-multiversion",
+        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage"
+      ],
+      "consumer_gates": [
+        "zig build test-dynamic-dispatch -Dhost-tool-smoke=false"
+      ],
+      "consumer_gate_ids": [
+        "step:build.zig:build:test-dynamic-dispatch"
+      ],
+      "source_package_disposition": "Ship source and generator. Dispatch bodies/signatures remain authoritative; generator strips only its own injected client-return adapter and deterministically restores adapters and protocol/object with the pinned Zig formatter.",
+      "binary_package_disposition": "Private compiled ISA tier protocol only; generated source is not a public C ABI artifact."
+    },
+    {
+      "id": "derived:src/blas/kernels/multiversion/object.zig",
+      "path": "src/blas/kernels/multiversion/object.zig",
       "class": "designated-reproducible-contract-reference",
       "owner": "library-source",
       "tracking_status": "tracked",
@@ -12779,33 +12998,14 @@
       "binary_package_disposition": "Private compiled ISA tier protocol only; generated source is not a public C ABI artifact."
     },
     {
-      "id": "derived:src/blas/kernels/multiversion/object.zig",
-      "path": "src/blas/kernels/multiversion/object.zig",
-      "class": "designated-reproducible-contract-reference",
-      "owner": "library-source",
+      "id": "derived:tools/abi_baseline_observation.json",
+      "path": "tools/abi_baseline_observation.json",
+      "class": "non-generated-source",
+      "owner": "abi-compatibility",
       "tracking_status": "tracked",
-      "authoritative_inputs": [
-        "tools/generate_multiversion.py",
-        "src/blas/kernels/dispatch/vector_unary.zig",
-        "src/blas/kernels/dispatch/vector_binary.zig",
-        "src/blas/kernels/dispatch/matrix_vector.zig",
-        "src/blas/kernels/dispatch/matrix_matrix.zig",
-        "build.zig.zon"
-      ],
-      "canonical_command": "python3 tools/generate_multiversion.py",
-      "deterministic_drift_gate": "python3 tools/generate_multiversion.py --check",
-      "deterministic_drift_gate_ids": [
-        "step:build.zig:build:check-multiversion",
-        "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage"
-      ],
-      "consumer_gates": [
-        "zig build test-dynamic-dispatch -Dhost-tool-smoke=false"
-      ],
-      "consumer_gate_ids": [
-        "step:build.zig:build:test-dynamic-dispatch"
-      ],
-      "source_package_disposition": "Ship source and generator. Dispatch bodies/signatures remain authoritative; generator strips only its own injected client-return adapter and deterministically restores adapters and protocol/object with the pinned Zig formatter.",
-      "binary_package_disposition": "Private compiled ISA tier protocol only; generated source is not a public C ABI artifact."
+      "authorship": "observed ABI baseline policy source; not a generator output",
+      "package_disposition": "included",
+      "install_disposition": "not installed"
     }
   ],
   "current_gaps": [

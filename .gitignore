@@ -28,3 +28,6 @@ __pycache__/
 logs/
 !docs/assets/**/*.svg
 !docs/assets/benchmarks/2026-09-09/*.csv
+
+# Dated README benchmark evidence
+!docs/assets/benchmarks/2026-09-14/*.csv

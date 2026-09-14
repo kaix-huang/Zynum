@@ -1,0 +1,324 @@
+{
+  "benchmark_identity": {
+    "controller": {
+      "compiler": {
+        "default_target": "aarch64-macos.26.6.2...26.6.2-none",
+        "default_target_diagnostic": {
+          "classification": "zig_env_parsed",
+          "format": "zig-object",
+          "status": "ok"
+        },
+        "name": "zig",
+        "version": "0.16.0"
+      },
+      "host": {
+        "detected_capabilities": [
+          "feat_sme",
+          "feat_sme2"
+        ],
+        "machine": "arm64",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "processor": "arm",
+        "system": "Darwin"
+      },
+      "python": {
+        "version": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]"
+      }
+    },
+    "payload": {
+      "artifacts": {
+        "binaries": [
+          {
+            "name": "level1_probe",
+            "sha256": "67dfe076e97ad7fdcb991af4c40a1aae10bf0568ccfa4009f10463cbabb55d57"
+          },
+          {
+            "name": "copy_probe",
+            "sha256": "20abc552350adba6563121884091a316dde662f79d5fab971d632e5fe58ada42"
+          },
+          {
+            "name": "run_level1_report",
+            "sha256": "58b3ae68feef3b73e487f6d7d354d989cda50bfa7f5041c755fcce6c6253fcae"
+          }
+        ],
+        "hash_claim_scope": "content_identity_only; artifact hashes do not prove build flags",
+        "libraries": [
+          {
+            "name": "Zynum",
+            "sha256": "e59d2f04714bc54de13be0840b6663e4d0db97aed7324f024e19bb75793db63d"
+          },
+          {
+            "name": "Accelerate",
+            "sha256": null
+          },
+          {
+            "name": "OpenBLAS",
+            "sha256": "aeb5f40d3b5cc0fca84e05e90b8e7da6921cea2c33ca701062b0ccd7b4caf117"
+          }
+        ]
+      },
+      "build": {
+        "declaration_status": "complete",
+        "missing_fields": [],
+        "requested": {
+          "cpu": "baseline",
+          "optimization": "ReleaseFast",
+          "target_triple": "aarch64-macos"
+        },
+        "schema_version": 1,
+        "source": {
+          "kind": "controller_cli",
+          "options": {
+            "cpu": "--build-cpu",
+            "optimization": "--build-optimize",
+            "target_triple": "--build-target"
+          }
+        },
+        "validation": {
+          "artifact_match": "not_verified",
+          "claim_scope": "requested_configuration_only",
+          "syntax": "valid"
+        }
+      },
+      "declared_capabilities": [],
+      "kernel_selection": {
+        "coverage_artifact": {
+          "authority_detail": "schema_version must be 1",
+          "authority_diagnostic": "kernel_coverage_invalid_document",
+          "authority_status": "malformed",
+          "generator": null,
+          "schema_version": null,
+          "sha256": "ed9f66c05432adce43a1d3e41e6bcbef612c6078ea8a3390a041c5f2e740eab9",
+          "summary": null
+        },
+        "registry_ids": [],
+        "selected_paths": [],
+        "selection_observation": "no per-call selection mapping supplied; do not infer a selected kernel from declared capability alone"
+      }
+    },
+    "schema_version": 2,
+    "source": {
+      "branch": null,
+      "cleanliness_status": "known",
+      "dirty": false,
+      "identity_diagnostic": "source_identity_manifest_loaded",
+      "identity_status": "exported",
+      "revision": "4650d14c4dbe92489f3b37fb167a62df0bfa0ce4",
+      "snapshot_created_utc": "2026-09-14T12:02:29.457734+00:00",
+      "snapshot_manifest_sha256": "79427fc4f54a18bb328d9943c9d0c8babdd486257da46ce1d1e97de160968297",
+      "snapshot_tree_sha256": "77934613895002b71dc573a9a89ff76eaac4fa75ef9275b86518a89ec6ad0d54"
+    }
+  },
+  "command": {
+    "controller": "run_level1_report.py",
+    "parameters": {
+      "copy_byte_coverage": true,
+      "copy_byte_sizes": [
+        8192,
+        8388608
+      ],
+      "copy_only": false,
+      "copy_seconds": 1,
+      "groups": null,
+      "level1_stride_pairs": [
+        [
+          1,
+          1
+        ]
+      ],
+      "level1_strides": [
+        1
+      ],
+      "n": 1048576,
+      "ops": [
+        "sswap",
+        "dswap",
+        "cswap",
+        "zswap",
+        "isamax",
+        "idamax",
+        "icamax",
+        "izamax",
+        "sscal",
+        "saxpy",
+        "sdot",
+        "sasum",
+        "snrm2",
+        "srot",
+        "srotm",
+        "dscal",
+        "daxpy",
+        "ddot",
+        "dasum",
+        "dnrm2",
+        "drot",
+        "drotm",
+        "sdsdot",
+        "dsdot",
+        "csscal",
+        "cscal",
+        "caxpy",
+        "cdotu",
+        "cdotc",
+        "scasum",
+        "scnrm2",
+        "csrot",
+        "zdscal",
+        "zscal",
+        "zaxpy",
+        "zdotu",
+        "zdotc",
+        "dzasum",
+        "dznrm2",
+        "zdrot",
+        "scopy",
+        "dcopy"
+      ],
+      "process_repeats": 6,
+      "seconds": 1
+    }
+  },
+  "copy_byte_coverage": true,
+  "copy_byte_sizes": [
+    8192,
+    8388608
+  ],
+  "copy_case_policy": "Copy rows use the concrete scopy/dcopy/ccopy/zcopy op name; n is the function element count, and copy_bytes records the measured byte footprint. The independent byte-size sweep may be disabled without disabling vector COPY operation coverage.",
+  "copy_only": false,
+  "copy_seconds": 1,
+  "correctness_check": "isolated per library/op/variant/incx/incy before timing with logical-stride references, guard canaries, and gap checks",
+  "environment": {
+    "AOCL_DYNAMIC": "unset",
+    "BLIS_NUM_THREADS": "10",
+    "MKL_DYNAMIC": "FALSE",
+    "MKL_NUM_THREADS": "10",
+    "OMP_NUM_THREADS": "10",
+    "OPENBLAS_DYNAMIC": "0",
+    "OPENBLAS_NUM_THREADS": "10",
+    "VECLIB_MAXIMUM_THREADS": "10",
+    "ZYNUM_MAXIMUM_THREADS": "unset"
+  },
+  "generated_at_unix": 1789388218.782511,
+  "git_revision": "4650d14c4dbe92489f3b37fb167a62df0bfa0ce4",
+  "groups": null,
+  "isolation": "fresh process per library/op/size/repeat; best repeat kept as the primary metric with min/median/max and ordered samples retained",
+  "level1_stride_pairs": [
+    [
+      1,
+      1
+    ]
+  ],
+  "level1_strides": [
+    1
+  ],
+  "level1_variants": {
+    "drotm": [
+      "flag_m1",
+      "flag_0",
+      "flag_p1"
+    ],
+    "srotm": [
+      "flag_m1",
+      "flag_0",
+      "flag_p1"
+    ]
+  },
+  "libraries": {
+    "Accelerate": {
+      "sha256": null
+    },
+    "OpenBLAS": {
+      "sha256": "aeb5f40d3b5cc0fca84e05e90b8e7da6921cea2c33ca701062b0ccd7b4caf117"
+    },
+    "Zynum": {
+      "sha256": "e59d2f04714bc54de13be0840b6663e4d0db97aed7324f024e19bb75793db63d"
+    }
+  },
+  "metadata_projection": {
+    "audience": "public",
+    "private_diagnostics": "excluded",
+    "schema_version": 1
+  },
+  "n": 1048576,
+  "negative_stride_policy": "Only stable_negative_operations are generated when incx or incy is negative; AXPBY, SCAL, ASUM, IAMAX, and NRM2 are excluded.",
+  "ops": [
+    "sswap",
+    "dswap",
+    "cswap",
+    "zswap",
+    "isamax",
+    "idamax",
+    "icamax",
+    "izamax",
+    "sscal",
+    "saxpy",
+    "sdot",
+    "sasum",
+    "snrm2",
+    "srot",
+    "srotm",
+    "dscal",
+    "daxpy",
+    "ddot",
+    "dasum",
+    "dnrm2",
+    "drot",
+    "drotm",
+    "sdsdot",
+    "dsdot",
+    "csscal",
+    "cscal",
+    "caxpy",
+    "cdotu",
+    "cdotc",
+    "scasum",
+    "scnrm2",
+    "csrot",
+    "zdscal",
+    "zscal",
+    "zaxpy",
+    "zdotu",
+    "zdotc",
+    "dzasum",
+    "dznrm2",
+    "zdrot",
+    "scopy",
+    "dcopy"
+  ],
+  "probes": {
+    "copy_probe_sha256": "20abc552350adba6563121884091a316dde662f79d5fab971d632e5fe58ada42",
+    "level1_probe_sha256": "67dfe076e97ad7fdcb991af4c40a1aae10bf0568ccfa4009f10463cbabb55d57"
+  },
+  "process_repeats": 6,
+  "seconds": 1,
+  "stable_negative_operations": [
+    "caxpy",
+    "ccopy",
+    "cdotc",
+    "cdotu",
+    "csrot",
+    "cswap",
+    "daxpy",
+    "dcopy",
+    "ddot",
+    "drot",
+    "drotm",
+    "dsdot",
+    "dswap",
+    "saxpy",
+    "scopy",
+    "sdot",
+    "sdsdot",
+    "srot",
+    "srotm",
+    "sswap",
+    "zaxpy",
+    "zcopy",
+    "zdotc",
+    "zdotu",
+    "zdrot",
+    "zswap"
+  ],
+  "zig_version": "0.16.0",
+  "zynum_maximum_threads_detected": 10
+}

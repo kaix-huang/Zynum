@@ -29,34 +29,38 @@ Transformer workloads across portable and architecture-specific CPU kernels.
 
 ## Performance Evidence
 
-The charts below retain the early Level 1 / Level 2 / GEMM layout and compare
-**Zynum, Accelerate, OpenBLAS**, in that order. **Higher is better.** They use
-medians from three interleaved fresh-process runs on Apple M5 (10 logical CPUs),
-macOS 26.6.2, Zig 0.16.0, `apple_m4+sme+sme2+sme2p1` CPU profile, ReleaseFast, measured 2026-09-09.
-Zynum uses its default thread policy; comparator thread caps are 10.
+The charts compare **Zynum, Accelerate, OpenBLAS**, in that order.
+**Higher is better.** This 2026-09-14 snapshot uses a baseline-CPU,
+dynamic-dispatch ReleaseFast build and six cyclically interleaved
+fresh-process measurements per case and library. The target machine, comparator versions,
+thread settings, source commit, and binary hashes are recorded in the
+[source manifest](docs/assets/benchmarks/2026-09-14/source.json).
 
-![Level 1 median performance](docs/assets/benchmarks/2026-09-09/level1.svg)
+![Level 1 median performance](docs/assets/benchmarks/2026-09-14/level1.svg)
 
-<sub>Level 1: real and complex vector routines at n=1,048,576, plus 8 KiB and
-8 MiB copy cases. Panels identify Gops or GB/s. The four nonstandard AXPBY
-extensions are excluded from this common-operation comparison.</sub>
+<sub>Level 1: 46 cases covering real and complex vector routines at
+n=1,048,576 and 8 KiB/8 MiB copy cases; Gops or GB/s as labeled.
+The four nonstandard AXPBY extensions are excluded.</sub>
 
-![Level 2 median performance](docs/assets/benchmarks/2026-09-09/level2.svg)
+![Level 2 median performance](docs/assets/benchmarks/2026-09-14/level2.svg)
 
-<sub>Level 2: real/complex GEMV, symmetric/Hermitian matrix-vector operations,
-and rank-one updates at n=128, 256, 512; GFLOP/s.</sub>
+<sub>Level 2: 60 legacy cases at n=128, 256, 512; GFLOP/s.
+Each process retains its minimum positive time for an individual Python/ctypes
+call; charts use the median of the six process rates. This is not a native
+batched-call benchmark.</sub>
 
-![GEMM median performance](docs/assets/benchmarks/2026-09-09/gemm.svg)
+![GEMM median performance](docs/assets/benchmarks/2026-09-14/gemm.svg)
 
-<sub>Level 3: SGEMM, DGEMM, CGEMM, ZGEMM over the 42-shape NN column-major sweep,
-including square, remainder, skinny, wide, and K-varied cases; GFLOP/s computed
-from median timings.</sub>
+<sub>Level 3: 168 cases, comprising SGEMM, DGEMM, CGEMM, and ZGEMM
+across the original 42-shape NN column-major sweep; GFLOP/s derived from
+median per-call timings from calibrated batches. This chart does not cover
+every Level 3 operation.</sub>
 
-These are measurements of the recorded specialized snapshot, not a before/after speedup
-claim or a portable performance guarantee. See the
-[reproduction package and methodology](docs/performance/README.md#readme-snapshot-2026-09-09)
-for source identity, raw CSVs, checks, comparator versions, commands, and
-measurement limits.
+These selected cases do not establish a portable performance guarantee,
+a historical speedup, or completion of the all-operation performance gate.
+See the [methodology and reproduction package](docs/performance/README.md#readme-snapshot-2026-09-14).
+The [2026-09-09 specialized snapshot](docs/performance/README.md#readme-snapshot-2026-09-09)
+remains archived with its original source identity and measurement method.
 
 ## Highlights
 
