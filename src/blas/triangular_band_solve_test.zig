@@ -340,7 +340,7 @@ fn runFiniteCandidate(comptime T: type) !void {
     var a: [5000]T = undefined;
     var x: [260]T = undefined;
     for ([_]usize{ 128, 129 }) |n| {
-        for ([_]usize{ 0, 1, 8, 15, 16, 17, 32 }) |k| {
+        for ([_]usize{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 15, 16, 17, 32 }) |k| {
             const lda = k + 3;
             for ([_]Uplo{ .upper, .lower }) |uplo| {
                 for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
@@ -364,6 +364,50 @@ fn runFiniteCandidate(comptime T: type) !void {
                             try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
                         }
                     }
+                }
+            }
+        }
+    }
+    // Identity solves with normal inputs and positive zero need no workspace or caller writes.
+    // Allocation failure distinguishes this path from the general candidate.
+    {
+        var no_storage: [0]u8 = .{};
+        var no_alloc = std.heap.FixedBufferAllocator.init(&no_storage);
+        @memset(&a, std.math.nan(T));
+        const normals = [_]T{ 0.0, 1, -1, std.math.floatMin(T), -std.math.floatMin(T), std.math.floatMax(T), -std.math.floatMax(T) };
+        for ([_]usize{ 128, 129 }) |n| {
+            for ([_]i32{ 1, -1, 2, -2 }) |inc| {
+                const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                @memset(&x, -123);
+                for (0..n) |i| x[1 + i * stride] = normals[i % normals.len];
+                for ([_]Uplo{ .upper, .lower }) |uplo| {
+                    for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                        var expected = x;
+                        candidateReference(T, uplo, trans, .unit, n, 0, &a, 1, expected[1..].ptr, inc);
+                        try std.testing.expect(entry.testing.forceTbsv(T, id, no_alloc.allocator(), 64 * 1024 * 1024, uplo, trans, .unit, @intCast(n), 0, &a, 1, x[1..].ptr, inc));
+                        try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+                    }
+                }
+            }
+        }
+        for ([_]usize{ 128, 129 }) |n| {
+            for ([_]usize{ 0, 15, 16, 63, n - 1 }) |index| {
+                @memset(&x, 1);
+                x[1 + index] = 0;
+                const before_positive_zero = x;
+                try std.testing.expect(entry.testing.forceTbsv(T, id, no_alloc.allocator(), 64 * 1024 * 1024, .upper, .no_trans, .unit, @intCast(n), 0, &a, 1, x[1..].ptr, 1));
+                try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before_positive_zero), std.mem.asBytes(&x));
+            }
+        }
+        const excluded = [_]T{ -0.0, std.math.floatMin(T) / 2, -std.math.floatMin(T) / 2, std.math.inf(T), -std.math.inf(T), std.math.nan(T) };
+        for (excluded) |excluded_value| {
+            for ([_]usize{ 128, 129 }) |n| {
+                for ([_]usize{ 0, 15, 16, 63, n - 1 }) |index| {
+                    @memset(&x, 1);
+                    x[1 + index] = excluded_value;
+                    const before_identity = x;
+                    try std.testing.expect(!entry.testing.forceTbsv(T, id, no_alloc.allocator(), 64 * 1024 * 1024, .lower, .no_trans, .unit, @intCast(n), 0, &a, 1, x[1..].ptr, 1));
+                    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before_identity), std.mem.asBytes(&x));
                 }
             }
         }
@@ -483,4 +527,105 @@ fn runFiniteCandidate(comptime T: type) !void {
     const matrix_before = a;
     try std.testing.expect(!entry.testing.forceTbsv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, 1, &a, 3, &a, 1));
     try std.testing.expectEqualSlices(u8, std.mem.asBytes(&matrix_before), std.mem.asBytes(&a));
+}
+
+test "production TBSV staging copies preserve strides and late-failure fallback" {
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    inline for (.{ f32, f64 }) |T| {
+        const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+        var a: [5000]T = undefined;
+        var x: [520]T = undefined;
+        for ([_]bool{ false, true }) |late_failure| {
+            for ([_]usize{ 127, 128, 129, 256, 257 }) |n| {
+                for ([_]usize{ 1, 5, 8, 16 }) |k| {
+                    const lda = k + 3;
+                    for ([_]Uplo{ .upper, .lower }) |uplo| {
+                        for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                            for ([_]Diag{ .non_unit, .unit }) |diag| {
+                                @memset(&a, std.math.nan(T));
+                                for (0..n) |col| {
+                                    const first = if (uplo == .upper) col - @min(col, k) else col;
+                                    const last = if (uplo == .upper) col + 1 else @min(n, col + k + 1);
+                                    for (first..last) |row| {
+                                        const pos = if (uplo == .upper) k + row - col + col * lda else row - col + col * lda;
+                                        a[pos] = if (row == col) (if (diag == .unit) std.math.nan(T) else 2) else @as(T, 1.0 / 128.0);
+                                    }
+                                }
+                                for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                                    @memset(&x, -123);
+                                    const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                                    for (0..n) |i| x[1 + i * stride] = 1 + @as(T, @floatFromInt(i % 5)) / 8;
+                                    if (late_failure) {
+                                        const upper = (trans == .no_trans and uplo == .upper) or (trans != .no_trans and uplo == .lower);
+                                        const last_row = if (upper) @as(usize, 0) else n - 1;
+                                        const physical = if (inc > 0) last_row * stride else (n - 1 - last_row) * stride;
+                                        x[1 + physical] = std.math.inf(T);
+                                    }
+                                    var expected = x;
+                                    candidateReference(T, uplo, trans, diag, n, k, &a, lda, expected[1..].ptr, inc);
+                                    entry.tbsv(T, uplo, trans, diag, @intCast(n), @intCast(k), &a, @intCast(lda), x[1..].ptr, inc);
+                                    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+test "finite TBSV reconstructs early signs when the first zero accumulator is late" {
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    inline for (.{ f32, f64 }) |T| {
+        var a: [5000]T = undefined;
+        var x: [520]T = undefined;
+        for ([_]usize{ 128, 256 }) |n| {
+            for ([_]usize{ 8, 16 }) |k| {
+                const lda = k + 3;
+                for (0..3) |mode| {
+                    const uplo: Uplo = if (mode == 0) .lower else .upper;
+                    const trans: Order = if (mode == 0) .no_trans else if (mode == 1) .trans else .conj_trans;
+                    for ([_]Diag{ .unit, .non_unit }) |diag| {
+                        @memset(&a, std.math.nan(T));
+                        for (0..n) |col| {
+                            const begin = if (uplo == .upper) col - @min(col, k) else col;
+                            const end = if (uplo == .upper) col + 1 else @min(n, col + k + 1);
+                            for (begin..end) |row| {
+                                const pos = if (uplo == .upper) k + row - col + col * lda else row - col + col * lda;
+                                a[pos] = if (row == col) (if (diag == .unit) std.math.nan(T) else 2) else 0;
+                            }
+                        }
+                        for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                            const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                            for (0..4) |pattern| {
+                                for ([_]usize{ k + 1, n / 2, n - 1 }) |zero_at| {
+                                    @memset(&x, -123);
+                                    for (0..n) |i| {
+                                        const negative = switch (pattern) {
+                                            0 => i == 0,
+                                            1 => i != 0,
+                                            2 => false,
+                                            else => true,
+                                        };
+                                        var v: T = if (negative) -1 else 1;
+                                        if (i >= zero_at) v = if (i % 2 == 0) -@as(T, 0) else 0;
+                                        // A previously absent sign appears after tracking starts.
+                                        if (i == zero_at + 1) v = if (pattern == 2) -1 else 1;
+                                        const physical = if (inc > 0) i * stride else (n - 1 - i) * stride;
+                                        x[1 + physical] = v;
+                                    }
+                                    var expected = x;
+                                    candidateReference(T, uplo, trans, diag, n, k, &a, lda, expected[1..].ptr, inc);
+                                    try std.testing.expect(entry.testing.forceTbsv(T, .compact_triangular_band_finite, std.testing.allocator, 64 * 1024 * 1024, uplo, trans, diag, @intCast(n), @intCast(k), &a, @intCast(lda), x[1..].ptr, inc));
+                                    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&expected), std.mem.asBytes(&x));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

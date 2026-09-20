@@ -212,6 +212,31 @@ submission overhead dominated, the wider vector reduced frequency, a hot
 function grew enough to perturb layout, or a partial semantic body was mistaken
 for a complete operation. Do not preserve a public diary of individual runs.
 
+### Contiguous swap scheduling on AArch64
+
+For disjoint unit-stride real and complex swaps, attempt the existing parallel
+route before the serial streaming route. Otherwise an eligible SME leaf can
+hide the parallel implementation in their overlapping byte ranges. Retain the
+existing 4–16 MiB parallel gate, task limits and single-task fallback; smaller
+calls and unavailable parallel execution still use the serial selection.
+
+Partition parallel swaps at whole 128-byte blocks relative to the array start,
+with the final task owning the remainder. Element-wise division can misalign
+worker vector loops when the real-lane count is not divisible by the task count.
+This partitioning adds no caller alignment requirement. Preserve all payload
+bits and guards, including complex components, and test both sides of the byte
+gates plus lengths with a remainder. Compare single-thread controls as well as
+default scheduling before retaining changes to the selection order.
+
+For the serial SME swap leaf, the existing 64-byte streaming-vector gate allows
+a predicated byte prefix to align both streams when their pointer residues
+match. Clamp the prefix to the remaining length, load both inputs before either
+store, then retain the original bulk loop and tail. Already aligned pointers
+and differing residues keep the original traversal. This adds no caller
+alignment requirement and preserves payload bits and the SM-only lifetime.
+Validate equal and different offsets separately; unaligned grouped loads can
+otherwise obscure the streaming kernel's throughput.
+
 ### Real IAMAX with a positive non-unit stride
 
 On AArch64, real IAMAX uses four independent scalar magnitude/index chains for

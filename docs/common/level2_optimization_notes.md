@@ -338,7 +338,57 @@ column supplies two adjacent matrix elements and one shared vector element,
 with a separate ordered accumulator for each output row. Peel the differing
 diagonal boundaries before or after the common column interval; never use a
 horizontal reduction across the two outputs. Stage both results privately and
-retain the single-row path for an odd tail and for transposed operations.
+retain the single-row path for an odd tail.
+
+Transposed real TPMV also pairs adjacent outputs, reading two contiguous packed
+columns and sharing each vector load. Each column keeps its original ascending
+multiply/add order, including the initial positive-zero addition and unit
+diagonal multiplication. Real conjugate-transpose uses the same path. The odd
+tail computes the final logical row; all outputs remain private until every
+pair and tail passes the finite/nonzero checks. Test refusal in either member
+of a pair and in the odd tail with both stride directions.
+
+At n >= 64, eligible real TPMV uses eight independent output accumulators for
+both non-transposed and transposed calls. Non-transposed rows share
+contiguous packed-column loads. Keep the eight sums in an explicit vector so
+the compiler need not repeatedly split and rebuild double-precision lanes in
+the upper-row loop. SIMD lanes represent separate outputs; never combine
+partial sums from the same row or fuse multiply and add. Peel distinct diagonal
+boundaries without changing term order. Transposed calls gather coefficients
+from eight packed columns into the independent vector lanes, retaining each
+column's ascending term order. Effective lower rows (lower non-transposed or
+upper transposed) process a remaining group of four with independent ordered
+vector accumulators, then ordered pairs, leaving at most one scalar row. The
+four-output leaf shares X loads without combining partial sums across terms. Effective upper rows retain the short ordered scalar tail. Verify every block position and remainder length, including
+n = 64 through 71 and the former n = 128 threshold;
+the wider block must not change input validation or private commit.
+
+For non-transposed f32 at n >= 512, use sixteen output rows per block. Process
+a remaining eight-row block at its actual row offset, then leave the final
+one to seven rows to the existing scalar tail. This retains the same workspace
+and supports every size and stride. Keep smaller calls and f64 on eight rows.
+Validate all sixteen remainders, failure in each accumulator and in both tail
+stages, and protected unit-diagonal endpoints before retaining the wider path.
+
+For transposed calls with incx == 1, specialize vector indexing at compile time
+to remove stride-direction selections and index scaling from the eight-row
+leaf. Dispatch once outside the leaf and retain the general implementation for
+every other nonzero stride. Check short rows and all tails: this optimization
+has a smaller margin than widening the output block.
+
+In the common transposed interval, load two adjacent coefficients per packed
+column, then explicitly deinterleave them into two vectors of independent
+outputs. Add the first product and then the second; never reduce across terms
+or fuse multiply/add. A plain array of pairs may still compile into scalar
+lane loads, so verify the generated wide loads and shuffle instructions. Only
+pair columns when both terms exist, and retain a single-term tail to avoid
+crossing a column boundary or reading a unit diagonal.
+
+The macOS real row leaves use 64-byte entry alignment. Adding a transposed
+leaf can otherwise shift an unchanged non-transposed loop and regress small
+calls. Validate the alignment with native interleaved measurements at the size
+gate, odd sizes and larger sizes, including unchanged non-transposed controls;
+alignment alone does not establish a performance improvement.
 
 The macOS AArch64 real legacy TPMV leaf has an explicit 64-byte entry alignment
 so changes in the finite leaf do not shift its loop instructions within cache
@@ -349,3 +399,113 @@ unchanged; use long interleaved batches with a same-library control to separate
 layout regressions from timing variability. For microsecond-scale calls, also
 measure continuous native batches with input resets; more trials of a minimum
 single-call timer do not remove its quantization or foreign-call overhead.
+
+For real CBLAS triangular matrix-vector multiply and solve (dense, banded and
+packed storage), normalize ConjTrans to Trans before applying the
+row-major transpose mapping. Conjugation is an identity on real values, so
+both requests must use the same traversal after swapping the triangle.
+Keep the complex conjugation handling separate. Exercise both precisions,
+triangles, diagonal modes and signed strides against an independent reference;
+comparison with an older library alone cannot detect a shared ABI mapping bug.
+
+The same real row-major ConjTrans normalization applies to SYRK and SYR2K.
+Use non-square inputs with padded leading dimensions to detect incorrect
+orientation, and compare with independently computed rank updates. Check the
+unwritten triangle and padding, both layouts, precisions and beta handling;
+real conjugation must not change matrix shape or leading-dimension semantics.
+
+Upper non-transposed real TPMV with incx == 1 uses the contiguous-input leaf
+for both precisions, retaining ordered paired-product preparation. The general
+f32 eight-output leaf has 128-byte entry alignment; other row leaves retain
+64-byte alignment. Controlled identical-code replicas on M5 reproduced a slow
+entry position after adding the f32 specialization, while direct leaf timing
+excluded dispatch as its sole cause. The aligned candidate must still pass
+noncontiguous, transposed and other-type performance controls. This is measured
+layout tuning, not an asserted cache or branch-predictor mechanism. A compile-time
+leaf type makes precision/width-specific function alignment expressible in Zig.
+
+For eligible contiguous transposed TPMV, use sixteen independent output
+columns per block at the thresholds documented below. Reuse the ordered two-input deinterleave within each
+eight-column group, concatenate their lanes, and retain each output's original
+addition order. Process a remaining eight-column block at its actual offset
+before the existing 4/2/1 or short scalar tails. Other transposed modes retain
+eight columns. Wider blocks increase diagonal-boundary code and stack traffic;
+measure that tradeoff and inspect the common loop separately from the whole
+function. Extend correctness tests to large transposed remainder sizes.
+
+Within a sixteen-output transposed boundary, use two eight-output triangular
+blocks and vectorize the eight-by-eight rectangle between them. For upper
+storage, process the rectangle before the second block's diagonal terms; for
+lower storage, process it after the first block's diagonal terms. This retains
+each row's ascending order and avoids reading unit diagonals. Reducing all
+boundary expansion to scalar runtime loops shrank code but did not improve
+measured speed; retain vectorized rectangle work and validate small gains with
+longer repeated measurements and unchanged-path controls.
+
+## Retained Compact Triangular Tuning
+
+The following rules describe the retained macOS AArch64 implementation.
+Private experiment logs are kept outside the repository; incremental timings
+are diagnostic evidence, not a cumulative speedup claim.
+
+### Transposed TPMV
+
+For contiguous input, f32 uses sixteen outputs from n=128 and also for unit
+diagonals from n=64. Small non-unit f32 calls at n=64..127 enter a separate
+sixteen-output branch after the original large/unit-diagonal branch. This
+layout avoids a measured unchanged-path penalty from simply lowering the first
+threshold. f64 uses sixteen outputs from n=512. Remaining blocks retain the
+eight-output and smaller tails at their actual offsets.
+
+Packed-column bases use bounded recurrences in specialized f32 leaves and
+the f64 eight-output leaf. Unit/non-unit diagonal selection is made early for
+f32 and for contiguous f64 eight-output calls. Triangle specialization is
+limited to f32 sixteen-output calls and unit-diagonal eight-output calls;
+broader specialization increased code size without consistent gains.
+
+SIMD groups contain independent output rows and preserve every row's ascending
+multiply/add order. Four-row groups handle eight-output triangular boundaries.
+Upper f32 sixteen-output common columns use two eight-row groups through n=256;
+larger calls retain the original grouping. Double-precision non-unit
+eight-output common columns use two four-row groups. Double-precision lower
+sixteen-output common columns use two eight-row groups. These choices limit
+register and boundary-code costs without introducing horizontal reductions.
+
+The f64 sixteen-output common loop prefetches coefficients sixteen input
+positions ahead every eight positions. From n=4096, lookahead is thirty-two
+positions every sixteen positions. Compile-time leaves select the distance;
+prefetch addresses remain strictly within the common off-diagonal interval.
+
+### Staging and validation
+
+Small real TPMV uses bounded stack staging for up to 128 outputs; larger calls
+retain the checked workspace allocation path. Contiguous input in either
+direction uses sixteen-element integer exponent scans to detect non-finite
+values. Logical order, stride gaps, overlap checks and transactional output
+commit remain unchanged. Normal-result checks for f32 transpose use integer
+lane tests and retain refusal for zero, subnormal and non-finite outputs.
+
+Contiguous TBSV gather/scatter uses bulk copies. The f32 four-term solve creates
+signed-zero history only when required by a zero accumulator; structural-zero
+terms must preserve the original signs and dependency order. Arbitrary strides,
+unit diagonals, non-finite refusal and the general fallback remain supported.
+
+### Evidence and limits
+
+Retained changes passed focused ReleaseSafe and ReleaseFast packed and banded
+triangular tests, Intel Linux/macOS compilation, complete-output comparisons,
+stride-gap and protected-page checks. Floating-point checks compare output
+bits, FPSR and preserved FPCR across rounding modes, flush-to-zero settings and
+exceptional operands. They do not establish equivalence of enabled-trap order.
+
+The final small non-unit f32 dispatch qualification measured about 1.07–1.12x
+on selected n=64..127 cases. Later f64 grouping changes gave only small gains;
+same-binary replicas and repeated controls were necessary to distinguish those
+from placement and process noise. A few unrelated TBSV controls were unstable:
+repeat measurements and disassembly did not reproduce the initial loss, but
+this is not proof of universal absence of regression.
+
+Use the published README snapshot for the current broad comparator evidence.
+Its legacy Level 2 cases do not replace focused native TPMV/TBSV measurements.
+Revisit these predicates if boundary sweeps, exception checks or unchanged-path
+controls show a repeatable regression on a supported machine.

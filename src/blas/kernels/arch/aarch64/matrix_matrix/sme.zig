@@ -302,8 +302,8 @@ fn packBPanel2F64ForTask(task: gemm_task.Task(f64), j: usize, tile: usize, b_pac
 
 fn tailRowsDirect(comptime T: type, task: gemm_task.Task(T), b_pack: []const T, row_start: usize, j: usize, tile: usize) void {
     if (row_start >= task.m) return;
-    // Scalar tail rows are intentionally simple: they are for fewer than
-    // one SME tile of M after the assembly kernels consume full rows.
+    // Finish rows below one SME tile after the assembly kernels. Four-column
+    // f32 groups preserve each output's ascending-K fused accumulation order.
     var acc_storage: [maxSmeTile(T)]T = undefined;
     var i = row_start;
     while (i < task.m) : (i += 1) {
@@ -315,6 +315,13 @@ fn tailRowsDirect(comptime T: type, task: gemm_task.Task(T), b_pack: []const T, 
             const av = task.a[matIndex(task.lda, i, p)];
             const b_base = p * tile;
             var col: usize = 0;
+            if (T == f32) {
+                while (col + 4 <= tile) : (col += 4) {
+                    const bv = loadF32x4(b_pack.ptr + b_base + col);
+                    const cv = loadF32x4(acc.ptr + col);
+                    storeF32x4(acc.ptr + col, @mulAdd(@Vector(4, f32), @as(@Vector(4, f32), @splat(av)), bv, cv));
+                }
+            }
             while (col < tile) : (col += 1) {
                 acc[col] = @mulAdd(T, av, b_pack[b_base + col], acc[col]);
             }

@@ -313,9 +313,9 @@ fn finitePackedCases(comptime T: type) !void {
     profile.enable_finite_tpmv = false;
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTpmv(T, 128));
     if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
-    var ap: [34000]T = undefined;
-    var x: [516]T = undefined;
-    for ([_]usize{ 64, 65, 66, 67, 96, 97, 127, 128, 129, 257 }) |n| {
+    var ap: [140000]T = undefined;
+    var x: [1060]T = undefined;
+    for ([_]usize{ 64, 65, 66, 67, 68, 69, 70, 71, 96, 97, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527 }) |n| {
         for ([_]Uplo{ .upper, .lower }) |uplo| {
             for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
                 for ([_]Diag{ .non_unit, .unit }) |diag| {
@@ -352,13 +352,47 @@ fn finitePackedCases(comptime T: type) !void {
             }
         }
     }
-    // Nonzero subnormal outputs remain eligible; unit diagonals never load AP.
-    @memset(&ap, 0);
-    for (0..128) |i| ap[i * (257 - i) / 2] = std.math.nan(T);
-    @memset(&x, std.math.floatMin(T) / 2);
-    const small_before = x;
-    try std.testing.expect(entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, .lower, .no_trans, .unit, 128, &ap, x[1..].ptr, 1));
-    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&small_before), std.mem.asBytes(&x));
+    // Row blocks and their tails must refuse without committing earlier rows,
+    // including an invalid value in any of the sixteen sums or the final row.
+    for ([_]usize{ 65, 129, 130, 131, 132, 133, 134, 135, 512, 527 }) |n| {
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                if (n >= 512 and trans != .no_trans) continue;
+                for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                    for ([_]usize{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, n - 15, n - 8, n - 1 }) |bad_row| {
+                        for ([_]T{ 0, std.math.nan(T), std.math.inf(T), std.math.floatMax(T) }) |bad| {
+                            @memset(&ap, 0);
+                            @memset(&x, 2);
+                            for (0..n) |i| {
+                                const offset = if (uplo == .upper) i * (i + 1) / 2 + i else i * (2 * n + 1 - i) / 2;
+                                ap[offset] = if (i == bad_row) bad else 1;
+                            }
+                            const unchanged = x;
+                            try std.testing.expect(!entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, uplo, trans, .non_unit, @intCast(n), &ap, x[1..].ptr, inc));
+                            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&unchanged), std.mem.asBytes(&x));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Nonzero subnormal outputs remain eligible in both transpose block widths.
+    // Unit diagonals must remain unread even on the exceptional-exponent path.
+    for ([_]usize{ 64, 128 }) |n| {
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                @memset(&ap, 0);
+                for (0..n) |i| {
+                    const diagonal = if (uplo == .upper) i * (i + 1) / 2 + i else i * (2 * n + 1 - i) / 2;
+                    ap[diagonal] = std.math.nan(T);
+                }
+                @memset(&x, std.math.floatMin(T) / 2);
+                const small_before = x;
+                try std.testing.expect(entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, uplo, trans, .unit, @intCast(n), &ap, x[1..].ptr, 1));
+                try std.testing.expectEqualSlices(u8, std.mem.asBytes(&small_before), std.mem.asBytes(&x));
+            }
+        }
+    }
     for (0..10) |mode| {
         @memset(&ap, 0);
         @memset(&x, 1);
@@ -414,4 +448,115 @@ fn finitePackedCases(comptime T: type) !void {
     const matrix_before = ap;
     try std.testing.expect(!entry.testing.forceTpmv(T, id, std.testing.allocator, 64 * 1024 * 1024, .upper, .no_trans, .unit, 128, &ap, &ap, 1));
     try std.testing.expectEqualSlices(u8, std.mem.asBytes(&matrix_before), std.mem.asBytes(&ap));
+}
+
+test "finite f64 transpose preserves exact results across large prefetch threshold" {
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    const allocator = std.testing.allocator;
+    for ([_]usize{ 4095, 4096, 4097 }) |n| {
+        const ap = try allocator.alloc(f64, n * (n + 1) / 2);
+        defer allocator.free(ap);
+        const x = try allocator.alloc(f64, n + 2);
+        defer allocator.free(x);
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Diag{ .unit, .non_unit }) |diag| {
+                @memset(ap, 0.125);
+                for (0..n) |j| {
+                    const pos = if (uplo == .upper) j * (j + 1) / 2 + j else j * (2 * n - j + 1) / 2;
+                    ap[pos] = if (diag == .unit) std.math.nan(f64) else 2;
+                }
+                for ([_]Order{ .trans, .conj_trans }) |trans| {
+                    @memset(x, 1);
+                    x[0] = -123;
+                    x[n + 1] = -123;
+                    try std.testing.expect(entry.testing.forceTpmv(f64, .compact_triangular_packed_finite, allocator, 64 * 1024 * 1024, uplo, trans, diag, @intCast(n), ap.ptr, x[1..].ptr, 1));
+                    // With unit input and binary coefficients, counting the
+                    // off-diagonal terms gives an exact independent oracle.
+                    for (0..n) |i| {
+                        const terms = if (uplo == .upper) i else n - i - 1;
+                        const expected: f64 = (if (diag == .unit) @as(f64, 1) else 2) + @as(f64, @floatFromInt(terms)) * 0.125;
+                        try std.testing.expectEqual(expected, x[i + 1]);
+                    }
+                    try std.testing.expectEqual(@as(f64, -123), x[0]);
+                    try std.testing.expectEqual(@as(f64, -123), x[n + 1]);
+                }
+            }
+        }
+    }
+}
+
+test "production TPMV preserves staged results across small workspace threshold" {
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    inline for (.{ f32, f64 }) |T| {
+        for ([_]usize{ 127, 128, 129 }) |n| {
+            const ap = try std.testing.allocator.alloc(T, n * (n + 1) / 2);
+            defer std.testing.allocator.free(ap);
+            var storage: [260]T = undefined;
+            for ([_]Uplo{ .upper, .lower }) |uplo| {
+                for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans_| {
+                    for ([_]i32{ 1, -1, 2, -2 }) |inc| {
+                        const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                        const last = (n - 1) * stride;
+                        const effective_upper = (uplo == .upper) == (trans_ == .no_trans);
+                        // The final case forces a late zero-result refusal, so
+                        // a partial write before scalar fallback changes results.
+                        for (0..3) |mode| {
+                            const diag: Diag = if (mode == 0) .unit else .non_unit;
+                            @memset(ap, 0.125);
+                            for (0..n) |i| {
+                                const index = if (uplo == .upper) i * (i + 1) / 2 + i else i * (2 * n - i + 1) / 2;
+                                ap[index] = if (diag == .unit) std.math.nan(T) else 2;
+                                if (mode == 2 and i == n - 1) {
+                                    const terms = if (effective_upper) n - i - 1 else i;
+                                    ap[index] = -@as(T, @floatFromInt(terms)) * 0.125;
+                                }
+                            }
+                            @memset(&storage, -123);
+                            const x = storage[1..].ptr;
+                            for (0..n) |i| x[if (inc > 0) i * stride else last - i * stride] = 1;
+                            entry.tpmv(T, uplo, trans_, diag, @intCast(n), ap.ptr, x, inc);
+                            for (0..n) |i| {
+                                const terms = if (effective_upper) n - i - 1 else i;
+                                const expected: T = if (mode == 2 and i == n - 1) 0 else (if (diag == .unit) @as(T, 1) else 2) + @as(T, @floatFromInt(terms)) * 0.125;
+                                try std.testing.expectEqual(expected, x[if (inc > 0) i * stride else last - i * stride]);
+                            }
+                            try std.testing.expectEqual(@as(T, -123), storage[0]);
+                            for (1..storage.len) |i| {
+                                const offset = i - 1;
+                                if (offset > last or offset % stride != 0) try std.testing.expectEqual(@as(T, -123), storage[i]);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+test "finite TPMV rejects exceptional inputs before allocating across scan tails" {
+    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    inline for (.{ f32, f64 }) |T| {
+        var ap: [8385]T = undefined;
+        @memset(&ap, 0.125);
+        for ([_]usize{ 64, 65, 79, 80, 129 }) |n| {
+            for ([_]i32{ 1, -1, 2, -2 }) |inc| {
+                const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                for (0..n) |position| {
+                    for ([_]T{ std.math.inf(T), std.math.nan(T) }) |exceptional| {
+                        var storage: [260]T = @splat(-123);
+                        for (0..n) |i| storage[1 + i * stride] = 1;
+                        storage[1 + position * stride] = exceptional;
+                        const before = storage;
+                        var tracked = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+                        try std.testing.expect(!entry.testing.forceTpmv(T, .compact_triangular_packed_finite, tracked.allocator(), 64 * 1024 * 1024, .upper, .trans, .unit, @intCast(n), &ap, storage[1..].ptr, inc));
+                        try std.testing.expectEqual(@as(usize, 0), tracked.allocated_bytes);
+                        try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&storage));
+                    }
+                }
+            }
+        }
+    }
 }

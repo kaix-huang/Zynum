@@ -2609,6 +2609,18 @@
           "name": "TBSV band-window gate misses leave x unchanged",
           "ordinal": 2,
           "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/triangular_band_solve_test.zig:3",
+          "name": "production TBSV staging copies preserve strides and late-failure fallback",
+          "ordinal": 3,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/triangular_band_solve_test.zig:4",
+          "name": "finite TBSV reconstructs early signs when the first zero accumulator is late",
+          "ordinal": 4,
+          "kind": "named"
         }
       ],
       "reaching_root_ids": [
@@ -2677,6 +2689,24 @@
           "id": "zig-decl:src/blas/triangular_packed_unit_test.zig:2",
           "name": "packed-column production gates fail without modifying x",
           "ordinal": 2,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/triangular_packed_unit_test.zig:3",
+          "name": "finite f64 transpose preserves exact results across large prefetch threshold",
+          "ordinal": 3,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/triangular_packed_unit_test.zig:4",
+          "name": "production TPMV preserves staged results across small workspace threshold",
+          "ordinal": 4,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/blas/triangular_packed_unit_test.zig:5",
+          "name": "finite TPMV rejects exceptional inputs before allocating across scan tails",
+          "ordinal": 5,
           "kind": "named"
         }
       ],
@@ -2938,6 +2968,18 @@
           "id": "zig-decl:test/abi/cblas_compat_test.zig:23",
           "name": "cblas row-major ztrmm and ztrsm conjugate transpose reference",
           "ordinal": 23,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/abi/cblas_compat_test.zig:24",
+          "name": "cblas real row-major triangular conjugate transpose matches exact reference",
+          "ordinal": 24,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/abi/cblas_compat_test.zig:25",
+          "name": "cblas real rank updates conjugate transpose independent reference",
+          "ordinal": 25,
           "kind": "named"
         }
       ],
@@ -15588,7 +15630,7 @@
       "enumeration_source": "zig-0.16-builtin-test-functions"
     },
     {
-      "id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
+      "id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
       "root_id": "zig-root:cblas-tests",
       "tests": [
         {
@@ -15710,10 +15752,20 @@
           "id": "test:zig-root-cblas-tests:23",
           "name": "cblas_compat_test.test.cblas row-major ztrmm and ztrsm conjugate transpose reference",
           "ordinal": 23
+        },
+        {
+          "id": "test:zig-root-cblas-tests:24",
+          "name": "cblas_compat_test.test.cblas real row-major triangular conjugate transpose matches exact reference",
+          "ordinal": 24
+        },
+        {
+          "id": "test:zig-root-cblas-tests:25",
+          "name": "cblas_compat_test.test.cblas real rank updates conjugate transpose independent reference",
+          "ordinal": 25
         }
       ],
-      "count": 24,
-      "digest": "7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
+      "count": 26,
+      "digest": "e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
       "enumeration_source": "zig-0.16-builtin-test-functions"
     },
     {
@@ -17621,7 +17673,7 @@
       "enumeration_source": "zig-0.16-builtin-test-functions"
     },
     {
-      "id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
+      "id": "set:zig-root:triangular-band-solve-tests:4cf32ba87cbf478c50321ec538c1eeef674014aa412a7406907e1c9a0e7d1923",
       "root_id": "zig-root:triangular-band-solve-tests",
       "tests": [
         {
@@ -17641,102 +17693,241 @@
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:3",
-          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 width profile changes only width switches",
+          "name": "triangular_band_solve_test.test.production TBSV staging copies preserve strides and late-failure fallback",
           "ordinal": 3
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:4",
-          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 fixed profile changes only its candidate switch",
+          "name": "triangular_band_solve_test.test.finite TBSV reconstructs early signs when the first zero accumulator is late",
           "ordinal": 4
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:5",
-          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 hard feasibility is independent from shape preference",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 terminal catalog covers every public operation and scalar cell",
           "ordinal": 5
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:6",
-          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 selector preserves unit and signed-stride default boundaries",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fixed SIMD build tiers have distinct identities and scalar tails",
           "ordinal": 6
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:7",
-          "name": "kernels.shared.matrix_vector.tuning.test.named Level 2 production profile preserves retained thresholds",
+          "name": "kernels.shared.matrix_vector.catalog.test.isolated x86 width bodies have distinct identities and lifecycle",
           "ordinal": 7
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:8",
-          "name": "kernels.shared.matrix_vector.dependency_vector.test.dependency vectors cover short real and conjugated complex tails",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fused bodies declare partial ownership and unit fallback",
           "ordinal": 8
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:9",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 terminal catalog covers every public operation and scalar cell",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 storage and ownership contracts distinguish compact and dependency paths",
           "ordinal": 9
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:10",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fixed SIMD build tiers have distinct identities and scalar tails",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 compact families declare window merge and task fallback contracts",
           "ordinal": 10
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:11",
-          "name": "kernels.shared.matrix_vector.catalog.test.isolated x86 width bodies have distinct identities and lifecycle",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 unit execution layers require unit stride and total fallback",
           "ordinal": 11
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:12",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fused bodies declare partial ownership and unit fallback",
+          "name": "kernels.contract.test.kernel lifecycle controls default eligibility",
           "ordinal": 12
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:13",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 storage and ownership contracts distinguish compact and dependency paths",
+          "name": "kernels.contract.test.real scalar kinds are stable",
           "ordinal": 13
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:14",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 compact families declare window merge and task fallback contracts",
+          "name": "kernels.contract.test.complex scalar kinds are stable",
           "ordinal": 14
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:15",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 unit execution layers require unit stride and total fallback",
+          "name": "kernels.contract.test.private Level 2 outputs declare a merge obligation",
           "ordinal": 15
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:16",
-          "name": "kernels.contract.test.kernel lifecycle controls default eligibility",
+          "name": "kernels.contract.test.Level 2 task fallback distinguishes private commit from disjoint output",
           "ordinal": 16
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:17",
-          "name": "kernels.contract.test.real scalar kinds are stable",
+          "name": "kernels.contract.test.stateful ISA contracts declare entry exit clobbers and total cleanup",
           "ordinal": 17
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:18",
-          "name": "kernels.contract.test.complex scalar kinds are stable",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 width profile changes only width switches",
           "ordinal": 18
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:19",
-          "name": "kernels.contract.test.private Level 2 outputs declare a merge obligation",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 fixed profile changes only its candidate switch",
           "ordinal": 19
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:20",
-          "name": "kernels.contract.test.Level 2 task fallback distinguishes private commit from disjoint output",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 hard feasibility is independent from shape preference",
           "ordinal": 20
         },
         {
           "id": "test:zig-root-triangular-band-solve-tests:21",
-          "name": "kernels.contract.test.stateful ISA contracts declare entry exit clobbers and total cleanup",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 selector preserves unit and signed-stride default boundaries",
           "ordinal": 21
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:22",
+          "name": "kernels.shared.matrix_vector.tuning.test.named Level 2 production profile preserves retained thresholds",
+          "ordinal": 22
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:23",
+          "name": "kernels.shared.matrix_vector.dependency_vector.test.dependency vectors cover short real and conjugated complex tails",
+          "ordinal": 23
         }
       ],
-      "count": 22,
-      "digest": "b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
+      "count": 24,
+      "digest": "4cf32ba87cbf478c50321ec538c1eeef674014aa412a7406907e1c9a0e7d1923",
+      "enumeration_source": "zig-0.16-builtin-test-functions"
+    },
+    {
+      "id": "set:zig-root:triangular-band-solve-tests:5357c2a5b56fae844ed99b7f3112e596435fd99d3129c78264c2a9707261f737",
+      "root_id": "zig-root:triangular-band-solve-tests",
+      "tests": [
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:0",
+          "name": "triangular_band_solve_test.test.TBSV band-window solve matches independent s/d/c/z references",
+          "ordinal": 0
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:1",
+          "name": "triangular_band_solve_test.test.matrix-vector facade routes compact TBSV",
+          "ordinal": 1
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:2",
+          "name": "triangular_band_solve_test.test.TBSV band-window gate misses leave x unchanged",
+          "ordinal": 2
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:3",
+          "name": "triangular_band_solve_test.test.production TBSV staging copies preserve strides and late-failure fallback",
+          "ordinal": 3
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:4",
+          "name": "triangular_band_solve_test.test.finite TBSV reconstructs early signs when the first zero accumulator is late",
+          "ordinal": 4
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:5",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 terminal catalog covers every public operation and scalar cell",
+          "ordinal": 5
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:6",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fixed SIMD build tiers have distinct identities and scalar tails",
+          "ordinal": 6
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:7",
+          "name": "kernels.shared.matrix_vector.catalog.test.isolated x86 width bodies have distinct identities and lifecycle",
+          "ordinal": 7
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:8",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fused bodies declare partial ownership and unit fallback",
+          "ordinal": 8
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:9",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 storage and ownership contracts distinguish compact and dependency paths",
+          "ordinal": 9
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:10",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 compact families declare window merge and task fallback contracts",
+          "ordinal": 10
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:11",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 unit execution layers require unit stride and total fallback",
+          "ordinal": 11
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:12",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 width profile changes only width switches",
+          "ordinal": 12
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:13",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 fixed profile changes only its candidate switch",
+          "ordinal": 13
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:14",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 hard feasibility is independent from shape preference",
+          "ordinal": 14
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:15",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 selector preserves unit and signed-stride default boundaries",
+          "ordinal": 15
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:16",
+          "name": "kernels.shared.matrix_vector.tuning.test.named Level 2 production profile preserves retained thresholds",
+          "ordinal": 16
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:17",
+          "name": "kernels.contract.test.kernel lifecycle controls default eligibility",
+          "ordinal": 17
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:18",
+          "name": "kernels.contract.test.real scalar kinds are stable",
+          "ordinal": 18
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:19",
+          "name": "kernels.contract.test.complex scalar kinds are stable",
+          "ordinal": 19
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:20",
+          "name": "kernels.contract.test.private Level 2 outputs declare a merge obligation",
+          "ordinal": 20
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:21",
+          "name": "kernels.contract.test.Level 2 task fallback distinguishes private commit from disjoint output",
+          "ordinal": 21
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:22",
+          "name": "kernels.contract.test.stateful ISA contracts declare entry exit clobbers and total cleanup",
+          "ordinal": 22
+        },
+        {
+          "id": "test:zig-root-triangular-band-solve-tests:23",
+          "name": "kernels.shared.matrix_vector.dependency_vector.test.dependency vectors cover short real and conjugated complex tails",
+          "ordinal": 23
+        }
+      ],
+      "count": 24,
+      "digest": "5357c2a5b56fae844ed99b7f3112e596435fd99d3129c78264c2a9707261f737",
       "enumeration_source": "zig-0.16-builtin-test-functions"
     },
     {
@@ -17983,7 +18174,7 @@
       "enumeration_source": "zig-0.16-builtin-test-functions"
     },
     {
-      "id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
+      "id": "set:zig-root:triangular-packed-unit-tests:2bbfc9ea8e8a14fbd94bbd4c91a778d2ea03615dbd78a4437160fbe07cd76d2e",
       "root_id": "zig-root:triangular-packed-unit-tests",
       "tests": [
         {
@@ -18003,102 +18194,251 @@
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:3",
-          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 width profile changes only width switches",
+          "name": "triangular_packed_unit_test.test.finite f64 transpose preserves exact results across large prefetch threshold",
           "ordinal": 3
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:4",
-          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 fixed profile changes only its candidate switch",
+          "name": "triangular_packed_unit_test.test.production TPMV preserves staged results across small workspace threshold",
           "ordinal": 4
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:5",
-          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 hard feasibility is independent from shape preference",
+          "name": "triangular_packed_unit_test.test.finite TPMV rejects exceptional inputs before allocating across scan tails",
           "ordinal": 5
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:6",
-          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 selector preserves unit and signed-stride default boundaries",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 terminal catalog covers every public operation and scalar cell",
           "ordinal": 6
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:7",
-          "name": "kernels.shared.matrix_vector.tuning.test.named Level 2 production profile preserves retained thresholds",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fixed SIMD build tiers have distinct identities and scalar tails",
           "ordinal": 7
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:8",
-          "name": "kernels.shared.matrix_vector.dependency_vector.test.dependency vectors cover short real and conjugated complex tails",
+          "name": "kernels.shared.matrix_vector.catalog.test.isolated x86 width bodies have distinct identities and lifecycle",
           "ordinal": 8
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:9",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 terminal catalog covers every public operation and scalar cell",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fused bodies declare partial ownership and unit fallback",
           "ordinal": 9
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:10",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fixed SIMD build tiers have distinct identities and scalar tails",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 storage and ownership contracts distinguish compact and dependency paths",
           "ordinal": 10
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:11",
-          "name": "kernels.shared.matrix_vector.catalog.test.isolated x86 width bodies have distinct identities and lifecycle",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 compact families declare window merge and task fallback contracts",
           "ordinal": 11
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:12",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fused bodies declare partial ownership and unit fallback",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 unit execution layers require unit stride and total fallback",
           "ordinal": 12
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:13",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 storage and ownership contracts distinguish compact and dependency paths",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 width profile changes only width switches",
           "ordinal": 13
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:14",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 compact families declare window merge and task fallback contracts",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 fixed profile changes only its candidate switch",
           "ordinal": 14
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:15",
-          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 unit execution layers require unit stride and total fallback",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 hard feasibility is independent from shape preference",
           "ordinal": 15
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:16",
-          "name": "kernels.contract.test.kernel lifecycle controls default eligibility",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 selector preserves unit and signed-stride default boundaries",
           "ordinal": 16
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:17",
-          "name": "kernels.contract.test.real scalar kinds are stable",
+          "name": "kernels.shared.matrix_vector.tuning.test.named Level 2 production profile preserves retained thresholds",
           "ordinal": 17
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:18",
-          "name": "kernels.contract.test.complex scalar kinds are stable",
+          "name": "kernels.contract.test.kernel lifecycle controls default eligibility",
           "ordinal": 18
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:19",
-          "name": "kernels.contract.test.private Level 2 outputs declare a merge obligation",
+          "name": "kernels.contract.test.real scalar kinds are stable",
           "ordinal": 19
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:20",
-          "name": "kernels.contract.test.Level 2 task fallback distinguishes private commit from disjoint output",
+          "name": "kernels.contract.test.complex scalar kinds are stable",
           "ordinal": 20
         },
         {
           "id": "test:zig-root-triangular-packed-unit-tests:21",
-          "name": "kernels.contract.test.stateful ISA contracts declare entry exit clobbers and total cleanup",
+          "name": "kernels.contract.test.private Level 2 outputs declare a merge obligation",
           "ordinal": 21
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:22",
+          "name": "kernels.contract.test.Level 2 task fallback distinguishes private commit from disjoint output",
+          "ordinal": 22
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:23",
+          "name": "kernels.contract.test.stateful ISA contracts declare entry exit clobbers and total cleanup",
+          "ordinal": 23
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:24",
+          "name": "kernels.shared.matrix_vector.dependency_vector.test.dependency vectors cover short real and conjugated complex tails",
+          "ordinal": 24
         }
       ],
-      "count": 22,
-      "digest": "e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
+      "count": 25,
+      "digest": "2bbfc9ea8e8a14fbd94bbd4c91a778d2ea03615dbd78a4437160fbe07cd76d2e",
+      "enumeration_source": "zig-0.16-builtin-test-functions"
+    },
+    {
+      "id": "set:zig-root:triangular-packed-unit-tests:a9336dfb4785414e9c6a0472175bcabb346ab0ba0af33f8502ba25d129d763bb",
+      "root_id": "zig-root:triangular-packed-unit-tests",
+      "tests": [
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:0",
+          "name": "triangular_packed_unit_test.test.packed-column unit TPMV and TPSV match independent references",
+          "ordinal": 0
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:1",
+          "name": "triangular_packed_unit_test.test.matrix-vector facade routes compact TPMV and TPSV",
+          "ordinal": 1
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:2",
+          "name": "triangular_packed_unit_test.test.packed-column production gates fail without modifying x",
+          "ordinal": 2
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:3",
+          "name": "triangular_packed_unit_test.test.finite f64 transpose preserves exact results across large prefetch threshold",
+          "ordinal": 3
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:4",
+          "name": "triangular_packed_unit_test.test.production TPMV preserves staged results across small workspace threshold",
+          "ordinal": 4
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:5",
+          "name": "triangular_packed_unit_test.test.finite TPMV rejects exceptional inputs before allocating across scan tails",
+          "ordinal": 5
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:6",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 terminal catalog covers every public operation and scalar cell",
+          "ordinal": 6
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:7",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fixed SIMD build tiers have distinct identities and scalar tails",
+          "ordinal": 7
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:8",
+          "name": "kernels.shared.matrix_vector.catalog.test.isolated x86 width bodies have distinct identities and lifecycle",
+          "ordinal": 8
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:9",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 fused bodies declare partial ownership and unit fallback",
+          "ordinal": 9
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:10",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 storage and ownership contracts distinguish compact and dependency paths",
+          "ordinal": 10
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:11",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 compact families declare window merge and task fallback contracts",
+          "ordinal": 11
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:12",
+          "name": "kernels.shared.matrix_vector.catalog.test.Level 2 unit execution layers require unit stride and total fallback",
+          "ordinal": 12
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:13",
+          "name": "kernels.contract.test.kernel lifecycle controls default eligibility",
+          "ordinal": 13
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:14",
+          "name": "kernels.contract.test.real scalar kinds are stable",
+          "ordinal": 14
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:15",
+          "name": "kernels.contract.test.complex scalar kinds are stable",
+          "ordinal": 15
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:16",
+          "name": "kernels.contract.test.private Level 2 outputs declare a merge obligation",
+          "ordinal": 16
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:17",
+          "name": "kernels.contract.test.Level 2 task fallback distinguishes private commit from disjoint output",
+          "ordinal": 17
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:18",
+          "name": "kernels.contract.test.stateful ISA contracts declare entry exit clobbers and total cleanup",
+          "ordinal": 18
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:19",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 width profile changes only width switches",
+          "ordinal": 19
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:20",
+          "name": "kernels.shared.matrix_vector.tuning.test.experimental Level 2 fixed profile changes only its candidate switch",
+          "ordinal": 20
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:21",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 hard feasibility is independent from shape preference",
+          "ordinal": 21
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:22",
+          "name": "kernels.shared.matrix_vector.tuning.test.Level 2 selector preserves unit and signed-stride default boundaries",
+          "ordinal": 22
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:23",
+          "name": "kernels.shared.matrix_vector.tuning.test.named Level 2 production profile preserves retained thresholds",
+          "ordinal": 23
+        },
+        {
+          "id": "test:zig-root-triangular-packed-unit-tests:24",
+          "name": "kernels.shared.matrix_vector.dependency_vector.test.dependency vectors cover short real and conjugated complex tails",
+          "ordinal": 24
+        }
+      ],
+      "count": 25,
+      "digest": "a9336dfb4785414e9c6a0472175bcabb346ab0ba0af33f8502ba25d129d763bb",
       "enumeration_source": "zig-0.16-builtin-test-functions"
     },
     {
@@ -18491,14 +18831,14 @@
       "digest": "0840eebc05bce54859c2766d7fa3ab65c30c859a24cab4a18195307d8720113a"
     },
     {
-      "id": "native-observation:085610bc389057e178af23693aa6471ea80fc1582d5f2b5e104c1fdfeb7bbd68",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseSafe",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseSafe",
+      "id": "native-observation:0a7b5682507e96796cf572301f77374d89196cd7b78681f7a4fe8bf112acf31a",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseFast",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseFast",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:ReleaseSafe",
-      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:a9336dfb4785414e9c6a0472175bcabb346ab0ba0af33f8502ba25d129d763bb",
       "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "085610bc389057e178af23693aa6471ea80fc1582d5f2b5e104c1fdfeb7bbd68"
+      "digest": "0a7b5682507e96796cf572301f77374d89196cd7b78681f7a4fe8bf112acf31a"
     },
     {
       "id": "native-observation:0aa51db645499177080e1c851fdfac53ce2349bcc97bd40eaf5d9cc128b4d7a2",
@@ -18509,6 +18849,26 @@
       "expected_test_set_id": "set:zig-root:modern-tests:2b841f8e355e9bb81745432be86bba2eb32cd48e707ecd7eabe4e08f9febbef1",
       "enumeration_source": "zig-0.16-builtin-test-functions",
       "digest": "0aa51db645499177080e1c851fdfac53ce2349bcc97bd40eaf5d9cc128b4d7a2"
+    },
+    {
+      "id": "native-observation:0bb574ae1d36dfc6227625f9f5ed602b6f9ed017575107968b01a7077c19f243",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:Debug",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:Debug",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:Debug",
+      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:5357c2a5b56fae844ed99b7f3112e596435fd99d3129c78264c2a9707261f737",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "0bb574ae1d36dfc6227625f9f5ed602b6f9ed017575107968b01a7077c19f243"
+    },
+    {
+      "id": "native-observation:0c967ca86e59f2eec75a5f6a3c61f68dcf7c680d79867fda939d9bd7c6efb46e",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseSafe",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:4cf32ba87cbf478c50321ec538c1eeef674014aa412a7406907e1c9a0e7d1923",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "0c967ca86e59f2eec75a5f6a3c61f68dcf7c680d79867fda939d9bd7c6efb46e"
     },
     {
       "id": "native-observation:12b3f0b33994c0d140993961a50b33c1228a7d6a0fd3e5899c87b802b4c05583",
@@ -18549,6 +18909,16 @@
       "expected_test_set_id": "set:zig-root:gemm-registry-tests:c5eddb6719f090c448720e1c93f44a69f8bf8ecb8693ceaf88a238aa0cb8bbf2",
       "enumeration_source": "zig-0.16-builtin-test-functions",
       "digest": "1c1a20bd92888ed8a8dd2e1c97f49ef6eb9a565ab905a7a98682b004369bc550"
+    },
+    {
+      "id": "native-observation:2065a642f0940f2f8a88ec26743639daae0210c418fc1d948d991c597d2edd90",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseFast",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseFast",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:4cf32ba87cbf478c50321ec538c1eeef674014aa412a7406907e1c9a0e7d1923",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "2065a642f0940f2f8a88ec26743639daae0210c418fc1d948d991c597d2edd90"
     },
     {
       "id": "native-observation:2519d0ac40e3e185be2b8c559a0a44e28f3f9a483e7f5a2f4174d2f9fcef584d",
@@ -18599,16 +18969,6 @@
       "expected_test_set_id": "set:zig-root:zynum-public-surface-contract-tests:f4c3173a3cd2e8e5d9eef155d4b866db068938e933fb673074f3e808c0120dda",
       "enumeration_source": "zig-0.16-builtin-test-functions",
       "digest": "2d9a5d6b8c72ecb20c6b287f6a760b65a111b5b7fc503346d29bf547a1446083"
-    },
-    {
-      "id": "native-observation:2f7e308d852db8413c3858f9530af99a39e1698867957330800ae363975a44cd",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:Debug",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:Debug",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:Debug",
-      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "2f7e308d852db8413c3858f9530af99a39e1698867957330800ae363975a44cd"
     },
     {
       "id": "native-observation:3c9935f49e485cb99fb1fbd0023858dbeb4e15fba44e02ab0e90985b27c4c81a",
@@ -18741,16 +19101,6 @@
       "digest": "5a33bf00057ab0f62a334e016370f64f5761f3464eb0a1355e02f2fc35265c0c"
     },
     {
-      "id": "native-observation:5b2ad3d6b0ad20724bd7f97c788c8ed46d9913fad29e9097445a7d7756be33e3",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseFast",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseFast",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:ReleaseFast",
-      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "5b2ad3d6b0ad20724bd7f97c788c8ed46d9913fad29e9097445a7d7756be33e3"
-    },
-    {
       "id": "native-observation:5da3ea32fd1124693052dc6719bc8c4205199b91be4768868e8e647cbdc83a6b",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-window-tests:ReleaseFast",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-window-tests:ReleaseFast",
@@ -18811,6 +19161,16 @@
       "digest": "85d48b69e4d844d00274501c18aaefcca8c669c036c44b6cb9c88bdf9a56e4f4"
     },
     {
+      "id": "native-observation:87569c615a28f310cfb535e510c844a2e79e8b3c4f3dbbaca4bfc7dbec9017f8",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseSafe",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "expected_test_set_id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "87569c615a28f310cfb535e510c844a2e79e8b3c4f3dbbaca4bfc7dbec9017f8"
+    },
+    {
       "id": "native-observation:960fcdb070e15e027d36e7981df8f6b01cb698ababc86f87f1d772f1e3e2e2d1",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-blas-module-tests:ReleaseSafe",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-blas-module-tests:ReleaseSafe",
@@ -18821,16 +19181,6 @@
       "digest": "960fcdb070e15e027d36e7981df8f6b01cb698ababc86f87f1d772f1e3e2e2d1"
     },
     {
-      "id": "native-observation:a00dfa2b4703999b66472c9e66cab7b7002534ed141347213e4dfcfffef0b6cf",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseSafe",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseSafe",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:ReleaseSafe",
-      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "a00dfa2b4703999b66472c9e66cab7b7002534ed141347213e4dfcfffef0b6cf"
-    },
-    {
       "id": "native-observation:a122826a315596fecffc2a5e845b8600b22e4df0823194ab659876af308c2dae",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-zynum-public-surface-contract-tests:ReleaseSafe",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-zynum-public-surface-contract-tests:ReleaseSafe",
@@ -18839,16 +19189,6 @@
       "expected_test_set_id": "set:zig-root:zynum-public-surface-contract-tests:f4c3173a3cd2e8e5d9eef155d4b866db068938e933fb673074f3e808c0120dda",
       "enumeration_source": "zig-0.16-builtin-test-functions",
       "digest": "a122826a315596fecffc2a5e845b8600b22e4df0823194ab659876af308c2dae"
-    },
-    {
-      "id": "native-observation:a5a109b37af1a1849b632ef3a2d9c7a093442f06f1361520d730490a73c6de29",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-cblas-tests:Debug",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:Debug",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:Debug",
-      "expected_test_set_id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "a5a109b37af1a1849b632ef3a2d9c7a093442f06f1361520d730490a73c6de29"
     },
     {
       "id": "native-observation:a5f4e9b8b5bd88cc0fae6b9261ff2478197a467c4edb833883ba2e8ccfee04f1",
@@ -18871,6 +19211,16 @@
       "digest": "afc1b396a2c26cc0f03a7fb9cfbf51f97971258f6a29947e334d0c8e53dbaacf"
     },
     {
+      "id": "native-observation:b66027a414888f2905318d0b287626ec083ea876c8f29beca226d68266cb28cd",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-cblas-tests:Debug",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:Debug",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:Debug",
+      "expected_test_set_id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "b66027a414888f2905318d0b287626ec083ea876c8f29beca226d68266cb28cd"
+    },
+    {
       "id": "native-observation:b8b07e671bffc16a78c907a33c3402289a697d6417128502422819f4fb2f1923",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-zynum-public-surface-contract-tests:Debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-zynum-public-surface-contract-tests:Debug",
@@ -18881,16 +19231,6 @@
       "digest": "b8b07e671bffc16a78c907a33c3402289a697d6417128502422819f4fb2f1923"
     },
     {
-      "id": "native-observation:bb0be58ef1fbd3dc2e009ca6017ae0e0eca2a543f053e8d7da21dcb5a31d7f99",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseFast",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseFast",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:ReleaseFast",
-      "expected_test_set_id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "bb0be58ef1fbd3dc2e009ca6017ae0e0eca2a543f053e8d7da21dcb5a31d7f99"
-    },
-    {
       "id": "native-observation:c12e4633d1a1c235bd5d56e4619448b44e545526e6cc856852fab529ce69d7bf",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-symm-dense-gemm-tests:Debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-symm-dense-gemm-tests:Debug",
@@ -18899,6 +19239,26 @@
       "expected_test_set_id": "set:zig-root:symm-dense-gemm-tests:35acbe08abaebb9cada888321f054a8065d3b6bf32a1ecfa8509859963333e31",
       "enumeration_source": "zig-0.16-builtin-test-functions",
       "digest": "c12e4633d1a1c235bd5d56e4619448b44e545526e6cc856852fab529ce69d7bf"
+    },
+    {
+      "id": "native-observation:c143d0281dcad228ef50b6085fcad149dc5e3324038864a51a30467d83883f8b",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:Debug",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:Debug",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:Debug",
+      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:2bbfc9ea8e8a14fbd94bbd4c91a778d2ea03615dbd78a4437160fbe07cd76d2e",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "c143d0281dcad228ef50b6085fcad149dc5e3324038864a51a30467d83883f8b"
+    },
+    {
+      "id": "native-observation:c1872fe7e837dcbb904f2094a0c4f95679e03c127073c8435dfc2efe5746a576",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseSafe",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseSafe",
+      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
+      "optimize_mode_id": "mode:ReleaseSafe",
+      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:a9336dfb4785414e9c6a0472175bcabb346ab0ba0af33f8502ba25d129d763bb",
+      "enumeration_source": "zig-0.16-builtin-test-functions",
+      "digest": "c1872fe7e837dcbb904f2094a0c4f95679e03c127073c8435dfc2efe5746a576"
     },
     {
       "id": "native-observation:c2e1493ad722671d2989f15a1463beeb5fcd2c75ca93fb87cc8382fb4aceb557",
@@ -18919,16 +19279,6 @@
       "expected_test_set_id": "set:zig-root:triangular-parallel-tests:5b7d0fee24bd1c446bc0892b650bdd3a54896de2fd4aea228d8a61523073403d",
       "enumeration_source": "zig-0.16-builtin-test-functions",
       "digest": "c39c46e4bcaab70d844b46986fba98b3ad2b2ca35350fd67d21cb1ac73c08617"
-    },
-    {
-      "id": "native-observation:c9d4d4c936238b1e677cd3db0f716932c29cb51bc6c2f73ded049acba2ee8d7b",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseFast",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseFast",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:ReleaseFast",
-      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "c9d4d4c936238b1e677cd3db0f716932c29cb51bc6c2f73ded049acba2ee8d7b"
     },
     {
       "id": "native-observation:cebeef4026a998b9af67d06ee092eeba2eae39973a49b928f1d199e6551e39fc",
@@ -18981,24 +19331,14 @@
       "digest": "dab8bf8e063f3249bc4780a84cb5d1dd65be157a44491666a4d315cb503c0da2"
     },
     {
-      "id": "native-observation:dbb76f6f403c15ffca2c2f199f523085bdbeca9df357ed0fa61e3873f89fa732",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseSafe",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseSafe",
+      "id": "native-observation:ded362181c5905ab68213f5332f02e0025d743a5c6890d341596161d19d8ada6",
+      "row_id": "row:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseFast",
+      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseFast",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:ReleaseSafe",
-      "expected_test_set_id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
+      "optimize_mode_id": "mode:ReleaseFast",
+      "expected_test_set_id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
       "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "dbb76f6f403c15ffca2c2f199f523085bdbeca9df357ed0fa61e3873f89fa732"
-    },
-    {
-      "id": "native-observation:e5d42174dda93288beb780e982227baab0e54069b940d3df2f55922249927546",
-      "row_id": "row:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:Debug",
-      "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:Debug",
-      "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "optimize_mode_id": "mode:Debug",
-      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
-      "enumeration_source": "zig-0.16-builtin-test-functions",
-      "digest": "e5d42174dda93288beb780e982227baab0e54069b940d3df2f55922249927546"
+      "digest": "ded362181c5905ab68213f5332f02e0025d743a5c6890d341596161d19d8ada6"
     },
     {
       "id": "native-observation:e64c8f9580c41eb2ff95831aa8f8ac7eb7379fe7af6706d7b74f5e63bc1611e8",
@@ -20759,7 +21099,7 @@
       "expected_actual_module_optimize": "Debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:Debug",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
+      "expected_test_set_id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -20774,7 +21114,7 @@
       "expected_actual_module_optimize": "ReleaseFast",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseFast",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
+      "expected_test_set_id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -20789,7 +21129,7 @@
       "expected_actual_module_optimize": "ReleaseSafe",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-cblas-tests:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:cblas-tests:7ecaa67757eb0331b43eacb959521b19c4391197589a498c859704b36471d5ac",
+      "expected_test_set_id": "set:zig-root:cblas-tests:e79274f65e75430c85d5ea19832d40e347464af4d061cd44b2f5e5bcd784a08f",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21299,7 +21639,7 @@
       "expected_actual_module_optimize": "Debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:Debug",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
+      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:5357c2a5b56fae844ed99b7f3112e596435fd99d3129c78264c2a9707261f737",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21314,7 +21654,7 @@
       "expected_actual_module_optimize": "ReleaseFast",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseFast",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
+      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:4cf32ba87cbf478c50321ec538c1eeef674014aa412a7406907e1c9a0e7d1923",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21329,7 +21669,7 @@
       "expected_actual_module_optimize": "ReleaseSafe",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-band-solve-tests:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:b81589052ac0dfdf065533caa51f4bc138580f68a1cdda977cb5ed6bf9f76a6f",
+      "expected_test_set_id": "set:zig-root:triangular-band-solve-tests:4cf32ba87cbf478c50321ec538c1eeef674014aa412a7406907e1c9a0e7d1923",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21434,7 +21774,7 @@
       "expected_actual_module_optimize": "Debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:Debug",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
+      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:2bbfc9ea8e8a14fbd94bbd4c91a778d2ea03615dbd78a4437160fbe07cd76d2e",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21449,7 +21789,7 @@
       "expected_actual_module_optimize": "ReleaseFast",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseFast",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
+      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:a9336dfb4785414e9c6a0472175bcabb346ab0ba0af33f8502ba25d129d763bb",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -21464,7 +21804,7 @@
       "expected_actual_module_optimize": "ReleaseSafe",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-triangular-packed-unit-tests:ReleaseSafe",
       "enumeration_class_id": "enumeration-class:aarch64-macos-system-macho",
-      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:e0a3e5c0a85cbcb07569216281fc557e2f0c4e16cf7405025b12b200aae6706c",
+      "expected_test_set_id": "set:zig-root:triangular-packed-unit-tests:a9336dfb4785414e9c6a0472175bcabb346ab0ba0af33f8502ba25d129d763bb",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -24745,23 +25085,23 @@
     },
     "zig_test_files": {
       "count": 53,
-      "digest": "5c8cc4f4838edf1ecc9537df4d8c92d65827c22609afb0795813a2eabb267fe3"
+      "digest": "ce1b83b2b27b4ab28875b16b9c72c7e269c0cfd298de83174d5aa9922fe63d70"
     },
     "python_test_modules": {
       "count": 24,
       "digest": "0f0dc448e1597053f4805c3b1c3c09430d8d3fef2fbc80830fe832ce7f644be9"
     },
     "expected_test_sets": {
-      "count": 28,
-      "digest": "50c34eb5fc09a1d9254b899474fca208a669bbad1cccab39770642baa68fa076"
+      "count": 30,
+      "digest": "be1d670e0942234d0ba5d9c2ededd13c8a19f160b2ef03f6d622566e939a274c"
     },
     "native_observation_bindings": {
       "count": 63,
-      "digest": "9ca3add93efaf4b00e101c0260874b3bbebf8f39cea09b492ab6ae23d09700cc"
+      "digest": "573f0171b796ce0ce87370f17701379915d4edb8afdc73af330845aaa5f6a1d8"
     },
     "test_mode_rows": {
       "count": 336,
-      "digest": "8b8e27d084d67e2aef8b0790ff3aa5b2dc9b564cfb2c091082e9a8379204ec73"
+      "digest": "841c0c31bd89786c1fa68f47a56261f4335d2f1f48d735ee3f568c0b43b25668"
     },
     "workflow_mode_bindings": {
       "count": 4,

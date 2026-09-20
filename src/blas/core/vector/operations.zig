@@ -1901,10 +1901,14 @@ fn parallelSwapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]SwapTask(T) = undefined;
+    // Keep AArch64 worker boundaries on whole 128-byte blocks. Splitting an
+    // odd real-lane count can otherwise put neighboring workers on the same
+    // cache line and misalign their vector loops. The final task owns the tail.
+    const grain = if (comptime builtin.cpu.arch == .aarch64) 128 / @sizeOf(T) else 1;
     for (0..task_count) |task_index| {
         tasks[task_index] = .{
-            .n0 = task_index * n / task_count,
-            .n1 = (task_index + 1) * n / task_count,
+            .n0 = task_index * n / task_count / grain * grain,
+            .n1 = if (task_index + 1 == task_count) n else (task_index + 1) * n / task_count / grain * grain,
             .x = x,
             .y = y,
         };
@@ -2807,13 +2811,14 @@ pub fn swap(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, inc
             const real_x = asRealPtr(T, x);
             const real_y = asRealPtr(T, y);
             const n_bytes = real_n * @sizeOf(R);
+            // Honor the existing parallel gate before a serial streaming leaf.
+            if (parallelSwapUnitReal(R, real_n, real_x, real_y)) return;
             if (comptime builtin.cpu.arch == .aarch64) {
                 if (!byteRangesOverlap(@ptrCast(real_x), @ptrCast(real_y), n_bytes)) {
-                    // Keep one streaming-mode lifetime around the full swap.
+                    // Single-task fallback owns one streaming-mode lifetime.
                     if (vector_binary_kernels.swapUnitRealStreaming(R, real_n, real_x, real_y)) return;
                 }
             }
-            if (parallelSwapUnitReal(R, real_n, real_x, real_y)) return;
             return swapUnit(R, real_n, real_x, real_y);
         }
         if (comptime T == ComplexF32) {
@@ -2829,12 +2834,13 @@ pub fn swap(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, inc
     if (comptime isReal(T)) {
         if (incx_ == 1 and incy_ == 1) {
             const n_bytes = n * @sizeOf(T);
+            // Honor the existing parallel gate before a serial streaming leaf.
+            if (parallelSwapUnitReal(T, n, x, y)) return;
             if (comptime builtin.cpu.arch == .aarch64) {
                 if (!byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) {
                     if (vector_binary_kernels.swapUnitRealStreaming(T, n, x, y)) return;
                 }
             }
-            if (parallelSwapUnitReal(T, n, x, y)) return;
             return swapUnit(T, n, x, y);
         }
         if (incx_ == 2 and incy_ == 2) {

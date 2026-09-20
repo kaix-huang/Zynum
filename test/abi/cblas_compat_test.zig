@@ -1011,3 +1011,113 @@ test "cblas row-major ztrmm and ztrsm conjugate transpose reference" {
     cblas.cblas_ztrsm(cblas.CblasRowMajor, cblas.CblasRight, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, trsm_m, trsm_n, &trsm_alpha, &trsm_a, trsm_lda, &trsm_b, trsm_ldb);
     try expectComplexF64SliceApprox(&trsm_expected, &trsm_b);
 }
+
+// Real conjugation is the identity; row-major C must use the same mapping as T.
+test "cblas real row-major triangular conjugate transpose matches exact reference" {
+    inline for (.{ f32, f64 }) |T| {
+        for ([_]c_int{ cblas.CblasUpper, cblas.CblasLower }) |uplo| {
+            for ([_]c_int{ cblas.CblasNonUnit, cblas.CblasUnit }) |diag| {
+                var ap: [6]T = if (uplo == cblas.CblasUpper) .{ 2, 3, 5, 7, 11, 13 } else .{ 2, 3, 7, 5, 11, 13 };
+                if (diag == cblas.CblasUnit) {
+                    ap[0] = std.math.nan(T);
+                    ap[if (uplo == cblas.CblasUpper) 3 else 2] = std.math.nan(T);
+                    ap[5] = std.math.nan(T);
+                }
+                const want: [3]T = if (uplo == cblas.CblasUpper)
+                    (if (diag == cblas.CblasUnit) .{ 1, 5, 30 } else .{ 2, 17, 66 })
+                else
+                    (if (diag == cblas.CblasUnit) .{ 22, 35, 3 } else .{ 23, 47, 39 });
+                const nan = std.math.nan(T);
+                const full: [9]T = if (uplo == cblas.CblasUpper)
+                    .{ ap[0], ap[1], ap[2], nan, ap[3], ap[4], nan, nan, ap[5] }
+                else
+                    .{ ap[0], nan, nan, ap[1], ap[2], nan, ap[3], ap[4], ap[5] };
+                const band: [9]T = if (uplo == cblas.CblasUpper)
+                    .{ ap[0], ap[1], ap[2], ap[3], ap[4], nan, ap[5], nan, nan }
+                else
+                    .{ nan, nan, ap[0], nan, ap[1], ap[2], ap[3], ap[4], ap[5] };
+                inline for (.{ "tpmv", "trmv", "tbmv", "tpsv", "trsv", "tbsv" }) |op| {
+                    const solve = comptime op[2] == 's';
+                    for ([_]c_int{ 1, -1, 2, -2 }) |inc| {
+                        const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                        var x: [7]T = @splat(-123);
+                        var expected = x;
+                        for (0..3) |j| {
+                            const index = 1 + (if (inc > 0) j else 2 - j) * stride;
+                            x[index] = if (solve) want[j] else @floatFromInt(j + 1);
+                            expected[index] = if (solve) @floatFromInt(j + 1) else want[j];
+                        }
+                        const function = @field(cblas, "cblas_" ++ (if (T == f32) "s" else "d") ++ op);
+                        if (comptime op[1] == 'p') {
+                            function(cblas.CblasRowMajor, uplo, cblas.CblasConjTrans, diag, 3, &ap, x[1..].ptr, inc);
+                        } else if (comptime op[1] == 'b') {
+                            function(cblas.CblasRowMajor, uplo, cblas.CblasConjTrans, diag, 3, 2, &band, 3, x[1..].ptr, inc);
+                        } else {
+                            function(cblas.CblasRowMajor, uplo, cblas.CblasConjTrans, diag, 3, &full, 3, x[1..].ptr, inc);
+                        }
+                        try std.testing.expectEqualSlices(T, &expected, &x);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// For real rank updates, conjugation leaves each input coefficient unchanged.
+test "cblas real rank updates conjugate transpose independent reference" {
+    inline for (.{ f32, f64 }) |T| {
+        inline for (.{ "syrk", "syr2k" }) |op| {
+            for ([_]c_int{ cblas.CblasRowMajor, cblas.CblasColMajor }) |layout| {
+                for ([_]c_int{ cblas.CblasUpper, cblas.CblasLower }) |uplo| {
+                    for ([_]c_int{ cblas.CblasTrans, cblas.CblasConjTrans }) |trans| {
+                        for ([_][2]usize{ .{ 2, 3 }, .{ 3, 2 } }) |shape| {
+                            const n = shape[0];
+                            const k = shape[1];
+                            var a: [15]T = @splat(std.math.nan(T));
+                            var b: [15]T = @splat(std.math.nan(T));
+                            for (0..k) |l| {
+                                for (0..n) |j| {
+                                    const index = if (layout == cblas.CblasRowMajor) l * 5 + j else j * 5 + l;
+                                    a[index] = @floatFromInt(1 + l * n + j);
+                                    b[index] = @as(T, @floatFromInt(2 + l + 2 * j)) - 4;
+                                }
+                            }
+                            for ([_]T{ 0, 1 }) |beta| {
+                                var c: [15]T = @splat(-123);
+                                for (0..n) |i| {
+                                    for (0..n) |j| c[if (layout == cblas.CblasRowMajor) i * 5 + j else j * 5 + i] = 7;
+                                }
+                                var expected = c;
+                                for (0..n) |i| {
+                                    for (0..n) |j| {
+                                        if ((uplo == cblas.CblasUpper and i > j) or (uplo == cblas.CblasLower and i < j)) continue;
+                                        var sum: T = 0;
+                                        for (0..k) |l| {
+                                            const ai: T = @floatFromInt(1 + l * n + i);
+                                            const aj: T = @floatFromInt(1 + l * n + j);
+                                            if (comptime std.mem.eql(u8, op, "syrk")) {
+                                                sum += ai * aj;
+                                            } else {
+                                                const bi = @as(T, @floatFromInt(2 + l + 2 * i)) - 4;
+                                                const bj = @as(T, @floatFromInt(2 + l + 2 * j)) - 4;
+                                                sum += ai * bj + bi * aj;
+                                            }
+                                        }
+                                        expected[if (layout == cblas.CblasRowMajor) i * 5 + j else j * 5 + i] = 2 * sum + beta * 7;
+                                    }
+                                }
+                                const function = @field(cblas, "cblas_" ++ (if (T == f32) "s" else "d") ++ op);
+                                if (comptime std.mem.eql(u8, op, "syrk")) {
+                                    function(layout, uplo, trans, @intCast(n), @intCast(k), 2, &a, 5, beta, &c, 5);
+                                } else {
+                                    function(layout, uplo, trans, @intCast(n), @intCast(k), 2, &a, 5, &b, 5, beta, &c, 5);
+                                }
+                                try std.testing.expectEqualSlices(T, &expected, &c);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

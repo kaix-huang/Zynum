@@ -266,7 +266,8 @@ fn selectBPack(comptime T: type, shape: Shape) gemm_task.BPackPath {
         const tall_narrow = shape.n <= 64 and shape.m >= 512 and shape.k >= 256;
         const high_k_panel = shape.n <= 128 and shape.k >= 2048 and shape.m <= 512;
         const mid_k_wide = shape.m >= 128 and shape.n >= 256 and shape.k >= 512;
-        return if (short_wide or tall_narrow or high_k_panel or mid_k_wide) .transpose4 else .natural;
+        const small_matrix = shape.m >= 32 and shape.m <= 128 and shape.n <= 128 and shape.k >= 16 and shape.k <= 128;
+        return if (small_matrix or short_wide or tall_narrow or high_k_panel or mid_k_wide) .transpose4 else .natural;
     }
     if (T == f64) {
         return if (shape.m <= 64 and shape.n >= 64 and shape.k >= 256) .dynamic else .natural;

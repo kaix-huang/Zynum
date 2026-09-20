@@ -356,3 +356,63 @@ at least 256 Ki, and actual padded-row work below 96 cubed. The last condition
 keeps each product below the real planner's lowest non-vector parallel threshold.
 A pool refusal retains the original serial sequence. Square and vector-shaped
 GEMM do not enter this additional range.
+
+
+### Small f32 SME panels: four-row transpose packing
+
+Select the existing four-row transpose B packer for streaming-matrix f32 plans
+with 32 <= m <= 128, 32 <= n <= 128, 16 <= k <= 128 and k divisible by four.
+Keep other shape rules and the existing tile/packing feasibility checks. Packing
+only rearranges payload bits; the GEMM accumulation kernel remains unchanged.
+This removes a measured packing bottleneck in small regular NN and TN products.
+
+On the local Apple M5, default-thread SGEMM 64/96/128 square comparisons measured
+2.00/2.21/2.01 baseline-to-candidate speedups. Single-thread rectangular cases
+also improved, while unselected/tail-heavy cases often stayed flat. The sampled
+64-square path uses packBPanel2F32Transpose4N; computation now accounts for a
+larger fraction of samples. Sample fractions are not instruction-cycle counts.
+
+Validation included 432 fresh timing processes across three rounds with rotated
+library order, sampled numerical checks, and a byte-identical baseline copy in
+the later rounds. A TN 129x64x64 control initially measured 0.986; the fixed
+six-repeat default check was 0.9961 relative to baseline and effectively equal
+to the baseline copy. Results do not establish universal absence of regressions.
+
+Safe/Fast GEMM registry tests passed 47/47 each; Intel Linux/macOS cross
+compilation passed. Another 256 dynamic CBLAS cases covered padded leading
+dimensions, both layouts, all N/T pairs, alpha/beta variations, complete output
+and padding equality, unchanged inputs, and independent reference samples.
+3,456 additional comparisons covered NaNs, infinities, signed zeros, subnormals,
+large values, four rounding modes and FZ on/off: full outputs, FPSR and FPCR
+matched the baseline. These checks do not prove enabled-trap ordering or every
+possible matrix/value combination.
+
+Private evidence: zynum-local-r244 through r246 (2026-09-19). R246 retains the
+measured R244 selector without further executable changes. No full benchmark,
+README figure replacement or publication was performed.
+
+
+### Vectorize f32 SME tail-row accumulators
+
+Process four adjacent output columns with an explicit vector FMA in the SME
+row-tail helper, retaining scalar handling for remaining columns and f64.
+Each output still accumulates K terms in the original order; only independent
+columns are grouped. This targets matrices with rows left after full SME tiles.
+
+On the local Apple M5, a fixed six-repeat default-thread comparison measured
+2.05x speedup for SGEMM 127x127x127. Default-thread m=97–111, n=128, k=124
+cases improved about 1.45–2.55x; 127-square N/T combinations improved as well.
+An m=96 control initially measured 0.991 and then 1.0006 in the fixed repeat;
+other controls include a noisy baseline copy, so no universal no-regression
+claim follows. Three rounds ran 360 fresh processes with rotated library order.
+
+Safe/Fast GEMM registry tests passed 47/47 each; Intel Linux/macOS compiled.
+256 normal dynamic CBLAS cases compared full outputs, padding and inputs and
+sampled an independent reference. Expanded 10,368 output/FPSR/FPCR comparisons
+covered 63/97/127 sizes, middle and tail input positions, both layouts, N/T pairs,
+rounding modes, FZ and exceptional values. Enabled-trap ordering remains unproven.
+Disassembly confirms four-lane FMA instructions, while scalar fallback remains;
+the wrapper grows in instruction count, so code size alone is not the mechanism.
+
+Private evidence: zynum-local-r247 through r249 (2026-09-19). R249 retains R248
+executable logic and clarifies its comment. No full benchmark or publication.

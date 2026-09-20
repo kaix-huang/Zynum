@@ -3897,10 +3897,33 @@ pub fn smeSwapBytesStreamingAsm() []const u8 {
         \\cntb x6
         \\lsl x7, x6, #3
         \\
-        \\0:
-        \\cmp x0, x7
-        \\b.lo 1f
+        \\eor x8, x1, x2
+        \\tst x8, #63
+        \\b.ne 0f
+        \\neg x8, x1
+        \\and x8, x8, #63
+        \\cbz x8, 0f
+        \\cmp x0, x8
+        \\csel x8, x0, x8, lo
+        \\whilelt pn9.b, xzr, x8, vlx4
     , .{}) ++
+        // The caller requires a 64-byte streaming vector. Equal pointer
+        // residues allow one predicated prefix to align both streams without
+        // changing their byte order or touching inactive lanes.
+        smeVgx4Ld1AtVl("b", 4, "pn9", "x1", 0) ++
+        smeVgx4Ld1AtVl("b", 20, "pn9", "x2", 0) ++
+        smeVgx4St1AtVl("b", 20, "pn9", "x1", 0) ++
+        smeVgx4St1AtVl("b", 4, "pn9", "x2", 0) ++
+        std.fmt.comptimePrint(
+            \\
+            \\add x1, x1, x8
+            \\add x2, x2, x8
+            \\sub x0, x0, x8
+            \\
+            \\0:
+            \\cmp x0, x7
+            \\b.lo 1f
+        , .{}) ++
         smeVgx4Ld1AtVl("b", 4, "pn8", "x1", 0) ++
         smeVgx4Ld1AtVl("b", 16, "pn8", "x1", 4) ++
         smeVgx4Ld1AtVl("b", 20, "pn8", "x2", 0) ++

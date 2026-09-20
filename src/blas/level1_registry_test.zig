@@ -73,6 +73,7 @@ test "forced contiguous real kernel covers exact width, tail, and misalignment" 
 test "native SME2 Level 1 catalog cells enter and balance declared state" {
     if (comptime builtin.cpu.arch != .aarch64 or !aarch_features.has_sme2) return;
     if (aarch_features.streamingVectorBytes() != 64) return;
+    try checkStreamingSwapAlignment();
 
     const allocator = std.testing.allocator;
     const n: usize = 64 * 1024;
@@ -592,6 +593,7 @@ test "fixed candidates instantiate 128 256 and 512 bit accumulator geometries" {
 }
 
 test "native architecture candidate entrypoints preserve fixed kernel semantics" {
+    if (comptime builtin.cpu.arch == .aarch64) try checkSwapParallelBoundaries();
     if (comptime builtin.cpu.arch != .aarch64 and builtin.cpu.arch != .x86_64) return;
     const n: usize = 21;
     var dot_x: [24]f32 align(64) = undefined;
@@ -743,4 +745,71 @@ test "isolated stride-two request ABI has a stable fixed layout" {
     try std.testing.expectEqual(@as(usize, 32), @offsetOf(isolated_abi.Request, "args"));
     try std.testing.expectEqual(@as(usize, 96), @offsetOf(isolated_abi.Request, "result"));
     try std.testing.expectEqual(@as(usize, 112), @offsetOf(isolated_abi.Request, "result_index"));
+}
+
+// Swapping must preserve payload bits, guards and tails when the production
+// route crosses the parallel byte thresholds, for both real and complex types.
+fn checkSwapParallelBoundaries() !void {
+    inline for (.{ f32, f64, types.ComplexF32, types.ComplexF64 }) |T| {
+        const boundary = 4 * 1024 * 1024 / @sizeOf(T);
+        for ([_]usize{ boundary - 1, boundary, boundary + 1, 2 * boundary + 1, 4 * boundary + 1 }) |n| {
+            const x = try std.testing.allocator.alloc(T, n + 2);
+            defer std.testing.allocator.free(x);
+            const y = try std.testing.allocator.alloc(T, n + 2);
+            defer std.testing.allocator.free(y);
+            const xb = std.mem.sliceAsBytes(x);
+            const yb = std.mem.sliceAsBytes(y);
+            for (xb, yb, 0..) |*a, *b, i| {
+                a.* = @truncate(i * 37 + 11);
+                b.* = @truncate(i * 13 + 91);
+            }
+            ops.swap(T, @intCast(n), x[1..].ptr, 1, y[1..].ptr, 1);
+            for (xb, yb, 0..) |a, b, i| {
+                const inner = i >= @sizeOf(T) and i < (n + 1) * @sizeOf(T);
+                const want_x: u8 = @truncate(if (inner) i * 13 + 91 else i * 37 + 11);
+                const want_y: u8 = @truncate(if (inner) i * 37 + 11 else i * 13 + 91);
+                if (a != want_x) try std.testing.expectEqual(want_x, a);
+                if (b != want_y) try std.testing.expectEqual(want_y, b);
+            }
+            // Same-pointer fallback must not lose bits or disturb guard data.
+            ops.swap(T, @intCast(n), x[1..].ptr, 1, x[1..].ptr, 1);
+            ops.swap(T, @intCast(n), x[1..].ptr, 1, y[1..].ptr, 1);
+            for (xb, yb, 0..) |a, b, i| {
+                const want_x: u8 = @truncate(i * 37 + 11);
+                const want_y: u8 = @truncate(i * 13 + 91);
+                if (a != want_x) try std.testing.expectEqual(want_x, a);
+                if (b != want_y) try std.testing.expectEqual(want_y, b);
+            }
+        }
+    }
+}
+
+fn checkStreamingSwapAlignment() !void {
+    var x_storage: [65536 + 256]u8 align(64) = undefined;
+    var y_storage: [65536 + 256]u8 align(64) = undefined;
+    inline for (.{ f32, f64 }) |T| {
+        for ([_]usize{ 0, @sizeOf(T), 32, 64 - @sizeOf(T) }) |residue| {
+            for ([_]bool{ false, true }) |different| {
+                const x_offset = 64 + residue;
+                const y_offset = 64 + (if (different) (residue + @sizeOf(T)) % 64 else residue);
+                for ([_]usize{ 65536 / @sizeOf(T), 65536 / @sizeOf(T) + 1 }) |n| {
+                    for (&x_storage, &y_storage, 0..) |*a, *b, i| {
+                        a.* = @truncate(i * 37 + 11);
+                        b.* = @truncate(i * 13 + 91);
+                    }
+                    const before = aarch_features.testStreamingEntries();
+                    try std.testing.expect(aarch_binary.swapUnitRealStreaming(T, n, @ptrCast(@alignCast(x_storage[x_offset..].ptr)), @ptrCast(@alignCast(y_storage[y_offset..].ptr))));
+                    try expectStreamingCall(before, false);
+                    for (x_storage, y_storage, 0..) |a, b, i| {
+                        const in_x = i >= x_offset and i < x_offset + n * @sizeOf(T);
+                        const in_y = i >= y_offset and i < y_offset + n * @sizeOf(T);
+                        const want_x: u8 = @truncate(if (in_x) (i - x_offset + y_offset) * 13 + 91 else i * 37 + 11);
+                        const want_y: u8 = @truncate(if (in_y) (i - y_offset + x_offset) * 37 + 11 else i * 13 + 91);
+                        if (a != want_x) try std.testing.expectEqual(want_x, a);
+                        if (b != want_y) try std.testing.expectEqual(want_y, b);
+                    }
+                }
+            }
+        }
+    }
 }
