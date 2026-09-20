@@ -11040,6 +11040,66 @@
       "owner": "documentation-maintainers"
     },
     {
+      "path": "docs/assets/benchmarks/2026-09-21/gemm.csv",
+      "kind": "other-public-file",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/gemm.svg",
+      "kind": "visual-asset",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/level1.csv",
+      "kind": "other-public-file",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/level1.csv.meta.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/level1.svg",
+      "kind": "visual-asset",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/level2.csv",
+      "kind": "other-public-file",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/level2.csv.meta.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/level2.svg",
+      "kind": "visual-asset",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
+      "path": "docs/assets/benchmarks/2026-09-21/source.json",
+      "kind": "json-data",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers"
+    },
+    {
       "path": "docs/common/benchmarking.md",
       "kind": "documentation",
       "class": "non-generated-source",
@@ -12360,7 +12420,7 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "e4da82345a93d9fe398c6e951bfffaae0b4193ce7e681948e7ea6c31a2b5fc6e",
+  "repository_file_classifications_digest": "fe4de968209593f86a0f373905a24c34ccc8650e6e854cc9e1b1738e72d7b4d9",
   "derived_candidates": [
     {
       "id": "derived:docs/assets/benchmarks/2026-09-09/gemm.csv",
@@ -12655,6 +12715,146 @@
       "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
       "deterministic_regeneration_claim": false,
       "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-14/source.json; docs/assets/benchmarks/2026-09-14/level1.csv; docs/assets/benchmarks/2026-09-14/level1.csv.meta.json; docs/assets/benchmarks/2026-09-14/level2.csv; docs/assets/benchmarks/2026-09-14/level2.csv.meta.json; docs/assets/benchmarks/2026-09-14/gemm.csv; docs/assets/benchmarks/2026-09-14/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/gemm.csv",
+      "path": "docs/assets/benchmarks/2026-09-21/gemm.csv",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: 22bb087b8842638e57d8d0da3ad9e38c99bca57223400339c9f11dd3bc05221c.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json",
+      "path": "docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: c8cab9dbbcd3337cacbe64627f18c9ec79c999f40a37bf381f3610de621fa0a9.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/gemm.svg",
+      "path": "docs/assets/benchmarks/2026-09-21/gemm.svg",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: 958e979c781f0991cb7340d69126183dadb34aaea2f5c7bd56da4874dbc92ddd.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/level1.csv",
+      "path": "docs/assets/benchmarks/2026-09-21/level1.csv",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: 3d4d5be65a3eef2d9362e8ca5145dcb446bad3a4e52ac4ecdd8980592571aa49.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/level1.csv.meta.json",
+      "path": "docs/assets/benchmarks/2026-09-21/level1.csv.meta.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: d5196204ee10d3b8ddcc9ceacafa36eee8aff42f853e047a461fa097644db39d.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/level1.svg",
+      "path": "docs/assets/benchmarks/2026-09-21/level1.svg",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: ba3049274aff66fa33bb40783b1aeace21bfd728e040a367746b0a914b6c0269.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/level2.csv",
+      "path": "docs/assets/benchmarks/2026-09-21/level2.csv",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: 75c16ca20513694f41c50aa77f11dd7943e226fb8c9f09404660113b6dfd4116.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/level2.csv.meta.json",
+      "path": "docs/assets/benchmarks/2026-09-21/level2.csv.meta.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: 0b0d1bc932ebddb9d7df87e4b1960b538c5e8b889881d25c0366dbc3e51a07f4.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/level2.svg",
+      "path": "docs/assets/benchmarks/2026-09-21/level2.svg",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: 41eac7a0eb12a2bbd744c349b3a2a25d0aadb2147c3b0e5f1c0e38253c5574ca.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
+    },
+    {
+      "id": "derived:docs/assets/benchmarks/2026-09-21/source.json",
+      "path": "docs/assets/benchmarks/2026-09-21/source.json",
+      "class": "curated-documentation-asset",
+      "owner": "documentation-maintainers",
+      "tracking_status": "tracked",
+      "public_safe_provenance": "User-requested README benchmark refresh. Clean code commit 00699605f110b5abdc07f33088e189dfb7c92f46; Apple M5, 10 logical CPUs, macOS 27.0 (26A428), Zig 0.16.0; requested baseline CPU, dynamic dispatch, ReleaseFast. Six fresh-process repeats per case. Public evidence: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Asset SHA-256: f02215c56e49bb0202015566901308a08b130f68d3cc44c92f78169c9c4e3832.",
+      "claim_scope": "Selected BLAS Level 1/2 and GEMM cases on the recorded host; median of six fresh-process repeats. No cross-platform, all-function coverage, optimality, or historical speedup claim. Build flags are recorded declarations; no per-call kernel selection inference.",
+      "review_date": "2026-09-21",
+      "freshness_criteria": "Historical dated measurement; remeasure after material kernel, compiler, CPU, OS, or benchmark protocol changes.",
+      "replacement_criteria": "Replace README links only with another dated, checked measurement bundle retaining raw evidence and source provenance.",
+      "deterministic_regeneration_claim": false,
+      "raw_inputs_disposition": "Public clean-source manifest, CSV and metadata retained: docs/assets/benchmarks/2026-09-21/source.json; docs/assets/benchmarks/2026-09-21/level1.csv; docs/assets/benchmarks/2026-09-21/level1.csv.meta.json; docs/assets/benchmarks/2026-09-21/level2.csv; docs/assets/benchmarks/2026-09-21/level2.csv.meta.json; docs/assets/benchmarks/2026-09-21/gemm.csv; docs/assets/benchmarks/2026-09-21/gemm.csv.meta.json. Timing values are observations, not deterministically regenerable."
     },
     {
       "id": "derived:docs/kernel_coverage.json",

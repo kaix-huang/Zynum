@@ -584,7 +584,7 @@ class TestInventoryTests(unittest.TestCase):
             else:
                 environment["GIT_PAGER"] = ambient_git_pager
         self.assertEqual(336, len(self.inventory["test_mode_rows"]))
-        self.assertEqual(28, len(self.inventory["expected_test_sets"]))
+        self.assertEqual(30, len(self.inventory["expected_test_sets"]))
         self.assertEqual(63, len(self.inventory["native_observation_bindings"]))
         self.assertEqual(183, CHECKER._matrix_incomplete_count(self.inventory))
 
@@ -4238,7 +4238,7 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(0, real_binding_summary.artifact_platform_skips)
         self.assertEqual(0, real_binding_summary.publication_platform_skips)
         self.assertEqual(0, real_binding_summary.platform_skips)
-        self.assertEqual(28, len(source_current["expected_test_sets"]))
+        self.assertEqual(30, len(source_current["expected_test_sets"]))
         self.assertEqual(336, len(source_current["test_mode_rows"]))
         self.assertEqual(63, len(source_current["native_observation_bindings"]))
         self.assertEqual(183, CHECKER._matrix_incomplete_count(source_current))

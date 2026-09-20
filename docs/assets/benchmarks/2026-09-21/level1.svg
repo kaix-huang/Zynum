@@ -1,0 +1,317 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="2785" viewBox="0 0 1500 2785">
+
+<style>
+  text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+  .title { font-size: 25px; font-weight: 700; }
+  .subtitle { font-size: 13px; fill: #4b5563; }
+  .panel-title { font-size: 16px; font-weight: 700; }
+  .axis-label { font-size: 11px; fill: #4b5563; }
+  .op-label { font-size: 11px; fill: #374151; }
+  .value-label { font-size: 10px; fill: #111827; }
+  .legend { font-size: 13px; }
+  .axis { stroke: #111827; stroke-width: 1; }
+  .grid { stroke: #e5e7eb; stroke-width: 1; }
+</style>
+
+<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>
+<text x="40" y="42" class="title">Zynum Level 1 Performance Coverage</text>
+<text x="40" y="66" class="subtitle">Higher is better. Statistic: median. Fresh process per library/op/size; n=1048576; copy=8KiB,8MiB; seconds=1; grouped bars use operation names on the x-axis</text>
+<rect x="1030" y="33" width="18" height="12" fill="#2563eb"/>
+<text x="1056" y="43" class="legend">Zynum</text>
+<rect x="1175" y="33" width="18" height="12" fill="#dc2626"/>
+<text x="1201" y="43" class="legend">Accelerate</text>
+<rect x="1320" y="33" width="18" height="12" fill="#16a34a"/>
+<text x="1346" y="43" class="legend">OpenBLAS</text>
+<text x="105" y="100" class="panel-title">Copy bandwidth (GB/s)</text>
+<line x1="105" y1="360.0" x2="1450" y2="360.0" class="grid"/>
+<text x="95" y="364.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="300.0" x2="1450" y2="300.0" class="grid"/>
+<text x="95" y="304.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="240.0" x2="1450" y2="240.0" class="grid"/>
+<text x="95" y="244.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="180.0" x2="1450" y2="180.0" class="grid"/>
+<text x="95" y="184.0" text-anchor="end" class="axis-label">300</text>
+<line x1="105" y1="120.0" x2="1450" y2="120.0" class="grid"/>
+<text x="95" y="124.0" text-anchor="end" class="axis-label">400</text>
+<line x1="105" y1="120" x2="105" y2="360" class="axis"/>
+<line x1="105" y1="360" x2="1450" y2="360" class="axis"/>
+<rect x="402.2" y="175.8" width="24.0" height="184.2" fill="#2563eb"/>
+<rect x="428.2" y="169.0" width="24.0" height="191.0" fill="#dc2626"/>
+<rect x="454.2" y="296.8" width="24.0" height="63.2" fill="#16a34a"/>
+<text x="441.2" y="378" text-anchor="start" class="op-label" transform="rotate(45 441.2 378)">scopy 8KiB</text>
+<rect x="1074.8" y="236.6" width="24.0" height="123.4" fill="#2563eb"/>
+<rect x="1100.8" y="258.1" width="24.0" height="101.9" fill="#dc2626"/>
+<rect x="1126.8" y="263.9" width="24.0" height="96.1" fill="#16a34a"/>
+<text x="1113.8" y="378" text-anchor="start" class="op-label" transform="rotate(45 1113.8 378)">dcopy 8MiB</text>
+<text x="105" y="435" class="panel-title">Swap bandwidth (GB/s)</text>
+<line x1="105" y1="695.0" x2="1450" y2="695.0" class="grid"/>
+<text x="95" y="699.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="647.0" x2="1450" y2="647.0" class="grid"/>
+<text x="95" y="651.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="599.0" x2="1450" y2="599.0" class="grid"/>
+<text x="95" y="603.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="551.0" x2="1450" y2="551.0" class="grid"/>
+<text x="95" y="555.0" text-anchor="end" class="axis-label">300</text>
+<line x1="105" y1="503.0" x2="1450" y2="503.0" class="grid"/>
+<text x="95" y="507.0" text-anchor="end" class="axis-label">400</text>
+<line x1="105" y1="455.0" x2="1450" y2="455.0" class="grid"/>
+<text x="95" y="459.0" text-anchor="end" class="axis-label">500</text>
+<line x1="105" y1="455" x2="105" y2="695" class="axis"/>
+<line x1="105" y1="695" x2="1450" y2="695" class="axis"/>
+<rect x="234.1" y="540.2" width="24.0" height="154.8" fill="#2563eb"/>
+<rect x="260.1" y="511.1" width="24.0" height="183.9" fill="#dc2626"/>
+<rect x="286.1" y="651.5" width="24.0" height="43.5" fill="#16a34a"/>
+<text x="273.1" y="713" text-anchor="middle" class="op-label">sswap</text>
+<rect x="570.4" y="566.3" width="24.0" height="128.7" fill="#2563eb"/>
+<rect x="596.4" y="564.5" width="24.0" height="130.5" fill="#dc2626"/>
+<rect x="622.4" y="603.1" width="24.0" height="91.9" fill="#16a34a"/>
+<text x="609.4" y="713" text-anchor="middle" class="op-label">dswap</text>
+<rect x="906.6" y="562.5" width="24.0" height="132.5" fill="#2563eb"/>
+<rect x="932.6" y="569.6" width="24.0" height="125.4" fill="#dc2626"/>
+<rect x="958.6" y="602.3" width="24.0" height="92.7" fill="#16a34a"/>
+<text x="945.6" y="713" text-anchor="middle" class="op-label">cswap</text>
+<rect x="1242.9" y="625.1" width="24.0" height="69.9" fill="#2563eb"/>
+<rect x="1268.9" y="640.3" width="24.0" height="54.7" fill="#dc2626"/>
+<rect x="1294.9" y="638.7" width="24.0" height="56.3" fill="#16a34a"/>
+<text x="1281.9" y="713" text-anchor="middle" class="op-label">zswap</text>
+<text x="105" y="770" class="panel-title">Index reduction bandwidth (GB/s)</text>
+<line x1="105" y1="1030.0" x2="1450" y2="1030.0" class="grid"/>
+<text x="95" y="1034.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="970.0" x2="1450" y2="970.0" class="grid"/>
+<text x="95" y="974.0" text-anchor="end" class="axis-label">50</text>
+<line x1="105" y1="910.0" x2="1450" y2="910.0" class="grid"/>
+<text x="95" y="914.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="850.0" x2="1450" y2="850.0" class="grid"/>
+<text x="95" y="854.0" text-anchor="end" class="axis-label">150</text>
+<line x1="105" y1="790.0" x2="1450" y2="790.0" class="grid"/>
+<text x="95" y="794.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="790" x2="105" y2="1030" class="axis"/>
+<line x1="105" y1="1030" x2="1450" y2="1030" class="axis"/>
+<rect x="234.1" y="934.0" width="24.0" height="96.0" fill="#2563eb"/>
+<rect x="260.1" y="972.3" width="24.0" height="57.7" fill="#dc2626"/>
+<rect x="286.1" y="926.0" width="24.0" height="104.0" fill="#16a34a"/>
+<text x="273.1" y="1048" text-anchor="middle" class="op-label">isamax</text>
+<rect x="570.4" y="931.6" width="24.0" height="98.4" fill="#2563eb"/>
+<rect x="596.4" y="970.4" width="24.0" height="59.6" fill="#dc2626"/>
+<rect x="622.4" y="871.0" width="24.0" height="159.0" fill="#16a34a"/>
+<text x="609.4" y="1048" text-anchor="middle" class="op-label">idamax</text>
+<rect x="906.6" y="849.6" width="24.0" height="180.4" fill="#2563eb"/>
+<rect x="932.6" y="1007.8" width="24.0" height="22.2" fill="#dc2626"/>
+<rect x="958.6" y="871.0" width="24.0" height="159.0" fill="#16a34a"/>
+<text x="945.6" y="1048" text-anchor="middle" class="op-label">icamax</text>
+<rect x="1242.9" y="851.3" width="24.0" height="178.7" fill="#2563eb"/>
+<rect x="1268.9" y="969.8" width="24.0" height="60.2" fill="#dc2626"/>
+<rect x="1294.9" y="855.3" width="24.0" height="174.7" fill="#16a34a"/>
+<text x="1281.9" y="1048" text-anchor="middle" class="op-label">izamax</text>
+<text x="105" y="1105" class="panel-title">Real f32 Level 1 (Gops)</text>
+<line x1="105" y1="1365.0" x2="1450" y2="1365.0" class="grid"/>
+<text x="95" y="1369.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="1305.0" x2="1450" y2="1305.0" class="grid"/>
+<text x="95" y="1309.0" text-anchor="end" class="axis-label">50</text>
+<line x1="105" y1="1245.0" x2="1450" y2="1245.0" class="grid"/>
+<text x="95" y="1249.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="1185.0" x2="1450" y2="1185.0" class="grid"/>
+<text x="95" y="1189.0" text-anchor="end" class="axis-label">150</text>
+<line x1="105" y1="1125.0" x2="1450" y2="1125.0" class="grid"/>
+<text x="95" y="1129.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="1125" x2="105" y2="1365" class="axis"/>
+<line x1="105" y1="1365" x2="1450" y2="1365" class="axis"/>
+<rect x="140.7" y="1309.0" width="24.0" height="56.0" fill="#2563eb"/>
+<rect x="166.7" y="1301.3" width="24.0" height="63.7" fill="#dc2626"/>
+<rect x="192.7" y="1346.6" width="24.0" height="18.4" fill="#16a34a"/>
+<text x="179.7" y="1383" text-anchor="middle" class="op-label">sscal</text>
+<rect x="290.2" y="1297.9" width="24.0" height="67.1" fill="#2563eb"/>
+<rect x="316.2" y="1259.5" width="24.0" height="105.5" fill="#dc2626"/>
+<rect x="342.2" y="1330.1" width="24.0" height="34.9" fill="#16a34a"/>
+<text x="329.2" y="1383" text-anchor="middle" class="op-label">saxpy</text>
+<rect x="439.6" y="1171.5" width="24.0" height="193.5" fill="#2563eb"/>
+<rect x="465.6" y="1160.5" width="24.0" height="204.5" fill="#dc2626"/>
+<rect x="491.6" y="1324.6" width="24.0" height="40.4" fill="#16a34a"/>
+<text x="478.6" y="1383" text-anchor="middle" class="op-label">sdot</text>
+<rect x="589.1" y="1298.7" width="24.0" height="66.3" fill="#2563eb"/>
+<rect x="615.1" y="1291.0" width="24.0" height="74.0" fill="#dc2626"/>
+<rect x="641.1" y="1338.5" width="24.0" height="26.5" fill="#16a34a"/>
+<text x="628.1" y="1383" text-anchor="middle" class="op-label">sasum</text>
+<rect x="738.5" y="1303.0" width="24.0" height="62.0" fill="#2563eb"/>
+<rect x="764.5" y="1346.9" width="24.0" height="18.1" fill="#dc2626"/>
+<rect x="790.5" y="1362.5" width="24.0" height="2.5" fill="#16a34a"/>
+<text x="777.5" y="1383" text-anchor="middle" class="op-label">snrm2</text>
+<rect x="887.9" y="1274.9" width="24.0" height="90.1" fill="#2563eb"/>
+<rect x="913.9" y="1165.9" width="24.0" height="199.1" fill="#dc2626"/>
+<rect x="939.9" y="1314.5" width="24.0" height="50.5" fill="#16a34a"/>
+<text x="926.9" y="1383" text-anchor="middle" class="op-label">srot</text>
+<rect x="1037.4" y="1275.5" width="24.0" height="89.5" fill="#2563eb"/>
+<rect x="1063.4" y="1177.1" width="24.0" height="187.9" fill="#dc2626"/>
+<rect x="1089.4" y="1345.7" width="24.0" height="19.3" fill="#16a34a"/>
+<text x="1076.4" y="1383" text-anchor="middle" class="op-label">srotm flag_m1</text>
+<rect x="1186.8" y="1306.8" width="24.0" height="58.2" fill="#2563eb"/>
+<rect x="1212.8" y="1244.7" width="24.0" height="120.3" fill="#dc2626"/>
+<rect x="1238.8" y="1351.6" width="24.0" height="13.4" fill="#16a34a"/>
+<text x="1225.8" y="1383" text-anchor="middle" class="op-label">srotm flag_0</text>
+<rect x="1336.3" y="1306.5" width="24.0" height="58.5" fill="#2563eb"/>
+<rect x="1362.3" y="1237.1" width="24.0" height="127.9" fill="#dc2626"/>
+<rect x="1388.3" y="1351.5" width="24.0" height="13.5" fill="#16a34a"/>
+<text x="1375.3" y="1383" text-anchor="middle" class="op-label">srotm flag_p1</text>
+<text x="105" y="1440" class="panel-title">Real f64 Level 1 (Gops)</text>
+<line x1="105" y1="1700.0" x2="1450" y2="1700.0" class="grid"/>
+<text x="95" y="1704.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="1620.0" x2="1450" y2="1620.0" class="grid"/>
+<text x="95" y="1624.0" text-anchor="end" class="axis-label">20</text>
+<line x1="105" y1="1540.0" x2="1450" y2="1540.0" class="grid"/>
+<text x="95" y="1544.0" text-anchor="end" class="axis-label">40</text>
+<line x1="105" y1="1460.0" x2="1450" y2="1460.0" class="grid"/>
+<text x="95" y="1464.0" text-anchor="end" class="axis-label">60</text>
+<line x1="105" y1="1460" x2="105" y2="1700" class="axis"/>
+<line x1="105" y1="1700" x2="1450" y2="1700" class="axis"/>
+<rect x="140.7" y="1597.0" width="24.0" height="103.0" fill="#2563eb"/>
+<rect x="166.7" y="1596.2" width="24.0" height="103.8" fill="#dc2626"/>
+<rect x="192.7" y="1668.1" width="24.0" height="31.9" fill="#16a34a"/>
+<text x="179.7" y="1718" text-anchor="middle" class="op-label">dscal</text>
+<rect x="290.2" y="1615.6" width="24.0" height="84.4" fill="#2563eb"/>
+<rect x="316.2" y="1624.2" width="24.0" height="75.8" fill="#dc2626"/>
+<rect x="342.2" y="1627.0" width="24.0" height="73.0" fill="#16a34a"/>
+<text x="329.2" y="1718" text-anchor="middle" class="op-label">daxpy</text>
+<rect x="439.6" y="1587.3" width="24.0" height="112.7" fill="#2563eb"/>
+<rect x="465.6" y="1623.7" width="24.0" height="76.3" fill="#dc2626"/>
+<rect x="491.6" y="1616.4" width="24.0" height="83.6" fill="#16a34a"/>
+<text x="478.6" y="1718" text-anchor="middle" class="op-label">ddot</text>
+<rect x="589.1" y="1587.4" width="24.0" height="112.6" fill="#2563eb"/>
+<rect x="615.1" y="1577.3" width="24.0" height="122.7" fill="#dc2626"/>
+<rect x="641.1" y="1634.8" width="24.0" height="65.2" fill="#16a34a"/>
+<text x="628.1" y="1718" text-anchor="middle" class="op-label">dasum</text>
+<rect x="738.5" y="1566.1" width="24.0" height="133.9" fill="#2563eb"/>
+<rect x="764.5" y="1669.4" width="24.0" height="30.6" fill="#dc2626"/>
+<rect x="790.5" y="1691.8" width="24.0" height="8.2" fill="#16a34a"/>
+<text x="777.5" y="1718" text-anchor="middle" class="op-label">dnrm2</text>
+<rect x="887.9" y="1513.2" width="24.0" height="186.8" fill="#2563eb"/>
+<rect x="913.9" y="1523.8" width="24.0" height="176.2" fill="#dc2626"/>
+<rect x="939.9" y="1617.2" width="24.0" height="82.8" fill="#16a34a"/>
+<text x="926.9" y="1718" text-anchor="middle" class="op-label">drot</text>
+<rect x="1037.4" y="1504.9" width="24.0" height="195.1" fill="#2563eb"/>
+<rect x="1063.4" y="1532.6" width="24.0" height="167.4" fill="#dc2626"/>
+<rect x="1089.4" y="1645.2" width="24.0" height="54.8" fill="#16a34a"/>
+<text x="1076.4" y="1718" text-anchor="middle" class="op-label">drotm flag_m1</text>
+<rect x="1186.8" y="1567.6" width="24.0" height="132.4" fill="#2563eb"/>
+<rect x="1212.8" y="1576.6" width="24.0" height="123.4" fill="#dc2626"/>
+<rect x="1238.8" y="1661.6" width="24.0" height="38.4" fill="#16a34a"/>
+<text x="1225.8" y="1718" text-anchor="middle" class="op-label">drotm flag_0</text>
+<rect x="1336.3" y="1567.7" width="24.0" height="132.3" fill="#2563eb"/>
+<rect x="1362.3" y="1572.9" width="24.0" height="127.1" fill="#dc2626"/>
+<rect x="1388.3" y="1663.0" width="24.0" height="37.0" fill="#16a34a"/>
+<text x="1375.3" y="1718" text-anchor="middle" class="op-label">drotm flag_p1</text>
+<text x="105" y="1775" class="panel-title">Mixed-precision dot Level 1 (Gops)</text>
+<line x1="105" y1="2035.0" x2="1450" y2="2035.0" class="grid"/>
+<text x="95" y="2039.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="1987.0" x2="1450" y2="1987.0" class="grid"/>
+<text x="95" y="1991.0" text-anchor="end" class="axis-label">5</text>
+<line x1="105" y1="1939.0" x2="1450" y2="1939.0" class="grid"/>
+<text x="95" y="1943.0" text-anchor="end" class="axis-label">10</text>
+<line x1="105" y1="1891.0" x2="1450" y2="1891.0" class="grid"/>
+<text x="95" y="1895.0" text-anchor="end" class="axis-label">15</text>
+<line x1="105" y1="1843.0" x2="1450" y2="1843.0" class="grid"/>
+<text x="95" y="1847.0" text-anchor="end" class="axis-label">20</text>
+<line x1="105" y1="1795.0" x2="1450" y2="1795.0" class="grid"/>
+<text x="95" y="1799.0" text-anchor="end" class="axis-label">25</text>
+<line x1="105" y1="1795" x2="105" y2="2035" class="axis"/>
+<line x1="105" y1="2035" x2="1450" y2="2035" class="axis"/>
+<rect x="402.2" y="1850.6" width="24.0" height="184.4" fill="#2563eb"/>
+<rect x="428.2" y="1953.3" width="24.0" height="81.7" fill="#dc2626"/>
+<rect x="454.2" y="1925.4" width="24.0" height="109.6" fill="#16a34a"/>
+<text x="441.2" y="2053" text-anchor="middle" class="op-label">sdsdot</text>
+<rect x="1074.8" y="1845.8" width="24.0" height="189.2" fill="#2563eb"/>
+<rect x="1100.8" y="1953.4" width="24.0" height="81.6" fill="#dc2626"/>
+<rect x="1126.8" y="1926.8" width="24.0" height="108.2" fill="#16a34a"/>
+<text x="1113.8" y="2053" text-anchor="middle" class="op-label">dsdot</text>
+<text x="105" y="2110" class="panel-title">Complex f32 Level 1 (Gops)</text>
+<line x1="105" y1="2370.0" x2="1450" y2="2370.0" class="grid"/>
+<text x="95" y="2374.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="2310.0" x2="1450" y2="2310.0" class="grid"/>
+<text x="95" y="2314.0" text-anchor="end" class="axis-label">50</text>
+<line x1="105" y1="2250.0" x2="1450" y2="2250.0" class="grid"/>
+<text x="95" y="2254.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="2190.0" x2="1450" y2="2190.0" class="grid"/>
+<text x="95" y="2194.0" text-anchor="end" class="axis-label">150</text>
+<line x1="105" y1="2130.0" x2="1450" y2="2130.0" class="grid"/>
+<text x="95" y="2134.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="2130" x2="105" y2="2370" class="axis"/>
+<line x1="105" y1="2370" x2="1450" y2="2370" class="axis"/>
+<rect x="150.1" y="2306.4" width="24.0" height="63.6" fill="#2563eb"/>
+<rect x="176.1" y="2308.1" width="24.0" height="61.9" fill="#dc2626"/>
+<rect x="202.1" y="2356.9" width="24.0" height="13.1" fill="#16a34a"/>
+<text x="189.1" y="2388" text-anchor="middle" class="op-label">csscal</text>
+<rect x="318.2" y="2197.3" width="24.0" height="172.7" fill="#2563eb"/>
+<rect x="344.2" y="2322.4" width="24.0" height="47.6" fill="#dc2626"/>
+<rect x="370.2" y="2329.6" width="24.0" height="40.4" fill="#16a34a"/>
+<text x="357.2" y="2388" text-anchor="middle" class="op-label">cscal</text>
+<rect x="486.3" y="2291.2" width="24.0" height="78.8" fill="#2563eb"/>
+<rect x="512.3" y="2323.8" width="24.0" height="46.2" fill="#dc2626"/>
+<rect x="538.3" y="2291.2" width="24.0" height="78.8" fill="#16a34a"/>
+<text x="525.3" y="2388" text-anchor="middle" class="op-label">caxpy</text>
+<rect x="654.4" y="2324.8" width="24.0" height="45.2" fill="#2563eb"/>
+<rect x="680.4" y="2334.2" width="24.0" height="35.8" fill="#dc2626"/>
+<rect x="706.4" y="2278.9" width="24.0" height="91.1" fill="#16a34a"/>
+<text x="693.4" y="2388" text-anchor="middle" class="op-label">cdotu</text>
+<rect x="822.6" y="2324.3" width="24.0" height="45.7" fill="#2563eb"/>
+<rect x="848.6" y="2334.9" width="24.0" height="35.1" fill="#dc2626"/>
+<rect x="874.6" y="2276.2" width="24.0" height="93.8" fill="#16a34a"/>
+<text x="861.6" y="2388" text-anchor="middle" class="op-label">cdotc</text>
+<rect x="990.7" y="2300.6" width="24.0" height="69.4" fill="#2563eb"/>
+<rect x="1016.7" y="2297.9" width="24.0" height="72.1" fill="#dc2626"/>
+<rect x="1042.7" y="2330.1" width="24.0" height="39.9" fill="#16a34a"/>
+<text x="1029.7" y="2388" text-anchor="middle" class="op-label">scasum</text>
+<rect x="1158.8" y="2288.6" width="24.0" height="81.4" fill="#2563eb"/>
+<rect x="1184.8" y="2352.3" width="24.0" height="17.7" fill="#dc2626"/>
+<rect x="1210.8" y="2367.5" width="24.0" height="2.5" fill="#16a34a"/>
+<text x="1197.8" y="2388" text-anchor="middle" class="op-label">scnrm2</text>
+<rect x="1326.9" y="2257.0" width="24.0" height="113.0" fill="#2563eb"/>
+<rect x="1352.9" y="2265.7" width="24.0" height="104.3" fill="#dc2626"/>
+<rect x="1378.9" y="2319.8" width="24.0" height="50.2" fill="#16a34a"/>
+<text x="1365.9" y="2388" text-anchor="middle" class="op-label">csrot</text>
+<text x="105" y="2445" class="panel-title">Complex f64 Level 1 (Gops)</text>
+<line x1="105" y1="2705.0" x2="1450" y2="2705.0" class="grid"/>
+<text x="95" y="2709.0" text-anchor="end" class="axis-label">0</text>
+<line x1="105" y1="2657.0" x2="1450" y2="2657.0" class="grid"/>
+<text x="95" y="2661.0" text-anchor="end" class="axis-label">10</text>
+<line x1="105" y1="2609.0" x2="1450" y2="2609.0" class="grid"/>
+<text x="95" y="2613.0" text-anchor="end" class="axis-label">20</text>
+<line x1="105" y1="2561.0" x2="1450" y2="2561.0" class="grid"/>
+<text x="95" y="2565.0" text-anchor="end" class="axis-label">30</text>
+<line x1="105" y1="2513.0" x2="1450" y2="2513.0" class="grid"/>
+<text x="95" y="2517.0" text-anchor="end" class="axis-label">40</text>
+<line x1="105" y1="2465.0" x2="1450" y2="2465.0" class="grid"/>
+<text x="95" y="2469.0" text-anchor="end" class="axis-label">50</text>
+<line x1="105" y1="2465" x2="105" y2="2705" class="axis"/>
+<line x1="105" y1="2705" x2="1450" y2="2705" class="axis"/>
+<rect x="150.1" y="2657.9" width="24.0" height="47.1" fill="#2563eb"/>
+<rect x="176.1" y="2629.9" width="24.0" height="75.1" fill="#dc2626"/>
+<rect x="202.1" y="2680.8" width="24.0" height="24.2" fill="#16a34a"/>
+<text x="189.1" y="2723" text-anchor="middle" class="op-label">zdscal</text>
+<rect x="318.2" y="2509.0" width="24.0" height="196.0" fill="#2563eb"/>
+<rect x="344.2" y="2612.8" width="24.0" height="92.2" fill="#dc2626"/>
+<rect x="370.2" y="2633.1" width="24.0" height="71.9" fill="#16a34a"/>
+<text x="357.2" y="2723" text-anchor="middle" class="op-label">zscal</text>
+<rect x="486.3" y="2594.8" width="24.0" height="110.2" fill="#2563eb"/>
+<rect x="512.3" y="2630.3" width="24.0" height="74.7" fill="#dc2626"/>
+<rect x="538.3" y="2602.1" width="24.0" height="102.9" fill="#16a34a"/>
+<text x="525.3" y="2723" text-anchor="middle" class="op-label">zaxpy</text>
+<rect x="654.4" y="2579.2" width="24.0" height="125.8" fill="#2563eb"/>
+<rect x="680.4" y="2623.2" width="24.0" height="81.8" fill="#dc2626"/>
+<rect x="706.4" y="2561.3" width="24.0" height="143.7" fill="#16a34a"/>
+<text x="693.4" y="2723" text-anchor="middle" class="op-label">zdotu</text>
+<rect x="822.6" y="2583.8" width="24.0" height="121.2" fill="#2563eb"/>
+<rect x="848.6" y="2623.6" width="24.0" height="81.4" fill="#dc2626"/>
+<rect x="874.6" y="2565.8" width="24.0" height="139.2" fill="#16a34a"/>
+<text x="861.6" y="2723" text-anchor="middle" class="op-label">zdotc</text>
+<rect x="990.7" y="2607.9" width="24.0" height="97.1" fill="#2563eb"/>
+<rect x="1016.7" y="2636.8" width="24.0" height="68.2" fill="#dc2626"/>
+<rect x="1042.7" y="2620.9" width="24.0" height="84.1" fill="#16a34a"/>
+<text x="1029.7" y="2723" text-anchor="middle" class="op-label">dzasum</text>
+<rect x="1158.8" y="2527.4" width="24.0" height="177.6" fill="#2563eb"/>
+<rect x="1184.8" y="2696.0" width="24.0" height="9.0" fill="#dc2626"/>
+<rect x="1210.8" y="2695.3" width="24.0" height="9.7" fill="#16a34a"/>
+<text x="1197.8" y="2723" text-anchor="middle" class="op-label">dznrm2</text>
+<rect x="1326.9" y="2591.1" width="24.0" height="113.9" fill="#2563eb"/>
+<rect x="1352.9" y="2599.1" width="24.0" height="105.9" fill="#dc2626"/>
+<rect x="1378.9" y="2629.4" width="24.0" height="75.6" fill="#16a34a"/>
+<text x="1365.9" y="2723" text-anchor="middle" class="op-label">zdrot</text>
+</svg>

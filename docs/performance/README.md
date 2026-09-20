@@ -59,6 +59,115 @@ Keep raw profiler output, local disassembly notes, one-off failed experiments,
 machine-specific comparator paths, and uncurated CSVs in local private notes
 outside the committed tree.
 
+## README Snapshot: 2026-09-21
+
+The current charts measure code commit `00699605f110b5abdc07f33088e189dfb7c92f46`
+on Apple M5 (10 logical CPUs), macOS 27.0 (26A428), Zig 0.16.0 and Homebrew
+OpenBLAS 0.3.34, with the system Accelerate framework. The library uses
+`-Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast`. The code and
+probe/library bytes were frozen before timing; recorded source hashes matched
+again after all three families completed.
+
+All 822 aggregate rows retain six successful fresh-process measurements:
+138 Level 1 rows, 180 Level 2 rows and 504 GEMM rows. All 4,932 process-case
+samples have positive finite timings, complete three-library coverage and
+successful reference-check statuses. Level 1/2 report `sampled-ok`; GEMM
+reports `checked-ok` from its sampled reference checker. These statuses do
+not establish an independent check of every output element.
+
+The scope and measurement methods match the archived September 14 profile:
+46 Level 1 cases with one-second windows, 60 legacy Level 2 cases at
+n=128/256/512, and 168 GEMM cases across four types and 42 NN column-major
+shapes. Libraries are cyclically interleaved. Zynum uses its default thread
+policy; comparator caps are 10 with dynamic threading disabled where supported.
+No compilation, tests or profiling ran concurrently with timing.
+
+Level 1 charts use the median of six process rates. Level 2 retains each
+process's minimum positive Python/ctypes call time over 100 repetitions at
+n=128/256 or 30 at n=512, then plots the median process rate. GEMM uses 30
+calibrated batches per process and derives throughput from the median of six
+process-median per-call timings. The CSVs retain individual samples, including
+GEMM batch sizes. Native TPMV/TBSV investigations remain separate from the
+legacy Level 2 chart.
+
+| Plotted family | Cases | Zynum / Accelerate geometric mean | Zynum / OpenBLAS geometric mean | Cases below Accelerate |
+| --- | ---: | ---: | ---: | ---: |
+| Level 1 | 46 | 1.373x | 2.266x | 15 |
+| Level 2 | 60 | 1.281x | 3.674x | 11 |
+| GEMM | 168 | 1.047x | 1.789x | 64 |
+
+Each case has equal weight. These ratios are not workload scores, confidence
+intervals, historical speedups or an all-function performance guarantee.
+The strict no-slower-than-comparator gates remain unmet; slower cases are
+retained. macOS changed from 26.6.2 to 27.0 between the archived and current
+snapshots, so differences between them cannot be attributed solely to code.
+
+Before timing, Debug and ReleaseSafe each passed 500 tests with 4 expected
+skips; ReleaseFast passed 497 with 7 expected skips. Dynamic dispatch and its
+forced baseline passed 132 tests. Host tooling checks and generated header/
+kernel-coverage consistency checks also passed. Existing cross-platform
+compile evidence does not establish native performance on those systems.
+
+As in the archived report, the metadata reader recognizes kernel-coverage
+schema 1 while the generator emits schema 3. Metadata retains the coverage
+artifact hash and the `kernel_coverage_invalid_document` diagnostic; it does
+not provide validated per-call kernel selection evidence.
+
+Public evidence: [source manifest](../assets/benchmarks/2026-09-21/source.json),
+[Level 1 CSV](../assets/benchmarks/2026-09-21/level1.csv),
+[Level 2 CSV](../assets/benchmarks/2026-09-21/level2.csv), and
+[GEMM CSV](../assets/benchmarks/2026-09-21/gemm.csv), each with its `.meta.json`.
+The figures can be regenerated from these CSVs with the existing plotters.
+
+### Reproduce the current configuration
+
+Use the recorded commit and host/toolchain. The published run supplied its
+frozen source manifest using `--source-identity`; the commands below collect
+the clean checkout's Git identity. New runs must collect their own identity
+and binary hashes rather than reuse an archived manifest.
+
+```sh
+git worktree add --detach ../zynum-readme-2026-09-21 00699605f110b5abdc07f33088e189dfb7c92f46
+cd ../zynum-readme-2026-09-21
+zig build -Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast
+unset ZYNUM_MAXIMUM_THREADS
+export OPENBLAS_NUM_THREADS=10 OPENBLAS_DYNAMIC=0 VECLIB_MAXIMUM_THREADS=10
+export MKL_NUM_THREADS=10 MKL_DYNAMIC=FALSE OMP_NUM_THREADS=10 BLIS_NUM_THREADS=10
+mkdir -p zig-out/readme-benchmark
+python3 bench/tools/run_level1_report.py \
+  --level1-probe zig-out/bin/level1-probe --copy-probe zig-out/bin/dcopy-probe \
+  --n 1048576 --copy-byte-size 8KiB --copy-byte-size 8MiB \
+  --seconds 1 --copy-seconds 1 \
+  --op sswap --op dswap --op cswap --op zswap --op isamax --op idamax \
+  --op icamax --op izamax --op sscal --op saxpy --op sdot --op sasum \
+  --op snrm2 --op srot --op srotm --op dscal --op daxpy --op ddot \
+  --op dasum --op dnrm2 --op drot --op drotm --op sdsdot --op dsdot \
+  --op csscal --op cscal --op caxpy --op cdotu --op cdotc --op scasum \
+  --op scnrm2 --op csrot --op zdscal --op zscal --op zaxpy --op zdotu \
+  --op zdotc --op dzasum --op dznrm2 --op zdrot --op scopy --op dcopy \
+  --process-repeats 6 --process-schedule interleaved \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize ReleaseFast \
+  --csv zig-out/readme-benchmark/level1.csv --zynum zig-out/lib/libzynum_blas.dylib
+python3 bench/tools/run_level2_report.py \
+  --n 128 --n 256 --n 512 --op legacy --reps-small 100 --reps-large 30 \
+  --process-repeats 6 --process-schedule interleaved \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize ReleaseFast \
+  --csv zig-out/readme-benchmark/level2.csv --zynum zig-out/lib/libzynum_blas.dylib
+python3 bench/tools/run_gemm_sweep_isolated.py \
+  --gemm-sweep zig-out/bin/gemm-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib \
+  --reps 30 --process-repeats 6 --process-schedule interleaved \
+  --isolate-kind --isolate-shape --check \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize ReleaseFast \
+  --csv zig-out/readme-benchmark/gemm.csv
+python3 bench/tools/plot_level1_report.py zig-out/readme-benchmark/level1.csv \
+  --bars-svg zig-out/readme-benchmark/level1.svg \
+  --ratio-svg zig-out/readme-benchmark/level1-ratio.svg --stat median
+python3 bench/tools/plot_level2_report.py zig-out/readme-benchmark/level2.csv \
+  --bars-svg zig-out/readme-benchmark/level2.svg --stat median
+python3 bench/tools/plot_gemm_sweep.py zig-out/readme-benchmark/gemm.csv \
+  zig-out/readme-benchmark/gemm.svg --stat median
+```
+
 ## README Snapshot: 2026-09-14
 
 The README charts use clean code commit `4650d14c4dbe92489f3b37fb167a62df0bfa0ce4` on Apple M5

@@ -30,26 +30,26 @@ Transformer workloads across portable and architecture-specific CPU kernels.
 ## Performance Evidence
 
 The charts compare **Zynum, Accelerate, OpenBLAS**, in that order.
-**Higher is better.** This 2026-09-14 snapshot uses a baseline-CPU,
+**Higher is better.** This 2026-09-21 snapshot uses a baseline-CPU,
 dynamic-dispatch ReleaseFast build and six cyclically interleaved
 fresh-process measurements per case and library. The target machine, comparator versions,
 thread settings, source commit, and binary hashes are recorded in the
-[source manifest](docs/assets/benchmarks/2026-09-14/source.json).
+[source manifest](docs/assets/benchmarks/2026-09-21/source.json).
 
-![Level 1 median performance](docs/assets/benchmarks/2026-09-14/level1.svg)
+![Level 1 median performance](docs/assets/benchmarks/2026-09-21/level1.svg)
 
 <sub>Level 1: 46 cases covering real and complex vector routines at
 n=1,048,576 and 8 KiB/8 MiB copy cases; Gops or GB/s as labeled.
 The four nonstandard AXPBY extensions are excluded.</sub>
 
-![Level 2 median performance](docs/assets/benchmarks/2026-09-14/level2.svg)
+![Level 2 median performance](docs/assets/benchmarks/2026-09-21/level2.svg)
 
 <sub>Level 2: 60 legacy cases at n=128, 256, 512; GFLOP/s.
 Each process retains its minimum positive time for an individual Python/ctypes
 call; charts use the median of the six process rates. This is not a native
 batched-call benchmark.</sub>
 
-![GEMM median performance](docs/assets/benchmarks/2026-09-14/gemm.svg)
+![GEMM median performance](docs/assets/benchmarks/2026-09-21/gemm.svg)
 
 <sub>Level 3: 168 cases, comprising SGEMM, DGEMM, CGEMM, and ZGEMM
 across the original 42-shape NN column-major sweep; GFLOP/s derived from
@@ -58,9 +58,10 @@ every Level 3 operation.</sub>
 
 These selected cases do not establish a portable performance guarantee,
 a historical speedup, or completion of the all-operation performance gate.
-See the [methodology and reproduction package](docs/performance/README.md#readme-snapshot-2026-09-14).
-The [2026-09-09 specialized snapshot](docs/performance/README.md#readme-snapshot-2026-09-09)
-remains archived with its original source identity and measurement method.
+See the [methodology and reproduction package](docs/performance/README.md#readme-snapshot-2026-09-21).
+The [2026-09-14 dynamic snapshot](docs/performance/README.md#readme-snapshot-2026-09-14)
+and [2026-09-09 specialized snapshot](docs/performance/README.md#readme-snapshot-2026-09-09)
+remain archived with their original source identities and measurement methods.
 
 ## Highlights
 
