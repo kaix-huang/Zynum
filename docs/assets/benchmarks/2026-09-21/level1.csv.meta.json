@@ -45,7 +45,7 @@
         "libraries": [
           {
             "name": "Zynum",
-            "sha256": "a3e6daa1295c504ad19b34780887950b0ce7a156ffb969d27255fcf6c7a6f714"
+            "sha256": "87b463b3cfedd14792a8ce5313de9f6ec9dcfbba0e3a23c731c0500584453d92"
           },
           {
             "name": "Accelerate",
@@ -103,10 +103,10 @@
       "dirty": false,
       "identity_diagnostic": "source_identity_manifest_loaded",
       "identity_status": "exported",
-      "revision": "00699605f110b5abdc07f33088e189dfb7c92f46",
-      "snapshot_created_utc": "2026-09-20T17:32:58.061483+00:00",
-      "snapshot_manifest_sha256": "f02215c56e49bb0202015566901308a08b130f68d3cc44c92f78169c9c4e3832",
-      "snapshot_tree_sha256": "5d74a79748d01956cf0e89c3739e2fbf6118f678ca76bc9094d5c10fe635ad11"
+      "revision": "6a8b991f5130c977b633e172bbf7913fcd474703",
+      "snapshot_created_utc": "2026-09-20T20:21:59.823458+00:00",
+      "snapshot_manifest_sha256": "3225ebaa7db6a4b2cea4ae8620a2fec5ebb5af8bb2456a2cd8737ec95a83ecd9",
+      "snapshot_tree_sha256": "f817239a5726c92a921294a165160e2df224c7ace4207f0ac700583c6fe28fba"
     }
   },
   "command": {
@@ -198,8 +198,8 @@
     "VECLIB_MAXIMUM_THREADS": "10",
     "ZYNUM_MAXIMUM_THREADS": "unset"
   },
-  "generated_at_unix": 1789926436.1452959,
-  "git_revision": "00699605f110b5abdc07f33088e189dfb7c92f46",
+  "generated_at_unix": 1789936576.509335,
+  "git_revision": "6a8b991f5130c977b633e172bbf7913fcd474703",
   "groups": null,
   "isolation": "fresh process per library/op/size/repeat; best repeat kept as the primary metric with min/median/max and ordered samples retained",
   "level1_stride_pairs": [
@@ -231,7 +231,7 @@
       "sha256": "aeb5f40d3b5cc0fca84e05e90b8e7da6921cea2c33ca701062b0ccd7b4caf117"
     },
     "Zynum": {
-      "sha256": "a3e6daa1295c504ad19b34780887950b0ce7a156ffb969d27255fcf6c7a6f714"
+      "sha256": "87b463b3cfedd14792a8ce5313de9f6ec9dcfbba0e3a23c731c0500584453d92"
     }
   },
   "metadata_projection": {
