@@ -416,3 +416,32 @@ the wrapper grows in instruction count, so code size alone is not the mechanism.
 
 Private evidence: zynum-local-r247 through r249 (2026-09-19). R249 retains R248
 executable logic and clarifies its comment. No full benchmark or publication.
+
+### Keep fixed-width f32 SME row tails in registers
+
+For 16- and 32-column panels, specialize the row-tail helper with four or eight
+independent vector accumulators. Keep the helper out of line and skip its call
+when there are no tail rows. Each output retains ascending-K fused accumulation;
+other panel widths and f64 retain their existing implementation. Disassembly
+confirms register accumulators without per-K accumulator scratch loads/stores.
+
+On Apple M5, two six-repeat comparisons loaded each library in turn from the
+same path, with rotated and reversed process order: 468 fresh processes across
+13 cases, 100 timed batches per process. Against the published R249 baseline,
+SGEMM m=97/103/111, n=128, k=124 improved about 1.26/1.95/2.51x. The 127-square
+N/T combinations improved about 1.12–1.58x. No-tail controls remained within
+about 1% of baseline; this is a bounded observation, not a universal guarantee.
+
+Earlier different-path measurements suggested 5–6% small-square regressions.
+A rebuilt, unchanged baseline reproduced that gap, despite identical Mach-O
+text sections. Loading all versions from the same path removed most of it.
+The underlying process/layout cause is unresolved; do not attribute the entire
+earlier gap to the source change or compare those timings as interchangeable.
+
+The retained source is byte-identical to the tested R256 candidate: Safe/Fast
+GEMM registry tests passed 47/47 each and Intel Linux/macOS compiled. All 768
+normal cases matched complete outputs and padding, preserved inputs, and passed
+independent reference samples; 10,368 exceptional-value/rounding/FZ comparisons
+matched complete outputs, FPSR and FPCR. Enabled-trap ordering remains unproven.
+Private evidence: zynum-local-r256 and r257 (2026-09-21). Targeted results above
+are separate from the broader README measurement snapshot.

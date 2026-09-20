@@ -245,3 +245,30 @@ to the first logical index. All chains are seeded from the first element, so a
 first-element NaN retains the scalar result while later NaNs remain ignored.
 The unit-stride, complex, invalid-argument and small-vector routes are unchanged;
 no gather buffers or vector-width assumptions are added.
+
+### Bounded parallel streaming SROT on macOS
+
+For non-overlapping contiguous f32 vectors of 512 Ki through 1 Mi elements,
+use at most three tasks when the existing SME2 ROT leaf accepts the call and
+the streaming vector length is 64 bytes. Split at 256-element boundaries and
+leave the original tail to the last task. Respect the configured thread limit;
+single-thread calls and enabled floating-point traps retain serial dispatch.
+
+Every task keeps the original streaming arithmetic. Propagate the caller's
+FPCR and restore each helper's FPCR/FPSR afterward. Replacing it with the
+non-streaming ROT leaf changes NaN payloads and status flags. The caller owns
+task zero, retaining the streaming leaf's caller-visible status behavior.
+
+On Apple M5, three-task measurements improved selected 512 Ki–1 Mi calls by
+about 10–16%; four tasks regressed and were rejected. The fixed three-task
+candidate measured about 16% faster at 1 Mi with default scheduling, while
+single-thread and out-of-range controls stayed near baseline. Accelerate
+remains faster for this case. These are targeted observations, not a general
+performance guarantee.
+
+Native integration checks compare complete output, padding, FPSR and preserved
+FPCR across size boundaries, rounding/flush modes, exceptional inputs and
+coefficient pairs. Checks also put exceptional values exclusively in the last
+chunk and exercise thread caps 1/2 and forced baseline dispatch. The native
+SME2 registry regression reuses workers across changes in FPCR. Private
+evidence: zynum-local-r271 through r276, 2026-09-21.

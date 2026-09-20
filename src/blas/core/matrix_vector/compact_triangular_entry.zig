@@ -984,6 +984,9 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
 inline fn finiteTpmvNoTransRows(comptime T: type, comptime width: usize, first_row: usize, uplo: Uplo, diag: Diag, n: usize, ap: [*]const T, x: [*]const T, incx: BlasInt, stride: usize, last: usize, output: []T) bool {
     if (comptime T == f64 or T == f32) {
         if (incx == 1 and uplo == .upper) return finiteTpmvNoTransRowsImpl(T, width, true, first_row, uplo, diag, n, ap, x, incx, stride, last, output);
+        // Lower f32 rows below 512 benefit from fixed-stride addressing and
+        // unrolling; larger calls showed no consistent gain over the generic leaf.
+        if (T == f32 and n <= 511 and incx == 1 and uplo == .lower) return finiteTpmvNoTransRowsImpl(T, width, true, first_row, uplo, diag, n, ap, x, incx, stride, last, output);
     }
     return finiteTpmvNoTransRowsImpl(T, width, false, first_row, uplo, diag, n, ap, x, incx, stride, last, output);
 }
@@ -1038,7 +1041,16 @@ fn FiniteTpmvRowsLeaf(comptime T: type, comptime width: usize, comptime unit_str
                     }
                 } else {
                     var offset = i;
-                    for (0..i) |j| {
+                    var column: usize = 0;
+                    if (comptime T == f32 and unit_stride) {
+                        while (i - column >= 4) : (column += 4) {
+                            inline for (0..4) |term| {
+                                sums = sums + @as(@Vector(width, T), ap[offset..][0..width].*) * @as(@Vector(width, T), @splat(x[column + term]));
+                                offset += n - column - term - 1;
+                            }
+                        }
+                    }
+                    for (column..i) |j| {
                         const xj = x[if (unit_stride) j else if (incx > 0) j * stride else last - j * stride];
                         sums = sums + @as(@Vector(width, T), ap[offset..][0..width].*) * @as(@Vector(width, T), @splat(xj));
                         offset += n - j - 1;

@@ -478,6 +478,45 @@ prefetch addresses remain strictly within the common off-diagonal interval.
 
 ### Staging and validation
 
+For non-transposed f32 lower triangles with contiguous input, use the existing
+fixed-stride row leaf through n=511. Larger calls retain the generic leaf:
+an unrestricted experiment improved small cases but regressed at 512/1024.
+This changes addressing only; each output retains its original multiply/add
+order. Disassembly shows direct input pointer increments instead of runtime
+stride-direction selection in the common loop.
+
+The bounded variant was checked in 256 fresh paired processes on Apple M5,
+including 63/64/65, 127/128/129, 255/256/257/258 and 511/512/513 boundaries.
+Selected n=64..256 lower cases improved about 2–10%; larger and unrelated
+upper/transpose/f64 controls stayed within about 1% of baseline. Safe/Fast
+packed tests passed 25/25 each and Intel Linux/macOS compiled. At n=256/257,
+13,824 complete-output/FPSR comparisons also checked preserved FPCR across
+both real types, triangles, transpose modes, signed strides, diagonal modes,
+rounding/FZ settings and exceptional input patterns. Another 2,880 exact-output,
+gap and protected-page checks passed. These checks do not prove enabled-trap
+ordering or universal absence of regression. Private evidence: r259 (rejected
+unrestricted variant) and r260 (retained), 2026-09-21.
+
+The same bounded f32 lower leaf subsequently unrolls four common columns per
+iteration, preserving the sequence of separate multiplies and additions for
+each output. Against r260, r261 measured a further roughly 6–12% improvement
+on selected n=64..256 cases in 256 fresh paired processes; larger and unrelated
+controls remained within about 1%. Disassembly confirms four columns between
+loop back edges without changing to fused arithmetic. Safe/Fast packed tests
+passed 25/25 each, Intel Linux/macOS compiled, 13,824 complete-output/FPSR/FPCR
+comparisons at n=256/257 and 2,880 exact-output/gap/protected-page checks passed.
+These incremental ratios are not a cumulative speedup against Accelerate.
+Private evidence: r261, 2026-09-21; the same validation limits apply.
+
+After four-column unrolling, r263 extends the bound from 256 to 511. A sweep
+through 257, 319/320, 383/384, 447/448, 479/480 and 510/511 measured roughly
+2–10% gains over r261. In 264 fresh paired processes, unchanged small, upper,
+transpose, f64 and 512/513/1024/8192 controls stayed within about 1% of baseline.
+Safe/Fast tests passed 25/25 each, Intel Linux/macOS compiled, 13,824 complete
+output/FPSR/preserved-FPCR comparisons at 511/512 and 2,880 protected-page/gap
+checks passed. An unrestricted extension (r262) was not retained: it offered
+no consistent larger-size benefit and measured about 2% slower at 8192.
+
 Small real TPMV uses bounded stack staging for up to 128 outputs; larger calls
 retain the checked workspace allocation path. Contiguous input in either
 direction uses sixteen-element integer exponent scans to detect non-finite

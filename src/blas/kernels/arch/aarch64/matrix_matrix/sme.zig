@@ -300,8 +300,29 @@ fn packBPanel2F64ForTask(task: gemm_task.Task(f64), j: usize, tile: usize, b_pac
     }
 }
 
+// Fixed panel widths keep independent column accumulators in registers while
+// retaining each output's ascending-K fused accumulation order.
+noinline fn tailRowsF32Fixed(comptime columns: usize, task: gemm_task.Task(f32), b_pack: []const f32, row_start: usize, j: usize) void {
+    for (row_start..task.m) |row| {
+        var sums: [columns / 4]@Vector(4, f32) = @splat(@splat(0));
+        for (0..task.k) |p| {
+            const av: @Vector(4, f32) = @splat(task.a[matIndex(task.lda, row, p)]);
+            inline for (0..columns / 4) |group| {
+                sums[group] = @mulAdd(@Vector(4, f32), av, loadF32x4(b_pack.ptr + p * columns + group * 4), sums[group]);
+            }
+        }
+        inline for (0..columns / 4) |group| {
+            inline for (0..4) |lane| task.c[matIndex(task.ldc, row, j + group * 4 + lane)] = sums[group][lane];
+        }
+    }
+}
+
 fn tailRowsDirect(comptime T: type, task: gemm_task.Task(T), b_pack: []const T, row_start: usize, j: usize, tile: usize) void {
     if (row_start >= task.m) return;
+    if (T == f32) {
+        if (tile == 16) return tailRowsF32Fixed(16, task, b_pack, row_start, j);
+        if (tile == 32) return tailRowsF32Fixed(32, task, b_pack, row_start, j);
+    }
     // Finish rows below one SME tile after the assembly kernels. Four-column
     // f32 groups preserve each output's ascending-K fused accumulation order.
     var acc_storage: [maxSmeTile(T)]T = undefined;
@@ -419,7 +440,7 @@ fn noTransRealF32SmeDirectWithPack(task: gemm_task.Task(f32), tile: usize, b_pac
         panel_index = 0;
         while (panel_index < batch_panels) : (panel_index += 1) {
             const panel_offset = panel_index * panel2_elems;
-            tailRowsDirect(f32, task, b_pack[panel_offset .. panel_offset + panel2_elems], scalar_tail_row, tail_j, panel2_cols);
+            if (scalar_tail_row < task.m) tailRowsDirect(f32, task, b_pack[panel_offset .. panel_offset + panel2_elems], scalar_tail_row, tail_j, panel2_cols);
             tail_j += panel2_cols;
         }
     }
@@ -436,7 +457,7 @@ fn noTransRealF32SmeDirectWithPack(task: gemm_task.Task(f32), tile: usize, b_pac
             const c_panel = task.c + matIndex(task.ldc, full_rows_4m, j);
             callSmeGemmPanel(f32, sme_asm.sgemmPanelF32, a_panel, b_pack.ptr, c_panel, full_rows - full_rows_4m, task.k, lda_bytes, ldc_bytes);
         }
-        tailRowsDirect(f32, task, b_pack, full_rows, j, tile);
+        if (full_rows < task.m) tailRowsDirect(f32, task, b_pack, full_rows, j, tile);
     }
 
     if (j < task.n1) {

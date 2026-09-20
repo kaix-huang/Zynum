@@ -1967,6 +1967,62 @@ fn runRotTaskF64(raw_tasks: *const anyopaque, index: usize) void {
     runRotTask(f64, raw_tasks, index);
 }
 
+const StreamingRotTask = struct {
+    n: usize,
+    x: [*]f32,
+    y: [*]f32,
+    c: f32,
+    s: f32,
+    fpcr: u64,
+};
+
+fn runStreamingRotTask(raw: *const anyopaque, index: usize) void {
+    const tasks: [*]const StreamingRotTask = @ptrCast(@alignCast(raw));
+    const task = tasks[index];
+    const old_cr = asm volatile ("mrs %[value], fpcr"
+        : [value] "=r" (-> u64),
+    );
+    const old_sr = asm volatile ("mrs %[value], fpsr"
+        : [value] "=r" (-> u64),
+    );
+    asm volatile ("msr fpcr, %[value]"
+        :
+        : [value] "r" (task.fpcr),
+        : .{ .memory = true });
+    defer {
+        asm volatile ("msr fpcr, %[value]"
+            :
+            : [value] "r" (old_cr),
+            : .{ .memory = true });
+        if (index != 0) asm volatile ("msr fpsr, %[value]"
+            :
+            : [value] "r" (old_sr),
+            : .{ .memory = true });
+    }
+    if (!vector_binary_kernels.rotUnitRealStreaming(f32, task.n, task.x, task.y, task.c, task.s))
+        rotUnitReal(f32, task.n, task.x, task.y, task.c, task.s);
+}
+
+fn parallelStreamingRot(n: usize, x: [*]f32, y: [*]f32, c: f32, s: f32) bool {
+    if (comptime builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return false;
+    if (n < 512 * 1024 or n > 1024 * 1024) return false;
+    if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n * @sizeOf(f32))) return false;
+    const count = @min(core_pool.taskCount(n, 128 * 1024), 3);
+    if (count <= 1 or !vector_binary_kernels.supportsRotUnitRealStreaming(f32, n)) return false;
+    const fpcr = asm volatile ("mrs %[value], fpcr"
+        : [value] "=r" (-> u64),
+    );
+    if (fpcr & 0x9f00 != 0) return false;
+    var tasks: [3]StreamingRotTask = undefined;
+    const blocks = n / 256;
+    for (0..count) |index| {
+        const begin = (blocks * index / count) * 256;
+        const end = if (index + 1 == count) n else (blocks * (index + 1) / count) * 256;
+        tasks[index] = .{ .n = end - begin, .x = x + begin, .y = y + begin, .c = c, .s = s, .fpcr = fpcr };
+    }
+    return core_pool.runLowLatency(runStreamingRotTask, @ptrCast(&tasks), count);
+}
+
 fn parallelRotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
@@ -3238,8 +3294,10 @@ pub fn rot(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, incy
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (incx_ == 1 and incy_ == 1) {
-            // Large SME transforms own SM/ZA once for the complete vector.
+            // Keep the SME arithmetic in each chunk; non-streaming ROT has
+            // different NaN and floating-point status behavior.
             if (comptime builtin.cpu.arch == .aarch64 and T == f32) {
+                if (parallelStreamingRot(n, x, y, c, s)) return;
                 if (vector_binary_kernels.rotUnitRealStreaming(T, n, x, y, c, s)) return;
             }
             if (parallelRotUnitReal(T, n, x, y, c, s)) return;

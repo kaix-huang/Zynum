@@ -293,6 +293,19 @@ fn execute(operation: u32, scalar_id: u32, raw_packet: *anyopaque) callconv(.c) 
             },
             else => @panic("invalid multiversion kernel scalar"),
         },
+        @intFromEnum(protocol.Operation.vector_binary_supportsRotUnitRealStreaming) => switch (scalar_id) {
+            @intFromEnum(protocol.scalarId(f32)) => {
+                const T = f32;
+                const packet: *protocol.Packet(.vector_binary_supportsRotUnitRealStreaming, T) = @ptrCast(@alignCast(raw_packet));
+                packet.result = @call(.auto, vector_binary.supportsRotUnitRealStreaming, .{T} ++ packet.args);
+            },
+            @intFromEnum(protocol.scalarId(f64)) => {
+                const T = f64;
+                const packet: *protocol.Packet(.vector_binary_supportsRotUnitRealStreaming, T) = @ptrCast(@alignCast(raw_packet));
+                packet.result = @call(.auto, vector_binary.supportsRotUnitRealStreaming, .{T} ++ packet.args);
+            },
+            else => @panic("invalid multiversion kernel scalar"),
+        },
         @intFromEnum(protocol.Operation.vector_binary_rotUnitRealStreaming) => switch (scalar_id) {
             @intFromEnum(protocol.scalarId(f32)) => {
                 const T = f32;

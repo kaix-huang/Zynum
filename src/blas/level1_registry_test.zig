@@ -52,6 +52,72 @@ fn expectStreamingCall(before: aarch_features.TestStreamingDepths, uses_za: bool
     try std.testing.expectEqual(@as(u2, 0), aarch_features.streamingModeBits());
 }
 
+fn checkStreamingRotEnvironment() !void {
+    if (comptime builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos or !aarch_features.has_sme2) return;
+    const old_cr = asm volatile ("mrs %[value], fpcr"
+        : [value] "=r" (-> u64),
+    );
+    const old_sr = asm volatile ("mrs %[value], fpsr"
+        : [value] "=r" (-> u64),
+    );
+    defer {
+        asm volatile ("msr fpcr, %[value]"
+            :
+            : [value] "r" (old_cr),
+            : .{ .memory = true });
+        asm volatile ("msr fpsr, %[value]"
+            :
+            : [value] "r" (old_sr),
+            : .{ .memory = true });
+    }
+    const n = 1024 * 1024 - 1;
+    const allocator = std.testing.allocator;
+    const x = try allocator.alloc(f32, n + 16);
+    defer allocator.free(x);
+    const y = try allocator.alloc(f32, n + 16);
+    defer allocator.free(y);
+    const expected_x = try allocator.alloc(f32, n + 16);
+    defer allocator.free(expected_x);
+    const expected_y = try allocator.alloc(f32, n + 16);
+    defer allocator.free(expected_y);
+    // Reuse the pool while changing the caller's rounding/flush settings.
+    // The special value lives only in the last chunk, which also owns the tail.
+    for (0..4) |rounding| {
+        for (0..2) |flush| {
+            for ([_]u32{ 1, 0x7f800001, 0x80000000 }) |special| {
+                @memset(x, 0.6875);
+                @memset(y, -0.4375);
+                x[n - 1] = @bitCast(special);
+                @memcpy(expected_x, x);
+                @memcpy(expected_y, y);
+                const cr = (old_cr & ~@as(u64, 0x9f00 | (3 << 22) | (1 << 24))) |
+                    (@as(u64, rounding) << 22) | (@as(u64, flush) << 24);
+                asm volatile ("msr fpcr, %[value]"
+                    :
+                    : [value] "r" (cr),
+                    : .{ .memory = true });
+                asm volatile ("msr fpsr, xzr" ::: .{ .memory = true });
+                try std.testing.expect(aarch_binary.rotUnitRealStreaming(f32, n, expected_x.ptr, expected_y.ptr, 0.8, 0.6));
+                const expected_sr = asm volatile ("mrs %[value], fpsr"
+                    : [value] "=r" (-> u64),
+                );
+                asm volatile ("msr fpsr, xzr" ::: .{ .memory = true });
+                ops.rot(f32, n, x.ptr, 1, y.ptr, 1, 0.8, 0.6);
+                const actual_sr = asm volatile ("mrs %[value], fpsr"
+                    : [value] "=r" (-> u64),
+                );
+                const actual_cr = asm volatile ("mrs %[value], fpcr"
+                    : [value] "=r" (-> u64),
+                );
+                try std.testing.expectEqual(cr, actual_cr);
+                try std.testing.expectEqual(expected_sr, actual_sr);
+                try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected_x), std.mem.sliceAsBytes(x));
+                try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected_y), std.mem.sliceAsBytes(y));
+            }
+        }
+    }
+}
+
 test "forced contiguous real kernel covers exact width, tail, and misalignment" {
     inline for (.{ @as(usize, 8), @as(usize, 13) }) |n| {
         var x_storage: [24]f64 align(64) = undefined;
@@ -74,6 +140,7 @@ test "native SME2 Level 1 catalog cells enter and balance declared state" {
     if (comptime builtin.cpu.arch != .aarch64 or !aarch_features.has_sme2) return;
     if (aarch_features.streamingVectorBytes() != 64) return;
     try checkStreamingSwapAlignment();
+    try checkStreamingRotEnvironment();
 
     const allocator = std.testing.allocator;
     const n: usize = 64 * 1024;

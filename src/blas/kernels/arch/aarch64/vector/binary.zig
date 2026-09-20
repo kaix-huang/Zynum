@@ -615,6 +615,13 @@ pub fn sveDotComplexF32Candidate(n: usize, x: [*]const types.ComplexF32, y: [*]c
     return out;
 }
 
+pub fn supportsRotUnitRealStreaming(comptime T: type, n: usize) bool {
+    if (comptime T == f32 and profile.enable_sme_linear_transform and features.has_sme2) {
+        return profile.preferSmeRot(T, n) and features.streamingVectorBytes() == 64;
+    }
+    return false;
+}
+
 pub fn rotUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
     if (comptime T == f32 and profile.enable_sme_linear_transform and features.has_sme2) {
         if (profile.preferSmeRot(T, n) and features.streamingVectorBytes() == 64) {
