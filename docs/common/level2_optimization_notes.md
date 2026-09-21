@@ -517,6 +517,120 @@ output/FPSR/preserved-FPCR comparisons at 511/512 and 2,880 protected-page/gap
 checks passed. An unrestricted extension (r262) was not retained: it offered
 no consistent larger-size benefit and measured about 2% slower at 8192.
 
+For AArch64 with ASIMD, the contiguous f32 lower-transpose sixteen-row loop loads
+its two adjacent input values together and uses their individual vector lanes.
+An explicit 64-bit load prevents LLVM from splitting an ordinary vector load
+back into a broadcast load plus a scalar load. The paired-column bound covers
+both inputs; the odd tail, arithmetic order and other paths are unchanged.
+Disassembly reduces the measured common loop from 56 to 55 instructions.
+
+In 132 fresh paired processes on Apple M5, selected n=64..2048 targets improved
+about 1.7–2.8%; n=4096 improved about 1.8–2.3% and n=8192 about 0.5–1.3%.
+Upper, non-transpose and f64 controls stayed within about 0.5% of baseline.
+Safe/Fast packed tests passed 25/25 each and Intel Linux/macOS compiled;
+20,736 complete-output/FPSR/FPCR comparisons at n=257/511/512 and 2,880
+exact-output/gap/protected-page checks passed. These targeted observations do
+not prove universal absence of regression or enabled-trap ordering. Private
+evidence: r278 (ordinary load, identical machine code) and r279 (retained
+explicit load), 2026-09-21. The README snapshot remains unchanged.
+
+Another 144 fresh paired processes cover 17/18, 31/32/33, 47/48/49, 63/65 and
+127/129 boundaries with both triangles and diagonal modes. Calls below the
+existing n=64 finite-path gate remain scalar; their observed variation was
+within about 1.1%. This boundary sweep does not extend the dispatch gate.
+
+The existing grouped f32 upper-transpose path (n=64..256) also shares one
+explicit input-pair load across its two eight-row groups when ASIMD is
+available. The representative common loop drops from 55 to 54 instructions;
+each output keeps its original multiply/add sequence. In 288 fresh paired
+processes, including a six-repeat boundary sweep, most target cases improved
+about 0.7–2.0%; n=64 with a non-unit diagonal was approximately flat. Other
+triangles/types, non-transposes and n=257/512 controls stayed within about
+0.4%. Safe/Fast packed tests passed 25/25 each, Intel Linux/macOS and AArch64
+Linux without NEON compiled, 13,824 complete-output/FPSR/FPCR comparisons at
+n=256/257 and 2,880 exact-output/gap/protected-page checks passed. The same
+validation limits apply. Private evidence: r280, 2026-09-21; local only.
+
+The same bounded input-pair load is retained for the ungrouped sixteen-row
+upper f32 transpose path (n>256, contiguous input, AArch64 ASIMD). The common
+paired-column loop drops from 55 to 54 instructions and keeps separate,
+ordered multiply/add operations. In 132 fresh paired processes over 44 cases,
+n=257..4096 improved about 1.9–2.9%, while n=8192 improved about 0.3–1.4%.
+Unchanged-path controls remained within about 0.3%. Safe/Fast packed tests
+passed 25/25 each; Intel Linux/macOS and AArch64 Linux without NEON compiled.
+Another 20,736 complete-output/FPSR/FPCR comparisons at n=257/511/512 and
+2,880 exact-output/gap/protected-page cases passed. Timings include input
+reset, use a single-thread cap, and do not establish universal speedup or
+enabled-trap equivalence. Private evidence: r281, 2026-09-21; local only.
+
+The grouped upper f32 transpose loop also computes the second-column product
+before accumulating either column, keeping each output's two additions in
+their original order. Disassembly confirms earlier independent multiplies
+with no fused accumulation or extra loop instructions. Across 288 fresh paired
+processes, including six repetitions of 32 boundary/control cases, unit
+diagonals at n=64..256 improved about 0.5–1.2%; non-unit diagonals were flat.
+Initial unchanged-path controls stayed within 0.4%, and boundary controls
+within 0.15%. Safe/Fast packed tests passed 25/25 each, Intel Linux/macOS and
+AArch64 Linux without NEON compiled, 6,912 complete-output/FPSR/FPCR comparisons
+and 2,880 protected-page/gap cases passed. This does not establish enabled-trap
+ordering equivalence. Private evidence: r285, 2026-09-21; local only.
+
+Within that grouped upper path, unit diagonals now use four groups of four
+rows; non-unit diagonals keep two groups of eight. This is a compile-time
+choice using the existing diagonal specialization. A blanket four-row change
+was rejected after a repeatable roughly 0.6% loss at n=64 non-unit. With the
+unit-only choice, 288 fresh paired processes measured about 0.3–0.8% gains
+at n=64..256; six-repeat boundary controls stayed within 0.08% (initial broader
+controls within 0.53%). Disassembly changed only the grouped unit leaf among
+the inspected f32 siblings, leaving the non-unit leaf identical. Safe/Fast
+packed tests passed 25/25 each, Intel Linux/macOS and AArch64 Linux without
+NEON compiled, 6,912 full-output/FPSR/FPCR and 2,880 guard/gap checks passed.
+The same timing and floating-point validation limits apply. Private evidence:
+r288, 2026-09-21; local only.
+
+The contiguous f64 eight-row non-unit transpose loop shares a 128-bit input
+pair load across its two four-row groups on AArch64 ASIMD. Lane multiplies
+replace a broadcast load plus scalar load; the representative common loop
+falls from 40 to 39 instructions without changing separate accumulation.
+In 384 fresh paired processes, including 80 boundary cases and focused
+confirmation, n=64..511 targets generally improved about 2–4%; larger
+sixteen-row paths and eight-row tails were approximately flat. One unchanged
+n=129 lower-unit control varied from -1.6% to +1.4% on repetition; its leaf
+instructions were identical, so this was not treated as evidence of either
+gain or regression. Safe/Fast packed tests passed 25/25 each, Intel Linux/macOS
+and AArch64 Linux without NEON compiled, 20,736 complete-output/FPSR/FPCR
+comparisons at n=257/511/512 and 2,880 guard/gap cases passed. The paired loop
+bound ensures both input elements exist. The same validation limits apply.
+Private evidence: r291, 2026-09-21; local only.
+
+The corresponding contiguous f64 eight-row unit-diagonal path also retains
+the single 128-bit input-pair load. Its representative common loop falls
+from 40 to 39 instructions. In 372 fresh paired processes, including the same
+80-case boundary sweep and targeted confirmation, n=64..511 typically gained
+about 2–4%; sixteen-row main paths and their eight-row tails were nearly flat.
+The unchanged n=129 lower non-unit control varied from -1.4% to +0.6% on
+repetition, with identical leaf instructions; the targeted upper-unit gain
+remained about 3.1% and lower-unit about 1.8%. Initial isolated non-transpose
+control noise reduced on repetition (f32 n=128 upper non-transpose: -0.7% to
+-0.35%). Safe/Fast packed tests passed 25/25 each, the same three cross-target
+compiles passed, and 20,736 full-output/FPSR/FPCR plus 2,880 guard/gap checks
+passed. These focused results do not establish a universal speedup or absence
+of regression. Private evidence: r292, 2026-09-21; local only.
+
+The 128-bit pair load is also retained for the contiguous f64 sixteen-row
+upper transpose path. Extending both triangles initially gave no consistent
+lower-triangle benefit and a roughly 1.1% loss at n=2048 lower non-unit, so
+the lower extension was withdrawn before final measurement. The upper-only
+version improved n=512..2048 about 1.6–2.3%; n=4095/4096/4097/8192 was nearly
+flat to about 1% faster. Across 312 fresh paired processes (144 initial,
+144 upper-only, 24 larger boundary cases), final unchanged-path controls
+stayed within about 0.3%. Safe/Fast packed tests passed 25/25 each; Intel
+Linux/macOS and AArch64 Linux without NEON compiled. The retained version
+passed 6,912 full-output/FPSR/FPCR comparisons at n=512 and 2,880 guard/gap
+cases. These focused timings include reset and do not establish a universal
+speedup or enabled-trap equivalence. Private evidence: r293, 2026-09-21;
+local only.
+
 Small real TPMV uses bounded stack staging for up to 128 outputs; larger calls
 retain the checked workspace allocation path. Contiguous input in either
 direction uses sixteen-element integer exponent scans to detect non-finite
@@ -548,3 +662,25 @@ Use the published README snapshot for the current broad comparator evidence.
 Its legacy Level 2 cases do not replace focused native TPMV/TBSV measurements.
 Revisit these predicates if boundary sweeps, exception checks or unchanged-path
 controls show a repeatable regression on a supported machine.
+
+Local R326/R329/R330 qualification retains earlier scheduling of the second
+column product in the f64, eight-row, contiguous, non-unit-diagonal transpose
+leaf. The two additions remain in their original order, with separate strict
+multiply and add operations. On this M5, selected n=64/128 cases improved about
+0.2–0.4%, and n=256/511 cases about 0.7–1.9%. These are local paired measurements,
+not an updated Accelerate comparison or a broad benchmark claim.
+
+Qualification included 400 fresh processes interleaving candidate comparisons
+with independently loaded, byte-identical baseline replicas, and alternating
+library load order. Unit-diagonal and larger n=512..4096 controls were generally
+flat; small individual shifts remain possible. Earlier same-path replica tests
+reused one loaded module and understated inter-module variation. An unchanged
+f32 leaf and its caller were byte-identical at the same library-relative offsets,
+yet their timings varied with loading order; this does not establish a precise
+microarchitectural cause. Use independent images for future subpercent checks.
+
+The exact candidate passed 27,648 output/FPSR comparisons at n=256/257/511/512,
+2,880 guard-page checks, 25 packed tests each in ReleaseSafe and ReleaseFast,
+and compilation for x86_64 Linux/macOS and aarch64 Linux without NEON. This does
+not establish enabled-trap ordering equivalence or runtime performance on those
+cross-compiled targets. Evidence is archived in local rounds R326–R330.

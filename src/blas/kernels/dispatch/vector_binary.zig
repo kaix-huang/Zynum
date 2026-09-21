@@ -153,6 +153,14 @@ pub fn rotUnitRealStreaming(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, 
     };
 }
 
+pub fn supportsRotmUnitRealStreaming(comptime T: type, n: usize) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_supportsRotmUnitRealStreaming, T, .{n});
+    return switch (builtin.cpu.arch) {
+        .aarch64 => aarch64.supportsRotmUnitRealStreaming(T, n),
+        else => false,
+    };
+}
+
 pub fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
     if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.vector_binary_rotmUnitReal, T, .{ n, x, y, flag, h11, h21, h12, h22 });
     return switch (builtin.cpu.arch) {

@@ -272,3 +272,20 @@ coefficient pairs. Checks also put exceptional values exclusively in the last
 chunk and exercise thread caps 1/2 and forced baseline dispatch. The native
 SME2 registry regression reuses workers across changes in FPCR. Private
 evidence: zynum-local-r271 through r276, 2026-09-21.
+
+Apply the same bounded three-task policy to SROTM, with its own streaming
+capability query and unchanged coefficient/flag interpretation. Keep the
+original leaf inside each chunk, propagate FPCR, and restore helper state.
+The flag=-2 no-op returns before dispatch. Larger vectors, overlaps, non-unit
+strides and unavailable streaming kernels retain their existing routes.
+
+Against the published `6a8b991` library, 96 fresh-process measurements loaded
+baseline and candidate from the same path in rotated order. All three SROTM
+flag modes improved about 10% at 512 Ki elements and 16% at 1 Mi. Single-thread,
+2 Mi-element and SROT controls stayed within about 0.3% of baseline. Accelerate
+remains faster on these target cases. Complete-output, padding, FPSR and FPCR
+comparisons cover seven boundary sizes, four rounding modes, flush modes,
+exceptional values confined to the last chunk, all valid flags, two coefficient
+sets and pre-existing status flags. Native SME2 regression coverage reuses the
+workers across floating-point environment changes. Private evidence: r277,
+2026-09-21; this subsequent local optimization is outside the README snapshot.

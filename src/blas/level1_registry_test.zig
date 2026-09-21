@@ -52,7 +52,7 @@ fn expectStreamingCall(before: aarch_features.TestStreamingDepths, uses_za: bool
     try std.testing.expectEqual(@as(u2, 0), aarch_features.streamingModeBits());
 }
 
-fn checkStreamingRotEnvironment() !void {
+fn checkStreamingRotEnvironment(modified_flag: ?f32) !void {
     if (comptime builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos or !aarch_features.has_sme2) return;
     const old_cr = asm volatile ("mrs %[value], fpcr"
         : [value] "=r" (-> u64),
@@ -97,12 +97,21 @@ fn checkStreamingRotEnvironment() !void {
                     : [value] "r" (cr),
                     : .{ .memory = true });
                 asm volatile ("msr fpsr, xzr" ::: .{ .memory = true });
-                try std.testing.expect(aarch_binary.rotUnitRealStreaming(f32, n, expected_x.ptr, expected_y.ptr, 0.8, 0.6));
+                if (modified_flag) |flag| {
+                    try std.testing.expect(aarch_binary.rotmUnitReal(f32, n, expected_x.ptr, expected_y.ptr, flag, 0.8, -0.6, 0.6, 0.8));
+                } else {
+                    try std.testing.expect(aarch_binary.rotUnitRealStreaming(f32, n, expected_x.ptr, expected_y.ptr, 0.8, 0.6));
+                }
                 const expected_sr = asm volatile ("mrs %[value], fpsr"
                     : [value] "=r" (-> u64),
                 );
                 asm volatile ("msr fpsr, xzr" ::: .{ .memory = true });
-                ops.rot(f32, n, x.ptr, 1, y.ptr, 1, 0.8, 0.6);
+                if (modified_flag) |flag| {
+                    const param = [_]f32{ flag, 0.8, -0.6, 0.6, 0.8 };
+                    ops.rotm(f32, n, x.ptr, 1, y.ptr, 1, &param);
+                } else {
+                    ops.rot(f32, n, x.ptr, 1, y.ptr, 1, 0.8, 0.6);
+                }
                 const actual_sr = asm volatile ("mrs %[value], fpsr"
                     : [value] "=r" (-> u64),
                 );
@@ -140,7 +149,8 @@ test "native SME2 Level 1 catalog cells enter and balance declared state" {
     if (comptime builtin.cpu.arch != .aarch64 or !aarch_features.has_sme2) return;
     if (aarch_features.streamingVectorBytes() != 64) return;
     try checkStreamingSwapAlignment();
-    try checkStreamingRotEnvironment();
+    try checkStreamingRotEnvironment(null);
+    for ([_]f32{ -1, 0, 1 }) |flag| try checkStreamingRotEnvironment(flag);
 
     const allocator = std.testing.allocator;
     const n: usize = 64 * 1024;

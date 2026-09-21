@@ -827,20 +827,59 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                     inline for (0..width) |r| @prefetch(ap + bases[r] + column + prefetch_distance, .{ .rw = .read, .locality = 3, .cache = .data });
                 }
                 if (grouped_rows) {
-                    var groups: [2]@Vector(8, T) = undefined;
-                    inline for (0..2) |group| {
-                        const offset = group * 8;
-                        var pairs: [8]@Vector(2, T) = undefined;
-                        inline for (0..8) |r| pairs[r] = ap[bases[offset + r] + column ..][0..2].*;
-                        const split = splitTpmvColumnPairs(T, 8, pairs);
-                        var part = @shuffle(T, sums, undefined, @Vector(8, i32){ offset, offset + 1, offset + 2, offset + 3, offset + 4, offset + 5, offset + 6, offset + 7 });
-                        part = part + split.first * @as(@Vector(8, T), @splat(x[column]));
-                        part = part + split.second * @as(@Vector(8, T), @splat(x[column + 1]));
-                        groups[group] = part;
+                    // Share one input-pair load across the row groups.
+                    const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32)
+                        asm volatile ("ldr %[pair:d], [%[ptr]]"
+                            : [pair] "=w" (-> @Vector(2, f32)),
+                            : [ptr] "r" (x + column),
+                            : .{ .memory = true })
+                    else
+                        .{ x[column], x[column + 1] };
+                    // Four-row scheduling helps unit diagonals; eight rows avoid
+                    // the measured small non-unit regression.
+                    if (comptime unit_diagonal) {
+                        var groups: [4]@Vector(4, T) = undefined;
+                        inline for (0..4) |group| {
+                            const offset = group * 4;
+                            var pairs: [4]@Vector(2, T) = undefined;
+                            inline for (0..4) |r| pairs[r] = ap[bases[offset + r] + column ..][0..2].*;
+                            const low = @shuffle(T, pairs[0], pairs[1], @Vector(4, i32){ 0, 1, -1, -2 });
+                            const high = @shuffle(T, pairs[2], pairs[3], @Vector(4, i32){ 0, 1, -1, -2 });
+                            const first = @shuffle(T, low, high, @Vector(4, i32){ 0, 2, -1, -3 });
+                            const second = @shuffle(T, low, high, @Vector(4, i32){ 1, 3, -2, -4 });
+                            var part = @shuffle(T, sums, undefined, @Vector(4, i32){ offset, offset + 1, offset + 2, offset + 3 });
+                            const second_product = second * @as(@Vector(4, T), @splat(input_pair[1]));
+                            part = part + first * @as(@Vector(4, T), @splat(input_pair[0]));
+                            part = part + second_product;
+                            groups[group] = part;
+                        }
+                        const low = @shuffle(T, groups[0], groups[1], @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
+                        const high = @shuffle(T, groups[2], groups[3], @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
+                        sums = @shuffle(T, low, high, @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
+                    } else {
+                        var groups: [2]@Vector(8, T) = undefined;
+                        inline for (0..2) |group| {
+                            const offset = group * 8;
+                            var pairs: [8]@Vector(2, T) = undefined;
+                            inline for (0..8) |r| pairs[r] = ap[bases[offset + r] + column ..][0..2].*;
+                            const split = splitTpmvColumnPairs(T, 8, pairs);
+                            var part = @shuffle(T, sums, undefined, @Vector(8, i32){ offset, offset + 1, offset + 2, offset + 3, offset + 4, offset + 5, offset + 6, offset + 7 });
+                            const second_product = split.second * @as(@Vector(8, T), @splat(input_pair[1]));
+                            part = part + split.first * @as(@Vector(8, T), @splat(input_pair[0]));
+                            part = part + second_product;
+                            groups[group] = part;
+                        }
+                        sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
                     }
-                    sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
                 } else {
                     if (T == f64 and width == 8 and unit_stride and !unit_diagonal) {
+                        const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
+                            asm volatile ("ldr %[pair:q], [%[ptr]]"
+                                : [pair] "=w" (-> @Vector(2, f64)),
+                                : [ptr] "r" (x + column),
+                                : .{ .memory = true })
+                        else
+                            .{ x[column], x[column + 1] };
                         var groups: [2]@Vector(4, T) = undefined;
                         inline for (0..2) |group| {
                             const offset = group * 4;
@@ -852,8 +891,9 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                             const first = @shuffle(T, low, high, @Vector(4, i32){ 0, 2, -1, -3 });
                             const second = @shuffle(T, low, high, @Vector(4, i32){ 1, 3, -2, -4 });
                             var value = @shuffle(T, sums, undefined, @Vector(4, i32){ offset, offset + 1, offset + 2, offset + 3 });
-                            value = value + first * @as(@Vector(4, T), @splat(x[column]));
-                            value = value + second * @as(@Vector(4, T), @splat(x[column + 1]));
+                            const second_product = second * @as(@Vector(4, T), @splat(input_pair[1]));
+                            value = value + first * @as(@Vector(4, T), @splat(input_pair[0]));
+                            value = value + second_product;
                             groups[group] = value;
                         }
                         sums = @shuffle(T, groups[0], groups[1], @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
@@ -863,10 +903,26 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                         const split = splitTpmvColumnPairs(T, width, pairs);
                         const first = split.first;
                         const second = split.second;
-                        const x0 = x[if (unit_stride) column else if (incx > 0) column * stride else last - column * stride];
-                        const x1 = x[if (unit_stride) column + 1 else if (incx > 0) (column + 1) * stride else last - (column + 1) * stride];
-                        sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(x0));
-                        sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(x1));
+                        if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and width == 16 and unit_stride) {
+                            const input_pair = asm volatile ("ldr %[pair:d], [%[ptr]]"
+                                : [pair] "=w" (-> @Vector(2, f32)),
+                                : [ptr] "r" (x + column),
+                                : .{ .memory = true });
+                            sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(input_pair[0]));
+                            sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(input_pair[1]));
+                        } else if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f64 and (width == 8 or width == 16) and unit_stride) {
+                            const input_pair = asm volatile ("ldr %[pair:q], [%[ptr]]"
+                                : [pair] "=w" (-> @Vector(2, f64)),
+                                : [ptr] "r" (x + column),
+                                : .{ .memory = true });
+                            sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(input_pair[0]));
+                            sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(input_pair[1]));
+                        } else {
+                            const x0 = x[if (unit_stride) column else if (incx > 0) column * stride else last - column * stride];
+                            const x1 = x[if (unit_stride) column + 1 else if (incx > 0) (column + 1) * stride else last - (column + 1) * stride];
+                            sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(x0));
+                            sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(x1));
+                        }
                     }
                 }
             }
@@ -927,6 +983,13 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                     }
                     sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
                 } else if (T == f64 and width == 8 and unit_stride and !unit_diagonal) {
+                    const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
+                        asm volatile ("ldr %[pair:q], [%[ptr]]"
+                            : [pair] "=w" (-> @Vector(2, f64)),
+                            : [ptr] "r" (x + column),
+                            : .{ .memory = true })
+                    else
+                        .{ x[column], x[column + 1] };
                     var groups: [2]@Vector(4, T) = undefined;
                     inline for (0..2) |group| {
                         const offset = group * 4;
@@ -938,8 +1001,9 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                         const first = @shuffle(T, low, high, @Vector(4, i32){ 0, 2, -1, -3 });
                         const second = @shuffle(T, low, high, @Vector(4, i32){ 1, 3, -2, -4 });
                         var value = @shuffle(T, sums, undefined, @Vector(4, i32){ offset, offset + 1, offset + 2, offset + 3 });
-                        value = value + first * @as(@Vector(4, T), @splat(x[column]));
-                        value = value + second * @as(@Vector(4, T), @splat(x[column + 1]));
+                        const second_product = second * @as(@Vector(4, T), @splat(input_pair[1]));
+                        value = value + first * @as(@Vector(4, T), @splat(input_pair[0]));
+                        value = value + second_product;
                         groups[group] = value;
                     }
                     sums = @shuffle(T, groups[0], groups[1], @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
@@ -949,10 +1013,28 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                     const split = splitTpmvColumnPairs(T, width, pairs);
                     const first = split.first;
                     const second = split.second;
-                    const x0 = x[if (unit_stride) column else if (incx > 0) column * stride else last - column * stride];
-                    const x1 = x[if (unit_stride) column + 1 else if (incx > 0) (column + 1) * stride else last - (column + 1) * stride];
-                    sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(x0));
-                    sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(x1));
+                    if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and width == 16 and unit_stride) {
+                        // Keep the pair in one load instead of separate broadcast/scalar
+                        // loads. The paired-column bound guarantees both inputs exist.
+                        const input_pair = asm volatile ("ldr %[pair:d], [%[ptr]]"
+                            : [pair] "=w" (-> @Vector(2, f32)),
+                            : [ptr] "r" (x + column),
+                            : .{ .memory = true });
+                        sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(input_pair[0]));
+                        sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(input_pair[1]));
+                    } else if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f64 and width == 8 and unit_stride) {
+                        const input_pair = asm volatile ("ldr %[pair:q], [%[ptr]]"
+                            : [pair] "=w" (-> @Vector(2, f64)),
+                            : [ptr] "r" (x + column),
+                            : .{ .memory = true });
+                        sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(input_pair[0]));
+                        sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(input_pair[1]));
+                    } else {
+                        const x0 = x[if (unit_stride) column else if (incx > 0) column * stride else last - column * stride];
+                        const x1 = x[if (unit_stride) column + 1 else if (incx > 0) (column + 1) * stride else last - (column + 1) * stride];
+                        sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(x0));
+                        sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(x1));
+                    }
                 }
             }
             if (column < n) {

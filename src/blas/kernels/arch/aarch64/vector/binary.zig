@@ -656,6 +656,13 @@ pub fn sveRotUnitRealCandidate(comptime T: type, n: usize, x: [*]T, y: [*]T, c: 
     return true;
 }
 
+pub fn supportsRotmUnitRealStreaming(comptime T: type, n: usize) bool {
+    if (comptime T == f32 and profile.enable_sme_linear_transform and features.has_sme2) {
+        return profile.preferSmeRotm(T, n) and features.streamingVectorBytes() == 64;
+    }
+    return false;
+}
+
 pub fn rotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
     if (comptime profile.enable_sme_linear_transform and features.has_sme2) {
         if (T == f32 and profile.preferSmeRotm(T, n) and features.streamingVectorBytes() == 64) {
