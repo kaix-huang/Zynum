@@ -37,7 +37,7 @@
         "libraries": [
           {
             "name": "Zynum",
-            "sha256": "dde636c434efc7ce44403fc7d704ac7ed8ec038e3ae0aa1d0f806ec246a5e947"
+            "sha256": "9fc08a9b3b2d282ac4e5fba6b08f2e1937f9fedf6259b07407dcda4424c7ad30"
           },
           {
             "name": "Accelerate",
@@ -95,10 +95,10 @@
       "dirty": false,
       "identity_diagnostic": "source_identity_manifest_loaded",
       "identity_status": "exported",
-      "revision": "59a3820d9503c896fef261ed11c06f022964157e",
-      "snapshot_created_utc": "2026-09-21T00:37:44.969333+00:00",
-      "snapshot_manifest_sha256": "59c81edcab4e85aa08f9dbf43f49fe50d82f9cef1717841307cc5eefb5233f52",
-      "snapshot_tree_sha256": "63b8ca50747c8e549f8312294a4d4c07604567f2359db29bdfd3c9790430e4d7"
+      "revision": "7852e2e24cdc11a858f912324b5293f6d5cf907a",
+      "snapshot_created_utc": "2026-09-21T04:46:57.483660+00:00",
+      "snapshot_manifest_sha256": "d7008542f859cc2a01d74d8674894024645afbeac3a6191ec17ec128766adbab",
+      "snapshot_tree_sha256": "1cfa6e431ca5b621a914e27d6e9a261c2c3c4821f5deb0f091500cc5ea43ecb0"
     }
   },
   "binaries": {
@@ -108,7 +108,7 @@
     "libraries": [
       {
         "name": "Zynum",
-        "sha256": "dde636c434efc7ce44403fc7d704ac7ed8ec038e3ae0aa1d0f806ec246a5e947"
+        "sha256": "9fc08a9b3b2d282ac4e5fba6b08f2e1937f9fedf6259b07407dcda4424c7ad30"
       },
       {
         "name": "Accelerate",
@@ -193,7 +193,7 @@
     "ZIG_GLOBAL_CACHE_DIR": "unset",
     "ZYNUM_MAXIMUM_THREADS": "unset"
   },
-  "generated_at_unix": 1789952137.469604,
+  "generated_at_unix": 1789967095.1864362,
   "isolate_kind": true,
   "isolate_shape": true,
   "kinds": null,
@@ -254,7 +254,7 @@
   "source": {
     "branch": "main",
     "dirty": false,
-    "revision": "59a3820d9503c896fef261ed11c06f022964157e"
+    "revision": "7852e2e24cdc11a858f912324b5293f6d5cf907a"
   },
   "transposes": [
     "NN"

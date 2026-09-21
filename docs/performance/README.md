@@ -61,17 +61,17 @@ outside the committed tree.
 
 ## README Snapshot: 2026-09-21
 
-The current charts measure code commit `59a3820d9503c896fef261ed11c06f022964157e`
+The current charts measure code commit `7852e2e24cdc11a858f912324b5293f6d5cf907a`
 on Apple M5 (10 logical CPUs), macOS 27.0 (26A428), Zig 0.16.0 and Homebrew
 OpenBLAS 0.3.34, with the system Accelerate framework. The library uses
 `-Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast`. The code and
 probe/library bytes were frozen before timing; recorded source hashes matched
 again after all three families completed.
 
-This refresh adds bounded parallel streaming SROTM and packed TPMV input-load,
-row-grouping and instruction-scheduling improvements. It retains the earlier
-SROT, lower f32 TPMV and SME GEMM tail optimizations. It replaces the same-day
-snapshot of `6a8b991`; that data remains in Git history.
+This refresh adds separate strided f32 TPMV triangle kernels, packed transpose
+row-pair loads and bounded contiguous input staging for small strided transpose
+calls. It retains the earlier SROT/SROTM and SME GEMM tail optimizations. It
+replaces the same-day snapshot of `59a3820`; that data remains in Git history.
 The targeted optimization evidence is documented separately in the Level 1/2
 and GEMM notes. Independent publication runs do not isolate code changes from
 run-to-run variation in either Zynum or the comparators.
@@ -100,9 +100,9 @@ legacy Level 2 chart.
 
 | Plotted family | Cases | Zynum / Accelerate geometric mean | Zynum / OpenBLAS geometric mean | Cases below Accelerate |
 | --- | ---: | ---: | ---: | ---: |
-| Level 1 | 46 | 1.415x | 2.421x | 17 |
-| Level 2 | 60 | 1.257x | 3.714x | 8 |
-| GEMM | 168 | 1.022x | 1.908x | 72 |
+| Level 1 | 46 | 1.391x | 2.370x | 16 |
+| Level 2 | 60 | 1.258x | 3.698x | 12 |
+| GEMM | 168 | 1.016x | 1.876x | 68 |
 
 Each case has equal weight. These ratios are not workload scores, confidence
 intervals, historical speedups or an all-function performance guarantee.
@@ -114,14 +114,17 @@ Before timing, Debug and ReleaseSafe each passed 500 tests with 4 expected
 skips; ReleaseFast passed 497 with 7 expected skips. Dynamic dispatch and its
 forced baseline passed 132 tests. The native SME2 Level 1 regression passed,
 including persistent-worker FPCR changes and complete SROT/SROTM output/status
-comparisons. The exact measured dynamic library passed 27,648 TPMV output/FPSR
-comparisons across rounding and flush modes, 6,272 SROTM complete-output,
-padding/FPSR/FPCR comparisons, and 2,880 packed triangular guard-page checks.
-These comparisons use the preceding published library as their baseline.
-Build/test inventory structure, generated multiversion, and header/kernel-
-coverage consistency checks also passed. The full build-inventory security
-suite was stopped before completion and is not claimed as passing this run.
-Earlier focused qualification includes Intel Linux/macOS compilation; that
+comparisons. The exact measured dynamic library passed 69,120 TPMV complete-
+output/FPSR/FPCR comparisons at n=63/64/65/127/128/129/256/257/511/512 across
+rounding and flush modes, and 2,880 packed triangular guard-page checks. These
+comparisons use the preceding published library as their baseline. The
+production regression now includes both staging boundaries, strides ±1/±2/±3,
+poisoned unit diagonals, untouched gaps and late refusal. Packed ReleaseSafe
+and ReleaseFast tests passed 25 each. Host tooling, build/test inventory
+structure, generated multiversion and header/kernel-coverage consistency checks
+also passed. The full inventory/security matrix was not rerun and is not
+claimed as passing this run. Focused qualification includes Intel Linux/macOS
+and AArch64 Linux without NEON compilation; that
 does not establish runtime performance on those systems or enabled-trap order.
 
 As in the archived report, the metadata reader recognizes kernel-coverage
@@ -143,7 +146,7 @@ the clean checkout's Git identity. New runs must collect their own identity
 and binary hashes rather than reuse an archived manifest.
 
 ```sh
-git worktree add --detach ../zynum-readme-2026-09-21 59a3820d9503c896fef261ed11c06f022964157e
+git worktree add --detach ../zynum-readme-2026-09-21 7852e2e24cdc11a858f912324b5293f6d5cf907a
 cd ../zynum-readme-2026-09-21
 zig build -Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast
 unset ZYNUM_MAXIMUM_THREADS

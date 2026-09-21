@@ -25,21 +25,25 @@
 <text x="105" y="100" class="panel-title">Copy bandwidth (GB/s)</text>
 <line x1="105" y1="360.0" x2="1450" y2="360.0" class="grid"/>
 <text x="95" y="364.0" text-anchor="end" class="axis-label">0</text>
-<line x1="105" y1="280.0" x2="1450" y2="280.0" class="grid"/>
-<text x="95" y="284.0" text-anchor="end" class="axis-label">200</text>
-<line x1="105" y1="200.0" x2="1450" y2="200.0" class="grid"/>
-<text x="95" y="204.0" text-anchor="end" class="axis-label">400</text>
+<line x1="105" y1="312.0" x2="1450" y2="312.0" class="grid"/>
+<text x="95" y="316.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="264.0" x2="1450" y2="264.0" class="grid"/>
+<text x="95" y="268.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="216.0" x2="1450" y2="216.0" class="grid"/>
+<text x="95" y="220.0" text-anchor="end" class="axis-label">300</text>
+<line x1="105" y1="168.0" x2="1450" y2="168.0" class="grid"/>
+<text x="95" y="172.0" text-anchor="end" class="axis-label">400</text>
 <line x1="105" y1="120.0" x2="1450" y2="120.0" class="grid"/>
-<text x="95" y="124.0" text-anchor="end" class="axis-label">600</text>
+<text x="95" y="124.0" text-anchor="end" class="axis-label">500</text>
 <line x1="105" y1="120" x2="105" y2="360" class="axis"/>
 <line x1="105" y1="360" x2="1450" y2="360" class="axis"/>
-<rect x="402.2" y="161.1" width="24.0" height="198.9" fill="#2563eb"/>
-<rect x="428.2" y="190.3" width="24.0" height="169.7" fill="#dc2626"/>
-<rect x="454.2" y="314.2" width="24.0" height="45.8" fill="#16a34a"/>
+<rect x="402.2" y="150.2" width="24.0" height="209.8" fill="#2563eb"/>
+<rect x="428.2" y="184.1" width="24.0" height="175.9" fill="#dc2626"/>
+<rect x="454.2" y="306.5" width="24.0" height="53.5" fill="#16a34a"/>
 <text x="441.2" y="378" text-anchor="start" class="op-label" transform="rotate(45 441.2 378)">scopy 8KiB</text>
-<rect x="1074.8" y="258.0" width="24.0" height="102.0" fill="#2563eb"/>
-<rect x="1100.8" y="282.7" width="24.0" height="77.3" fill="#dc2626"/>
-<rect x="1126.8" y="290.8" width="24.0" height="69.2" fill="#16a34a"/>
+<rect x="1074.8" y="260.1" width="24.0" height="99.9" fill="#2563eb"/>
+<rect x="1100.8" y="283.3" width="24.0" height="76.7" fill="#dc2626"/>
+<rect x="1126.8" y="282.6" width="24.0" height="77.4" fill="#16a34a"/>
 <text x="1113.8" y="378" text-anchor="start" class="op-label" transform="rotate(45 1113.8 378)">dcopy 8MiB</text>
 <text x="105" y="435" class="panel-title">Swap bandwidth (GB/s)</text>
 <line x1="105" y1="695.0" x2="1450" y2="695.0" class="grid"/>
@@ -56,21 +60,21 @@
 <text x="95" y="459.0" text-anchor="end" class="axis-label">500</text>
 <line x1="105" y1="455" x2="105" y2="695" class="axis"/>
 <line x1="105" y1="695" x2="1450" y2="695" class="axis"/>
-<rect x="234.1" y="504.4" width="24.0" height="190.6" fill="#2563eb"/>
-<rect x="260.1" y="474.3" width="24.0" height="220.7" fill="#dc2626"/>
-<rect x="286.1" y="645.9" width="24.0" height="49.1" fill="#16a34a"/>
+<rect x="234.1" y="522.7" width="24.0" height="172.3" fill="#2563eb"/>
+<rect x="260.1" y="497.2" width="24.0" height="197.8" fill="#dc2626"/>
+<rect x="286.1" y="647.7" width="24.0" height="47.3" fill="#16a34a"/>
 <text x="273.1" y="713" text-anchor="middle" class="op-label">sswap</text>
-<rect x="570.4" y="539.9" width="24.0" height="155.1" fill="#2563eb"/>
-<rect x="596.4" y="537.1" width="24.0" height="157.9" fill="#dc2626"/>
-<rect x="622.4" y="597.6" width="24.0" height="97.4" fill="#16a34a"/>
+<rect x="570.4" y="560.6" width="24.0" height="134.4" fill="#2563eb"/>
+<rect x="596.4" y="555.6" width="24.0" height="139.4" fill="#dc2626"/>
+<rect x="622.4" y="606.2" width="24.0" height="88.8" fill="#16a34a"/>
 <text x="609.4" y="713" text-anchor="middle" class="op-label">dswap</text>
-<rect x="906.6" y="524.0" width="24.0" height="171.0" fill="#2563eb"/>
-<rect x="932.6" y="531.8" width="24.0" height="163.2" fill="#dc2626"/>
-<rect x="958.6" y="597.0" width="24.0" height="98.0" fill="#16a34a"/>
+<rect x="906.6" y="557.0" width="24.0" height="138.0" fill="#2563eb"/>
+<rect x="932.6" y="564.1" width="24.0" height="130.9" fill="#dc2626"/>
+<rect x="958.6" y="605.1" width="24.0" height="89.9" fill="#16a34a"/>
 <text x="945.6" y="713" text-anchor="middle" class="op-label">cswap</text>
-<rect x="1242.9" y="612.3" width="24.0" height="82.7" fill="#2563eb"/>
-<rect x="1268.9" y="631.6" width="24.0" height="63.4" fill="#dc2626"/>
-<rect x="1294.9" y="603.2" width="24.0" height="91.8" fill="#16a34a"/>
+<rect x="1242.9" y="621.1" width="24.0" height="73.9" fill="#2563eb"/>
+<rect x="1268.9" y="638.6" width="24.0" height="56.4" fill="#dc2626"/>
+<rect x="1294.9" y="641.7" width="24.0" height="53.3" fill="#16a34a"/>
 <text x="1281.9" y="713" text-anchor="middle" class="op-label">zswap</text>
 <text x="105" y="770" class="panel-title">Index reduction bandwidth (GB/s)</text>
 <line x1="105" y1="1030.0" x2="1450" y2="1030.0" class="grid"/>
@@ -85,121 +89,117 @@
 <text x="95" y="794.0" text-anchor="end" class="axis-label">200</text>
 <line x1="105" y1="790" x2="105" y2="1030" class="axis"/>
 <line x1="105" y1="1030" x2="1450" y2="1030" class="axis"/>
-<rect x="234.1" y="920.2" width="24.0" height="109.8" fill="#2563eb"/>
-<rect x="260.1" y="964.9" width="24.0" height="65.1" fill="#dc2626"/>
-<rect x="286.1" y="906.6" width="24.0" height="123.4" fill="#16a34a"/>
+<rect x="234.1" y="928.8" width="24.0" height="101.2" fill="#2563eb"/>
+<rect x="260.1" y="971.6" width="24.0" height="58.4" fill="#dc2626"/>
+<rect x="286.1" y="926.7" width="24.0" height="103.3" fill="#16a34a"/>
 <text x="273.1" y="1048" text-anchor="middle" class="op-label">isamax</text>
-<rect x="570.4" y="918.7" width="24.0" height="111.3" fill="#2563eb"/>
-<rect x="596.4" y="963.9" width="24.0" height="66.1" fill="#dc2626"/>
-<rect x="622.4" y="863.6" width="24.0" height="166.4" fill="#16a34a"/>
+<rect x="570.4" y="927.2" width="24.0" height="102.8" fill="#2563eb"/>
+<rect x="596.4" y="969.2" width="24.0" height="60.8" fill="#dc2626"/>
+<rect x="622.4" y="874.5" width="24.0" height="155.5" fill="#16a34a"/>
 <text x="609.4" y="1048" text-anchor="middle" class="op-label">idamax</text>
-<rect x="906.6" y="817.1" width="24.0" height="212.9" fill="#2563eb"/>
-<rect x="932.6" y="1005.4" width="24.0" height="24.6" fill="#dc2626"/>
-<rect x="958.6" y="851.6" width="24.0" height="178.4" fill="#16a34a"/>
+<rect x="906.6" y="839.3" width="24.0" height="190.7" fill="#2563eb"/>
+<rect x="932.6" y="1007.5" width="24.0" height="22.5" fill="#dc2626"/>
+<rect x="958.6" y="872.9" width="24.0" height="157.1" fill="#16a34a"/>
 <text x="945.6" y="1048" text-anchor="middle" class="op-label">icamax</text>
-<rect x="1242.9" y="825.2" width="24.0" height="204.8" fill="#2563eb"/>
-<rect x="1268.9" y="961.2" width="24.0" height="68.8" fill="#dc2626"/>
-<rect x="1294.9" y="842.6" width="24.0" height="187.4" fill="#16a34a"/>
+<rect x="1242.9" y="843.5" width="24.0" height="186.5" fill="#2563eb"/>
+<rect x="1268.9" y="968.2" width="24.0" height="61.8" fill="#dc2626"/>
+<rect x="1294.9" y="860.5" width="24.0" height="169.5" fill="#16a34a"/>
 <text x="1281.9" y="1048" text-anchor="middle" class="op-label">izamax</text>
 <text x="105" y="1105" class="panel-title">Real f32 Level 1 (Gops)</text>
 <line x1="105" y1="1365.0" x2="1450" y2="1365.0" class="grid"/>
 <text x="95" y="1369.0" text-anchor="end" class="axis-label">0</text>
-<line x1="105" y1="1317.0" x2="1450" y2="1317.0" class="grid"/>
-<text x="95" y="1321.0" text-anchor="end" class="axis-label">50</text>
-<line x1="105" y1="1269.0" x2="1450" y2="1269.0" class="grid"/>
-<text x="95" y="1273.0" text-anchor="end" class="axis-label">100</text>
-<line x1="105" y1="1221.0" x2="1450" y2="1221.0" class="grid"/>
-<text x="95" y="1225.0" text-anchor="end" class="axis-label">150</text>
-<line x1="105" y1="1173.0" x2="1450" y2="1173.0" class="grid"/>
-<text x="95" y="1177.0" text-anchor="end" class="axis-label">200</text>
+<line x1="105" y1="1305.0" x2="1450" y2="1305.0" class="grid"/>
+<text x="95" y="1309.0" text-anchor="end" class="axis-label">50</text>
+<line x1="105" y1="1245.0" x2="1450" y2="1245.0" class="grid"/>
+<text x="95" y="1249.0" text-anchor="end" class="axis-label">100</text>
+<line x1="105" y1="1185.0" x2="1450" y2="1185.0" class="grid"/>
+<text x="95" y="1189.0" text-anchor="end" class="axis-label">150</text>
 <line x1="105" y1="1125.0" x2="1450" y2="1125.0" class="grid"/>
-<text x="95" y="1129.0" text-anchor="end" class="axis-label">250</text>
+<text x="95" y="1129.0" text-anchor="end" class="axis-label">200</text>
 <line x1="105" y1="1125" x2="105" y2="1365" class="axis"/>
 <line x1="105" y1="1365" x2="1450" y2="1365" class="axis"/>
-<rect x="140.7" y="1315.2" width="24.0" height="49.8" fill="#2563eb"/>
-<rect x="166.7" y="1306.2" width="24.0" height="58.8" fill="#dc2626"/>
-<rect x="192.7" y="1348.7" width="24.0" height="16.3" fill="#16a34a"/>
+<rect x="140.7" y="1307.7" width="24.0" height="57.3" fill="#2563eb"/>
+<rect x="166.7" y="1300.2" width="24.0" height="64.8" fill="#dc2626"/>
+<rect x="192.7" y="1346.4" width="24.0" height="18.6" fill="#16a34a"/>
 <text x="179.7" y="1383" text-anchor="middle" class="op-label">sscal</text>
-<rect x="290.2" y="1302.2" width="24.0" height="62.8" fill="#2563eb"/>
-<rect x="316.2" y="1269.4" width="24.0" height="95.6" fill="#dc2626"/>
-<rect x="342.2" y="1337.2" width="24.0" height="27.8" fill="#16a34a"/>
+<rect x="290.2" y="1297.7" width="24.0" height="67.3" fill="#2563eb"/>
+<rect x="316.2" y="1258.6" width="24.0" height="106.4" fill="#dc2626"/>
+<rect x="342.2" y="1334.4" width="24.0" height="30.6" fill="#16a34a"/>
 <text x="329.2" y="1383" text-anchor="middle" class="op-label">saxpy</text>
-<rect x="439.6" y="1183.3" width="24.0" height="181.7" fill="#2563eb"/>
-<rect x="465.6" y="1170.7" width="24.0" height="194.3" fill="#dc2626"/>
-<rect x="491.6" y="1330.6" width="24.0" height="34.4" fill="#16a34a"/>
+<rect x="439.6" y="1162.5" width="24.0" height="202.5" fill="#2563eb"/>
+<rect x="465.6" y="1149.5" width="24.0" height="215.5" fill="#dc2626"/>
+<rect x="491.6" y="1327.5" width="24.0" height="37.5" fill="#16a34a"/>
 <text x="478.6" y="1383" text-anchor="middle" class="op-label">sdot</text>
-<rect x="589.1" y="1307.3" width="24.0" height="57.7" fill="#2563eb"/>
-<rect x="615.1" y="1300.4" width="24.0" height="64.6" fill="#dc2626"/>
-<rect x="641.1" y="1339.6" width="24.0" height="25.4" fill="#16a34a"/>
+<rect x="589.1" y="1297.5" width="24.0" height="67.5" fill="#2563eb"/>
+<rect x="615.1" y="1287.1" width="24.0" height="77.9" fill="#dc2626"/>
+<rect x="641.1" y="1337.3" width="24.0" height="27.7" fill="#16a34a"/>
 <text x="628.1" y="1383" text-anchor="middle" class="op-label">sasum</text>
-<rect x="738.5" y="1308.0" width="24.0" height="57.0" fill="#2563eb"/>
-<rect x="764.5" y="1349.3" width="24.0" height="15.7" fill="#dc2626"/>
-<rect x="790.5" y="1362.9" width="24.0" height="2.1" fill="#16a34a"/>
+<rect x="738.5" y="1298.8" width="24.0" height="66.2" fill="#2563eb"/>
+<rect x="764.5" y="1346.1" width="24.0" height="18.9" fill="#dc2626"/>
+<rect x="790.5" y="1362.4" width="24.0" height="2.6" fill="#16a34a"/>
 <text x="777.5" y="1383" text-anchor="middle" class="op-label">snrm2</text>
-<rect x="887.9" y="1275.8" width="24.0" height="89.2" fill="#2563eb"/>
-<rect x="913.9" y="1185.2" width="24.0" height="179.8" fill="#dc2626"/>
-<rect x="939.9" y="1318.9" width="24.0" height="46.1" fill="#16a34a"/>
+<rect x="887.9" y="1266.1" width="24.0" height="98.9" fill="#2563eb"/>
+<rect x="913.9" y="1156.2" width="24.0" height="208.8" fill="#dc2626"/>
+<rect x="939.9" y="1311.6" width="24.0" height="53.4" fill="#16a34a"/>
 <text x="926.9" y="1383" text-anchor="middle" class="op-label">srot</text>
-<rect x="1037.4" y="1278.7" width="24.0" height="86.3" fill="#2563eb"/>
-<rect x="1063.4" y="1198.6" width="24.0" height="166.4" fill="#dc2626"/>
-<rect x="1089.4" y="1348.7" width="24.0" height="16.3" fill="#16a34a"/>
+<rect x="1037.4" y="1268.8" width="24.0" height="96.2" fill="#2563eb"/>
+<rect x="1063.4" y="1172.7" width="24.0" height="192.3" fill="#dc2626"/>
+<rect x="1089.4" y="1345.7" width="24.0" height="19.3" fill="#16a34a"/>
 <text x="1076.4" y="1383" text-anchor="middle" class="op-label">srotm flag_m1</text>
-<rect x="1186.8" y="1306.6" width="24.0" height="58.4" fill="#2563eb"/>
-<rect x="1212.8" y="1251.2" width="24.0" height="113.8" fill="#dc2626"/>
-<rect x="1238.8" y="1353.3" width="24.0" height="11.7" fill="#16a34a"/>
+<rect x="1186.8" y="1300.0" width="24.0" height="65.0" fill="#2563eb"/>
+<rect x="1212.8" y="1237.0" width="24.0" height="128.0" fill="#dc2626"/>
+<rect x="1238.8" y="1351.4" width="24.0" height="13.6" fill="#16a34a"/>
 <text x="1225.8" y="1383" text-anchor="middle" class="op-label">srotm flag_0</text>
-<rect x="1336.3" y="1306.6" width="24.0" height="58.4" fill="#2563eb"/>
-<rect x="1362.3" y="1252.9" width="24.0" height="112.1" fill="#dc2626"/>
-<rect x="1388.3" y="1353.3" width="24.0" height="11.7" fill="#16a34a"/>
+<rect x="1336.3" y="1301.7" width="24.0" height="63.3" fill="#2563eb"/>
+<rect x="1362.3" y="1238.5" width="24.0" height="126.5" fill="#dc2626"/>
+<rect x="1388.3" y="1351.4" width="24.0" height="13.6" fill="#16a34a"/>
 <text x="1375.3" y="1383" text-anchor="middle" class="op-label">srotm flag_p1</text>
 <text x="105" y="1440" class="panel-title">Real f64 Level 1 (Gops)</text>
 <line x1="105" y1="1700.0" x2="1450" y2="1700.0" class="grid"/>
 <text x="95" y="1704.0" text-anchor="end" class="axis-label">0</text>
-<line x1="105" y1="1640.0" x2="1450" y2="1640.0" class="grid"/>
-<text x="95" y="1644.0" text-anchor="end" class="axis-label">20</text>
-<line x1="105" y1="1580.0" x2="1450" y2="1580.0" class="grid"/>
-<text x="95" y="1584.0" text-anchor="end" class="axis-label">40</text>
-<line x1="105" y1="1520.0" x2="1450" y2="1520.0" class="grid"/>
-<text x="95" y="1524.0" text-anchor="end" class="axis-label">60</text>
+<line x1="105" y1="1620.0" x2="1450" y2="1620.0" class="grid"/>
+<text x="95" y="1624.0" text-anchor="end" class="axis-label">20</text>
+<line x1="105" y1="1540.0" x2="1450" y2="1540.0" class="grid"/>
+<text x="95" y="1544.0" text-anchor="end" class="axis-label">40</text>
 <line x1="105" y1="1460.0" x2="1450" y2="1460.0" class="grid"/>
-<text x="95" y="1464.0" text-anchor="end" class="axis-label">80</text>
+<text x="95" y="1464.0" text-anchor="end" class="axis-label">60</text>
 <line x1="105" y1="1460" x2="105" y2="1700" class="axis"/>
 <line x1="105" y1="1700" x2="1450" y2="1700" class="axis"/>
-<rect x="140.7" y="1611.8" width="24.0" height="88.2" fill="#2563eb"/>
-<rect x="166.7" y="1612.3" width="24.0" height="87.7" fill="#dc2626"/>
-<rect x="192.7" y="1673.7" width="24.0" height="26.3" fill="#16a34a"/>
+<rect x="140.7" y="1593.7" width="24.0" height="106.3" fill="#2563eb"/>
+<rect x="166.7" y="1591.4" width="24.0" height="108.6" fill="#dc2626"/>
+<rect x="192.7" y="1667.4" width="24.0" height="32.6" fill="#16a34a"/>
 <text x="179.7" y="1718" text-anchor="middle" class="op-label">dscal</text>
-<rect x="290.2" y="1618.8" width="24.0" height="81.2" fill="#2563eb"/>
-<rect x="316.2" y="1617.8" width="24.0" height="82.2" fill="#dc2626"/>
-<rect x="342.2" y="1640.7" width="24.0" height="59.3" fill="#16a34a"/>
+<rect x="290.2" y="1612.2" width="24.0" height="87.8" fill="#2563eb"/>
+<rect x="316.2" y="1623.3" width="24.0" height="76.7" fill="#dc2626"/>
+<rect x="342.2" y="1631.8" width="24.0" height="68.2" fill="#16a34a"/>
 <text x="329.2" y="1718" text-anchor="middle" class="op-label">daxpy</text>
-<rect x="439.6" y="1592.3" width="24.0" height="107.7" fill="#2563eb"/>
-<rect x="465.6" y="1625.9" width="24.0" height="74.1" fill="#dc2626"/>
-<rect x="491.6" y="1632.7" width="24.0" height="67.3" fill="#16a34a"/>
+<rect x="439.6" y="1576.6" width="24.0" height="123.4" fill="#2563eb"/>
+<rect x="465.6" y="1616.4" width="24.0" height="83.6" fill="#dc2626"/>
+<rect x="491.6" y="1620.5" width="24.0" height="79.5" fill="#16a34a"/>
 <text x="478.6" y="1718" text-anchor="middle" class="op-label">ddot</text>
-<rect x="589.1" y="1606.9" width="24.0" height="93.1" fill="#2563eb"/>
-<rect x="615.1" y="1600.0" width="24.0" height="100.0" fill="#dc2626"/>
-<rect x="641.1" y="1645.9" width="24.0" height="54.1" fill="#16a34a"/>
+<rect x="589.1" y="1582.7" width="24.0" height="117.3" fill="#2563eb"/>
+<rect x="615.1" y="1577.6" width="24.0" height="122.4" fill="#dc2626"/>
+<rect x="641.1" y="1636.1" width="24.0" height="63.9" fill="#16a34a"/>
 <text x="628.1" y="1718" text-anchor="middle" class="op-label">dasum</text>
-<rect x="738.5" y="1576.9" width="24.0" height="123.1" fill="#2563eb"/>
-<rect x="764.5" y="1675.2" width="24.0" height="24.8" fill="#dc2626"/>
-<rect x="790.5" y="1693.5" width="24.0" height="6.5" fill="#16a34a"/>
+<rect x="738.5" y="1555.1" width="24.0" height="144.9" fill="#2563eb"/>
+<rect x="764.5" y="1668.5" width="24.0" height="31.5" fill="#dc2626"/>
+<rect x="790.5" y="1691.5" width="24.0" height="8.5" fill="#16a34a"/>
 <text x="777.5" y="1718" text-anchor="middle" class="op-label">dnrm2</text>
-<rect x="887.9" y="1513.9" width="24.0" height="186.1" fill="#2563eb"/>
-<rect x="913.9" y="1506.8" width="24.0" height="193.2" fill="#dc2626"/>
-<rect x="939.9" y="1624.9" width="24.0" height="75.1" fill="#16a34a"/>
+<rect x="887.9" y="1491.4" width="24.0" height="208.6" fill="#2563eb"/>
+<rect x="913.9" y="1485.7" width="24.0" height="214.3" fill="#dc2626"/>
+<rect x="939.9" y="1609.0" width="24.0" height="91.0" fill="#16a34a"/>
 <text x="926.9" y="1718" text-anchor="middle" class="op-label">drot</text>
-<rect x="1037.4" y="1522.4" width="24.0" height="177.6" fill="#2563eb"/>
-<rect x="1063.4" y="1516.1" width="24.0" height="183.9" fill="#dc2626"/>
-<rect x="1089.4" y="1650.6" width="24.0" height="49.4" fill="#16a34a"/>
+<rect x="1037.4" y="1488.7" width="24.0" height="211.3" fill="#2563eb"/>
+<rect x="1063.4" y="1479.7" width="24.0" height="220.3" fill="#dc2626"/>
+<rect x="1089.4" y="1641.1" width="24.0" height="58.9" fill="#16a34a"/>
 <text x="1076.4" y="1718" text-anchor="middle" class="op-label">drotm flag_m1</text>
-<rect x="1186.8" y="1574.1" width="24.0" height="125.9" fill="#2563eb"/>
-<rect x="1212.8" y="1580.7" width="24.0" height="119.3" fill="#dc2626"/>
-<rect x="1238.8" y="1665.9" width="24.0" height="34.1" fill="#16a34a"/>
+<rect x="1186.8" y="1552.3" width="24.0" height="147.7" fill="#2563eb"/>
+<rect x="1212.8" y="1559.0" width="24.0" height="141.0" fill="#dc2626"/>
+<rect x="1238.8" y="1658.0" width="24.0" height="42.0" fill="#16a34a"/>
 <text x="1225.8" y="1718" text-anchor="middle" class="op-label">drotm flag_0</text>
-<rect x="1336.3" y="1574.2" width="24.0" height="125.8" fill="#2563eb"/>
-<rect x="1362.3" y="1569.6" width="24.0" height="130.4" fill="#dc2626"/>
-<rect x="1388.3" y="1666.4" width="24.0" height="33.6" fill="#16a34a"/>
+<rect x="1336.3" y="1555.8" width="24.0" height="144.2" fill="#2563eb"/>
+<rect x="1362.3" y="1559.2" width="24.0" height="140.8" fill="#dc2626"/>
+<rect x="1388.3" y="1659.0" width="24.0" height="41.0" fill="#16a34a"/>
 <text x="1375.3" y="1718" text-anchor="middle" class="op-label">drotm flag_p1</text>
 <text x="105" y="1775" class="panel-title">Mixed-precision dot Level 1 (Gops)</text>
 <line x1="105" y1="2035.0" x2="1450" y2="2035.0" class="grid"/>
@@ -216,13 +216,13 @@
 <text x="95" y="1799.0" text-anchor="end" class="axis-label">25</text>
 <line x1="105" y1="1795" x2="105" y2="2035" class="axis"/>
 <line x1="105" y1="2035" x2="1450" y2="2035" class="axis"/>
-<rect x="402.2" y="1828.3" width="24.0" height="206.7" fill="#2563eb"/>
-<rect x="428.2" y="1947.3" width="24.0" height="87.7" fill="#dc2626"/>
-<rect x="454.2" y="1915.7" width="24.0" height="119.3" fill="#16a34a"/>
+<rect x="402.2" y="1837.9" width="24.0" height="197.1" fill="#2563eb"/>
+<rect x="428.2" y="1949.4" width="24.0" height="85.6" fill="#dc2626"/>
+<rect x="454.2" y="1920.5" width="24.0" height="114.5" fill="#16a34a"/>
 <text x="441.2" y="2053" text-anchor="middle" class="op-label">sdsdot</text>
-<rect x="1074.8" y="1815.5" width="24.0" height="219.5" fill="#2563eb"/>
-<rect x="1100.8" y="1947.1" width="24.0" height="87.9" fill="#dc2626"/>
-<rect x="1126.8" y="1915.9" width="24.0" height="119.1" fill="#16a34a"/>
+<rect x="1074.8" y="1835.4" width="24.0" height="199.6" fill="#2563eb"/>
+<rect x="1100.8" y="1948.9" width="24.0" height="86.1" fill="#dc2626"/>
+<rect x="1126.8" y="1923.5" width="24.0" height="111.5" fill="#16a34a"/>
 <text x="1113.8" y="2053" text-anchor="middle" class="op-label">dsdot</text>
 <text x="105" y="2110" class="panel-title">Complex f32 Level 1 (Gops)</text>
 <line x1="105" y1="2370.0" x2="1450" y2="2370.0" class="grid"/>
@@ -237,79 +237,83 @@
 <text x="95" y="2134.0" text-anchor="end" class="axis-label">200</text>
 <line x1="105" y1="2130" x2="105" y2="2370" class="axis"/>
 <line x1="105" y1="2370" x2="1450" y2="2370" class="axis"/>
-<rect x="150.1" y="2291.7" width="24.0" height="78.3" fill="#2563eb"/>
-<rect x="176.1" y="2295.5" width="24.0" height="74.5" fill="#dc2626"/>
-<rect x="202.1" y="2355.0" width="24.0" height="15.0" fill="#16a34a"/>
+<rect x="150.1" y="2300.4" width="24.0" height="69.6" fill="#2563eb"/>
+<rect x="176.1" y="2302.1" width="24.0" height="67.9" fill="#dc2626"/>
+<rect x="202.1" y="2356.3" width="24.0" height="13.7" fill="#16a34a"/>
 <text x="189.1" y="2388" text-anchor="middle" class="op-label">csscal</text>
-<rect x="318.2" y="2174.6" width="24.0" height="195.4" fill="#2563eb"/>
-<rect x="344.2" y="2318.2" width="24.0" height="51.8" fill="#dc2626"/>
-<rect x="370.2" y="2325.5" width="24.0" height="44.5" fill="#16a34a"/>
+<rect x="318.2" y="2202.5" width="24.0" height="167.5" fill="#2563eb"/>
+<rect x="344.2" y="2322.8" width="24.0" height="47.2" fill="#dc2626"/>
+<rect x="370.2" y="2326.7" width="24.0" height="43.3" fill="#16a34a"/>
 <text x="357.2" y="2388" text-anchor="middle" class="op-label">cscal</text>
-<rect x="486.3" y="2282.5" width="24.0" height="87.5" fill="#2563eb"/>
-<rect x="512.3" y="2317.6" width="24.0" height="52.4" fill="#dc2626"/>
-<rect x="538.3" y="2287.2" width="24.0" height="82.8" fill="#16a34a"/>
+<rect x="486.3" y="2291.2" width="24.0" height="78.8" fill="#2563eb"/>
+<rect x="512.3" y="2320.7" width="24.0" height="49.3" fill="#dc2626"/>
+<rect x="538.3" y="2293.6" width="24.0" height="76.4" fill="#16a34a"/>
 <text x="525.3" y="2388" text-anchor="middle" class="op-label">caxpy</text>
-<rect x="654.4" y="2317.6" width="24.0" height="52.4" fill="#2563eb"/>
-<rect x="680.4" y="2329.5" width="24.0" height="40.5" fill="#dc2626"/>
-<rect x="706.4" y="2263.5" width="24.0" height="106.5" fill="#16a34a"/>
+<rect x="654.4" y="2320.0" width="24.0" height="50.0" fill="#2563eb"/>
+<rect x="680.4" y="2331.9" width="24.0" height="38.1" fill="#dc2626"/>
+<rect x="706.4" y="2279.7" width="24.0" height="90.3" fill="#16a34a"/>
 <text x="693.4" y="2388" text-anchor="middle" class="op-label">cdotu</text>
-<rect x="822.6" y="2317.3" width="24.0" height="52.7" fill="#2563eb"/>
-<rect x="848.6" y="2330.4" width="24.0" height="39.6" fill="#dc2626"/>
-<rect x="874.6" y="2265.3" width="24.0" height="104.7" fill="#16a34a"/>
+<rect x="822.6" y="2323.4" width="24.0" height="46.6" fill="#2563eb"/>
+<rect x="848.6" y="2334.1" width="24.0" height="35.9" fill="#dc2626"/>
+<rect x="874.6" y="2278.4" width="24.0" height="91.6" fill="#16a34a"/>
 <text x="861.6" y="2388" text-anchor="middle" class="op-label">cdotc</text>
-<rect x="990.7" y="2295.1" width="24.0" height="74.9" fill="#2563eb"/>
-<rect x="1016.7" y="2289.9" width="24.0" height="80.1" fill="#dc2626"/>
-<rect x="1042.7" y="2324.5" width="24.0" height="45.5" fill="#16a34a"/>
+<rect x="990.7" y="2300.0" width="24.0" height="70.0" fill="#2563eb"/>
+<rect x="1016.7" y="2294.6" width="24.0" height="75.4" fill="#dc2626"/>
+<rect x="1042.7" y="2330.3" width="24.0" height="39.7" fill="#16a34a"/>
 <text x="1029.7" y="2388" text-anchor="middle" class="op-label">scasum</text>
-<rect x="1158.8" y="2279.0" width="24.0" height="91.0" fill="#2563eb"/>
-<rect x="1184.8" y="2349.8" width="24.0" height="20.2" fill="#dc2626"/>
+<rect x="1158.8" y="2283.6" width="24.0" height="86.4" fill="#2563eb"/>
+<rect x="1184.8" y="2351.5" width="24.0" height="18.5" fill="#dc2626"/>
 <rect x="1210.8" y="2367.4" width="24.0" height="2.6" fill="#16a34a"/>
 <text x="1197.8" y="2388" text-anchor="middle" class="op-label">scnrm2</text>
-<rect x="1326.9" y="2213.9" width="24.0" height="156.1" fill="#2563eb"/>
-<rect x="1352.9" y="2227.0" width="24.0" height="143.0" fill="#dc2626"/>
-<rect x="1378.9" y="2310.2" width="24.0" height="59.8" fill="#16a34a"/>
+<rect x="1326.9" y="2239.5" width="24.0" height="130.5" fill="#2563eb"/>
+<rect x="1352.9" y="2241.1" width="24.0" height="128.9" fill="#dc2626"/>
+<rect x="1378.9" y="2314.8" width="24.0" height="55.2" fill="#16a34a"/>
 <text x="1365.9" y="2388" text-anchor="middle" class="op-label">csrot</text>
 <text x="105" y="2445" class="panel-title">Complex f64 Level 1 (Gops)</text>
 <line x1="105" y1="2705.0" x2="1450" y2="2705.0" class="grid"/>
 <text x="95" y="2709.0" text-anchor="end" class="axis-label">0</text>
-<line x1="105" y1="2625.0" x2="1450" y2="2625.0" class="grid"/>
-<text x="95" y="2629.0" text-anchor="end" class="axis-label">20</text>
-<line x1="105" y1="2545.0" x2="1450" y2="2545.0" class="grid"/>
-<text x="95" y="2549.0" text-anchor="end" class="axis-label">40</text>
+<line x1="105" y1="2657.0" x2="1450" y2="2657.0" class="grid"/>
+<text x="95" y="2661.0" text-anchor="end" class="axis-label">10</text>
+<line x1="105" y1="2609.0" x2="1450" y2="2609.0" class="grid"/>
+<text x="95" y="2613.0" text-anchor="end" class="axis-label">20</text>
+<line x1="105" y1="2561.0" x2="1450" y2="2561.0" class="grid"/>
+<text x="95" y="2565.0" text-anchor="end" class="axis-label">30</text>
+<line x1="105" y1="2513.0" x2="1450" y2="2513.0" class="grid"/>
+<text x="95" y="2517.0" text-anchor="end" class="axis-label">40</text>
 <line x1="105" y1="2465.0" x2="1450" y2="2465.0" class="grid"/>
-<text x="95" y="2469.0" text-anchor="end" class="axis-label">60</text>
+<text x="95" y="2469.0" text-anchor="end" class="axis-label">50</text>
 <line x1="105" y1="2465" x2="105" y2="2705" class="axis"/>
 <line x1="105" y1="2705" x2="1450" y2="2705" class="axis"/>
-<rect x="150.1" y="2641.2" width="24.0" height="63.8" fill="#2563eb"/>
-<rect x="176.1" y="2622.2" width="24.0" height="82.8" fill="#dc2626"/>
-<rect x="202.1" y="2680.2" width="24.0" height="24.8" fill="#16a34a"/>
+<rect x="150.1" y="2643.9" width="24.0" height="61.1" fill="#2563eb"/>
+<rect x="176.1" y="2625.1" width="24.0" height="79.9" fill="#dc2626"/>
+<rect x="202.1" y="2678.0" width="24.0" height="27.0" fill="#16a34a"/>
 <text x="189.1" y="2723" text-anchor="middle" class="op-label">zdscal</text>
-<rect x="318.2" y="2483.7" width="24.0" height="221.3" fill="#2563eb"/>
-<rect x="344.2" y="2612.2" width="24.0" height="92.8" fill="#dc2626"/>
-<rect x="370.2" y="2632.4" width="24.0" height="72.6" fill="#16a34a"/>
+<rect x="318.2" y="2488.7" width="24.0" height="216.3" fill="#2563eb"/>
+<rect x="344.2" y="2601.8" width="24.0" height="103.2" fill="#dc2626"/>
+<rect x="370.2" y="2623.0" width="24.0" height="82.0" fill="#16a34a"/>
 <text x="357.2" y="2723" text-anchor="middle" class="op-label">zscal</text>
-<rect x="486.3" y="2579.5" width="24.0" height="125.5" fill="#2563eb"/>
-<rect x="512.3" y="2631.3" width="24.0" height="73.7" fill="#dc2626"/>
-<rect x="538.3" y="2569.8" width="24.0" height="135.2" fill="#16a34a"/>
+<rect x="486.3" y="2584.2" width="24.0" height="120.8" fill="#2563eb"/>
+<rect x="512.3" y="2619.0" width="24.0" height="86.0" fill="#dc2626"/>
+<rect x="538.3" y="2580.3" width="24.0" height="124.7" fill="#16a34a"/>
 <text x="525.3" y="2723" text-anchor="middle" class="op-label">zaxpy</text>
-<rect x="654.4" y="2576.7" width="24.0" height="128.3" fill="#2563eb"/>
-<rect x="680.4" y="2623.9" width="24.0" height="81.1" fill="#dc2626"/>
-<rect x="706.4" y="2567.1" width="24.0" height="137.9" fill="#16a34a"/>
+<rect x="654.4" y="2569.9" width="24.0" height="135.1" fill="#2563eb"/>
+<rect x="680.4" y="2618.3" width="24.0" height="86.7" fill="#dc2626"/>
+<rect x="706.4" y="2554.7" width="24.0" height="150.3" fill="#16a34a"/>
 <text x="693.4" y="2723" text-anchor="middle" class="op-label">zdotu</text>
-<rect x="822.6" y="2580.5" width="24.0" height="124.5" fill="#2563eb"/>
-<rect x="848.6" y="2622.6" width="24.0" height="82.4" fill="#dc2626"/>
-<rect x="874.6" y="2567.9" width="24.0" height="137.1" fill="#16a34a"/>
+<rect x="822.6" y="2572.7" width="24.0" height="132.3" fill="#2563eb"/>
+<rect x="848.6" y="2618.1" width="24.0" height="86.9" fill="#dc2626"/>
+<rect x="874.6" y="2553.9" width="24.0" height="151.1" fill="#16a34a"/>
 <text x="861.6" y="2723" text-anchor="middle" class="op-label">zdotc</text>
-<rect x="990.7" y="2606.9" width="24.0" height="98.1" fill="#2563eb"/>
-<rect x="1016.7" y="2636.8" width="24.0" height="68.2" fill="#dc2626"/>
+<rect x="990.7" y="2602.5" width="24.0" height="102.5" fill="#2563eb"/>
+<rect x="1016.7" y="2631.3" width="24.0" height="73.7" fill="#dc2626"/>
 <rect x="1042.7" y="2618.2" width="24.0" height="86.8" fill="#16a34a"/>
 <text x="1029.7" y="2723" text-anchor="middle" class="op-label">dzasum</text>
-<rect x="1158.8" y="2533.2" width="24.0" height="171.8" fill="#2563eb"/>
-<rect x="1184.8" y="2696.5" width="24.0" height="8.5" fill="#dc2626"/>
-<rect x="1210.8" y="2696.4" width="24.0" height="8.6" fill="#16a34a"/>
+<rect x="1158.8" y="2519.0" width="24.0" height="186.0" fill="#2563eb"/>
+<rect x="1184.8" y="2695.4" width="24.0" height="9.6" fill="#dc2626"/>
+<rect x="1210.8" y="2694.7" width="24.0" height="10.3" fill="#16a34a"/>
 <text x="1197.8" y="2723" text-anchor="middle" class="op-label">dznrm2</text>
-<rect x="1326.9" y="2572.3" width="24.0" height="132.7" fill="#2563eb"/>
-<rect x="1352.9" y="2605.2" width="24.0" height="99.8" fill="#dc2626"/>
-<rect x="1378.9" y="2608.1" width="24.0" height="96.9" fill="#16a34a"/>
+<rect x="1326.9" y="2571.8" width="24.0" height="133.2" fill="#2563eb"/>
+<rect x="1352.9" y="2597.0" width="24.0" height="108.0" fill="#dc2626"/>
+<rect x="1378.9" y="2612.7" width="24.0" height="92.3" fill="#16a34a"/>
 <text x="1365.9" y="2723" text-anchor="middle" class="op-label">zdrot</text>
 </svg>
