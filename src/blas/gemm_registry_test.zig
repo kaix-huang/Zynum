@@ -206,6 +206,10 @@ fn runCase(comptime T: type, desc: catalog.Descriptor, layout: Layout, alpha: T,
     const m = @max(desc.bounds.min_m_block, desc.tile.register_m) + 3;
     const n = @max(desc.bounds.min_n_block, desc.tile.n_panel) + 3;
     const k = @max(desc.bounds.min_k_block, desc.tile.k_unroll * 2) + 1;
+    try runCaseShape(T, desc, layout, alpha, beta, m, n, k, 0);
+}
+
+fn runCaseShape(comptime T: type, desc: catalog.Descriptor, layout: Layout, alpha: T, beta: T, m: usize, n: usize, k: usize, n0: usize) !void {
     const lda: gemm_task.BlasInt = @intCast(m + 3);
     const ldb: gemm_task.BlasInt = @intCast(switch (layout) {
         .no_trans => k + 2,
@@ -238,10 +242,12 @@ fn runCase(comptime T: type, desc: catalog.Descriptor, layout: Layout, alpha: T,
     @memcpy(expected, c);
 
     reference(T, layout, m, n, k, alpha, a, lda, b, ldb, beta, c_initial, expected, ldc);
+    const prefix_len = @as(usize, @intCast(ldc)) * n0;
+    @memcpy(expected[0..prefix_len], c_initial[0..prefix_len]);
 
     const task: gemm_task.Task(T) = .{
         .m = m,
-        .n0 = 0,
+        .n0 = n0,
         .n1 = n,
         .k = k,
         .alpha = alpha,
@@ -265,6 +271,7 @@ fn runCase(comptime T: type, desc: catalog.Descriptor, layout: Layout, alpha: T,
         },
     };
     executor.run(T, task);
+    try std.testing.expectEqualSlices(T, c_initial[0..prefix_len], c[0..prefix_len]);
     try std.testing.expectEqual(aarch64_features.TestStreamingDepths{ .sm = 0, .za = 0 }, aarch64_features.testStreamingDepths());
     try std.testing.expectEqual(@as(usize, 0), apple_amx_ops.testStateDepth());
     if (comptime aarch64_features.has_sme) try std.testing.expectEqual(@as(u2, 0), aarch64_features.streamingModeBits());
@@ -308,6 +315,17 @@ test "forced f32 real GEMM paths match a scalar reference on tails and epilogues
 
 test "forced f64 real GEMM paths match a scalar reference on tails and epilogues" {
     try testForcedPaths(f64);
+    const desc = catalog.aarch64AsimdDescriptor(f64);
+    if (executor.availableFor(f64, desc.kernel)) {
+        // Cover every K remainder in the low-K path with row/column tails,
+        // padded leading dimensions, and an untouched column prefix.
+        for ([_]usize{ 28, 29, 30, 31, 32, 33 }) |k| {
+            for ([_]Layout{ .no_trans, .transposed_b }) |layout| {
+                try runCaseShape(f64, desc, layout, 1, 0, 49, 55, k, 3);
+                try runCaseShape(f64, desc, layout, 0.75, -0.25, 49, 55, k, 3);
+            }
+        }
+    }
 }
 
 test "descriptor packing and workspace contracts flow unchanged into execution plans" {

@@ -444,7 +444,7 @@ dispatch policy.
 ## Public README Charts
 
 README charts are generated from correctness-checked fresh-process results.
-Each dated chart must include a
+Each chart must include a
 public reproducibility package containing:
 
 - source commit and measurement date;
@@ -455,7 +455,7 @@ public reproducibility package containing:
 
 The chart and caption must identify the metric, statistic, library order, and
 measured type and shape scope, and state whether higher or lower is better.
-Private or unavailable evidence does not qualify. The curated README reproduction package lives under `docs/assets/benchmarks/`;
+Private or unavailable evidence does not qualify. The current README reproduction package lives under `docs/assets/benchmarks/current/`;
 its CSVs are an explicit exception to the transient-output policy. Other raw
 runs remain outside source control. The public raw artifact may also be hosted
 externally when its immutable link accompanies the chart.

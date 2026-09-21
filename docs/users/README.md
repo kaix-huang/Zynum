@@ -20,7 +20,8 @@ dispatch details unless they affect observable behavior.
 - `zynum-blas` is the BLAS-only Zig package module.
 - The installed library is named `zynum_blas`.
 - Standard BLAS and CBLAS ABI symbols keep their conventional names.
-- `ZYNUM_MAXIMUM_THREADS` is the only Zynum-specific environment variable.
+- `ZYNUM_MAXIMUM_THREADS` caps worker concurrency. Dynamic builds also support
+  `ZYNUM_MAX_ISA` for a safe instruction-set downgrade; see the architecture guide.
 
 Avoid depending on files under `src/blas/core/`, `src/blas/kernels/`, or
 `src/blas/core/matrix_matrix/` from downstream projects. Those are implementation details

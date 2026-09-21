@@ -36,6 +36,7 @@ fn lowKF64Config() packed_simd.Config {
         .max_stack_pack_bytes = s.max_stack_pack_bytes,
         .pack_tail_columns = true,
         .special_low_k_pack = true,
+        .paired_b_load = true,
     };
 }
 

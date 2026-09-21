@@ -296,6 +296,48 @@ fn finitePackedReference(comptime T: type, uplo: Uplo, trans: Order, diag: Diag,
     }
 }
 
+fn finitePanelCases(comptime T: type) !void {
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    const allocator = std.testing.allocator;
+    for ([_]usize{ 767, 768, 769, 775, 776, 783, 784, 785, 895, 896, 897, 1023, 1024, 1025 }) |n| {
+        const ap = try allocator.alloc(T, n * (n + 1) / 2);
+        defer allocator.free(ap);
+        const x = try allocator.alloc(T, 2 * n + 2);
+        defer allocator.free(x);
+        const expected = try allocator.alloc(T, x.len);
+        defer allocator.free(expected);
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Diag{ .unit, .non_unit }) |diag| {
+                for (0..n) |col| {
+                    const base = if (uplo == .upper) col * (col + 1) / 2 else col * (2 * n - col + 1) / 2;
+                    const row_start = if (uplo == .upper) 0 else col;
+                    const row_end = if (uplo == .upper) col + 1 else n;
+                    for (row_start..row_end) |row| {
+                        const magnitude = @as(T, @floatFromInt(1 + row % 3)) / 997;
+                        ap[base + row - row_start] = if (row == col) (if (diag == .unit) std.math.nan(T) else 2) else if ((row + col) % 2 == 0) magnitude else -magnitude;
+                    }
+                }
+                for ([_]i32{ 1, -1, 2, -2 }) |inc| {
+                    @memset(x, -123);
+                    const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                    for (0..n) |j| x[1 + j * stride] = if (j % 2 == 0) 1.0 / 16.0 else -1;
+                    @memcpy(expected, x);
+                    finitePackedReference(T, uplo, .no_trans, diag, n, ap.ptr, expected[1..].ptr, inc);
+                    try std.testing.expect(entry.testing.forceTpmv(T, .compact_triangular_packed_finite, allocator, 64 * 1024 * 1024, uplo, .no_trans, diag, @intCast(n), ap.ptr, x[1..].ptr, inc));
+                    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(x));
+                }
+            }
+            // A zero final row must reject after earlier panels without committing.
+            @memset(ap, 0);
+            for (0..n - 1) |j| ap[if (uplo == .upper) j * (j + 1) / 2 + j else j * (2 * n - j + 1) / 2] = 1;
+            @memset(x, 2);
+            @memcpy(expected, x);
+            try std.testing.expect(!entry.testing.forceTpmv(T, .compact_triangular_packed_finite, allocator, 64 * 1024 * 1024, uplo, .no_trans, .non_unit, @intCast(n), ap.ptr, x[1..].ptr, 1));
+            try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(x));
+        }
+    }
+}
+
 fn finitePackedCases(comptime T: type) !void {
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
     const catalog = @import("kernels/shared/matrix_vector/catalog.zig");
@@ -313,6 +355,7 @@ fn finitePackedCases(comptime T: type) !void {
     profile.enable_finite_tpmv = false;
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTpmv(T, 128));
     if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    try finitePanelCases(T);
     var ap: [140000]T = undefined;
     var x: [1060]T = undefined;
     for ([_]usize{ 64, 65, 66, 67, 68, 69, 70, 71, 96, 97, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 255, 256, 257, 258, 259, 260, 261, 262, 263, 264, 265, 266, 267, 268, 269, 270, 271, 511, 512, 513, 514, 515, 516, 517, 518, 519, 520, 521, 522, 523, 524, 525, 526, 527 }) |n| {
@@ -489,11 +532,50 @@ test "finite f64 transpose preserves exact results across large prefetch thresho
 test "production TPMV preserves staged results across small workspace threshold" {
     if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    // Probe both sides of the two-buffer budget gate using the production
+    // stack policy. Refusal must leave every caller byte unchanged.
+    for ([_]usize{ 128, 129, 512, 513, 1024, 1025 }) |n| {
+        const ap = try std.testing.allocator.alloc(f32, n * (n + 1) / 2);
+        defer std.testing.allocator.free(ap);
+        @memset(ap, 0.125);
+        const bytes = n * @sizeOf(f32);
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]i32{ -2, 2 }) |inc| {
+                for ([_]usize{ bytes - 1, bytes, 2 * bytes - 1, 2 * bytes }) |budget| {
+                    for ([_]bool{ false, true }) |fail_allocation| {
+                        var storage: [2052]f32 = @splat(-123);
+                        for (0..n) |i| storage[1 + 2 * i] = 1;
+                        const before = storage;
+                        var tracked = std.testing.FailingAllocator.init(std.testing.allocator, .{
+                            .fail_index = if (fail_allocation) 0 else std.math.maxInt(usize),
+                        });
+                        const accepted = entry.testing.productionFiniteTpmv(f32, tracked.allocator(), budget, uplo, .trans, .unit, @intCast(n), ap.ptr, storage[1..].ptr, inc);
+                        const expected_success = budget >= bytes and (!fail_allocation or n <= 128);
+                        try std.testing.expectEqual(expected_success, accepted);
+                        if (!accepted) {
+                            try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&storage));
+                        } else {
+                            for (0..n) |i| {
+                                const terms = if (uplo == .upper) i else n - i - 1;
+                                const offset = 1 + 2 * (if (inc > 0) i else n - i - 1);
+                                try std.testing.expectEqual(1 + @as(f32, @floatFromInt(terms)) * 0.125, storage[offset]);
+                            }
+                            for (0..storage.len) |i| {
+                                if (i == 0 or i > 2 * n - 1 or i % 2 == 0) try std.testing.expectEqual(before[i], storage[i]);
+                            }
+                        }
+                        try std.testing.expectEqual(@as(usize, if (accepted and n > 128) bytes else 0), tracked.allocated_bytes);
+                        try std.testing.expectEqual(tracked.allocated_bytes, tracked.freed_bytes);
+                    }
+                }
+            }
+        }
+    }
     inline for (.{ f32, f64 }) |T| {
-        for ([_]usize{ 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 513 }) |n| {
+        for ([_]usize{ 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 513, 1023, 1024, 1025 }) |n| {
             const ap = try std.testing.allocator.alloc(T, n * (n + 1) / 2);
             defer std.testing.allocator.free(ap);
-            var storage: [1542]T = undefined;
+            var storage: [3078]T = undefined;
             for ([_]Uplo{ .upper, .lower }) |uplo| {
                 for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans_| {
                     for ([_]i32{ 1, -1, 2, -2, 3, -3 }) |inc| {

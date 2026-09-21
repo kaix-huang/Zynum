@@ -2,7 +2,7 @@
   "benchmark_identity": {
     "controller": {
       "compiler": {
-        "default_target": "aarch64-macos.26.6.2...26.6.2-none",
+        "default_target": "aarch64-macos.27.0...27.0-none",
         "default_target_diagnostic": {
           "classification": "zig_env_parsed",
           "format": "zig-object",
@@ -17,7 +17,7 @@
           "feat_sme2"
         ],
         "machine": "arm64",
-        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
         "processor": "arm",
         "system": "Darwin"
       },
@@ -30,14 +30,14 @@
         "binaries": [
           {
             "name": "gemm_sweep",
-            "sha256": "8e2a778fa3964980ea32399af76ec13ee0ec62c354d9606e79fe5b3f4209ba5f"
+            "sha256": "b122ee07cf3866950a179c3942c49bddeee9996a20b79bf4787371aea905239e"
           }
         ],
         "hash_claim_scope": "content_identity_only; artifact hashes do not prove build flags",
         "libraries": [
           {
             "name": "Zynum",
-            "sha256": "06781c85d9703d792f1a20009d1cc91582ab8036eb4ef5d4748fac0fa0bbce71"
+            "sha256": "cc4c3842d1d138a303c803c0bff43644b7430f196ef41cb164759622bd35c737"
           },
           {
             "name": "Accelerate",
@@ -53,7 +53,7 @@
         "declaration_status": "complete",
         "missing_fields": [],
         "requested": {
-          "cpu": "apple_m4+sme+sme2+sme2p1",
+          "cpu": "baseline",
           "optimization": "ReleaseFast",
           "target_triple": "aarch64-macos"
         },
@@ -80,7 +80,7 @@
           "authority_status": "malformed",
           "generator": null,
           "schema_version": null,
-          "sha256": "9377ed4bef261475cfc3b4ffa968f6bdd582365a979ef6769ccf7b71df61b5b0",
+          "sha256": "ed9f66c05432adce43a1d3e41e6bcbef612c6078ea8a3390a041c5f2e740eab9",
           "summary": null
         },
         "registry_ids": [],
@@ -90,25 +90,22 @@
     },
     "schema_version": 2,
     "source": {
-      "branch": null,
+      "branch": "main",
       "cleanliness_status": "known",
       "dirty": true,
-      "identity_diagnostic": "source_identity_manifest_loaded",
-      "identity_status": "exported",
-      "revision": "28314cf7b6c0e72526771d8c7d23752020a0bdab",
-      "snapshot_created_utc": "2026-09-09T10:38:12.190415+00:00",
-      "snapshot_manifest_sha256": "b5e7c267b32867d5b4ec0baf1cd8ea1faca3eebb3ed80e86765091eb3e809750",
-      "snapshot_tree_sha256": "03222c868c212af4ede0411adf68f4671d9748a244b094c45451ee9ed77582d3"
+      "identity_diagnostic": "git_source_identity_loaded",
+      "identity_status": "git",
+      "revision": "6a989d0ced00b6fc99d7920d845092e8ea2f72f7"
     }
   },
   "binaries": {
     "gemm_sweep": {
-      "sha256": "8e2a778fa3964980ea32399af76ec13ee0ec62c354d9606e79fe5b3f4209ba5f"
+      "sha256": "b122ee07cf3866950a179c3942c49bddeee9996a20b79bf4787371aea905239e"
     },
     "libraries": [
       {
         "name": "Zynum",
-        "sha256": "06781c85d9703d792f1a20009d1cc91582ab8036eb4ef5d4748fac0fa0bbce71"
+        "sha256": "cc4c3842d1d138a303c803c0bff43644b7430f196ef41cb164759622bd35c737"
       },
       {
         "name": "Accelerate",
@@ -127,7 +124,7 @@
       "isolate_kind": true,
       "isolate_shape": true,
       "kinds": null,
-      "process_repeats": 3,
+      "process_repeats": 6,
       "reps": 30,
       "schedule": "interleaved",
       "shapes": [
@@ -193,7 +190,7 @@
     "ZIG_GLOBAL_CACHE_DIR": "unset",
     "ZYNUM_MAXIMUM_THREADS": "unset"
   },
-  "generated_at_unix": 1788951178.2838101,
+  "generated_at_unix": 1790015880.309536,
   "isolate_kind": true,
   "isolate_shape": true,
   "kinds": null,
@@ -202,8 +199,8 @@
     "private_diagnostics": "excluded",
     "schema_version": 1
   },
-  "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
-  "process_repeats": 3,
+  "os": "macOS-27.0-arm64-arm-64bit-Mach-O",
+  "process_repeats": 6,
   "python_version": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]",
   "reps": 30,
   "schedule": "interleaved",
@@ -252,9 +249,9 @@
     "m640_n384_k96:640:384:96"
   ],
   "source": {
-    "branch": null,
+    "branch": "main",
     "dirty": true,
-    "revision": "28314cf7b6c0e72526771d8c7d23752020a0bdab"
+    "revision": "6a989d0ced00b6fc99d7920d845092e8ea2f72f7"
   },
   "transposes": [
     "NN"

@@ -54,7 +54,7 @@ Inventory-dependent tests require an exact `-Dcpu=baseline` query. `native`, an
 explicit CPU model, and feature modifiers are not inventory queries. Use
 `test-native-feature` for correctness on a matching native host; ordinary
 `zig build` produces a baseline host with runtime-selected ISA objects. Explicit
-`-Dcpu` selects specialization. See the [build-mode table](../README.md#portable-and-specialized-builds).
+`-Dcpu` selects specialization. See [runtime kernel selection](architecture.md#runtime-kernel-selection).
 
 `tools/test_inventory.json` records the supported test surface: logical roots,
 ordered compiler-enumerated sets, target applicability, optimize modes, and
@@ -137,6 +137,18 @@ The benchmark-tool discovery command runs controller and parser unit tests; it
 does not launch a performance measurement.
 
 ## Installation
+
+| Build choice | Behavior |
+| --- | --- |
+| Default or `-Ddispatch=dynamic` | Baseline host code with separately compiled ISA objects and runtime CPU/OS admission |
+| Explicit `-Dcpu=...` with default dispatch | Specialized code for that CPU profile |
+| `-Ddispatch=specialized` | No runtime ISA resolver; baseline unless a CPU is specified |
+| `-Dthread-limit=N` | Build-time worker ceiling, capped by CPU capacity and stricter runtime limits |
+
+`-Doptimize=ReleaseFast` takes precedence over the `--release` preset.
+Each build targets one architecture, OS, and ABI. For a portable Zig dependency,
+pass `.dispatch = "dynamic"` explicitly because Zig forwards a CPU option with
+`.target`.
 
 `zig build` installs libraries and compatibility artifacts under `zig-out/`.
 ELF and Mach-O use:
@@ -242,6 +254,7 @@ pub fn build(b: *std.Build) void {
     const zynum_dep = b.dependency("zynum", .{
         .target = target,
         .optimize = optimize,
+        .dispatch = "dynamic",
     });
 
     const exe = b.addExecutable(.{
@@ -378,14 +391,19 @@ See `fortran_compatibility.md` for ABI details and complex-value caveats.
 
 ## Runtime Controls
 
-`ZYNUM_MAXIMUM_THREADS` is the only supported Zynum environment variable. Set
-it before the first BLAS call. A positive integer caps usable concurrency;
+Set `ZYNUM_MAXIMUM_THREADS` before the first BLAS call. A positive integer caps usable concurrency;
 values above runtime CPU capacity are capped. When unset, Zynum uses runtime
 capacity and may choose fewer threads internally.
 
 ```sh
 unset ZYNUM_MAXIMUM_THREADS
 ```
+
+Dynamic builds also accept `ZYNUM_MAX_ISA` to cap the instruction-set tier.
+For example, `ZYNUM_MAX_ISA=baseline` forces a safe baseline route. It is read
+once, never grants unsupported capabilities, and has no effect on specialized
+builds. See [runtime kernel selection](architecture.md#runtime-kernel-selection)
+for accepted tiers.
 
 Instruction-set selection, SME use, and worker strategy are internal dispatch
 decisions. Apple AMX is disabled by default because macOS exposes no public

@@ -246,7 +246,7 @@ first-element NaN retains the scalar result while later NaNs remain ignored.
 The unit-stride, complex, invalid-argument and small-vector routes are unchanged;
 no gather buffers or vector-width assumptions are added.
 
-### Bounded parallel streaming SROT on macOS
+### Bounded parallel streaming SROT and SROTM on macOS
 
 For non-overlapping contiguous f32 vectors of 512 Ki through 1 Mi elements,
 use at most three tasks when the existing SME2 ROT leaf accepts the call and
@@ -259,34 +259,12 @@ FPCR and restore each helper's FPCR/FPSR afterward. Replacing it with the
 non-streaming ROT leaf changes NaN payloads and status flags. The caller owns
 task zero, retaining the streaming leaf's caller-visible status behavior.
 
-On Apple M5, three-task measurements improved selected 512 Ki–1 Mi calls by
-about 10–16%; four tasks regressed and were rejected. The fixed three-task
-candidate measured about 16% faster at 1 Mi with default scheduling, while
-single-thread and out-of-range controls stayed near baseline. Accelerate
-remains faster for this case. These are targeted observations, not a general
-performance guarantee.
+SROTM uses the same bounded three-task policy with its own streaming capability
+query and unchanged coefficient/flag interpretation. The flag=-2 no-op returns
+before dispatch. Larger vectors, overlaps, non-unit strides and unavailable
+streaming kernels use the serial or portable routes.
 
-Native integration checks compare complete output, padding, FPSR and preserved
-FPCR across size boundaries, rounding/flush modes, exceptional inputs and
-coefficient pairs. Checks also put exceptional values exclusively in the last
-chunk and exercise thread caps 1/2 and forced baseline dispatch. The native
-SME2 registry regression reuses workers across changes in FPCR. Private
-evidence: zynum-local-r271 through r276, 2026-09-21.
-
-Apply the same bounded three-task policy to SROTM, with its own streaming
-capability query and unchanged coefficient/flag interpretation. Keep the
-original leaf inside each chunk, propagate FPCR, and restore helper state.
-The flag=-2 no-op returns before dispatch. Larger vectors, overlaps, non-unit
-strides and unavailable streaming kernels retain their existing routes.
-
-Against the published `6a8b991` library, 96 fresh-process measurements loaded
-baseline and candidate from the same path in rotated order. All three SROTM
-flag modes improved about 10% at 512 Ki elements and 16% at 1 Mi. Single-thread,
-2 Mi-element and SROT controls stayed within about 0.3% of baseline. Accelerate
-remains faster on these target cases. Complete-output, padding, FPSR and FPCR
-comparisons cover seven boundary sizes, four rounding modes, flush modes,
-exceptional values confined to the last chunk, all valid flags, two coefficient
-sets and pre-existing status flags. Native SME2 regression coverage reuses the
-workers across floating-point environment changes. Private evidence: r277,
-2026-09-21. The refreshed README snapshot at `59a3820` includes this change;
-its independent comparator measurements are separate from these paired gains.
+Native regression coverage checks complete outputs, padding, FPSR and preserved
+FPCR across size boundaries, rounding/flush modes, exceptional inputs, valid
+SROTM flags, and thread caps. Persistent workers must observe changes to the
+caller's floating-point environment between calls.

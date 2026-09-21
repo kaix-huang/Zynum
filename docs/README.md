@@ -76,9 +76,11 @@ for completed configuration hardening and explicitly pending internal work.
 ## Public Artifact Boundary
 
 Track source, tests, examples, generated compatibility files, benchmark tools,
-and documentation. No README chart assets are currently published. A future
-chart must have the complete public reproducibility package described in the
-[benchmarking guide](common/benchmarking.md). Do not track build outputs,
+and documentation. Publish the current benchmark figures, curated CSVs, metadata,
+and source manifest under `docs/assets/benchmarks/current/`, following the
+[benchmarking guide](common/benchmarking.md). Use stable names organized by
+purpose; keep experiment identifiers and historical run directories local.
+Do not track build outputs,
 caches, private raw reports, profiler captures, temporary probe binaries, or
 host-specific setup notes. Keep durable local records outside the repository.
 

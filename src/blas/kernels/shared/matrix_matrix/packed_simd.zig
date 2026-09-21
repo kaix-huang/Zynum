@@ -25,6 +25,8 @@ pub const Config = struct {
     max_stack_pack_bytes: comptime_int = 0,
     pack_tail_columns: bool = false,
     special_low_k_pack: bool = false,
+    // AArch64 f64: materialize B pairs only in the K remainder loop.
+    paired_b_load: bool = false,
     pack_a: bool = false,
     k_block: comptime_int = 0,
 };
@@ -145,6 +147,7 @@ inline fn accumulatePackedP(
     comptime T: type,
     comptime cfg: Config,
     comptime groups: comptime_int,
+    comptime paired_b_load: bool,
     task: gemm_task.Task(T),
     b_pack: []const T,
     i: usize,
@@ -156,6 +159,25 @@ inline fn accumulatePackedP(
     var av: [groups]V = undefined;
     inline for (0..groups) |group| {
         av[group] = loadVec(T, cfg.lane_count, task.a, task.lda, i + group * cfg.lane_count, p);
+    }
+    if (comptime paired_b_load) {
+        if (comptime T != f64 or cfg.lane_count != 2 or cfg.tile_n % 2 != 0) @compileError("paired B loads require f64 vector pairs");
+        inline for (0..cfg.tile_n / 2) |pair| {
+            const ptr: *align(1) const V = @ptrCast(b_pack.ptr + b_base + pair * 2);
+            // Keep both coefficients in one vector for lane FMLA without
+            // a memory barrier that forces task metadata to be reloaded.
+            const values = asm (""
+                : [value] "=w" (-> V),
+                : [input] "0" (ptr.*),
+            );
+            inline for (0..2) |lane| {
+                const bv: V = @splat(values[lane]);
+                inline for (0..groups) |group| {
+                    acc.*[group][pair * 2 + lane] = @mulAdd(V, av[group], bv, acc.*[group][pair * 2 + lane]);
+                }
+            }
+        }
+        return;
     }
     inline for (0..cfg.tile_n) |col| {
         const bv: V = @splat(b_pack[b_base + col]);
@@ -185,13 +207,15 @@ fn kernelPacked(
     }
 
     var p: usize = 0;
+    // The ordinary loads schedule better in the four-step main loop;
+    // paired vector materialization is useful for its remaining K steps.
     while (p + cfg.k_unroll <= task.k) : (p += cfg.k_unroll) {
         inline for (0..cfg.k_unroll) |u| {
-            accumulatePackedP(T, cfg, groups, task, b_pack, i, p + u, &acc);
+            accumulatePackedP(T, cfg, groups, false, task, b_pack, i, p + u, &acc);
         }
     }
     while (p < task.k) : (p += 1) {
-        accumulatePackedP(T, cfg, groups, task, b_pack, i, p, &acc);
+        accumulatePackedP(T, cfg, groups, cfg.paired_b_load, task, b_pack, i, p, &acc);
     }
 
     inline for (0..groups) |group| {
