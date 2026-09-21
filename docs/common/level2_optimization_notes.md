@@ -685,3 +685,90 @@ The exact candidate passed 27,648 output/FPSR comparisons at n=256/257/511/512,
 and compilation for x86_64 Linux/macOS and aarch64 Linux without NEON. This does
 not establish enabled-trap ordering equivalence or runtime performance on those
 cross-compiled targets. Evidence is archived in local rounds R326–R330.
+
+Local R359/R360 qualification retains separate f32 eight-row strided
+non-transpose leaves for the lower triangle and the two upper diagonal modes.
+The lower common-column loop advances the input index with a signed wrapping
+step and decreases the packed-column increment. A scalar input load avoids the
+post-index broadcast load selected in an earlier ordinary-code variant.
+Multiplication and addition remain separate and ordered; checked input spans,
+result refusal, temporary output staging and final copy semantics are unchanged.
+The contiguous, f64 and sixteen-row implementations keep their existing paths.
+
+On the M5, the 160-case non-transpose sweep measured lower strided gains of
+about 15.5–23.1% at n=64, 14.0–16.1% at n=128, 9.0–9.3% at n=257, and
+1.8–3.2% at n=511. Several independent-process repetitions of lower n=128,
+incx=-2 measured about 15.4–15.5%. These timings include input reset and compare
+against the published local runtime baseline, not Accelerate. No broad README
+benchmark or other-machine performance claim is made.
+
+Qualification used 3,892 fresh measurement processes across the two rounds:
+paired candidate/baseline comparisons with independently loaded exact baseline
+replicas, plus single-image processes comparing the baseline, replica, previous
+candidate and current candidate. The latter confirmation used all 24 library
+execution-order permutations. Additional coverage included 64 transpose cases
+and signed strides. Correctness checks remained separate from performance
+timing: n=256/257/511/512 passed 27,648 complete-output/FPSR/FPCR
+comparisons, guard/gap cases passed 2,880 checks, packed ReleaseSafe/ReleaseFast
+tests passed 25 each, and the three cross-target compiles described above passed.
+Inventory structure passed; the full inventory/security matrix was not rerun.
+
+Small unchanged-path timing differences remain uncertain. Upper n=65 non-unit,
+incx=-2 initially declined about 0.5–0.8%, then varied in sign. In the balanced
+24-block confirmation, its comparison against the replica had a median speedup
+of 0.16% and a descriptive bootstrap interval of -0.69% to +1.12%. The lower
+n=128 target's corresponding interval was +15.29% to +15.59%. Most transpose
+losses disappeared on independent-process confirmation; f32 n=64 upper unit
+transpose, incx=-2 remained about -0.47% versus replica with an interval spanning
+-0.82% to +0.22%. These within-run intervals do not prove universal absence of
+regression and do not account for all historical experiment selection.
+
+An exact text-section comparison of R350 and R359 found changes only inside the
+lower helper; the upper leaves, continuous leaf and caller code retained their
+instructions and relative addresses. This rules out a changed upper instruction
+sequence between those candidates, but does not identify the cause of small
+process/loading differences. Keep these control cases in subsequent checks.
+Evidence is archived in local rounds R359–R360.
+
+The subsequent packed-transpose qualification retains two related changes.
+The f32 upper contiguous sixteen-row kernel uses two eight-row groups for both
+diagonal modes. Each pair of packed rows is loaded directly into the two halves
+of a vector on AArch64, removing intermediate vector moves while preserving
+separate, ordered multiplication and addition. Other targets retain ordinary
+loads. Small f32 transpose calls with n=64–128 and incx other than +1 first
+stage logical input in a bounded stack buffer, then reuse the contiguous path.
+The caller validates spans and overlap before staging and reserves logical
+input plus output workspace. The inner unit-stride call cannot stage again.
+Only a successful computation is scattered back; refusal leaves original
+input untouched for the existing fallback. Insufficient workspace keeps the
+original path. No public interface or runtime control is added.
+
+On M5, 1,620 single-image measurement processes covering 45 cases and twelve
+rotating library-order blocks compared this combined candidate with the
+retained R359 runtime and an exact baseline replica. At n=64/128, both triangles
+and diagonal modes with strides -3, -2, -1, +2 and +3 improved about 18.0–29.4%.
+Upper non-unit contiguous cases improved about 7.7% and 3.7%, respectively;
+upper unit cases improved about 2.5% and 0.8%. The previously uncertain upper
+n=64 non-unit +2 control improved about 24.5%. The lower non-transpose n=128,
+-2 control was essentially flat (-0.06%, with the replica at -0.08%). These
+are local baseline comparisons including reset cost, not Accelerate speedups
+or a portable all-function guarantee.
+
+A further 384 paired processes covered n=63/65/127/129, both triangles and
+diagonal modes, and strides -1, -2 and +2. Enabled n=65/127 cases improved
+about 13.1–28.2%. Off-gate n=63/129 controls ranged from -0.71% to +0.53%;
+the largest decline also occurred in the exact replica (-0.70%). Small control
+differences remain measurement uncertainty rather than proof of no regression.
+
+The production regression test now covers n=63/64/65/127/128/129 and strides
+±1, ±2 and ±3, including poisoned unit diagonals, untouched gaps and late
+zero-result refusal. The final dynamic library passed 69,120 complete-output
+and FPSR/FPCR comparisons against the preceding published runtime across ten
+sizes, rounding/flush modes and exceptional values, plus 2,880 guard-page
+checks. Packed ReleaseSafe/ReleaseFast tests passed 25 each, and the three
+cross-target compilation checks above passed. Full Debug/ReleaseSafe each
+passed 500 tests with 4 expected skips; ReleaseFast passed 497 with 7 expected
+skips. Dynamic-dispatch validation passed 132 tests, and native SME2 and host
+tooling checks passed. The full inventory/security matrix was not rerun.
+Enabled-trap order and other-machine runtime performance remain unproven.
+Evidence is archived in local rounds R369–R370.

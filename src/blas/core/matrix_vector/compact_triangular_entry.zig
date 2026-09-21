@@ -374,7 +374,18 @@ pub const testing = struct {
     }
 };
 
-// Experimental ordered packed rows. No caller output is changed on refusal.
+// Reuse contiguous kernels for bounded strided input. Commit only after the
+// inner computation succeeds; its unit stride prevents repeated staging.
+noinline fn stagedSmallTpmv(comptime T: type, allocator: std.mem.Allocator, max_bytes: usize, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt, stride: usize, last: usize) bool {
+    const n: usize = @intCast(n_);
+    var values: [128]T = undefined;
+    for (0..n) |i| values[i] = x[if (incx > 0) i * stride else last - i * stride];
+    if (!tryFiniteTpmv(T, true, allocator, max_bytes, uplo, trans_, diag, n_, ap, &values, 1)) return false;
+    for (0..n) |i| x[if (incx > 0) i * stride else last - i * stride] = values[i];
+    return true;
+}
+
+// Ordered packed rows. No caller output is changed on refusal.
 noinline fn tryFiniteTpmv(comptime T: type, comptime stack_small: bool, allocator: std.mem.Allocator, max_bytes: usize, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) bool {
     @setFloatMode(.strict);
     if (comptime T != f32 and T != f64) return false;
@@ -395,6 +406,10 @@ noinline fn tryFiniteTpmv(comptime T: type, comptime stack_small: bool, allocato
     if (x_addr >= a_addr) {
         if (x_addr - a_addr < a_bytes) return false;
     } else if (a_addr - x_addr < x_bytes) return false;
+    // Reserve both logical input and output workspace before copying input.
+    if (stack_small and T == f32 and n <= 128 and trans_ != .no_trans and incx != 1 and bytes <= max_bytes / 2) {
+        return stagedSmallTpmv(T, allocator, max_bytes - bytes, uplo, trans_, diag, n_, ap, x, incx, stride, last);
+    }
     const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
     const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
     if (stride == 1) {
@@ -835,42 +850,46 @@ noinline fn finiteTpmvTransRowsSelectedImpl(comptime T: type, comptime width: us
                             : .{ .memory = true })
                     else
                         .{ x[column], x[column + 1] };
-                    // Four-row scheduling helps unit diagonals; eight rows avoid
-                    // the measured small non-unit regression.
-                    if (comptime unit_diagonal) {
-                        var groups: [4]@Vector(4, T) = undefined;
-                        inline for (0..4) |group| {
-                            const offset = group * 4;
-                            var pairs: [4]@Vector(2, T) = undefined;
-                            inline for (0..4) |r| pairs[r] = ap[bases[offset + r] + column ..][0..2].*;
-                            const low = @shuffle(T, pairs[0], pairs[1], @Vector(4, i32){ 0, 1, -1, -2 });
-                            const high = @shuffle(T, pairs[2], pairs[3], @Vector(4, i32){ 0, 1, -1, -2 });
-                            const first = @shuffle(T, low, high, @Vector(4, i32){ 0, 2, -1, -3 });
-                            const second = @shuffle(T, low, high, @Vector(4, i32){ 1, 3, -2, -4 });
-                            var part = @shuffle(T, sums, undefined, @Vector(4, i32){ offset, offset + 1, offset + 2, offset + 3 });
-                            const second_product = second * @as(@Vector(4, T), @splat(input_pair[1]));
-                            part = part + first * @as(@Vector(4, T), @splat(input_pair[0]));
-                            part = part + second_product;
-                            groups[group] = part;
-                        }
-                        const low = @shuffle(T, groups[0], groups[1], @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
-                        const high = @shuffle(T, groups[2], groups[3], @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
-                        sums = @shuffle(T, low, high, @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
-                    } else {
-                        var groups: [2]@Vector(8, T) = undefined;
-                        inline for (0..2) |group| {
-                            const offset = group * 8;
+                    var groups: [2]@Vector(8, T) = undefined;
+                    inline for (0..2) |group| {
+                        const offset = group * 8;
+                        var split: struct { first: @Vector(8, T), second: @Vector(8, T) } = undefined;
+                        if (comptime T == f32 and builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 })) {
+                            var joined: [4]@Vector(4, T) = undefined;
+                            inline for (0..4) |pair| {
+                                var address: usize = undefined;
+                                var value: @Vector(4, T) = undefined;
+                                asm volatile (
+                                    \\ldr %[value:d], [%[first], %[index]]
+                                    \\add %[address], %[second], %[index]
+                                    \\ld1 {%[value].d}[1], [%[address]]
+                                    : [value] "=&w" (value),
+                                      [address] "=&r" (address),
+                                    : [first] "r" (ap + bases[offset + 2 * pair]),
+                                      [second] "r" (ap + bases[offset + 2 * pair + 1]),
+                                      [index] "r" (column * 4),
+                                    : .{ .memory = true });
+                                joined[pair] = value;
+                            }
+                            const first_low = @shuffle(T, joined[0], joined[1], @Vector(4, i32){ 0, 2, -1, -3 });
+                            const first_high = @shuffle(T, joined[2], joined[3], @Vector(4, i32){ 0, 2, -1, -3 });
+                            const second_low = @shuffle(T, joined[0], joined[1], @Vector(4, i32){ 1, 3, -2, -4 });
+                            const second_high = @shuffle(T, joined[2], joined[3], @Vector(4, i32){ 1, 3, -2, -4 });
+                            split.first = @shuffle(T, first_low, first_high, @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
+                            split.second = @shuffle(T, second_low, second_high, @Vector(8, i32){ 0, 1, 2, 3, -1, -2, -3, -4 });
+                        } else {
                             var pairs: [8]@Vector(2, T) = undefined;
                             inline for (0..8) |r| pairs[r] = ap[bases[offset + r] + column ..][0..2].*;
-                            const split = splitTpmvColumnPairs(T, 8, pairs);
-                            var part = @shuffle(T, sums, undefined, @Vector(8, i32){ offset, offset + 1, offset + 2, offset + 3, offset + 4, offset + 5, offset + 6, offset + 7 });
-                            const second_product = split.second * @as(@Vector(8, T), @splat(input_pair[1]));
-                            part = part + split.first * @as(@Vector(8, T), @splat(input_pair[0]));
-                            part = part + second_product;
-                            groups[group] = part;
+                            const loaded = splitTpmvColumnPairs(T, 8, pairs);
+                            split = .{ .first = loaded.first, .second = loaded.second };
                         }
-                        sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
+                        var part = @shuffle(T, sums, undefined, @Vector(8, i32){ offset, offset + 1, offset + 2, offset + 3, offset + 4, offset + 5, offset + 6, offset + 7 });
+                        const second_product = split.second * @as(@Vector(8, T), @splat(input_pair[1]));
+                        part = part + split.first * @as(@Vector(8, T), @splat(input_pair[0]));
+                        part = part + second_product;
+                        groups[group] = part;
                     }
+                    sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
                 } else {
                     if (T == f64 and width == 8 and unit_stride and !unit_diagonal) {
                         const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
@@ -1077,6 +1096,88 @@ inline fn finiteTpmvNoTransRowsImpl(comptime T: type, comptime width: usize, com
     return FiniteTpmvRowsLeaf(T, width, unit_stride).run(first_row, uplo, diag, n, ap, x, incx, stride, last, output);
 }
 
+// Separate the strided f32 eight-row triangles so their boundary calculations
+// do not share register live ranges with the other triangle's common loop.
+fn FiniteTpmvLowerStridedRowsLeaf(comptime width: usize) type {
+    return struct {
+        noinline fn run(first_row: usize, diag: Diag, n: usize, ap: [*]const f32, x: [*]const f32, incx: BlasInt, stride: usize, last: usize, output: []f32) align(128) bool {
+            @setFloatMode(.strict);
+            // The caller checked the input span; wrapping represents a negative
+            // step without a direction test in each common-column iteration.
+            const input_step: usize = if (incx > 0) stride else 0 -% stride;
+            var i: usize = first_row;
+            while (i + width - 1 < n) : (i += width) {
+                var sums: @Vector(width, f32) = @splat(0);
+                var offset = i;
+                var input_index: usize = if (incx > 0) 0 else last;
+                var column_step = n - 1;
+                var remaining = i;
+                while (remaining != 0) : (remaining -= 1) {
+                    // Keep a scalar load: the compiler's post-index LD1R form
+                    // was slower in the measured strided lower-triangle cases.
+                    const xj = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
+                        asm volatile ("ldr %[value:s], [%[source]]"
+                            : [value] "=w" (-> f32),
+                            : [source] "r" (x + input_index),
+                            : .{ .memory = true })
+                    else
+                        x[input_index];
+                    sums = sums + @as(@Vector(width, f32), ap[offset..][0..width].*) * @as(@Vector(width, f32), @splat(xj));
+                    offset += column_step;
+                    column_step -= 1;
+                    input_index +%= input_step;
+                }
+                inline for (0..width) |c| {
+                    const j = i + c;
+                    const xj = x[if (incx > 0) j * stride else last - j * stride];
+                    const base = j * (2 * n - j + 1) / 2;
+                    inline for (c..width) |r| {
+                        const av: f32 = if (r == c and diag == .unit) 1 else ap[base + r - c];
+                        sums[r] = sums[r] + av * xj;
+                    }
+                }
+                inline for (0..width) |r| {
+                    if ((@as(u32, @bitCast(sums[r])) & 0x7f800000) == 0x7f800000 or sums[r] == 0) return false;
+                    output[i + r] = sums[r];
+                }
+            }
+            return true;
+        }
+    };
+}
+
+fn FiniteTpmvUpperStridedRowsLeaf(comptime width: usize, comptime unit_diagonal: bool) type {
+    return struct {
+        noinline fn run(first_row: usize, n: usize, ap: [*]const f32, x: [*]const f32, incx: BlasInt, stride: usize, last: usize, output: []f32) align(128) bool {
+            @setFloatMode(.strict);
+            var i: usize = first_row;
+            while (i + width - 1 < n) : (i += width) {
+                var sums: @Vector(width, f32) = @splat(0);
+                inline for (0..width) |c| {
+                    const j = i + c;
+                    const xj = x[if (incx > 0) j * stride else last - j * stride];
+                    const base = j * (j + 1) / 2 + i;
+                    inline for (0..c + 1) |r| {
+                        const av: f32 = if (unit_diagonal and r == c) 1 else ap[base + r];
+                        sums[r] = sums[r] + av * xj;
+                    }
+                }
+                var offset = (i + width) * (i + width + 1) / 2 + i;
+                for (i + width..n) |j| {
+                    const xj = x[if (incx > 0) j * stride else last - j * stride];
+                    sums = sums + @as(@Vector(width, f32), ap[offset..][0..width].*) * @as(@Vector(width, f32), @splat(xj));
+                    offset += j + 1;
+                }
+                inline for (0..width) |r| {
+                    if ((@as(u32, @bitCast(sums[r])) & 0x7f800000) == 0x7f800000 or sums[r] == 0) return false;
+                    output[i + r] = sums[r];
+                }
+            }
+            return true;
+        }
+    };
+}
+
 fn FiniteTpmvRowsLeaf(comptime T: type, comptime width: usize, comptime unit_stride: bool) type {
     return struct {
         noinline fn run(first_row: usize, uplo: Uplo, diag: Diag, n: usize, ap: [*]const T, x: [*]const T, incx: BlasInt, stride: usize, last: usize, output: []T) align(if (T == f32 and width == 8 and !unit_stride) 128 else 64) bool {
@@ -1087,6 +1188,10 @@ fn FiniteTpmvRowsLeaf(comptime T: type, comptime width: usize, comptime unit_str
             while (i + width - 1 < n) : (i += width) {
                 var sums: @Vector(width, T) = @splat(0);
                 if (uplo == .upper) {
+                    if (comptime T == f32 and width == 8 and !unit_stride) {
+                        if (diag == .unit) return FiniteTpmvUpperStridedRowsLeaf(width, true).run(i, n, ap, x, incx, stride, last, output);
+                        return FiniteTpmvUpperStridedRowsLeaf(width, false).run(i, n, ap, x, incx, stride, last, output);
+                    }
                     inline for (0..width) |c| {
                         const j = i + c;
                         const xj = x[if (unit_stride) j else if (incx > 0) j * stride else last - j * stride];
@@ -1122,6 +1227,9 @@ fn FiniteTpmvRowsLeaf(comptime T: type, comptime width: usize, comptime unit_str
                         }
                     }
                 } else {
+                    if (comptime T == f32 and width == 8 and !unit_stride) {
+                        return FiniteTpmvLowerStridedRowsLeaf(width).run(i, diag, n, ap, x, incx, stride, last, output);
+                    }
                     var offset = i;
                     var column: usize = 0;
                     if (comptime T == f32 and unit_stride) {
