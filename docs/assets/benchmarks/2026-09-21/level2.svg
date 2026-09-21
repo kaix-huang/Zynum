@@ -37,131 +37,131 @@
 <text x="80" y="122.0" text-anchor="end" class="tick">50</text>
 <line x1="90" y1="118" x2="90" y2="388" class="axis"/>
 <line x1="90" y1="388" x2="2365" y2="388" class="axis"/>
-<rect x="114.2" y="312.2" width="24.0" height="75.8" fill="#2563eb"><title>sgemv_n Zynum n=128: 14.045 Gops</title></rect>
-<text x="126.2" y="308.2" text-anchor="middle" class="val">14.0</text>
-<rect x="140.2" y="311.5" width="24.0" height="76.5" fill="#dc2626"><title>sgemv_n Accelerate n=128: 14.174 Gops</title></rect>
-<text x="152.2" y="307.5" text-anchor="middle" class="val">14.2</text>
-<rect x="166.2" y="301.3" width="24.0" height="86.7" fill="#16a34a"><title>sgemv_n OpenBLAS n=128: 16.051 Gops</title></rect>
+<rect x="114.2" y="309.3" width="24.0" height="78.7" fill="#2563eb"><title>sgemv_n Zynum n=128: 14.572 Gops</title></rect>
+<text x="126.2" y="305.3" text-anchor="middle" class="val">14.6</text>
+<rect x="140.2" y="310.1" width="24.0" height="77.9" fill="#dc2626"><title>sgemv_n Accelerate n=128: 14.430 Gops</title></rect>
+<text x="152.2" y="306.1" text-anchor="middle" class="val">14.4</text>
+<rect x="166.2" y="301.3" width="24.0" height="86.7" fill="#16a34a"><title>sgemv_n OpenBLAS n=128: 16.058 Gops</title></rect>
 <text x="178.2" y="297.3" text-anchor="middle" class="val">16.1</text>
 <text x="153.2" y="406" text-anchor="end" transform="rotate(-28 153.2 406)" class="op">sgemv_n</text>
-<rect x="240.6" y="308.6" width="24.0" height="79.4" fill="#2563eb"><title>sgemv_t Zynum n=128: 14.699 Gops</title></rect>
-<text x="252.6" y="304.6" text-anchor="middle" class="val">14.7</text>
-<rect x="266.6" y="317.8" width="24.0" height="70.2" fill="#dc2626"><title>sgemv_t Accelerate n=128: 12.999 Gops</title></rect>
-<text x="278.6" y="313.8" text-anchor="middle" class="val">13.0</text>
-<rect x="292.6" y="321.1" width="24.0" height="66.9" fill="#16a34a"><title>sgemv_t OpenBLAS n=128: 12.385 Gops</title></rect>
-<text x="304.6" y="317.1" text-anchor="middle" class="val">12.4</text>
+<rect x="240.6" y="304.7" width="24.0" height="83.3" fill="#2563eb"><title>sgemv_t Zynum n=128: 15.430 Gops</title></rect>
+<text x="252.6" y="300.7" text-anchor="middle" class="val">15.4</text>
+<rect x="266.6" y="319.5" width="24.0" height="68.5" fill="#dc2626"><title>sgemv_t Accelerate n=128: 12.686 Gops</title></rect>
+<text x="278.6" y="315.5" text-anchor="middle" class="val">12.7</text>
+<rect x="292.6" y="321.6" width="24.0" height="66.4" fill="#16a34a"><title>sgemv_t OpenBLAS n=128: 12.290 Gops</title></rect>
+<text x="304.6" y="317.6" text-anchor="middle" class="val">12.3</text>
 <text x="279.6" y="406" text-anchor="end" transform="rotate(-28 279.6 406)" class="op">sgemv_t</text>
-<rect x="367.0" y="311.5" width="24.0" height="76.5" fill="#2563eb"><title>ssymv Zynum n=128: 14.171 Gops</title></rect>
-<text x="379.0" y="307.5" text-anchor="middle" class="val">14.2</text>
-<rect x="393.0" y="345.1" width="24.0" height="42.9" fill="#dc2626"><title>ssymv Accelerate n=128: 7.947 Gops</title></rect>
-<text x="405.0" y="341.1" text-anchor="middle" class="val">7.9</text>
-<rect x="419.0" y="299.5" width="24.0" height="88.5" fill="#16a34a"><title>ssymv OpenBLAS n=128: 16.384 Gops</title></rect>
-<text x="431.0" y="295.5" text-anchor="middle" class="val">16.4</text>
+<rect x="367.0" y="309.3" width="24.0" height="78.7" fill="#2563eb"><title>ssymv Zynum n=128: 14.565 Gops</title></rect>
+<text x="379.0" y="305.3" text-anchor="middle" class="val">14.6</text>
+<rect x="393.0" y="344.6" width="24.0" height="43.4" fill="#dc2626"><title>ssymv Accelerate n=128: 8.028 Gops</title></rect>
+<text x="405.0" y="340.6" text-anchor="middle" class="val">8.0</text>
+<rect x="419.0" y="300.4" width="24.0" height="87.6" fill="#16a34a"><title>ssymv OpenBLAS n=128: 16.219 Gops</title></rect>
+<text x="431.0" y="296.4" text-anchor="middle" class="val">16.2</text>
 <text x="406.0" y="406" text-anchor="end" transform="rotate(-28 406.0 406)" class="op">ssymv</text>
-<rect x="493.4" y="310.8" width="24.0" height="77.2" fill="#2563eb"><title>sger Zynum n=128: 14.297 Gops</title></rect>
-<text x="505.4" y="306.8" text-anchor="middle" class="val">14.3</text>
-<rect x="519.4" y="307.9" width="24.0" height="80.1" fill="#dc2626"><title>sger Accelerate n=128: 14.841 Gops</title></rect>
+<rect x="493.4" y="314.8" width="24.0" height="73.2" fill="#2563eb"><title>sger Zynum n=128: 13.560 Gops</title></rect>
+<text x="505.4" y="310.8" text-anchor="middle" class="val">13.6</text>
+<rect x="519.4" y="307.9" width="24.0" height="80.1" fill="#dc2626"><title>sger Accelerate n=128: 14.837 Gops</title></rect>
 <text x="531.4" y="303.9" text-anchor="middle" class="val">14.8</text>
-<rect x="545.4" y="381.2" width="24.0" height="6.8" fill="#16a34a"><title>sger OpenBLAS n=128: 1.258 Gops</title></rect>
-<text x="557.4" y="377.2" text-anchor="middle" class="val">1.3</text>
+<rect x="545.4" y="380.6" width="24.0" height="7.4" fill="#16a34a"><title>sger OpenBLAS n=128: 1.379 Gops</title></rect>
+<text x="557.4" y="376.6" text-anchor="middle" class="val">1.4</text>
 <text x="532.4" y="406" text-anchor="end" transform="rotate(-28 532.4 406)" class="op">sger</text>
-<rect x="619.8" y="310.1" width="24.0" height="77.9" fill="#2563eb"><title>dgemv_n Zynum n=128: 14.430 Gops</title></rect>
-<text x="631.8" y="306.1" text-anchor="middle" class="val">14.4</text>
-<rect x="645.8" y="312.2" width="24.0" height="75.8" fill="#dc2626"><title>dgemv_n Accelerate n=128: 14.045 Gops</title></rect>
-<text x="657.8" y="308.2" text-anchor="middle" class="val">14.0</text>
-<rect x="671.8" y="337.7" width="24.0" height="50.3" fill="#16a34a"><title>dgemv_n OpenBLAS n=128: 9.308 Gops</title></rect>
-<text x="683.8" y="333.7" text-anchor="middle" class="val">9.3</text>
+<rect x="619.8" y="305.5" width="24.0" height="82.5" fill="#2563eb"><title>dgemv_n Zynum n=128: 15.282 Gops</title></rect>
+<text x="631.8" y="301.5" text-anchor="middle" class="val">15.3</text>
+<rect x="645.8" y="310.1" width="24.0" height="77.9" fill="#dc2626"><title>dgemv_n Accelerate n=128: 14.433 Gops</title></rect>
+<text x="657.8" y="306.1" text-anchor="middle" class="val">14.4</text>
+<rect x="671.8" y="336.2" width="24.0" height="51.8" fill="#16a34a"><title>dgemv_n OpenBLAS n=128: 9.597 Gops</title></rect>
+<text x="683.8" y="332.2" text-anchor="middle" class="val">9.6</text>
 <text x="658.8" y="406" text-anchor="end" transform="rotate(-28 658.8 406)" class="op">dgemv_n</text>
-<rect x="746.1" y="312.2" width="24.0" height="75.8" fill="#2563eb"><title>dgemv_t Zynum n=128: 14.045 Gops</title></rect>
-<text x="758.1" y="308.2" text-anchor="middle" class="val">14.0</text>
-<rect x="772.1" y="313.5" width="24.0" height="74.5" fill="#dc2626"><title>dgemv_t Accelerate n=128: 13.797 Gops</title></rect>
-<text x="784.1" y="309.5" text-anchor="middle" class="val">13.8</text>
-<rect x="798.1" y="337.4" width="24.0" height="50.6" fill="#16a34a"><title>dgemv_t OpenBLAS n=128: 9.362 Gops</title></rect>
-<text x="810.1" y="333.4" text-anchor="middle" class="val">9.4</text>
+<rect x="746.1" y="310.8" width="24.0" height="77.2" fill="#2563eb"><title>dgemv_t Zynum n=128: 14.304 Gops</title></rect>
+<text x="758.1" y="306.8" text-anchor="middle" class="val">14.3</text>
+<rect x="772.1" y="312.2" width="24.0" height="75.8" fill="#dc2626"><title>dgemv_t Accelerate n=128: 14.042 Gops</title></rect>
+<text x="784.1" y="308.2" text-anchor="middle" class="val">14.0</text>
+<rect x="798.1" y="335.8" width="24.0" height="52.2" fill="#16a34a"><title>dgemv_t OpenBLAS n=128: 9.658 Gops</title></rect>
+<text x="810.1" y="331.8" text-anchor="middle" class="val">9.7</text>
 <text x="785.1" y="406" text-anchor="end" transform="rotate(-28 785.1 406)" class="op">dgemv_t</text>
-<rect x="872.5" y="324.1" width="24.0" height="63.9" fill="#2563eb"><title>dsymv Zynum n=128: 11.828 Gops</title></rect>
-<text x="884.5" y="320.1" text-anchor="middle" class="val">11.8</text>
-<rect x="898.5" y="360.2" width="24.0" height="27.8" fill="#dc2626"><title>dsymv Accelerate n=128: 5.157 Gops</title></rect>
-<text x="910.5" y="356.2" text-anchor="middle" class="val">5.2</text>
-<rect x="924.5" y="316.0" width="24.0" height="72.0" fill="#16a34a"><title>dsymv OpenBLAS n=128: 13.331 Gops</title></rect>
-<text x="936.5" y="312.0" text-anchor="middle" class="val">13.3</text>
+<rect x="872.5" y="322.1" width="24.0" height="65.9" fill="#2563eb"><title>dsymv Zynum n=128: 12.199 Gops</title></rect>
+<text x="884.5" y="318.1" text-anchor="middle" class="val">12.2</text>
+<rect x="898.5" y="358.1" width="24.0" height="29.9" fill="#dc2626"><title>dsymv Accelerate n=128: 5.539 Gops</title></rect>
+<text x="910.5" y="354.1" text-anchor="middle" class="val">5.5</text>
+<rect x="924.5" y="312.8" width="24.0" height="75.2" fill="#16a34a"><title>dsymv OpenBLAS n=128: 13.921 Gops</title></rect>
+<text x="936.5" y="308.8" text-anchor="middle" class="val">13.9</text>
 <text x="911.5" y="406" text-anchor="end" transform="rotate(-28 911.5 406)" class="op">dsymv</text>
 <rect x="998.9" y="339.2" width="24.0" height="48.8" fill="#2563eb"><title>dger Zynum n=128: 9.039 Gops</title></rect>
 <text x="1010.9" y="335.2" text-anchor="middle" class="val">9.0</text>
-<rect x="1024.9" y="321.0" width="24.0" height="67.0" fill="#dc2626"><title>dger Accelerate n=128: 12.403 Gops</title></rect>
-<text x="1036.9" y="317.0" text-anchor="middle" class="val">12.4</text>
-<rect x="1050.9" y="381.0" width="24.0" height="7.0" fill="#16a34a"><title>dger OpenBLAS n=128: 1.288 Gops</title></rect>
+<rect x="1024.9" y="318.9" width="24.0" height="69.1" fill="#dc2626"><title>dger Accelerate n=128: 12.791 Gops</title></rect>
+<text x="1036.9" y="314.9" text-anchor="middle" class="val">12.8</text>
+<rect x="1050.9" y="381.0" width="24.0" height="7.0" fill="#16a34a"><title>dger OpenBLAS n=128: 1.296 Gops</title></rect>
 <text x="1062.9" y="377.0" text-anchor="middle" class="val">1.3</text>
 <text x="1037.9" y="406" text-anchor="end" transform="rotate(-28 1037.9 406)" class="op">dger</text>
-<rect x="1125.3" y="167.4" width="24.0" height="220.6" fill="#2563eb"><title>cgemv_n Zynum n=128: 40.858 Gops</title></rect>
-<text x="1137.3" y="163.4" text-anchor="middle" class="val">40.9</text>
-<rect x="1151.3" y="192.7" width="24.0" height="195.3" fill="#dc2626"><title>cgemv_n Accelerate n=128: 36.158 Gops</title></rect>
-<text x="1163.3" y="188.7" text-anchor="middle" class="val">36.2</text>
-<rect x="1177.3" y="363.8" width="24.0" height="24.2" fill="#16a34a"><title>cgemv_n OpenBLAS n=128: 4.487 Gops</title></rect>
-<text x="1189.3" y="359.8" text-anchor="middle" class="val">4.5</text>
+<rect x="1125.3" y="164.5" width="24.0" height="223.5" fill="#2563eb"><title>cgemv_n Zynum n=128: 41.393 Gops</title></rect>
+<text x="1137.3" y="160.5" text-anchor="middle" class="val">41.4</text>
+<rect x="1151.3" y="193.8" width="24.0" height="194.2" fill="#dc2626"><title>cgemv_n Accelerate n=128: 35.965 Gops</title></rect>
+<text x="1163.3" y="189.8" text-anchor="middle" class="val">36.0</text>
+<rect x="1177.3" y="361.5" width="24.0" height="26.5" fill="#16a34a"><title>cgemv_n OpenBLAS n=128: 4.907 Gops</title></rect>
+<text x="1189.3" y="357.5" text-anchor="middle" class="val">4.9</text>
 <text x="1164.3" y="406" text-anchor="end" transform="rotate(-28 1164.3 406)" class="op">cgemv_n</text>
-<rect x="1251.7" y="148.8" width="24.0" height="239.2" fill="#2563eb"><title>cgemv_t Zynum n=128: 44.304 Gops</title></rect>
-<text x="1263.7" y="144.8" text-anchor="middle" class="val">44.3</text>
-<rect x="1277.7" y="178.3" width="24.0" height="209.7" fill="#dc2626"><title>cgemv_t Accelerate n=128: 38.836 Gops</title></rect>
-<text x="1289.7" y="174.3" text-anchor="middle" class="val">38.8</text>
-<rect x="1303.7" y="361.8" width="24.0" height="26.2" fill="#16a34a"><title>cgemv_t OpenBLAS n=128: 4.847 Gops</title></rect>
-<text x="1315.7" y="357.8" text-anchor="middle" class="val">4.8</text>
+<rect x="1251.7" y="148.7" width="24.0" height="239.3" fill="#2563eb"><title>cgemv_t Zynum n=128: 44.311 Gops</title></rect>
+<text x="1263.7" y="144.7" text-anchor="middle" class="val">44.3</text>
+<rect x="1277.7" y="171.6" width="24.0" height="216.4" fill="#dc2626"><title>cgemv_t Accelerate n=128: 40.079 Gops</title></rect>
+<text x="1289.7" y="167.6" text-anchor="middle" class="val">40.1</text>
+<rect x="1303.7" y="359.4" width="24.0" height="28.6" fill="#16a34a"><title>cgemv_t OpenBLAS n=128: 5.297 Gops</title></rect>
+<text x="1315.7" y="355.4" text-anchor="middle" class="val">5.3</text>
 <text x="1290.7" y="406" text-anchor="end" transform="rotate(-28 1290.7 406)" class="op">cgemv_t</text>
-<rect x="1378.1" y="219.8" width="24.0" height="168.2" fill="#2563eb"><title>chemv Zynum n=128: 31.148 Gops</title></rect>
-<text x="1390.1" y="215.8" text-anchor="middle" class="val">31.1</text>
-<rect x="1404.1" y="249.9" width="24.0" height="138.1" fill="#dc2626"><title>chemv Accelerate n=128: 25.575 Gops</title></rect>
-<text x="1416.1" y="245.9" text-anchor="middle" class="val">25.6</text>
-<rect x="1430.1" y="262.2" width="24.0" height="125.8" fill="#16a34a"><title>chemv OpenBLAS n=128: 23.302 Gops</title></rect>
-<text x="1442.1" y="258.2" text-anchor="middle" class="val">23.3</text>
+<rect x="1378.1" y="219.0" width="24.0" height="169.0" fill="#2563eb"><title>chemv Zynum n=128: 31.302 Gops</title></rect>
+<text x="1390.1" y="215.0" text-anchor="middle" class="val">31.3</text>
+<rect x="1404.1" y="266.7" width="24.0" height="121.3" fill="#dc2626"><title>chemv Accelerate n=128: 22.470 Gops</title></rect>
+<text x="1416.1" y="262.7" text-anchor="middle" class="val">22.5</text>
+<rect x="1430.1" y="253.2" width="24.0" height="134.8" fill="#16a34a"><title>chemv OpenBLAS n=128: 24.966 Gops</title></rect>
+<text x="1442.1" y="249.2" text-anchor="middle" class="val">25.0</text>
 <text x="1417.1" y="406" text-anchor="end" transform="rotate(-28 1417.1 406)" class="op">chemv</text>
-<rect x="1504.5" y="178.3" width="24.0" height="209.7" fill="#2563eb"><title>cgeru Zynum n=128: 38.836 Gops</title></rect>
-<text x="1516.5" y="174.3" text-anchor="middle" class="val">38.8</text>
-<rect x="1530.5" y="207.3" width="24.0" height="180.7" fill="#dc2626"><title>cgeru Accelerate n=128: 33.462 Gops</title></rect>
-<text x="1542.5" y="203.3" text-anchor="middle" class="val">33.5</text>
-<rect x="1556.5" y="360.1" width="24.0" height="27.9" fill="#16a34a"><title>cgeru OpenBLAS n=128: 5.170 Gops</title></rect>
-<text x="1568.5" y="356.1" text-anchor="middle" class="val">5.2</text>
+<rect x="1504.5" y="174.3" width="24.0" height="213.7" fill="#2563eb"><title>cgeru Zynum n=128: 39.583 Gops</title></rect>
+<text x="1516.5" y="170.3" text-anchor="middle" class="val">39.6</text>
+<rect x="1530.5" y="189.3" width="24.0" height="198.7" fill="#dc2626"><title>cgeru Accelerate n=128: 36.793 Gops</title></rect>
+<text x="1542.5" y="185.3" text-anchor="middle" class="val">36.8</text>
+<rect x="1556.5" y="360.6" width="24.0" height="27.4" fill="#16a34a"><title>cgeru OpenBLAS n=128: 5.082 Gops</title></rect>
+<text x="1568.5" y="356.6" text-anchor="middle" class="val">5.1</text>
 <text x="1543.5" y="406" text-anchor="end" transform="rotate(-28 1543.5 406)" class="op">cgeru</text>
-<rect x="1630.9" y="179.6" width="24.0" height="208.4" fill="#2563eb"><title>cgerc Zynum n=128: 38.597 Gops</title></rect>
-<text x="1642.9" y="175.6" text-anchor="middle" class="val">38.6</text>
-<rect x="1656.9" y="195.0" width="24.0" height="193.0" fill="#dc2626"><title>cgerc Accelerate n=128: 35.744 Gops</title></rect>
-<text x="1668.9" y="191.0" text-anchor="middle" class="val">35.7</text>
-<rect x="1682.9" y="361.7" width="24.0" height="26.3" fill="#16a34a"><title>cgerc OpenBLAS n=128: 4.862 Gops</title></rect>
-<text x="1694.9" y="357.7" text-anchor="middle" class="val">4.9</text>
+<rect x="1630.9" y="173.0" width="24.0" height="215.0" fill="#2563eb"><title>cgerc Zynum n=128: 39.822 Gops</title></rect>
+<text x="1642.9" y="169.0" text-anchor="middle" class="val">39.8</text>
+<rect x="1656.9" y="190.4" width="24.0" height="197.6" fill="#dc2626"><title>cgerc Accelerate n=128: 36.587 Gops</title></rect>
+<text x="1668.9" y="186.4" text-anchor="middle" class="val">36.6</text>
+<rect x="1682.9" y="358.4" width="24.0" height="29.6" fill="#16a34a"><title>cgerc OpenBLAS n=128: 5.482 Gops</title></rect>
+<text x="1694.9" y="354.4" text-anchor="middle" class="val">5.5</text>
 <text x="1669.9" y="406" text-anchor="end" transform="rotate(-28 1669.9 406)" class="op">cgerc</text>
-<rect x="1757.2" y="219.8" width="24.0" height="168.2" fill="#2563eb"><title>zgemv_n Zynum n=128: 31.148 Gops</title></rect>
-<text x="1769.2" y="215.8" text-anchor="middle" class="val">31.1</text>
-<rect x="1783.2" y="227.0" width="24.0" height="161.0" fill="#dc2626"><title>zgemv_n Accelerate n=128: 29.817 Gops</title></rect>
-<text x="1795.2" y="223.0" text-anchor="middle" class="val">29.8</text>
-<rect x="1809.2" y="363.2" width="24.0" height="24.8" fill="#16a34a"><title>zgemv_n OpenBLAS n=128: 4.601 Gops</title></rect>
-<text x="1821.2" y="359.2" text-anchor="middle" class="val">4.6</text>
+<rect x="1757.2" y="214.7" width="24.0" height="173.3" fill="#2563eb"><title>zgemv_n Zynum n=128: 32.098 Gops</title></rect>
+<text x="1769.2" y="210.7" text-anchor="middle" class="val">32.1</text>
+<rect x="1783.2" y="218.1" width="24.0" height="169.9" fill="#dc2626"><title>zgemv_n Accelerate n=128: 31.458 Gops</title></rect>
+<text x="1795.2" y="214.1" text-anchor="middle" class="val">31.5</text>
+<rect x="1809.2" y="362.2" width="24.0" height="25.8" fill="#16a34a"><title>zgemv_n OpenBLAS n=128: 4.771 Gops</title></rect>
+<text x="1821.2" y="358.2" text-anchor="middle" class="val">4.8</text>
 <text x="1796.2" y="406" text-anchor="end" transform="rotate(-28 1796.2 406)" class="op">zgemv_n</text>
-<rect x="1883.6" y="223.9" width="24.0" height="164.1" fill="#2563eb"><title>zgemv_t Zynum n=128: 30.394 Gops</title></rect>
-<text x="1895.6" y="219.9" text-anchor="middle" class="val">30.4</text>
-<rect x="1909.6" y="200.3" width="24.0" height="187.7" fill="#dc2626"><title>zgemv_t Accelerate n=128: 34.759 Gops</title></rect>
-<text x="1921.6" y="196.3" text-anchor="middle" class="val">34.8</text>
-<rect x="1935.6" y="362.3" width="24.0" height="25.7" fill="#16a34a"><title>zgemv_t OpenBLAS n=128: 4.760 Gops</title></rect>
-<text x="1947.6" y="358.3" text-anchor="middle" class="val">4.8</text>
+<rect x="1883.6" y="219.8" width="24.0" height="168.2" fill="#2563eb"><title>zgemv_t Zynum n=128: 31.145 Gops</title></rect>
+<text x="1895.6" y="215.8" text-anchor="middle" class="val">31.1</text>
+<rect x="1909.6" y="203.3" width="24.0" height="184.7" fill="#dc2626"><title>zgemv_t Accelerate n=128: 34.195 Gops</title></rect>
+<text x="1921.6" y="199.3" text-anchor="middle" class="val">34.2</text>
+<rect x="1935.6" y="360.1" width="24.0" height="27.9" fill="#16a34a"><title>zgemv_t OpenBLAS n=128: 5.167 Gops</title></rect>
+<text x="1947.6" y="356.1" text-anchor="middle" class="val">5.2</text>
 <text x="1922.6" y="406" text-anchor="end" transform="rotate(-28 1922.6 406)" class="op">zgemv_t</text>
-<rect x="2010.0" y="266.6" width="24.0" height="121.4" fill="#2563eb"><title>zhemv Zynum n=128: 22.473 Gops</title></rect>
-<text x="2022.0" y="262.6" text-anchor="middle" class="val">22.5</text>
-<rect x="2036.0" y="283.8" width="24.0" height="104.2" fill="#dc2626"><title>zhemv Accelerate n=128: 19.299 Gops</title></rect>
-<text x="2048.0" y="279.8" text-anchor="middle" class="val">19.3</text>
-<rect x="2062.0" y="304.3" width="24.0" height="83.7" fill="#16a34a"><title>zhemv OpenBLAS n=128: 15.495 Gops</title></rect>
-<text x="2074.0" y="300.3" text-anchor="middle" class="val">15.5</text>
+<rect x="2010.0" y="260.2" width="24.0" height="127.8" fill="#2563eb"><title>zhemv Zynum n=128: 23.658 Gops</title></rect>
+<text x="2022.0" y="256.2" text-anchor="middle" class="val">23.7</text>
+<rect x="2036.0" y="286.6" width="24.0" height="101.4" fill="#dc2626"><title>zhemv Accelerate n=128: 18.781 Gops</title></rect>
+<text x="2048.0" y="282.6" text-anchor="middle" class="val">18.8</text>
+<rect x="2062.0" y="294.2" width="24.0" height="93.8" fill="#16a34a"><title>zhemv OpenBLAS n=128: 17.379 Gops</title></rect>
+<text x="2074.0" y="290.2" text-anchor="middle" class="val">17.4</text>
 <text x="2049.0" y="406" text-anchor="end" transform="rotate(-28 2049.0 406)" class="op">zhemv</text>
-<rect x="2136.4" y="203.3" width="24.0" height="184.7" fill="#2563eb"><title>zgeru Zynum n=128: 34.196 Gops</title></rect>
-<text x="2148.4" y="199.3" text-anchor="middle" class="val">34.2</text>
-<rect x="2162.4" y="258.2" width="24.0" height="129.8" fill="#dc2626"><title>zgeru Accelerate n=128: 24.037 Gops</title></rect>
-<text x="2174.4" y="254.2" text-anchor="middle" class="val">24.0</text>
-<rect x="2188.4" y="362.7" width="24.0" height="25.3" fill="#16a34a"><title>zgeru OpenBLAS n=128: 4.681 Gops</title></rect>
-<text x="2200.4" y="358.7" text-anchor="middle" class="val">4.7</text>
+<rect x="2136.4" y="193.7" width="24.0" height="194.3" fill="#2563eb"><title>zgeru Zynum n=128: 35.979 Gops</title></rect>
+<text x="2148.4" y="189.7" text-anchor="middle" class="val">36.0</text>
+<rect x="2162.4" y="260.7" width="24.0" height="127.3" fill="#dc2626"><title>zgeru Accelerate n=128: 23.566 Gops</title></rect>
+<text x="2174.4" y="256.7" text-anchor="middle" class="val">23.6</text>
+<rect x="2188.4" y="362.3" width="24.0" height="25.7" fill="#16a34a"><title>zgeru OpenBLAS n=128: 4.768 Gops</title></rect>
+<text x="2200.4" y="358.3" text-anchor="middle" class="val">4.8</text>
 <text x="2175.4" y="406" text-anchor="end" transform="rotate(-28 2175.4 406)" class="op">zgeru</text>
-<rect x="2262.8" y="208.3" width="24.0" height="179.7" fill="#2563eb"><title>zgerc Zynum n=128: 33.285 Gops</title></rect>
-<text x="2274.8" y="204.3" text-anchor="middle" class="val">33.3</text>
-<rect x="2288.8" y="252.1" width="24.0" height="135.9" fill="#dc2626"><title>zgerc Accelerate n=128: 25.167 Gops</title></rect>
-<text x="2300.8" y="248.1" text-anchor="middle" class="val">25.2</text>
-<rect x="2314.8" y="362.7" width="24.0" height="25.3" fill="#16a34a"><title>zgerc OpenBLAS n=128: 4.686 Gops</title></rect>
-<text x="2326.8" y="358.7" text-anchor="middle" class="val">4.7</text>
+<rect x="2262.8" y="194.9" width="24.0" height="193.1" fill="#2563eb"><title>zgerc Zynum n=128: 35.762 Gops</title></rect>
+<text x="2274.8" y="190.9" text-anchor="middle" class="val">35.8</text>
+<rect x="2288.8" y="251.5" width="24.0" height="136.5" fill="#dc2626"><title>zgerc Accelerate n=128: 25.271 Gops</title></rect>
+<text x="2300.8" y="247.5" text-anchor="middle" class="val">25.3</text>
+<rect x="2314.8" y="362.8" width="24.0" height="25.2" fill="#16a34a"><title>zgerc OpenBLAS n=128: 4.663 Gops</title></rect>
+<text x="2326.8" y="358.8" text-anchor="middle" class="val">4.7</text>
 <text x="2301.8" y="406" text-anchor="end" transform="rotate(-28 2301.8 406)" class="op">zgerc</text>
 <text x="90" y="467" class="panel">n=256</text>
 <line x1="90" y1="760.0" x2="2365" y2="760.0" class="grid"/>
@@ -174,131 +174,131 @@
 <text x="80" y="494.0" text-anchor="end" class="tick">150</text>
 <line x1="90" y1="490" x2="90" y2="760" class="axis"/>
 <line x1="90" y1="760" x2="2365" y2="760" class="axis"/>
-<rect x="114.2" y="658.9" width="24.0" height="101.1" fill="#2563eb"><title>sgemv_n Zynum n=256: 56.170 Gops</title></rect>
-<text x="126.2" y="654.9" text-anchor="middle" class="val">56.2</text>
-<rect x="140.2" y="664.8" width="24.0" height="95.2" fill="#dc2626"><title>sgemv_n Accelerate n=256: 52.866 Gops</title></rect>
-<text x="152.2" y="660.8" text-anchor="middle" class="val">52.9</text>
-<rect x="166.2" y="701.9" width="24.0" height="58.1" fill="#16a34a"><title>sgemv_n OpenBLAS n=256: 32.265 Gops</title></rect>
-<text x="178.2" y="697.9" text-anchor="middle" class="val">32.3</text>
+<rect x="114.2" y="665.6" width="24.0" height="94.4" fill="#2563eb"><title>sgemv_n Zynum n=256: 52.444 Gops</title></rect>
+<text x="126.2" y="661.6" text-anchor="middle" class="val">52.4</text>
+<rect x="140.2" y="674.2" width="24.0" height="85.8" fill="#dc2626"><title>sgemv_n Accelerate n=256: 47.663 Gops</title></rect>
+<text x="152.2" y="670.2" text-anchor="middle" class="val">47.7</text>
+<rect x="166.2" y="699.4" width="24.0" height="60.6" fill="#16a34a"><title>sgemv_n OpenBLAS n=256: 33.644 Gops</title></rect>
+<text x="178.2" y="695.4" text-anchor="middle" class="val">33.6</text>
 <text x="153.2" y="778" text-anchor="end" transform="rotate(-28 153.2 778)" class="op">sgemv_n</text>
-<rect x="240.6" y="676.7" width="24.0" height="83.3" fill="#2563eb"><title>sgemv_t Zynum n=256: 46.266 Gops</title></rect>
-<text x="252.6" y="672.7" text-anchor="middle" class="val">46.3</text>
-<rect x="266.6" y="672.9" width="24.0" height="87.1" fill="#dc2626"><title>sgemv_t Accelerate n=256: 48.402 Gops</title></rect>
-<text x="278.6" y="668.9" text-anchor="middle" class="val">48.4</text>
-<rect x="292.6" y="716.4" width="24.0" height="43.6" fill="#16a34a"><title>sgemv_t OpenBLAS n=256: 24.199 Gops</title></rect>
-<text x="304.6" y="712.4" text-anchor="middle" class="val">24.2</text>
+<rect x="240.6" y="675.5" width="24.0" height="84.5" fill="#2563eb"><title>sgemv_t Zynum n=256: 46.964 Gops</title></rect>
+<text x="252.6" y="671.5" text-anchor="middle" class="val">47.0</text>
+<rect x="266.6" y="677.9" width="24.0" height="82.1" fill="#dc2626"><title>sgemv_t Accelerate n=256: 45.590 Gops</title></rect>
+<text x="278.6" y="673.9" text-anchor="middle" class="val">45.6</text>
+<rect x="292.6" y="713.8" width="24.0" height="46.2" fill="#16a34a"><title>sgemv_t OpenBLAS n=256: 25.678 Gops</title></rect>
+<text x="304.6" y="709.8" text-anchor="middle" class="val">25.7</text>
 <text x="279.6" y="778" text-anchor="end" transform="rotate(-28 279.6 778)" class="op">sgemv_t</text>
-<rect x="367.0" y="687.4" width="24.0" height="72.6" fill="#2563eb"><title>ssymv Zynum n=256: 40.330 Gops</title></rect>
-<text x="379.0" y="683.4" text-anchor="middle" class="val">40.3</text>
-<rect x="393.0" y="725.5" width="24.0" height="34.5" fill="#dc2626"><title>ssymv Accelerate n=256: 19.182 Gops</title></rect>
-<text x="405.0" y="721.5" text-anchor="middle" class="val">19.2</text>
-<rect x="419.0" y="751.1" width="24.0" height="8.9" fill="#16a34a"><title>ssymv OpenBLAS n=256: 4.970 Gops</title></rect>
-<text x="431.0" y="747.1" text-anchor="middle" class="val">5.0</text>
+<rect x="367.0" y="686.4" width="24.0" height="73.6" fill="#2563eb"><title>ssymv Zynum n=256: 40.879 Gops</title></rect>
+<text x="379.0" y="682.4" text-anchor="middle" class="val">40.9</text>
+<rect x="393.0" y="726.5" width="24.0" height="33.5" fill="#dc2626"><title>ssymv Accelerate n=256: 18.617 Gops</title></rect>
+<text x="405.0" y="722.5" text-anchor="middle" class="val">18.6</text>
+<rect x="419.0" y="750.2" width="24.0" height="9.8" fill="#16a34a"><title>ssymv OpenBLAS n=256: 5.438 Gops</title></rect>
+<text x="431.0" y="746.2" text-anchor="middle" class="val">5.4</text>
 <text x="406.0" y="778" text-anchor="end" transform="rotate(-28 406.0 778)" class="op">ssymv</text>
-<rect x="493.4" y="695.7" width="24.0" height="64.3" fill="#2563eb"><title>sger Zynum n=256: 35.749 Gops</title></rect>
-<text x="505.4" y="691.7" text-anchor="middle" class="val">35.7</text>
-<rect x="519.4" y="683.5" width="24.0" height="76.5" fill="#dc2626"><title>sger Accelerate n=256: 42.514 Gops</title></rect>
-<text x="531.4" y="679.5" text-anchor="middle" class="val">42.5</text>
-<rect x="545.4" y="751.0" width="24.0" height="9.0" fill="#16a34a"><title>sger OpenBLAS n=256: 5.017 Gops</title></rect>
-<text x="557.4" y="747.0" text-anchor="middle" class="val">5.0</text>
+<rect x="493.4" y="696.4" width="24.0" height="63.6" fill="#2563eb"><title>sger Zynum n=256: 35.348 Gops</title></rect>
+<text x="505.4" y="692.4" text-anchor="middle" class="val">35.3</text>
+<rect x="519.4" y="682.4" width="24.0" height="77.6" fill="#dc2626"><title>sger Accelerate n=256: 43.127 Gops</title></rect>
+<text x="531.4" y="678.4" text-anchor="middle" class="val">43.1</text>
+<rect x="545.4" y="751.2" width="24.0" height="8.8" fill="#16a34a"><title>sger OpenBLAS n=256: 4.885 Gops</title></rect>
+<text x="557.4" y="747.2" text-anchor="middle" class="val">4.9</text>
 <text x="532.4" y="778" text-anchor="end" transform="rotate(-28 532.4 778)" class="op">sger</text>
-<rect x="619.8" y="675.4" width="24.0" height="84.6" fill="#2563eb"><title>dgemv_n Zynum n=256: 46.987 Gops</title></rect>
-<text x="631.8" y="671.4" text-anchor="middle" class="val">47.0</text>
-<rect x="645.8" y="676.1" width="24.0" height="83.9" fill="#dc2626"><title>dgemv_n Accelerate n=256: 46.614 Gops</title></rect>
+<rect x="619.8" y="673.4" width="24.0" height="86.6" fill="#2563eb"><title>dgemv_n Zynum n=256: 48.091 Gops</title></rect>
+<text x="631.8" y="669.4" text-anchor="middle" class="val">48.1</text>
+<rect x="645.8" y="676.1" width="24.0" height="83.9" fill="#dc2626"><title>dgemv_n Accelerate n=256: 46.606 Gops</title></rect>
 <text x="657.8" y="672.1" text-anchor="middle" class="val">46.6</text>
-<rect x="671.8" y="736.4" width="24.0" height="23.6" fill="#16a34a"><title>dgemv_n OpenBLAS n=256: 13.135 Gops</title></rect>
-<text x="683.8" y="732.4" text-anchor="middle" class="val">13.1</text>
+<rect x="671.8" y="736.3" width="24.0" height="23.7" fill="#16a34a"><title>dgemv_n OpenBLAS n=256: 13.162 Gops</title></rect>
+<text x="683.8" y="732.3" text-anchor="middle" class="val">13.2</text>
 <text x="658.8" y="778" text-anchor="end" transform="rotate(-28 658.8 778)" class="op">dgemv_n</text>
-<rect x="746.1" y="687.4" width="24.0" height="72.6" fill="#2563eb"><title>dgemv_t Zynum n=256: 40.330 Gops</title></rect>
-<text x="758.1" y="683.4" text-anchor="middle" class="val">40.3</text>
-<rect x="772.1" y="688.8" width="24.0" height="71.2" fill="#dc2626"><title>dgemv_t Accelerate n=256: 39.570 Gops</title></rect>
-<text x="784.1" y="684.8" text-anchor="middle" class="val">39.6</text>
-<rect x="798.1" y="734.5" width="24.0" height="25.5" fill="#16a34a"><title>dgemv_t OpenBLAS n=256: 14.170 Gops</title></rect>
-<text x="810.1" y="730.5" text-anchor="middle" class="val">14.2</text>
+<rect x="746.1" y="687.9" width="24.0" height="72.1" fill="#2563eb"><title>dgemv_t Zynum n=256: 40.073 Gops</title></rect>
+<text x="758.1" y="683.9" text-anchor="middle" class="val">40.1</text>
+<rect x="772.1" y="689.2" width="24.0" height="70.8" fill="#dc2626"><title>dgemv_t Accelerate n=256: 39.326 Gops</title></rect>
+<text x="784.1" y="685.2" text-anchor="middle" class="val">39.3</text>
+<rect x="798.1" y="734.4" width="24.0" height="25.6" fill="#16a34a"><title>dgemv_t OpenBLAS n=256: 14.235 Gops</title></rect>
+<text x="810.1" y="730.4" text-anchor="middle" class="val">14.2</text>
 <text x="785.1" y="778" text-anchor="end" transform="rotate(-28 785.1 778)" class="op">dgemv_t</text>
-<rect x="872.5" y="709.4" width="24.0" height="50.6" fill="#2563eb"><title>dsymv Zynum n=256: 28.087 Gops</title></rect>
-<text x="884.5" y="705.4" text-anchor="middle" class="val">28.1</text>
-<rect x="898.5" y="740.3" width="24.0" height="19.7" fill="#dc2626"><title>dsymv Accelerate n=256: 10.925 Gops</title></rect>
-<text x="910.5" y="736.3" text-anchor="middle" class="val">10.9</text>
-<rect x="924.5" y="751.3" width="24.0" height="8.7" fill="#16a34a"><title>dsymv OpenBLAS n=256: 4.851 Gops</title></rect>
-<text x="936.5" y="747.3" text-anchor="middle" class="val">4.9</text>
+<rect x="872.5" y="708.5" width="24.0" height="51.5" fill="#2563eb"><title>dsymv Zynum n=256: 28.599 Gops</title></rect>
+<text x="884.5" y="704.5" text-anchor="middle" class="val">28.6</text>
+<rect x="898.5" y="740.2" width="24.0" height="19.8" fill="#dc2626"><title>dsymv Accelerate n=256: 10.981 Gops</title></rect>
+<text x="910.5" y="736.2" text-anchor="middle" class="val">11.0</text>
+<rect x="924.5" y="751.2" width="24.0" height="8.8" fill="#16a34a"><title>dsymv OpenBLAS n=256: 4.908 Gops</title></rect>
+<text x="936.5" y="747.2" text-anchor="middle" class="val">4.9</text>
 <text x="911.5" y="778" text-anchor="end" transform="rotate(-28 911.5 778)" class="op">dsymv</text>
-<rect x="998.9" y="708.5" width="24.0" height="51.5" fill="#2563eb"><title>dger Zynum n=256: 28.596 Gops</title></rect>
-<text x="1010.9" y="704.5" text-anchor="middle" class="val">28.6</text>
-<rect x="1024.9" y="705.0" width="24.0" height="55.0" fill="#dc2626"><title>dger Accelerate n=256: 30.546 Gops</title></rect>
-<text x="1036.9" y="701.0" text-anchor="middle" class="val">30.5</text>
-<rect x="1050.9" y="751.1" width="24.0" height="8.9" fill="#16a34a"><title>dger OpenBLAS n=256: 4.927 Gops</title></rect>
-<text x="1062.9" y="747.1" text-anchor="middle" class="val">4.9</text>
+<rect x="998.9" y="708.1" width="24.0" height="51.9" fill="#2563eb"><title>dger Zynum n=256: 28.861 Gops</title></rect>
+<text x="1010.9" y="704.1" text-anchor="middle" class="val">28.9</text>
+<rect x="1024.9" y="705.6" width="24.0" height="54.4" fill="#dc2626"><title>dger Accelerate n=256: 30.250 Gops</title></rect>
+<text x="1036.9" y="701.6" text-anchor="middle" class="val">30.2</text>
+<rect x="1050.9" y="751.2" width="24.0" height="8.8" fill="#16a34a"><title>dger OpenBLAS n=256: 4.892 Gops</title></rect>
+<text x="1062.9" y="747.2" text-anchor="middle" class="val">4.9</text>
 <text x="1037.9" y="778" text-anchor="end" transform="rotate(-28 1037.9 778)" class="op">dger</text>
-<rect x="1125.3" y="588.4" width="24.0" height="171.6" fill="#2563eb"><title>cgemv_n Zynum n=256: 95.322 Gops</title></rect>
-<text x="1137.3" y="584.4" text-anchor="middle" class="val">95.3</text>
-<rect x="1151.3" y="587.8" width="24.0" height="172.2" fill="#dc2626"><title>cgemv_n Accelerate n=256: 95.692 Gops</title></rect>
-<text x="1163.3" y="583.8" text-anchor="middle" class="val">95.7</text>
-<rect x="1177.3" y="730.4" width="24.0" height="29.6" fill="#16a34a"><title>cgemv_n OpenBLAS n=256: 16.451 Gops</title></rect>
-<text x="1189.3" y="726.4" text-anchor="middle" class="val">16.5</text>
+<rect x="1125.3" y="578.8" width="24.0" height="181.2" fill="#2563eb"><title>cgemv_n Zynum n=256: 100.666 Gops</title></rect>
+<text x="1137.3" y="574.8" text-anchor="middle" class="val">100.7</text>
+<rect x="1151.3" y="585.8" width="24.0" height="174.2" fill="#dc2626"><title>cgemv_n Accelerate n=256: 96.786 Gops</title></rect>
+<text x="1163.3" y="581.8" text-anchor="middle" class="val">96.8</text>
+<rect x="1177.3" y="730.6" width="24.0" height="29.4" fill="#16a34a"><title>cgemv_n OpenBLAS n=256: 16.311 Gops</title></rect>
+<text x="1189.3" y="726.6" text-anchor="middle" class="val">16.3</text>
 <text x="1164.3" y="778" text-anchor="end" transform="rotate(-28 1164.3 778)" class="op">cgemv_n</text>
-<rect x="1251.7" y="570.5" width="24.0" height="189.5" fill="#2563eb"><title>cgemv_t Zynum n=256: 105.302 Gops</title></rect>
-<text x="1263.7" y="566.5" text-anchor="middle" class="val">105.3</text>
-<rect x="1277.7" y="586.3" width="24.0" height="173.7" fill="#dc2626"><title>cgemv_t Accelerate n=256: 96.490 Gops</title></rect>
-<text x="1289.7" y="582.3" text-anchor="middle" class="val">96.5</text>
-<rect x="1303.7" y="729.0" width="24.0" height="31.0" fill="#16a34a"><title>cgemv_t OpenBLAS n=256: 17.237 Gops</title></rect>
-<text x="1315.7" y="725.0" text-anchor="middle" class="val">17.2</text>
+<rect x="1251.7" y="562.2" width="24.0" height="197.8" fill="#2563eb"><title>cgemv_t Zynum n=256: 109.893 Gops</title></rect>
+<text x="1263.7" y="558.2" text-anchor="middle" class="val">109.9</text>
+<rect x="1277.7" y="592.2" width="24.0" height="167.8" fill="#dc2626"><title>cgemv_t Accelerate n=256: 93.207 Gops</title></rect>
+<text x="1289.7" y="588.2" text-anchor="middle" class="val">93.2</text>
+<rect x="1303.7" y="728.1" width="24.0" height="31.9" fill="#16a34a"><title>cgemv_t OpenBLAS n=256: 17.712 Gops</title></rect>
+<text x="1315.7" y="724.1" text-anchor="middle" class="val">17.7</text>
 <text x="1290.7" y="778" text-anchor="end" transform="rotate(-28 1290.7 778)" class="op">cgemv_t</text>
-<rect x="1378.1" y="612.9" width="24.0" height="147.1" fill="#2563eb"><title>chemv Zynum n=256: 81.713 Gops</title></rect>
-<text x="1390.1" y="608.9" text-anchor="middle" class="val">81.7</text>
-<rect x="1404.1" y="684.6" width="24.0" height="75.4" fill="#dc2626"><title>chemv Accelerate n=256: 41.875 Gops</title></rect>
-<text x="1416.1" y="680.6" text-anchor="middle" class="val">41.9</text>
-<rect x="1430.1" y="709.3" width="24.0" height="50.7" fill="#16a34a"><title>chemv OpenBLAS n=256: 28.182 Gops</title></rect>
-<text x="1442.1" y="705.3" text-anchor="middle" class="val">28.2</text>
+<rect x="1378.1" y="609.0" width="24.0" height="151.0" fill="#2563eb"><title>chemv Zynum n=256: 83.890 Gops</title></rect>
+<text x="1390.1" y="605.0" text-anchor="middle" class="val">83.9</text>
+<rect x="1404.1" y="692.8" width="24.0" height="67.2" fill="#dc2626"><title>chemv Accelerate n=256: 37.347 Gops</title></rect>
+<text x="1416.1" y="688.8" text-anchor="middle" class="val">37.3</text>
+<rect x="1430.1" y="705.2" width="24.0" height="54.8" fill="#16a34a"><title>chemv OpenBLAS n=256: 30.468 Gops</title></rect>
+<text x="1442.1" y="701.2" text-anchor="middle" class="val">30.5</text>
 <text x="1417.1" y="778" text-anchor="end" transform="rotate(-28 1417.1 778)" class="op">chemv</text>
-<rect x="1504.5" y="580.2" width="24.0" height="179.8" fill="#2563eb"><title>cgeru Zynum n=256: 99.864 Gops</title></rect>
-<text x="1516.5" y="576.2" text-anchor="middle" class="val">99.9</text>
-<rect x="1530.5" y="633.1" width="24.0" height="126.9" fill="#dc2626"><title>cgeru Accelerate n=256: 70.493 Gops</title></rect>
-<text x="1542.5" y="629.1" text-anchor="middle" class="val">70.5</text>
-<rect x="1556.5" y="728.3" width="24.0" height="31.7" fill="#16a34a"><title>cgeru OpenBLAS n=256: 17.623 Gops</title></rect>
-<text x="1568.5" y="724.3" text-anchor="middle" class="val">17.6</text>
+<rect x="1504.5" y="586.4" width="24.0" height="173.6" fill="#2563eb"><title>cgeru Zynum n=256: 96.422 Gops</title></rect>
+<text x="1516.5" y="582.4" text-anchor="middle" class="val">96.4</text>
+<rect x="1530.5" y="638.5" width="24.0" height="121.5" fill="#dc2626"><title>cgeru Accelerate n=256: 67.507 Gops</title></rect>
+<text x="1542.5" y="634.5" text-anchor="middle" class="val">67.5</text>
+<rect x="1556.5" y="729.2" width="24.0" height="30.8" fill="#16a34a"><title>cgeru OpenBLAS n=256: 17.124 Gops</title></rect>
+<text x="1568.5" y="725.2" text-anchor="middle" class="val">17.1</text>
 <text x="1543.5" y="778" text-anchor="end" transform="rotate(-28 1543.5 778)" class="op">cgeru</text>
-<rect x="1630.9" y="580.2" width="24.0" height="179.8" fill="#2563eb"><title>cgerc Zynum n=256: 99.864 Gops</title></rect>
-<text x="1642.9" y="576.2" text-anchor="middle" class="val">99.9</text>
-<rect x="1656.9" y="632.8" width="24.0" height="127.2" fill="#dc2626"><title>cgerc Accelerate n=256: 70.687 Gops</title></rect>
-<text x="1668.9" y="628.8" text-anchor="middle" class="val">70.7</text>
-<rect x="1682.9" y="728.8" width="24.0" height="31.2" fill="#16a34a"><title>cgerc OpenBLAS n=256: 17.348 Gops</title></rect>
-<text x="1694.9" y="724.8" text-anchor="middle" class="val">17.3</text>
+<rect x="1630.9" y="585.8" width="24.0" height="174.2" fill="#2563eb"><title>cgerc Zynum n=256: 96.786 Gops</title></rect>
+<text x="1642.9" y="581.8" text-anchor="middle" class="val">96.8</text>
+<rect x="1656.9" y="641.7" width="24.0" height="118.3" fill="#dc2626"><title>cgerc Accelerate n=256: 65.709 Gops</title></rect>
+<text x="1668.9" y="637.7" text-anchor="middle" class="val">65.7</text>
+<rect x="1682.9" y="727.8" width="24.0" height="32.2" fill="#16a34a"><title>cgerc OpenBLAS n=256: 17.875 Gops</title></rect>
+<text x="1694.9" y="723.8" text-anchor="middle" class="val">17.9</text>
 <text x="1669.9" y="778" text-anchor="end" transform="rotate(-28 1669.9 778)" class="op">cgerc</text>
-<rect x="1757.2" y="631.7" width="24.0" height="128.3" fill="#2563eb"><title>zgemv_n Zynum n=256: 71.293 Gops</title></rect>
-<text x="1769.2" y="627.7" text-anchor="middle" class="val">71.3</text>
-<rect x="1783.2" y="631.3" width="24.0" height="128.7" fill="#dc2626"><title>zgemv_n Accelerate n=256: 71.492 Gops</title></rect>
-<text x="1795.2" y="627.3" text-anchor="middle" class="val">71.5</text>
-<rect x="1809.2" y="733.0" width="24.0" height="27.0" fill="#16a34a"><title>zgemv_n OpenBLAS n=256: 15.007 Gops</title></rect>
-<text x="1821.2" y="729.0" text-anchor="middle" class="val">15.0</text>
+<rect x="1757.2" y="624.7" width="24.0" height="135.3" fill="#2563eb"><title>zgemv_n Zynum n=256: 75.157 Gops</title></rect>
+<text x="1769.2" y="620.7" text-anchor="middle" class="val">75.2</text>
+<rect x="1783.2" y="632.8" width="24.0" height="127.2" fill="#dc2626"><title>zgemv_n Accelerate n=256: 70.692 Gops</title></rect>
+<text x="1795.2" y="628.8" text-anchor="middle" class="val">70.7</text>
+<rect x="1809.2" y="733.2" width="24.0" height="26.8" fill="#16a34a"><title>zgemv_n OpenBLAS n=256: 14.909 Gops</title></rect>
+<text x="1821.2" y="729.2" text-anchor="middle" class="val">14.9</text>
 <text x="1796.2" y="778" text-anchor="end" transform="rotate(-28 1796.2 778)" class="op">zgemv_n</text>
-<rect x="1883.6" y="630.6" width="24.0" height="129.4" fill="#2563eb"><title>zgemv_t Zynum n=256: 71.899 Gops</title></rect>
-<text x="1895.6" y="626.6" text-anchor="middle" class="val">71.9</text>
-<rect x="1909.6" y="621.0" width="24.0" height="139.0" fill="#dc2626"><title>zgemv_t Accelerate n=256: 77.203 Gops</title></rect>
-<text x="1921.6" y="617.0" text-anchor="middle" class="val">77.2</text>
-<rect x="1935.6" y="729.2" width="24.0" height="30.8" fill="#16a34a"><title>zgemv_t OpenBLAS n=256: 17.131 Gops</title></rect>
-<text x="1947.6" y="725.2" text-anchor="middle" class="val">17.1</text>
+<rect x="1883.6" y="625.6" width="24.0" height="134.4" fill="#2563eb"><title>zgemv_t Zynum n=256: 74.675 Gops</title></rect>
+<text x="1895.6" y="621.6" text-anchor="middle" class="val">74.7</text>
+<rect x="1909.6" y="630.2" width="24.0" height="129.8" fill="#dc2626"><title>zgemv_t Accelerate n=256: 72.107 Gops</title></rect>
+<text x="1921.6" y="626.2" text-anchor="middle" class="val">72.1</text>
+<rect x="1935.6" y="728.5" width="24.0" height="31.5" fill="#16a34a"><title>zgemv_t OpenBLAS n=256: 17.513 Gops</title></rect>
+<text x="1947.6" y="724.5" text-anchor="middle" class="val">17.5</text>
 <text x="1922.6" y="778" text-anchor="end" transform="rotate(-28 1922.6 778)" class="op">zgemv_t</text>
-<rect x="2010.0" y="663.8" width="24.0" height="96.2" fill="#2563eb"><title>zhemv Zynum n=256: 53.431 Gops</title></rect>
-<text x="2022.0" y="659.8" text-anchor="middle" class="val">53.4</text>
-<rect x="2036.0" y="706.7" width="24.0" height="53.3" fill="#dc2626"><title>zhemv Accelerate n=256: 29.607 Gops</title></rect>
-<text x="2048.0" y="702.7" text-anchor="middle" class="val">29.6</text>
-<rect x="2062.0" y="726.8" width="24.0" height="33.2" fill="#16a34a"><title>zhemv OpenBLAS n=256: 18.423 Gops</title></rect>
-<text x="2074.0" y="722.8" text-anchor="middle" class="val">18.4</text>
+<rect x="2010.0" y="661.7" width="24.0" height="98.3" fill="#2563eb"><title>zhemv Zynum n=256: 54.591 Gops</title></rect>
+<text x="2022.0" y="657.7" text-anchor="middle" class="val">54.6</text>
+<rect x="2036.0" y="710.7" width="24.0" height="49.3" fill="#dc2626"><title>zhemv Accelerate n=256: 27.390 Gops</title></rect>
+<text x="2048.0" y="706.7" text-anchor="middle" class="val">27.4</text>
+<rect x="2062.0" y="725.5" width="24.0" height="34.5" fill="#16a34a"><title>zhemv OpenBLAS n=256: 19.167 Gops</title></rect>
+<text x="2074.0" y="721.5" text-anchor="middle" class="val">19.2</text>
 <text x="2049.0" y="778" text-anchor="end" transform="rotate(-28 2049.0 778)" class="op">zhemv</text>
-<rect x="2136.4" y="654.2" width="24.0" height="105.8" fill="#2563eb"><title>zgeru Zynum n=256: 58.801 Gops</title></rect>
-<text x="2148.4" y="650.2" text-anchor="middle" class="val">58.8</text>
-<rect x="2162.4" y="682.3" width="24.0" height="77.7" fill="#dc2626"><title>zgeru Accelerate n=256: 43.166 Gops</title></rect>
-<text x="2174.4" y="678.3" text-anchor="middle" class="val">43.2</text>
-<rect x="2188.4" y="729.0" width="24.0" height="31.0" fill="#16a34a"><title>zgeru OpenBLAS n=256: 17.195 Gops</title></rect>
+<rect x="2136.4" y="652.7" width="24.0" height="107.3" fill="#2563eb"><title>zgeru Zynum n=256: 59.636 Gops</title></rect>
+<text x="2148.4" y="648.7" text-anchor="middle" class="val">59.6</text>
+<rect x="2162.4" y="690.5" width="24.0" height="69.5" fill="#dc2626"><title>zgeru Accelerate n=256: 38.599 Gops</title></rect>
+<text x="2174.4" y="686.5" text-anchor="middle" class="val">38.6</text>
+<rect x="2188.4" y="729.0" width="24.0" height="31.0" fill="#16a34a"><title>zgeru OpenBLAS n=256: 17.199 Gops</title></rect>
 <text x="2200.4" y="725.0" text-anchor="middle" class="val">17.2</text>
 <text x="2175.4" y="778" text-anchor="end" transform="rotate(-28 2175.4 778)" class="op">zgeru</text>
-<rect x="2262.8" y="654.4" width="24.0" height="105.6" fill="#2563eb"><title>zgerc Zynum n=256: 58.659 Gops</title></rect>
-<text x="2274.8" y="650.4" text-anchor="middle" class="val">58.7</text>
-<rect x="2288.8" y="682.4" width="24.0" height="77.6" fill="#dc2626"><title>zgerc Accelerate n=256: 43.093 Gops</title></rect>
-<text x="2300.8" y="678.4" text-anchor="middle" class="val">43.1</text>
-<rect x="2314.8" y="729.8" width="24.0" height="30.2" fill="#16a34a"><title>zgerc OpenBLAS n=256: 16.754 Gops</title></rect>
-<text x="2326.8" y="725.8" text-anchor="middle" class="val">16.8</text>
+<rect x="2262.8" y="653.2" width="24.0" height="106.8" fill="#2563eb"><title>zgerc Zynum n=256: 59.356 Gops</title></rect>
+<text x="2274.8" y="649.2" text-anchor="middle" class="val">59.4</text>
+<rect x="2288.8" y="689.3" width="24.0" height="70.7" fill="#dc2626"><title>zgerc Accelerate n=256: 39.267 Gops</title></rect>
+<text x="2300.8" y="685.3" text-anchor="middle" class="val">39.3</text>
+<rect x="2314.8" y="729.7" width="24.0" height="30.3" fill="#16a34a"><title>zgerc OpenBLAS n=256: 16.833 Gops</title></rect>
+<text x="2326.8" y="725.7" text-anchor="middle" class="val">16.8</text>
 <text x="2301.8" y="778" text-anchor="end" transform="rotate(-28 2301.8 778)" class="op">zgerc</text>
 <text x="90" y="839" class="panel">n=512</text>
 <line x1="90" y1="1132.0" x2="2365" y2="1132.0" class="grid"/>
@@ -315,130 +315,130 @@
 <text x="80" y="866.0" text-anchor="end" class="tick">250</text>
 <line x1="90" y1="862" x2="90" y2="1132" class="axis"/>
 <line x1="90" y1="1132" x2="2365" y2="1132" class="axis"/>
-<rect x="114.2" y="968.3" width="24.0" height="163.7" fill="#2563eb"><title>sgemv_n Zynum n=512: 151.616 Gops</title></rect>
-<text x="126.2" y="964.3" text-anchor="middle" class="val">151.6</text>
-<rect x="140.2" y="968.3" width="24.0" height="163.7" fill="#dc2626"><title>sgemv_n Accelerate n=512: 151.616 Gops</title></rect>
-<text x="152.2" y="964.3" text-anchor="middle" class="val">151.6</text>
-<rect x="166.2" y="1085.1" width="24.0" height="46.9" fill="#16a34a"><title>sgemv_n OpenBLAS n=512: 43.464 Gops</title></rect>
-<text x="178.2" y="1081.1" text-anchor="middle" class="val">43.5</text>
+<rect x="114.2" y="969.3" width="24.0" height="162.7" fill="#2563eb"><title>sgemv_n Zynum n=512: 150.684 Gops</title></rect>
+<text x="126.2" y="965.3" text-anchor="middle" class="val">150.7</text>
+<rect x="140.2" y="973.0" width="24.0" height="159.0" fill="#dc2626"><title>sgemv_n Accelerate n=512: 147.194 Gops</title></rect>
+<text x="152.2" y="969.0" text-anchor="middle" class="val">147.2</text>
+<rect x="166.2" y="1084.6" width="24.0" height="47.4" fill="#16a34a"><title>sgemv_n OpenBLAS n=512: 43.849 Gops</title></rect>
+<text x="178.2" y="1080.6" text-anchor="middle" class="val">43.8</text>
 <text x="153.2" y="1150" text-anchor="end" transform="rotate(-28 153.2 1150)" class="op">sgemv_n</text>
-<rect x="240.6" y="1012.8" width="24.0" height="119.2" fill="#2563eb"><title>sgemv_t Zynum n=512: 110.376 Gops</title></rect>
-<text x="252.6" y="1008.8" text-anchor="middle" class="val">110.4</text>
-<rect x="266.6" y="1011.2" width="24.0" height="120.8" fill="#dc2626"><title>sgemv_t Accelerate n=512: 111.850 Gops</title></rect>
-<text x="278.6" y="1007.2" text-anchor="middle" class="val">111.9</text>
-<rect x="292.6" y="1098.2" width="24.0" height="33.8" fill="#16a34a"><title>sgemv_t OpenBLAS n=512: 31.301 Gops</title></rect>
-<text x="304.6" y="1094.2" text-anchor="middle" class="val">31.3</text>
+<rect x="240.6" y="1013.8" width="24.0" height="118.2" fill="#2563eb"><title>sgemv_t Zynum n=512: 109.409 Gops</title></rect>
+<text x="252.6" y="1009.8" text-anchor="middle" class="val">109.4</text>
+<rect x="266.6" y="1016.8" width="24.0" height="115.2" fill="#dc2626"><title>sgemv_t Accelerate n=512: 106.628 Gops</title></rect>
+<text x="278.6" y="1012.8" text-anchor="middle" class="val">106.6</text>
+<rect x="292.6" y="1097.4" width="24.0" height="34.6" fill="#16a34a"><title>sgemv_t OpenBLAS n=512: 32.078 Gops</title></rect>
+<text x="304.6" y="1093.4" text-anchor="middle" class="val">32.1</text>
 <text x="279.6" y="1150" text-anchor="end" transform="rotate(-28 279.6 1150)" class="op">sgemv_t</text>
-<rect x="367.0" y="1065.9" width="24.0" height="66.1" fill="#2563eb"><title>ssymv Zynum n=512: 61.231 Gops</title></rect>
-<text x="379.0" y="1061.9" text-anchor="middle" class="val">61.2</text>
-<rect x="393.0" y="1095.2" width="24.0" height="36.8" fill="#dc2626"><title>ssymv Accelerate n=512: 34.055 Gops</title></rect>
-<text x="405.0" y="1091.2" text-anchor="middle" class="val">34.1</text>
-<rect x="419.0" y="1113.0" width="24.0" height="19.0" fill="#16a34a"><title>ssymv OpenBLAS n=512: 17.602 Gops</title></rect>
-<text x="431.0" y="1109.0" text-anchor="middle" class="val">17.6</text>
+<rect x="367.0" y="1066.0" width="24.0" height="66.0" fill="#2563eb"><title>ssymv Zynum n=512: 61.084 Gops</title></rect>
+<text x="379.0" y="1062.0" text-anchor="middle" class="val">61.1</text>
+<rect x="393.0" y="1094.4" width="24.0" height="37.6" fill="#dc2626"><title>ssymv Accelerate n=512: 34.813 Gops</title></rect>
+<text x="405.0" y="1090.4" text-anchor="middle" class="val">34.8</text>
+<rect x="419.0" y="1113.1" width="24.0" height="18.9" fill="#16a34a"><title>ssymv OpenBLAS n=512: 17.525 Gops</title></rect>
+<text x="431.0" y="1109.1" text-anchor="middle" class="val">17.5</text>
 <text x="406.0" y="1150" text-anchor="end" transform="rotate(-28 406.0 1150)" class="op">ssymv</text>
-<rect x="493.4" y="1046.3" width="24.0" height="85.7" fill="#2563eb"><title>sger Zynum n=512: 79.390 Gops</title></rect>
-<text x="505.4" y="1042.3" text-anchor="middle" class="val">79.4</text>
-<rect x="519.4" y="1043.8" width="24.0" height="88.2" fill="#dc2626"><title>sger Accelerate n=512: 81.703 Gops</title></rect>
-<text x="531.4" y="1039.8" text-anchor="middle" class="val">81.7</text>
-<rect x="545.4" y="1114.2" width="24.0" height="17.8" fill="#16a34a"><title>sger OpenBLAS n=512: 16.491 Gops</title></rect>
-<text x="557.4" y="1110.2" text-anchor="middle" class="val">16.5</text>
+<rect x="493.4" y="1051.1" width="24.0" height="80.9" fill="#2563eb"><title>sger Zynum n=512: 74.898 Gops</title></rect>
+<text x="505.4" y="1047.1" text-anchor="middle" class="val">74.9</text>
+<rect x="519.4" y="1051.6" width="24.0" height="80.4" fill="#dc2626"><title>sger Accelerate n=512: 74.457 Gops</title></rect>
+<text x="531.4" y="1047.6" text-anchor="middle" class="val">74.5</text>
+<rect x="545.4" y="1113.9" width="24.0" height="18.1" fill="#16a34a"><title>sger OpenBLAS n=512: 16.744 Gops</title></rect>
+<text x="557.4" y="1109.9" text-anchor="middle" class="val">16.7</text>
 <text x="532.4" y="1150" text-anchor="end" transform="rotate(-28 532.4 1150)" class="op">sger</text>
-<rect x="619.8" y="1012.8" width="24.0" height="119.2" fill="#2563eb"><title>dgemv_n Zynum n=512: 110.376 Gops</title></rect>
-<text x="631.8" y="1008.8" text-anchor="middle" class="val">110.4</text>
-<rect x="645.8" y="1013.8" width="24.0" height="118.2" fill="#dc2626"><title>dgemv_n Accelerate n=512: 109.432 Gops</title></rect>
-<text x="657.8" y="1009.8" text-anchor="middle" class="val">109.4</text>
-<rect x="671.8" y="1115.2" width="24.0" height="16.8" fill="#16a34a"><title>dgemv_n OpenBLAS n=512: 15.536 Gops</title></rect>
-<text x="683.8" y="1111.2" text-anchor="middle" class="val">15.5</text>
+<rect x="619.8" y="1016.8" width="24.0" height="115.2" fill="#2563eb"><title>dgemv_n Zynum n=512: 106.638 Gops</title></rect>
+<text x="631.8" y="1012.8" text-anchor="middle" class="val">106.6</text>
+<rect x="645.8" y="1018.7" width="24.0" height="113.3" fill="#dc2626"><title>dgemv_n Accelerate n=512: 104.875 Gops</title></rect>
+<text x="657.8" y="1014.7" text-anchor="middle" class="val">104.9</text>
+<rect x="671.8" y="1114.7" width="24.0" height="17.3" fill="#16a34a"><title>dgemv_n OpenBLAS n=512: 15.989 Gops</title></rect>
+<text x="683.8" y="1110.7" text-anchor="middle" class="val">16.0</text>
 <text x="658.8" y="1150" text-anchor="end" transform="rotate(-28 658.8 1150)" class="op">dgemv_n</text>
-<rect x="746.1" y="1038.9" width="24.0" height="93.1" fill="#2563eb"><title>dgemv_t Zynum n=512: 86.193 Gops</title></rect>
-<text x="758.1" y="1034.9" text-anchor="middle" class="val">86.2</text>
-<rect x="772.1" y="1039.9" width="24.0" height="92.1" fill="#dc2626"><title>dgemv_t Accelerate n=512: 85.313 Gops</title></rect>
-<text x="784.1" y="1035.9" text-anchor="middle" class="val">85.3</text>
-<rect x="798.1" y="1114.7" width="24.0" height="17.3" fill="#16a34a"><title>dgemv_t OpenBLAS n=512: 16.009 Gops</title></rect>
-<text x="810.1" y="1110.7" text-anchor="middle" class="val">16.0</text>
+<rect x="746.1" y="1043.5" width="24.0" height="88.5" fill="#2563eb"><title>dgemv_t Zynum n=512: 81.972 Gops</title></rect>
+<text x="758.1" y="1039.5" text-anchor="middle" class="val">82.0</text>
+<rect x="772.1" y="1044.9" width="24.0" height="87.1" fill="#dc2626"><title>dgemv_t Accelerate n=512: 80.660 Gops</title></rect>
+<text x="784.1" y="1040.9" text-anchor="middle" class="val">80.7</text>
+<rect x="798.1" y="1114.1" width="24.0" height="17.9" fill="#16a34a"><title>dgemv_t OpenBLAS n=512: 16.535 Gops</title></rect>
+<text x="810.1" y="1110.1" text-anchor="middle" class="val">16.5</text>
 <text x="785.1" y="1150" text-anchor="end" transform="rotate(-28 785.1 1150)" class="op">dgemv_t</text>
-<rect x="872.5" y="1055.2" width="24.0" height="76.8" fill="#2563eb"><title>dsymv Zynum n=512: 71.090 Gops</title></rect>
-<text x="884.5" y="1051.2" text-anchor="middle" class="val">71.1</text>
-<rect x="898.5" y="1111.0" width="24.0" height="21.0" fill="#dc2626"><title>dsymv Accelerate n=512: 19.433 Gops</title></rect>
-<text x="910.5" y="1107.0" text-anchor="middle" class="val">19.4</text>
-<rect x="924.5" y="1115.2" width="24.0" height="16.8" fill="#16a34a"><title>dsymv OpenBLAS n=512: 15.525 Gops</title></rect>
-<text x="936.5" y="1111.2" text-anchor="middle" class="val">15.5</text>
+<rect x="872.5" y="1058.9" width="24.0" height="73.1" fill="#2563eb"><title>dsymv Zynum n=512: 67.650 Gops</title></rect>
+<text x="884.5" y="1054.9" text-anchor="middle" class="val">67.7</text>
+<rect x="898.5" y="1111.5" width="24.0" height="20.5" fill="#dc2626"><title>dsymv Accelerate n=512: 18.979 Gops</title></rect>
+<text x="910.5" y="1107.5" text-anchor="middle" class="val">19.0</text>
+<rect x="924.5" y="1114.5" width="24.0" height="17.5" fill="#16a34a"><title>dsymv OpenBLAS n=512: 16.248 Gops</title></rect>
+<text x="936.5" y="1110.5" text-anchor="middle" class="val">16.2</text>
 <text x="911.5" y="1150" text-anchor="end" transform="rotate(-28 911.5 1150)" class="op">dsymv</text>
-<rect x="998.9" y="1083.2" width="24.0" height="48.8" fill="#2563eb"><title>dger Zynum n=512: 45.182 Gops</title></rect>
-<text x="1010.9" y="1079.2" text-anchor="middle" class="val">45.2</text>
-<rect x="1024.9" y="1079.5" width="24.0" height="52.5" fill="#dc2626"><title>dger Accelerate n=512: 48.581 Gops</title></rect>
-<text x="1036.9" y="1075.5" text-anchor="middle" class="val">48.6</text>
-<rect x="1050.9" y="1116.2" width="24.0" height="15.8" fill="#16a34a"><title>dger OpenBLAS n=512: 14.657 Gops</title></rect>
-<text x="1062.9" y="1112.2" text-anchor="middle" class="val">14.7</text>
+<rect x="998.9" y="1086.0" width="24.0" height="46.0" fill="#2563eb"><title>dger Zynum n=512: 42.582 Gops</title></rect>
+<text x="1010.9" y="1082.0" text-anchor="middle" class="val">42.6</text>
+<rect x="1024.9" y="1084.4" width="24.0" height="47.6" fill="#dc2626"><title>dger Accelerate n=512: 44.089 Gops</title></rect>
+<text x="1036.9" y="1080.4" text-anchor="middle" class="val">44.1</text>
+<rect x="1050.9" y="1116.7" width="24.0" height="15.3" fill="#16a34a"><title>dger OpenBLAS n=512: 14.170 Gops</title></rect>
+<text x="1062.9" y="1112.7" text-anchor="middle" class="val">14.2</text>
 <text x="1037.9" y="1150" text-anchor="end" transform="rotate(-28 1037.9 1150)" class="op">dger</text>
-<rect x="1125.3" y="909.7" width="24.0" height="222.3" fill="#2563eb"><title>cgemv_n Zynum n=512: 205.856 Gops</title></rect>
-<text x="1137.3" y="905.7" text-anchor="middle" class="val">205.9</text>
-<rect x="1151.3" y="931.0" width="24.0" height="201.0" fill="#dc2626"><title>cgemv_n Accelerate n=512: 186.152 Gops</title></rect>
-<text x="1163.3" y="927.0" text-anchor="middle" class="val">186.2</text>
-<rect x="1177.3" y="1103.0" width="24.0" height="29.0" fill="#16a34a"><title>cgemv_n OpenBLAS n=512: 26.856 Gops</title></rect>
-<text x="1189.3" y="1099.0" text-anchor="middle" class="val">26.9</text>
+<rect x="1125.3" y="909.2" width="24.0" height="222.8" fill="#2563eb"><title>cgemv_n Zynum n=512: 206.284 Gops</title></rect>
+<text x="1137.3" y="905.2" text-anchor="middle" class="val">206.3</text>
+<rect x="1151.3" y="937.2" width="24.0" height="194.8" fill="#dc2626"><title>cgemv_n Accelerate n=512: 180.402 Gops</title></rect>
+<text x="1163.3" y="933.2" text-anchor="middle" class="val">180.4</text>
+<rect x="1177.3" y="1104.0" width="24.0" height="28.0" fill="#16a34a"><title>cgemv_n OpenBLAS n=512: 25.894 Gops</title></rect>
+<text x="1189.3" y="1100.0" text-anchor="middle" class="val">25.9</text>
 <text x="1164.3" y="1150" text-anchor="end" transform="rotate(-28 1164.3 1150)" class="op">cgemv_n</text>
-<rect x="1251.7" y="939.9" width="24.0" height="192.1" fill="#2563eb"><title>cgemv_t Zynum n=512: 177.855 Gops</title></rect>
-<text x="1263.7" y="935.9" text-anchor="middle" class="val">177.9</text>
-<rect x="1277.7" y="948.0" width="24.0" height="184.0" fill="#dc2626"><title>cgemv_t Accelerate n=512: 170.328 Gops</title></rect>
-<text x="1289.7" y="944.0" text-anchor="middle" class="val">170.3</text>
-<rect x="1303.7" y="1082.3" width="24.0" height="49.7" fill="#16a34a"><title>cgemv_t OpenBLAS n=512: 46.008 Gops</title></rect>
-<text x="1315.7" y="1078.3" text-anchor="middle" class="val">46.0</text>
+<rect x="1251.7" y="941.3" width="24.0" height="190.7" fill="#2563eb"><title>cgemv_t Zynum n=512: 176.602 Gops</title></rect>
+<text x="1263.7" y="937.3" text-anchor="middle" class="val">176.6</text>
+<rect x="1277.7" y="953.8" width="24.0" height="178.2" fill="#dc2626"><title>cgemv_t Accelerate n=512: 165.026 Gops</title></rect>
+<text x="1289.7" y="949.8" text-anchor="middle" class="val">165.0</text>
+<rect x="1303.7" y="1082.7" width="24.0" height="49.3" fill="#16a34a"><title>cgemv_t OpenBLAS n=512: 45.611 Gops</title></rect>
+<text x="1315.7" y="1078.7" text-anchor="middle" class="val">45.6</text>
 <text x="1290.7" y="1150" text-anchor="end" transform="rotate(-28 1290.7 1150)" class="op">cgemv_t</text>
-<rect x="1378.1" y="999.7" width="24.0" height="132.3" fill="#2563eb"><title>chemv Zynum n=512: 122.462 Gops</title></rect>
-<text x="1390.1" y="995.7" text-anchor="middle" class="val">122.5</text>
-<rect x="1404.1" y="1075.4" width="24.0" height="56.6" fill="#dc2626"><title>chemv Accelerate n=512: 52.372 Gops</title></rect>
-<text x="1416.1" y="1071.4" text-anchor="middle" class="val">52.4</text>
-<rect x="1430.1" y="1082.3" width="24.0" height="49.7" fill="#16a34a"><title>chemv OpenBLAS n=512: 46.008 Gops</title></rect>
-<text x="1442.1" y="1078.3" text-anchor="middle" class="val">46.0</text>
+<rect x="1378.1" y="998.4" width="24.0" height="133.6" fill="#2563eb"><title>chemv Zynum n=512: 123.664 Gops</title></rect>
+<text x="1390.1" y="994.4" text-anchor="middle" class="val">123.7</text>
+<rect x="1404.1" y="1078.1" width="24.0" height="53.9" fill="#dc2626"><title>chemv Accelerate n=512: 49.932 Gops</title></rect>
+<text x="1416.1" y="1074.1" text-anchor="middle" class="val">49.9</text>
+<rect x="1430.1" y="1081.9" width="24.0" height="50.1" fill="#16a34a"><title>chemv OpenBLAS n=512: 46.411 Gops</title></rect>
+<text x="1442.1" y="1077.9" text-anchor="middle" class="val">46.4</text>
 <text x="1417.1" y="1150" text-anchor="end" transform="rotate(-28 1417.1 1150)" class="op">chemv</text>
-<rect x="1504.5" y="989.7" width="24.0" height="142.3" fill="#2563eb"><title>cgeru Zynum n=512: 131.760 Gops</title></rect>
-<text x="1516.5" y="985.7" text-anchor="middle" class="val">131.8</text>
-<rect x="1530.5" y="1025.4" width="24.0" height="106.6" fill="#dc2626"><title>cgeru Accelerate n=512: 98.690 Gops</title></rect>
-<text x="1542.5" y="1021.4" text-anchor="middle" class="val">98.7</text>
-<rect x="1556.5" y="1078.5" width="24.0" height="53.5" fill="#16a34a"><title>cgeru OpenBLAS n=512: 49.544 Gops</title></rect>
-<text x="1568.5" y="1074.5" text-anchor="middle" class="val">49.5</text>
+<rect x="1504.5" y="985.9" width="24.0" height="146.1" fill="#2563eb"><title>cgeru Zynum n=512: 135.309 Gops</title></rect>
+<text x="1516.5" y="981.9" text-anchor="middle" class="val">135.3</text>
+<rect x="1530.5" y="1030.3" width="24.0" height="101.7" fill="#dc2626"><title>cgeru Accelerate n=512: 94.165 Gops</title></rect>
+<text x="1542.5" y="1026.3" text-anchor="middle" class="val">94.2</text>
+<rect x="1556.5" y="1078.6" width="24.0" height="53.4" fill="#16a34a"><title>cgeru OpenBLAS n=512: 49.442 Gops</title></rect>
+<text x="1568.5" y="1074.6" text-anchor="middle" class="val">49.4</text>
 <text x="1543.5" y="1150" text-anchor="end" transform="rotate(-28 1543.5 1150)" class="op">cgeru</text>
-<rect x="1630.9" y="1002.7" width="24.0" height="129.3" fill="#2563eb"><title>cgerc Zynum n=512: 119.697 Gops</title></rect>
-<text x="1642.9" y="998.7" text-anchor="middle" class="val">119.7</text>
-<rect x="1656.9" y="1024.8" width="24.0" height="107.2" fill="#dc2626"><title>cgerc Accelerate n=512: 99.273 Gops</title></rect>
-<text x="1668.9" y="1020.8" text-anchor="middle" class="val">99.3</text>
-<rect x="1682.9" y="1078.4" width="24.0" height="53.6" fill="#16a34a"><title>cgerc OpenBLAS n=512: 49.591 Gops</title></rect>
-<text x="1694.9" y="1074.4" text-anchor="middle" class="val">49.6</text>
+<rect x="1630.9" y="986.8" width="24.0" height="145.2" fill="#2563eb"><title>cgerc Zynum n=512: 134.399 Gops</title></rect>
+<text x="1642.9" y="982.8" text-anchor="middle" class="val">134.4</text>
+<rect x="1656.9" y="1030.6" width="24.0" height="101.4" fill="#dc2626"><title>cgerc Accelerate n=512: 93.904 Gops</title></rect>
+<text x="1668.9" y="1026.6" text-anchor="middle" class="val">93.9</text>
+<rect x="1682.9" y="1078.1" width="24.0" height="53.9" fill="#16a34a"><title>cgerc OpenBLAS n=512: 49.932 Gops</title></rect>
+<text x="1694.9" y="1074.1" text-anchor="middle" class="val">49.9</text>
 <text x="1669.9" y="1150" text-anchor="end" transform="rotate(-28 1669.9 1150)" class="op">cgerc</text>
-<rect x="1757.2" y="1017.4" width="24.0" height="114.6" fill="#2563eb"><title>zgemv_n Zynum n=512: 106.075 Gops</title></rect>
-<text x="1769.2" y="1013.4" text-anchor="middle" class="val">106.1</text>
-<rect x="1783.2" y="998.4" width="24.0" height="133.6" fill="#dc2626"><title>zgemv_n Accelerate n=512: 123.660 Gops</title></rect>
-<text x="1795.2" y="994.4" text-anchor="middle" class="val">123.7</text>
-<rect x="1809.2" y="1102.3" width="24.0" height="29.7" fill="#16a34a"><title>zgemv_n OpenBLAS n=512: 27.519 Gops</title></rect>
-<text x="1821.2" y="1098.3" text-anchor="middle" class="val">27.5</text>
+<rect x="1757.2" y="1017.6" width="24.0" height="114.4" fill="#2563eb"><title>zgemv_n Zynum n=512: 105.963 Gops</title></rect>
+<text x="1769.2" y="1013.6" text-anchor="middle" class="val">106.0</text>
+<rect x="1783.2" y="1014.1" width="24.0" height="117.9" fill="#dc2626"><title>zgemv_n Accelerate n=512: 109.178 Gops</title></rect>
+<text x="1795.2" y="1010.1" text-anchor="middle" class="val">109.2</text>
+<rect x="1809.2" y="1102.8" width="24.0" height="29.2" fill="#16a34a"><title>zgemv_n OpenBLAS n=512: 27.046 Gops</title></rect>
+<text x="1821.2" y="1098.8" text-anchor="middle" class="val">27.0</text>
 <text x="1796.2" y="1150" text-anchor="end" transform="rotate(-28 1796.2 1150)" class="op">zgemv_n</text>
-<rect x="1883.6" y="1002.3" width="24.0" height="129.7" fill="#2563eb"><title>zgemv_t Zynum n=512: 120.126 Gops</title></rect>
-<text x="1895.6" y="998.3" text-anchor="middle" class="val">120.1</text>
-<rect x="1909.6" y="1019.8" width="24.0" height="112.2" fill="#dc2626"><title>zgemv_t Accelerate n=512: 103.872 Gops</title></rect>
-<text x="1921.6" y="1015.8" text-anchor="middle" class="val">103.9</text>
-<rect x="1935.6" y="1082.1" width="24.0" height="49.9" fill="#16a34a"><title>zgemv_t OpenBLAS n=512: 46.184 Gops</title></rect>
-<text x="1947.6" y="1078.1" text-anchor="middle" class="val">46.2</text>
+<rect x="1883.6" y="1002.4" width="24.0" height="129.6" fill="#2563eb"><title>zgemv_t Zynum n=512: 119.978 Gops</title></rect>
+<text x="1895.6" y="998.4" text-anchor="middle" class="val">120.0</text>
+<rect x="1909.6" y="1026.2" width="24.0" height="105.8" fill="#dc2626"><title>zgemv_t Accelerate n=512: 97.921 Gops</title></rect>
+<text x="1921.6" y="1022.2" text-anchor="middle" class="val">97.9</text>
+<rect x="1935.6" y="1084.0" width="24.0" height="48.0" fill="#16a34a"><title>zgemv_t OpenBLAS n=512: 44.464 Gops</title></rect>
+<text x="1947.6" y="1080.0" text-anchor="middle" class="val">44.5</text>
 <text x="1922.6" y="1150" text-anchor="end" transform="rotate(-28 1922.6 1150)" class="op">zgemv_t</text>
-<rect x="2010.0" y="1026.7" width="24.0" height="105.3" fill="#2563eb"><title>zhemv Zynum n=512: 97.545 Gops</title></rect>
-<text x="2022.0" y="1022.7" text-anchor="middle" class="val">97.5</text>
-<rect x="2036.0" y="1089.6" width="24.0" height="42.4" fill="#dc2626"><title>zhemv Accelerate n=512: 39.293 Gops</title></rect>
-<text x="2048.0" y="1085.6" text-anchor="middle" class="val">39.3</text>
-<rect x="2062.0" y="1089.3" width="24.0" height="42.7" fill="#16a34a"><title>zhemv OpenBLAS n=512: 39.569 Gops</title></rect>
-<text x="2074.0" y="1085.3" text-anchor="middle" class="val">39.6</text>
+<rect x="2010.0" y="1026.3" width="24.0" height="105.7" fill="#2563eb"><title>zhemv Zynum n=512: 97.831 Gops</title></rect>
+<text x="2022.0" y="1022.3" text-anchor="middle" class="val">97.8</text>
+<rect x="2036.0" y="1089.3" width="24.0" height="42.7" fill="#dc2626"><title>zhemv Accelerate n=512: 39.572 Gops</title></rect>
+<text x="2048.0" y="1085.3" text-anchor="middle" class="val">39.6</text>
+<rect x="2062.0" y="1088.4" width="24.0" height="43.6" fill="#16a34a"><title>zhemv OpenBLAS n=512: 40.378 Gops</title></rect>
+<text x="2074.0" y="1084.4" text-anchor="middle" class="val">40.4</text>
 <text x="2049.0" y="1150" text-anchor="end" transform="rotate(-28 2049.0 1150)" class="op">zhemv</text>
-<rect x="2136.4" y="1051.1" width="24.0" height="80.9" fill="#2563eb"><title>zgeru Zynum n=512: 74.897 Gops</title></rect>
-<text x="2148.4" y="1047.1" text-anchor="middle" class="val">74.9</text>
-<rect x="2162.4" y="1074.4" width="24.0" height="57.6" fill="#dc2626"><title>zgeru Accelerate n=512: 53.317 Gops</title></rect>
-<text x="2174.4" y="1070.4" text-anchor="middle" class="val">53.3</text>
-<rect x="2188.4" y="1088.3" width="24.0" height="43.7" fill="#16a34a"><title>zgeru OpenBLAS n=512: 40.446 Gops</title></rect>
-<text x="2200.4" y="1084.3" text-anchor="middle" class="val">40.4</text>
+<rect x="2136.4" y="1050.5" width="24.0" height="81.5" fill="#2563eb"><title>zgeru Zynum n=512: 75.460 Gops</title></rect>
+<text x="2148.4" y="1046.5" text-anchor="middle" class="val">75.5</text>
+<rect x="2162.4" y="1074.3" width="24.0" height="57.7" fill="#dc2626"><title>zgeru Accelerate n=512: 53.438 Gops</title></rect>
+<text x="2174.4" y="1070.3" text-anchor="middle" class="val">53.4</text>
+<rect x="2188.4" y="1090.1" width="24.0" height="41.9" fill="#16a34a"><title>zgeru OpenBLAS n=512: 38.778 Gops</title></rect>
+<text x="2200.4" y="1086.1" text-anchor="middle" class="val">38.8</text>
 <text x="2175.4" y="1150" text-anchor="end" transform="rotate(-28 2175.4 1150)" class="op">zgeru</text>
-<rect x="2262.8" y="1051.3" width="24.0" height="80.7" fill="#2563eb"><title>zgerc Zynum n=512: 74.677 Gops</title></rect>
-<text x="2274.8" y="1047.3" text-anchor="middle" class="val">74.7</text>
-<rect x="2288.8" y="1074.4" width="24.0" height="57.6" fill="#dc2626"><title>zgerc Accelerate n=512: 53.289 Gops</title></rect>
-<text x="2300.8" y="1070.4" text-anchor="middle" class="val">53.3</text>
-<rect x="2314.8" y="1088.9" width="24.0" height="43.1" fill="#16a34a"><title>zgerc OpenBLAS n=512: 39.883 Gops</title></rect>
-<text x="2326.8" y="1084.9" text-anchor="middle" class="val">39.9</text>
+<rect x="2262.8" y="1050.4" width="24.0" height="81.6" fill="#2563eb"><title>zgerc Zynum n=512: 75.573 Gops</title></rect>
+<text x="2274.8" y="1046.4" text-anchor="middle" class="val">75.6</text>
+<rect x="2288.8" y="1075.1" width="24.0" height="56.9" fill="#dc2626"><title>zgerc Accelerate n=512: 52.703 Gops</title></rect>
+<text x="2300.8" y="1071.1" text-anchor="middle" class="val">52.7</text>
+<rect x="2314.8" y="1089.7" width="24.0" height="42.3" fill="#16a34a"><title>zgerc OpenBLAS n=512: 39.172 Gops</title></rect>
+<text x="2326.8" y="1085.7" text-anchor="middle" class="val">39.2</text>
 <text x="2301.8" y="1150" text-anchor="end" transform="rotate(-28 2301.8 1150)" class="op">zgerc</text>
 </svg>

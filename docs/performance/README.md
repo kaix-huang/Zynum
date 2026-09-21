@@ -61,16 +61,17 @@ outside the committed tree.
 
 ## README Snapshot: 2026-09-21
 
-The current charts measure code commit `6a8b991f5130c977b633e172bbf7913fcd474703`
+The current charts measure code commit `59a3820d9503c896fef261ed11c06f022964157e`
 on Apple M5 (10 logical CPUs), macOS 27.0 (26A428), Zig 0.16.0 and Homebrew
 OpenBLAS 0.3.34, with the system Accelerate framework. The library uses
 `-Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast`. The code and
 probe/library bytes were frozen before timing; recorded source hashes matched
 again after all three families completed.
 
-This refresh includes bounded parallel streaming SROT, contiguous lower f32
-TPMV through n=511, and fixed-width f32 SME GEMM row tails. It replaces the
-earlier same-day snapshot of `0069960`; that data remains in Git history.
+This refresh adds bounded parallel streaming SROTM and packed TPMV input-load,
+row-grouping and instruction-scheduling improvements. It retains the earlier
+SROT, lower f32 TPMV and SME GEMM tail optimizations. It replaces the same-day
+snapshot of `6a8b991`; that data remains in Git history.
 The targeted optimization evidence is documented separately in the Level 1/2
 and GEMM notes. Independent publication runs do not isolate code changes from
 run-to-run variation in either Zynum or the comparators.
@@ -99,9 +100,9 @@ legacy Level 2 chart.
 
 | Plotted family | Cases | Zynum / Accelerate geometric mean | Zynum / OpenBLAS geometric mean | Cases below Accelerate |
 | --- | ---: | ---: | ---: | ---: |
-| Level 1 | 46 | 1.342x | 2.298x | 21 |
-| Level 2 | 60 | 1.212x | 3.751x | 16 |
-| GEMM | 168 | 1.029x | 1.815x | 65 |
+| Level 1 | 46 | 1.415x | 2.421x | 17 |
+| Level 2 | 60 | 1.257x | 3.714x | 8 |
+| GEMM | 168 | 1.022x | 1.908x | 72 |
 
 Each case has equal weight. These ratios are not workload scores, confidence
 intervals, historical speedups or an all-function performance guarantee.
@@ -112,11 +113,16 @@ snapshots, so differences between them cannot be attributed solely to code.
 Before timing, Debug and ReleaseSafe each passed 500 tests with 4 expected
 skips; ReleaseFast passed 497 with 7 expected skips. Dynamic dispatch and its
 forced baseline passed 132 tests. The native SME2 Level 1 regression passed,
-including persistent-worker FPCR changes and complete SROT output/status
-comparisons. ReleaseSafe/ReleaseFast Level 1 tests passed 31 each, and Intel
-Linux/macOS Level 1 test roots compiled. Build/test inventory, generated
-multiversion, and header/kernel-coverage consistency checks also passed. This
-compilation evidence does not establish native performance on those systems.
+including persistent-worker FPCR changes and complete SROT/SROTM output/status
+comparisons. The exact measured dynamic library passed 27,648 TPMV output/FPSR
+comparisons across rounding and flush modes, 6,272 SROTM complete-output,
+padding/FPSR/FPCR comparisons, and 2,880 packed triangular guard-page checks.
+These comparisons use the preceding published library as their baseline.
+Build/test inventory structure, generated multiversion, and header/kernel-
+coverage consistency checks also passed. The full build-inventory security
+suite was stopped before completion and is not claimed as passing this run.
+Earlier focused qualification includes Intel Linux/macOS compilation; that
+does not establish runtime performance on those systems or enabled-trap order.
 
 As in the archived report, the metadata reader recognizes kernel-coverage
 schema 1 while the generator emits schema 3. Metadata retains the coverage
@@ -137,7 +143,7 @@ the clean checkout's Git identity. New runs must collect their own identity
 and binary hashes rather than reuse an archived manifest.
 
 ```sh
-git worktree add --detach ../zynum-readme-2026-09-21 6a8b991f5130c977b633e172bbf7913fcd474703
+git worktree add --detach ../zynum-readme-2026-09-21 59a3820d9503c896fef261ed11c06f022964157e
 cd ../zynum-readme-2026-09-21
 zig build -Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast
 unset ZYNUM_MAXIMUM_THREADS

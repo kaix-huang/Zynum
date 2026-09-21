@@ -288,4 +288,5 @@ comparisons cover seven boundary sizes, four rounding modes, flush modes,
 exceptional values confined to the last chunk, all valid flags, two coefficient
 sets and pre-existing status flags. Native SME2 regression coverage reuses the
 workers across floating-point environment changes. Private evidence: r277,
-2026-09-21; this subsequent local optimization is outside the README snapshot.
+2026-09-21. The refreshed README snapshot at `59a3820` includes this change;
+its independent comparator measurements are separate from these paired gains.

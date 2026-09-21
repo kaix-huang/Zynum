@@ -532,7 +532,8 @@ Safe/Fast packed tests passed 25/25 each and Intel Linux/macOS compiled;
 exact-output/gap/protected-page checks passed. These targeted observations do
 not prove universal absence of regression or enabled-trap ordering. Private
 evidence: r278 (ordinary load, identical machine code) and r279 (retained
-explicit load), 2026-09-21. The README snapshot remains unchanged.
+explicit load), 2026-09-21. These targeted measurements remain separate from
+the README's legacy Level 2 comparator cases.
 
 Another 144 fresh paired processes cover 17/18, 31/32/33, 47/48/49, 63/65 and
 127/129 boundaries with both triangles and diagonal modes. Calls below the

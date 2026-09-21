@@ -30,8 +30,8 @@ Transformer workloads across portable and architecture-specific CPU kernels.
 ## Performance Evidence
 
 The charts compare **Zynum, Accelerate, OpenBLAS**, in that order.
-**Higher is better.** This refreshed 2026-09-21 snapshot measures `6a8b991`
-(bounded SROT/TPMV and SME GEMM tail optimizations) using a baseline-CPU,
+**Higher is better.** This refreshed 2026-09-21 snapshot measures `59a3820`
+(including bounded SROTM and packed TPMV scheduling optimizations) using a baseline-CPU,
 dynamic-dispatch ReleaseFast build and six cyclically interleaved
 fresh-process measurements per case and library. The target machine, comparator versions,
 thread settings, source commit, and binary hashes are recorded in the
