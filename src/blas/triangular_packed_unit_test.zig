@@ -490,10 +490,10 @@ test "production TPMV preserves staged results across small workspace threshold"
     if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
     inline for (.{ f32, f64 }) |T| {
-        for ([_]usize{ 63, 64, 65, 127, 128, 129 }) |n| {
+        for ([_]usize{ 63, 64, 65, 127, 128, 129, 255, 256, 257, 511, 512, 513 }) |n| {
             const ap = try std.testing.allocator.alloc(T, n * (n + 1) / 2);
             defer std.testing.allocator.free(ap);
-            var storage: [390]T = undefined;
+            var storage: [1542]T = undefined;
             for ([_]Uplo{ .upper, .lower }) |uplo| {
                 for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans_| {
                     for ([_]i32{ 1, -1, 2, -2, 3, -3 }) |inc| {

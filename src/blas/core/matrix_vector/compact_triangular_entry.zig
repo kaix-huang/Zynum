@@ -378,7 +378,7 @@ pub const testing = struct {
 // inner computation succeeds; its unit stride prevents repeated staging.
 noinline fn stagedSmallTpmv(comptime T: type, allocator: std.mem.Allocator, max_bytes: usize, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt, stride: usize, last: usize) bool {
     const n: usize = @intCast(n_);
-    var values: [128]T = undefined;
+    var values: [512]T = undefined;
     for (0..n) |i| values[i] = x[if (incx > 0) i * stride else last - i * stride];
     if (!tryFiniteTpmv(T, true, allocator, max_bytes, uplo, trans_, diag, n_, ap, &values, 1)) return false;
     for (0..n) |i| x[if (incx > 0) i * stride else last - i * stride] = values[i];
@@ -407,7 +407,7 @@ noinline fn tryFiniteTpmv(comptime T: type, comptime stack_small: bool, allocato
         if (x_addr - a_addr < a_bytes) return false;
     } else if (a_addr - x_addr < x_bytes) return false;
     // Reserve both logical input and output workspace before copying input.
-    if (stack_small and T == f32 and n <= 128 and trans_ != .no_trans and incx != 1 and bytes <= max_bytes / 2) {
+    if (stack_small and T == f32 and n <= 512 and trans_ != .no_trans and incx != 1 and bytes <= max_bytes / 2) {
         return stagedSmallTpmv(T, allocator, max_bytes - bytes, uplo, trans_, diag, n_, ap, x, incx, stride, last);
     }
     const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));

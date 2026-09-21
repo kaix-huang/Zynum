@@ -772,3 +772,70 @@ skips. Dynamic-dispatch validation passed 132 tests, and native SME2 and host
 tooling checks passed. The full inventory/security matrix was not rerun.
 Enabled-trap order and other-machine runtime performance remain unproven.
 Evidence is archived in local rounds R369–R370.
+
+Subsequent R371 qualification extends the input-staging limit to n=256
+and the fixed input buffer to 256 floats. This extension was not included in
+the earlier README snapshot of code commit `7852e2e`. Calls above n=128 keep the
+existing allocated output workspace; logical input and output budget accounting,
+refusal and final scatter rules remain unchanged. An exact machine-code
+comparison against that published runtime found only three changed bytes in
+the staging helper and caller, with equal text size and unchanged addresses.
+
+The 52-case, 416-process paired screen measured about 21.2–29.9% improvement
+at n=129/255/256 with strides ±2, both triangles and both diagonal modes.
+The n=64/128/257 and contiguous controls were essentially flat. A further
+360 single-image processes covered 20 cases in six rotating order blocks:
+n=129/256 with strides -1 and +3 improved about 18.1–30.3%; control medians
+ranged from -0.15% to 0.00%, with comparable exact-replica variation. These
+are reset-inclusive comparisons with the newly published runtime, not
+Accelerate results or proof of universal absence of regression.
+
+The exact candidate passed 34,560 output/FPSR/FPCR comparisons at
+n=128/129/255/256/257 and 2,880 guard-page checks. The production regression
+also covers n=255/256/257 with strides ±1/±2/±3 and late refusal. Packed
+ReleaseSafe/ReleaseFast tests passed 25 each; the three cross-target compiles
+above, formatting and test-inventory structure passed. Full-suite and broad
+README measurements were not repeated for this local extension. The native
+performance and enabled-trap limitations above still apply.
+
+R372 qualification extends the same f32 input staging to n=512 with a
+512-float buffer. Relative to R371, the machine-code section has the same size
+and addresses; only the limit comparison and stack adjustment immediates
+change (three bytes). The original output allocation threshold stays at n=128.
+The 52-case paired screen used 416 processes: n=257/511/512 with strides ±2
+improved about 23.0–30.4%, while n=64/256/513 and contiguous controls remained
+within small timing variation. Another 360 single-image processes in six
+rotating order blocks measured 21.6–30.1% gains at n=257/512 with strides -1
+and +3. Its four controls ranged from -0.08% to +0.05% against the baseline.
+These reset-inclusive measurements support this bounded local change, not a
+general absence-of-regression claim.
+
+The exact candidate passed 34,560 complete-output/FPSR/FPCR comparisons at
+n=128/257/511/512/513 against R371 and 2,880 guard-page checks. The production
+regression now also covers n=511/512/513, both diagonal modes, late refusal and
+strides ±1/±2/±3. Packed ReleaseSafe/ReleaseFast tests passed 25 each; the same
+three cross-target compiles, formatting and inventory structure passed. Full
+suite and README measurements were not repeated during that local round;
+publication validation is recorded separately in the current README snapshot.
+
+A separate four-repeat, 512-process comparison with Accelerate covered 64
+transpose cases: both real types, n=64/128/256/512, both triangles and diagonal
+modes, and strides +1/-2. Fifty-eight cases remained below Accelerate. Small
+contiguous f32 cases measured roughly 0.51–0.57x Accelerate throughput, so
+input staging does not resolve the dominant contiguous-kernel gap. Libraries
+ran in separate processes; these timings do not establish cross-library
+bitwise equivalence. Sampling the lower unit-diagonal contiguous f32 kernel
+at n=64/128 attributed about 62%/80% of its samples to the common paired-column
+loop. The next investigation targets its row-pair loads and vector rearrangement
+while preserving each output's ordered arithmetic. Sample attribution is not
+a cycle or stall count. Detailed evidence is archived in local round R372.
+
+Publication qualification of the retained R371/R372 change passed Debug and
+ReleaseSafe (500 tests each, 4 expected skips), ReleaseFast (497 tests,
+7 expected skips), dynamic dispatch (132 tests), native SME2 and host tooling.
+The measured dynamic library passed 82,944 complete-output/FPSR/FPCR comparisons
+against the preceding published runtime at n=63/64/65/127/128/129/255/256/257/
+511/512/513, plus 2,880 guard-page checks. Packed tests passed 25 each in
+ReleaseSafe and ReleaseFast; the three cross-target compiles above, inventory
+structure, formatting and generated-artifact consistency also passed. This
+does not claim a full inventory/security matrix or other-machine runtime pass.
