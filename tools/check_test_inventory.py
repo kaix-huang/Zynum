@@ -1018,11 +1018,11 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "9bf0a4fc2827bc1b3b2a7352b5a684afaae29048a59ed6f8479c783cc60189c0"
+    "5fd6875e776923b61e0040d6b21b1c527a9f3c0f9bb908942140b1ed6fb4ff89"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
-    "4387c4607a623c4a9bd9db4c837dcd87a8326e21e0a10040ce359365c494f6be"
+    "0adfdac768bd6cf64ecb25e10786f31ec98814ec0d23b332abb076bde6bccd48"
 )
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 TOP_LEVEL_KEYS = {
@@ -2594,42 +2594,44 @@ def discover(
 
         module_symbol = ROOT_MODULE_SYMBOLS.get(symbol)
         required_objects: list[dict[str, str]] = []
+        link_symbols = {"official_tests.root_module"}
         if module_symbol is not None:
-            links = sorted(
-                (
-                    item
-                    for item in observations
-                    if item.get("category") == "link"
-                    and item.get("anchor", {}).get("symbol") == module_symbol
-                    and item["id"].endswith("isolated_test_library")
-                ),
-                key=lambda item: item["id"],
-            )
-            for link in links:
-                producer_symbol = link["id"].rsplit("<-", 1)[1]
-                compile_id = f"compile:build.zig:build:{producer_symbol}"
-                producer = by_id.get(compile_id)
-                if not isinstance(producer, dict):
-                    raise InventoryError(
-                        f"{link['id']}: isolated compile observation missing"
-                    )
-                if producer.get("optimize_source") != "test-optimize":
-                    raise InventoryError(
-                        f"{compile_id}: isolated object uses production optimize"
-                    )
-                if "x86_64" not in str(
-                    producer.get("condition")
-                ) or "x86_64" not in str(link.get("condition")):
-                    raise InventoryError(
-                        f"{link['id']}: isolated object guard is incorrect"
-                    )
-                required_objects.append(
-                    {
-                        "compile_observation_id": compile_id,
-                        "link_observation_id": link["id"],
-                        "predicate_id": "predicate:arch-x86-64",
-                    }
+            link_symbols.add(module_symbol)
+        links = sorted(
+            (
+                item
+                for item in observations
+                if item.get("category") == "link"
+                and item.get("anchor", {}).get("symbol") in link_symbols
+                and item["id"].endswith("isolated_test_library")
+            ),
+            key=lambda item: item["id"],
+        )
+        for link in links:
+            producer_symbol = link["id"].rsplit("<-", 1)[1]
+            compile_id = f"compile:build.zig:build:{producer_symbol}"
+            producer = by_id.get(compile_id)
+            if not isinstance(producer, dict):
+                raise InventoryError(
+                    f"{link['id']}: isolated compile observation missing"
                 )
+            if producer.get("optimize_source") != "test-optimize":
+                raise InventoryError(
+                    f"{compile_id}: isolated object uses production optimize"
+                )
+            if "x86_64" not in str(
+                producer.get("condition")
+            ) or "x86_64" not in str(link.get("condition")):
+                raise InventoryError(
+                    f"{link['id']}: isolated object guard is incorrect"
+                )
+            required_objects.append(
+                {
+                    "compile_observation_id": compile_id,
+                    "link_observation_id": link["id"],
+                    "predicate_id": "predicate:arch-x86-64",
+                }
+            )
         root_rows.append(
             {
                 "id": root_id,

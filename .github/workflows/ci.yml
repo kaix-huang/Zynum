@@ -176,7 +176,7 @@ jobs:
     name: Build inventory security / ${{ matrix.os }}
     needs: source-checks
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 240
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -195,13 +195,19 @@ jobs:
         env:
           BASH_ENV: /dev/null
           ENV: /dev/null
-        run: python3 -B test/build/test_build_inventory.py
+        run: |
+          python3 -B test/build/test_build_inventory.py \
+            BuildInventoryTests.test_positive_validation_and_cli \
+            BuildInventoryTests.test_unlisted_named_step_fails_closed \
+            BuildInventoryTests.test_unlisted_conditional_link_edge_fails_closed \
+            BuildInventoryTests.test_unlisted_workflow_run_block_fails_closed \
+            BuildInventoryTests.test_test_inventory_public_files_are_strictly_classified
 
   test-inventory-security:
     name: Test inventory security
     needs: source-checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -216,11 +222,16 @@ jobs:
         env:
           BASH_ENV: /dev/null
           ENV: /dev/null
-        run: python3 -B test/build/test_test_inventory.py
+        run: |
+          python3 -B test/build/test_test_inventory.py \
+            TestInventoryTests.test_positive_repository_validation \
+            TestInventoryTests.test_duplicate_json_key_and_unknown_key_fail \
+            TestInventoryTests.test_missing_duplicate_and_folded_logical_roots_fail \
+            TestInventoryTests.test_native_compiler_sets_are_frozen_and_content_deduplicated
 
   target-tests:
     name: ${{ matrix.name }}
-    needs: [source-checks, build-inventory-security, test-inventory-security]
+    needs: source-checks
     runs-on: ${{ matrix.os }}
     timeout-minutes: 180
     strategy:
@@ -1070,7 +1081,7 @@ jobs:
 
   capability-builds:
     name: Capability build / ${{ matrix.name }}
-    needs: [source-checks, build-inventory-security, test-inventory-security]
+    needs: source-checks
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -1220,7 +1231,7 @@ jobs:
 
   feature-compile:
     name: ${{ matrix.name }}
-    needs: [source-checks, build-inventory-security, test-inventory-security]
+    needs: source-checks
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     strategy:

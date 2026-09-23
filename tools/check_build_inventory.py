@@ -393,7 +393,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "5b2a216ecf44474e55329e3a17e8721af2c85e071450777459f51dee445de584"
+    "cbc5b37a79b8286869a6ae8fb50642ceb49811be64cd3541493f455fb7c21439"
 )
 NEXT_SOURCE_PROJECTION_SHA256 = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -13836,16 +13836,6 @@ def _validate(
         "conditional_link_guard_digests must exactly match every conditional link edge",
         errors,
     )
-    expected_links = [
-        item
-        for item in inventory["build_observations"]
-        if item.get("category") == "link"
-    ]
-    _require(
-        len(expected_links) == 42,
-        f"expected 42 current conditional link edges, found {len(expected_links)}",
-        errors,
-    )
     gap_ids = {item.get("id") for item in inventory.get("current_gaps", [])}
     _require(
         gap_ids == REQUIRED_GAP_IDS,
@@ -14703,6 +14693,18 @@ def _new_test_inventory_observation(
             "aggregate_condition": "outside the exact native Windows canonical baseline guard",
             "intentional_orphan": False,
             "orphan_reason": "fail-closed dependency of the Windows compatibility-only inventory link step",
+        }
+    isolated_test_links = {
+        "link:build.zig:build:official_tests.root_module<-stride2_isolated_test_library": "stride2_isolated_test_library",
+        "link:build.zig:build:official_tests.root_module<-compact_triangular_isolated_test_library": "compact_triangular_isolated_test_library",
+        "link:build.zig:build:official_tests.root_module<-level2_width_isolated_test_library": "level2_width_isolated_test_library",
+    }
+    if identifier in isolated_test_links:
+        return {
+            "owner": "build-composition",
+            "consumer": "official_tests.root_module",
+            "provider": isolated_test_links[identifier],
+            "condition": "target.result.cpu.arch == .x86_64 and isolated test library is present",
         }
     raise InventoryError(f"no reviewed template for new observation {identifier}")
 

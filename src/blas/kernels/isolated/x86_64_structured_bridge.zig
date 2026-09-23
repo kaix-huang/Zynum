@@ -5,7 +5,7 @@
 
 const abi = @import("x86_64_structured_abi.zig");
 const gemm_host = @import("structured_gemm_host.zig");
-const task_runtime_host = @import("task_runtime_host.zig");
+const thread_pool = @import("../../core/execution/thread_pool.zig");
 const scalar = @import("../../core/shared/scalar.zig");
 
 const BlasInt = scalar.BlasInt;
@@ -57,7 +57,7 @@ fn diagonalTag(value: Diag) abi.Diagonal {
 
 fn execute(comptime T: type, operation: abi.Operation, side: Side, uplo: Uplo, transpose: Order, diagonal: Diag, flags: u8, m: BlasInt, n: BlasInt, alpha: T, beta: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, c: [*]T, ldc: BlasInt) bool {
     _ = gemm_host;
-    _ = task_runtime_host;
+    _ = thread_pool;
     const alpha_parts = components(T, alpha);
     const beta_parts = components(T, beta);
     var request: abi.Request = .{

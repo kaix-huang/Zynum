@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 const Io = std.Io;
 const runner_io: Io = Io.Threaded.global_single_threaded.io();
 const maximum_inventory_bytes = 4 * 1024 * 1024;
-const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "9bf0a4fc2827bc1b3b2a7352b5a684afaae29048a59ed6f8479c783cc60189c0";
+const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "5fd6875e776923b61e0040d6b21b1c527a9f3c0f9bb908942140b1ed6fb4ff89";
 const NEXT_TEST_INVENTORY_SHA256: ?[]const u8 = null;
 
 const Inventory = struct {
@@ -127,7 +127,10 @@ const InventoryValidation = enum {
 
 pub fn main(init: std.process.Init.Minimal) void {
     @disableInstrumentation();
-    run(init) catch std.process.exit(1);
+    run(init) catch |err| {
+        std.debug.print("test inventory runner: {s}\n", .{@errorName(err)});
+        std.process.exit(1);
+    };
 }
 
 fn run(init: std.process.Init.Minimal) !void {

@@ -298,12 +298,6 @@ pub fn build(b: *std.Build) void {
         fortran_compat_mod.addObject(library);
         cblas_compat_mod.addObject(library);
     }
-    for (kernel_test_libraries) |library| {
-        zynum_test_mod.addObject(library);
-        zynum_blas_test_mod.addObject(library);
-        fortran_compat_test_mod.addObject(library);
-        cblas_compat_test_mod.addObject(library);
-    }
     const stride2_isolated_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
         .name = "zynum-level1-x86-stride2-isolated",
         .root_module = b.createModule(.{
@@ -311,6 +305,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = optimize,
             .pic = true,
+            .link_libc = true,
         }),
     }) else null;
     const stride2_isolated_test_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
@@ -320,6 +315,7 @@ pub fn build(b: *std.Build) void {
             .target = target,
             .optimize = test_optimize,
             .pic = true,
+            .link_libc = true,
         }),
     }) else null;
     const compact_triangular_isolated_library = if (target.result.cpu.arch == .x86_64) b.addObject(.{
@@ -382,38 +378,22 @@ pub fn build(b: *std.Build) void {
             .pic = true,
         }),
     }) else null;
+    if (stride2_isolated_library) |library| library.root_module.addOptions("zynum-build-options", zynum_build_options);
+    if (stride2_isolated_test_library) |library| library.root_module.addOptions("zynum-build-options", zynum_build_options);
     if (stride2_isolated_library) |library| {
         zynum_mod.addObject(library);
         zynum_blas_mod.addObject(library);
         blas_compat_mod.addObject(library);
-    }
-    if (stride2_isolated_test_library) |library| {
-        zynum_test_mod.addObject(library);
-        zynum_blas_test_mod.addObject(library);
-        fortran_compat_test_mod.addObject(library);
-        cblas_compat_test_mod.addObject(library);
     }
     if (compact_triangular_isolated_library) |library| {
         zynum_mod.addObject(library);
         zynum_blas_mod.addObject(library);
         blas_compat_mod.addObject(library);
     }
-    if (compact_triangular_isolated_test_library) |library| {
-        zynum_test_mod.addObject(library);
-        zynum_blas_test_mod.addObject(library);
-        fortran_compat_test_mod.addObject(library);
-        cblas_compat_test_mod.addObject(library);
-    }
     if (level2_width_isolated_library) |library| {
         zynum_mod.addObject(library);
         zynum_blas_mod.addObject(library);
         blas_compat_mod.addObject(library);
-    }
-    if (level2_width_isolated_test_library) |library| {
-        zynum_test_mod.addObject(library);
-        zynum_blas_test_mod.addObject(library);
-        fortran_compat_test_mod.addObject(library);
-        cblas_compat_test_mod.addObject(library);
     }
     if (structured_isolated_library) |library| {
         blas_compat_mod.addObject(library);
@@ -736,7 +716,6 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    if (compact_triangular_isolated_test_library) |library| triangular_packed_unit_test_mod.addObject(library);
     const triangular_packed_unit_tests = b.addTest(.{
         .name = "zynum-blas-triangular-packed-unit-tests",
         .root_module = triangular_packed_unit_test_mod,
@@ -749,7 +728,6 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    if (compact_triangular_isolated_test_library) |library| triangular_band_solve_test_mod.addObject(library);
     const triangular_band_solve_tests = b.addTest(.{
         .name = "zynum-blas-triangular-band-solve-tests",
         .root_module = triangular_band_solve_test_mod,
@@ -766,7 +744,6 @@ pub fn build(b: *std.Build) void {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    if (stride2_isolated_test_library) |library| vector_stride2_parallel_test_mod.addObject(library);
     const vector_stride2_parallel_tests = b.addTest(.{
         .name = "zynum-blas-vector-stride2-parallel-tests",
         .root_module = vector_stride2_parallel_test_mod,
@@ -1030,6 +1007,9 @@ pub fn build(b: *std.Build) void {
         const official_tests = inventory_case.logical_tests orelse continue;
         official_tests.root_module.addOptions("zynum-build-options", zynum_build_options);
         for (kernel_test_libraries) |library| official_tests.root_module.addObject(library);
+        if (stride2_isolated_test_library) |library| official_tests.root_module.addObject(library);
+        if (compact_triangular_isolated_test_library) |library| official_tests.root_module.addObject(library);
+        if (level2_width_isolated_test_library) |library| official_tests.root_module.addObject(library);
     }
     const test_inventory_link_step = b.step(
         "test-inventory-link",

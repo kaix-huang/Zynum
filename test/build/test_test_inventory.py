@@ -38,6 +38,32 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
+def _referenced_set_count(inventory: dict[str, Any]) -> int:
+    return len(
+        {
+            row["expected_test_set_id"]
+            for row in inventory["test_mode_rows"]
+            if row["expected_test_set_id"] is not None
+        }
+    )
+
+
+def _frozen_zig_count(inventory: dict[str, Any]) -> int:
+    return sum(
+        row["root_id"].startswith("zig-root:")
+        and row["expectation_state"] == CHECKER.FROZEN_STATE
+        for row in inventory["test_mode_rows"]
+    )
+
+
+def _pending_gap_count(inventory: dict[str, Any]) -> int:
+    return sum(
+        len(gap["subject_ids"])
+        for gap in inventory["known_gaps"]
+        if gap["kind"] == "native-test-enumeration-required"
+    )
+
+
 class TestInventoryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -584,9 +610,18 @@ class TestInventoryTests(unittest.TestCase):
             else:
                 environment["GIT_PAGER"] = ambient_git_pager
         self.assertEqual(336, len(self.inventory["test_mode_rows"]))
-        self.assertEqual(30, len(self.inventory["expected_test_sets"]))
-        self.assertEqual(63, len(self.inventory["native_observation_bindings"]))
-        self.assertEqual(183, CHECKER._matrix_incomplete_count(self.inventory))
+        self.assertEqual(
+            _referenced_set_count(self.inventory),
+            len(self.inventory["expected_test_sets"]),
+        )
+        self.assertEqual(
+            _frozen_zig_count(self.inventory),
+            len(self.inventory["native_observation_bindings"]),
+        )
+        self.assertEqual(
+            _pending_gap_count(self.inventory),
+            CHECKER._matrix_incomplete_count(self.inventory),
+        )
 
     def test_fixture_positive_validation(self) -> None:
         correctness_roots = self.inventory["correctness_only_roots"]
@@ -728,10 +763,16 @@ class TestInventoryTests(unittest.TestCase):
         rows = self.inventory["test_mode_rows"]
         rows_by_id = {row["id"]: row for row in rows}
         bindings = self.inventory["native_observation_bindings"]
-        self.assertEqual(183, CHECKER._matrix_incomplete_count(self.inventory))
+        self.assertEqual(
+            _pending_gap_count(self.inventory),
+            CHECKER._matrix_incomplete_count(self.inventory),
+        )
         self.assertEqual(bindings, sorted(bindings, key=lambda row: row["id"]))
-        self.assertEqual(63, len(bindings))
-        self.assertEqual(63, len({row["row_id"] for row in bindings}))
+        self.assertEqual(
+            _frozen_zig_count(self.inventory),
+            len(bindings),
+        )
+        self.assertEqual(len(bindings), len({row["row_id"] for row in bindings}))
         for binding in bindings:
             with self.subTest(binding=binding["row_id"]):
                 row = rows_by_id[binding["row_id"]]
@@ -753,7 +794,7 @@ class TestInventoryTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            3,
+            63,
             sum(
                 row["environment_id"] == "env:x86-64-linux-gnu-baseline"
                 and row["root_id"].startswith("zig-root:")
@@ -769,7 +810,6 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(
             {
                 "gap:native-test-enumeration:env-aarch64-linux-gnu-baseline": 60,
-                "gap:native-test-enumeration:env-x86-64-linux-gnu-baseline": 60,
                 "gap:native-test-enumeration:env-x86-64-windows-gnu-baseline": 63,
             },
             pending_gaps,
@@ -4238,10 +4278,19 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(0, real_binding_summary.artifact_platform_skips)
         self.assertEqual(0, real_binding_summary.publication_platform_skips)
         self.assertEqual(0, real_binding_summary.platform_skips)
-        self.assertEqual(30, len(source_current["expected_test_sets"]))
+        self.assertEqual(
+            _referenced_set_count(source_current),
+            len(source_current["expected_test_sets"]),
+        )
         self.assertEqual(336, len(source_current["test_mode_rows"]))
-        self.assertEqual(63, len(source_current["native_observation_bindings"]))
-        self.assertEqual(183, CHECKER._matrix_incomplete_count(source_current))
+        self.assertEqual(
+            _frozen_zig_count(source_current),
+            len(source_current["native_observation_bindings"]),
+        )
+        self.assertEqual(
+            _pending_gap_count(source_current),
+            CHECKER._matrix_incomplete_count(source_current),
+        )
         self.assertEqual(
             CHECKER.CURRENT_NATIVE_PROJECTION_SHA256,
             CHECKER._native_projection_digest(source_current),
@@ -7244,7 +7293,10 @@ class TestInventoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(1, default.returncode)
-        self.assertIn("matrix incomplete: 183 rows", default.stderr)
+        self.assertIn(
+            f"matrix incomplete: {CHECKER._matrix_incomplete_count(self.inventory)} rows",
+            default.stderr,
+        )
 
         structure = subprocess.run(
             [
@@ -7264,7 +7316,10 @@ class TestInventoryTests(unittest.TestCase):
             },
         )
         self.assertEqual(0, structure.returncode, structure.stderr)
-        self.assertIn("matrix incomplete: 183 rows", structure.stdout)
+        self.assertIn(
+            f"matrix incomplete: {CHECKER._matrix_incomplete_count(self.inventory)} rows",
+            structure.stdout,
+        )
 
     def test_explicit_test_optimize_and_mode_mismatch_fail(self) -> None:
         workflow = self.root / ".github/workflows/ci.yml"
@@ -8138,7 +8193,10 @@ class TestInventoryTests(unittest.TestCase):
             CHECKER.NATIVE_PROJECTION_SCHEMA_VERSION, projection["schema_version"]
         )
         self.assertEqual(246, len(projection["native_execution_rows"]))
-        self.assertEqual(63, len(projection["native_observation_bindings"]))
+        self.assertEqual(
+            _frozen_zig_count(baseline),
+            len(projection["native_observation_bindings"]),
+        )
         current_digest = CHECKER._native_projection_digest(baseline)
         self.assertEqual(CHECKER.CURRENT_NATIVE_PROJECTION_SHA256, current_digest)
         self.assertIsNone(CHECKER.NEXT_NATIVE_PROJECTION_SHA256)

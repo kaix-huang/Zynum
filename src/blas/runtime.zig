@@ -6,10 +6,8 @@ const builtin = @import("builtin");
 const build_options = @import("zynum-build-options");
 
 comptime {
-    // COFF requires the task bridge even when host-side feature folding removes
-    // all stride-two calls. Other platforms retain it through their call graph.
     if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .windows and !@hasDecl(build_options, "kernel_entry"))
-        _ = @import("kernels/isolated/task_runtime_host.zig");
+        _ = @import("core/execution/thread_pool.zig");
 }
 
 pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";

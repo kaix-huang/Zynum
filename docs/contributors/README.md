@@ -54,6 +54,12 @@ include build-inventory security, test-inventory security, or ABI artifact parit
 Run the independent `test-build-inventory` and `test-test-inventory` steps
 separately, as shown above.
 
+CI runs the inventory validators and representative fail-closed security cases
+for each change. Native correctness runs on macOS and x86_64 Linux; ARM Linux
+and Windows receive compile/link checks. The release workflow runs both complete
+inventory security suites. All CI jobs feed the final gate; a security-case
+failure does not skip platform testing.
+
 The canonical Python tooling gate reports and rejects unexpected skips, expected
 failures, and unexpected successes. An allowed skip is bound to exact
 `skip_kind`, reviewed `predicate_id`, and `predicate_ast_sha256`, the lowercase

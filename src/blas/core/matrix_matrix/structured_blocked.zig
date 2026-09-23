@@ -417,13 +417,16 @@ fn commitRankTile(comptime T: type, uplo: Uplo, hermitian: bool, row0: usize, co
 }
 
 fn rankDiagonal(comptime T: type, comptime rank_two: bool, uplo: Uplo, trans: Order, hermitian: bool, start: usize, size: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, workspace: []T) void {
+    // Both tile widths are at most 256. An explicit u32 product prevents Zig
+    // 0.16 ReleaseSafe on x86 from narrowing the area to an overflowing u8.
     const second_alpha = if (hermitian) scalar.conj(T, alpha) else alpha;
     // Complex 3M needs larger tiles to amortize conversion. Only real,
     // single-thread diagonal updates benefited from smaller subtiles.
     if (scalar.isComplex(T) or @import("../../runtime.zig").maxThreads() > 1) {
         const da = rankOperandBase(T, trans, a, lda, start);
         const db = rankOperandBase(T, trans, b, ldb, start);
-        const tile = workspace[0 .. size * size];
+        const tile_elements: u32 = @as(u32, @intCast(size)) * @as(u32, @intCast(size));
+        const tile = workspace[0..tile_elements];
         rankProduct(T, trans, hermitian, size, size, k, alpha, da, lda, db, ldb, scalar.zero(T), tile.ptr, @intCast(size));
         if (rank_two) rankProduct(T, trans, hermitian, size, size, k, second_alpha, db, ldb, da, lda, scalar.one(T), tile.ptr, @intCast(size));
         commitRankTile(T, uplo, hermitian, start, start, size, size, beta, tile, c, ldc);
@@ -442,7 +445,8 @@ fn rankDiagonal(comptime T: type, comptime rank_two: bool, uplo: Uplo, trans: Or
             rankProduct(T, trans, hermitian, rows, width, k, alpha, rankOperandBase(T, trans, a, lda, first), lda, db, ldb, beta, output, ldc);
             if (rank_two) rankProduct(T, trans, hermitian, rows, width, k, second_alpha, rankOperandBase(T, trans, b, ldb, first), ldb, da, lda, scalar.one(T), output, ldc);
         }
-        const tile = workspace[0 .. width * width];
+        const tile_elements: u32 = @as(u32, @intCast(width)) * @as(u32, @intCast(width));
+        const tile = workspace[0..tile_elements];
         rankProduct(T, trans, hermitian, width, width, k, alpha, da, lda, db, ldb, scalar.zero(T), tile.ptr, @intCast(width));
         if (rank_two) rankProduct(T, trans, hermitian, width, width, k, second_alpha, db, ldb, da, lda, scalar.one(T), tile.ptr, @intCast(width));
         commitRankTile(T, uplo, hermitian, d, d, width, width, beta, tile, c, ldc);
