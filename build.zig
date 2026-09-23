@@ -1547,6 +1547,8 @@ fn buildKernelTiers(
         libraries[index] = b.addObject(.{
             .name = b.fmt("zynum-kernel-{s}-{s}", .{ name, @tagName(optimize) }),
             .root_module = module,
+            // Zig 0.16's self-hosted Debug backend cannot assemble vmovntdq.
+            .use_llvm = if (baseline.result.cpu.arch == .x86_64 and index == 2 and optimize == .Debug) true else null,
         });
         // ISA objects must remain separate code-generation units. Never LTO
         // target-specific instructions into the baseline resolver or scheduler.

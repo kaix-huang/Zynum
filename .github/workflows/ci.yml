@@ -831,6 +831,15 @@ jobs:
           ENV: /dev/null
         run: zig build test-host-tool-smoke ${{ matrix.target_args }} --summary failures
 
+      - name: Run Zig example
+        if: matrix.zig_gate == 'inventory-certified'
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: zig build --build-file examples/zig/build.zig run
+
       - name: Test Debug target
         if: matrix.zig_gate == 'inventory-certified'
         timeout-minutes: 60
@@ -975,15 +984,6 @@ jobs:
             PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --exists zynum_blas
             PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
           fi
-
-      - name: Run Zig example
-        if: matrix.full_smoke
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: zig build --build-file examples/zig/build.zig run
 
       - name: Run CBLAS example
         if: matrix.full_smoke

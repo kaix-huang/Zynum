@@ -37,7 +37,7 @@
     }
   ],
   "build_root_digests": {
-    "build.zig": "f807d2ff64bc6b161d6f375cd33de15af8c7b660a97ac891fb08c977047e905d",
+    "build.zig": "44bfd26eb71db0557729a2ff44a75e721a3e2d9faeb99b5a9722c485e5c43c11",
     "examples/zig/build.zig": "a468031c30dba0ccf4244beb6decbe5f901ee6cd8219beb25504a793aaa5de89"
   },
   "option_surfaces": [
@@ -659,7 +659,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "72aa99429c3f061254a8690cb1984e402d0f146250d9d0bd082c87f3611b53b8",
+      "source_digest": "013bc1551b34c99f16aa0e01400b590f5410ee14e3b96d70191ee26b44cf0fa1",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "bench-zynum-blas",
@@ -690,7 +690,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "738699b16f9eb6228cd1d0dcf290f118823163c8c037addb5e9ebc8d005f5f3e",
+      "source_digest": "990368f543034a831c70f4fe33405c44740366f6ab7f9cb2138006746f2b3cc0",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-module-tests",
@@ -718,7 +718,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "2d753628993500753136853e9f2b6824263b462b7dbc751e25cddadf22d17313",
+      "source_digest": "56ef31aa72891d5823ab406ba2083e2949218ba7d99c524b388f39ccf87637cd",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-public-surface-contract-tests",
@@ -746,7 +746,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "66f09595a47e4327a504c1615e347efed4ec9949bf5ab2e35a0cc2f153942f3a",
+      "source_digest": "01ccf0a43c534c62e1dbc327dcff73d50b2697ba173e5353018d791b203786ac",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-cblas-compat-tests",
@@ -774,7 +774,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "2fa690b4444573be65d3529c13b6c7941e12f0dd36dffe5ee0758e70383982fc",
+      "source_digest": "da703fb2aed304589884599b4d8c6ecb18b971aa409a4143742d0f8e39b91010",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-compact-triangular-isolated",
@@ -821,7 +821,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "5cbdf7e77200abad25ff883483235101945f432d24b627d50ca9b2ccbb6631f7",
+      "source_digest": "ea6ddab8faff3d9482388c3a2d7484505a6e7f2097c8c03ebe86019d09b794d2",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-compact-triangular-isolated-test",
@@ -868,7 +868,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "27aba110f404ce4a23d7f66a4786e5e2ded31a563167fc49fd657abe79cbf492",
+      "source_digest": "880bfcade64af1fbef5ff4da9e6096b8c7f55e7ceeeecb7213d2c54bad8c9bac",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "dcopy-probe",
@@ -915,7 +915,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "4880a88e4282357e9ef06cc42a01517b34e740f017c36f3183ed0908f22c6850",
+      "source_digest": "6a9483bd4475809d1a5f5150a1ed700543afa5834f8198e37b89c627c71e0205",
       "artifact_role": "dynamic-dispatch-correctness-only"
     },
     {
@@ -928,7 +928,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "7de21e80947b85cbbda0e857eea4d0b60027a783c227a8e7f92b6e8fba7c3136",
+      "source_digest": "b782945407d9ac1b0f53ce2afb1e04acf65bc3d674d86bfc81cdbe7a20651048",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-fortran-compat-tests",
@@ -956,7 +956,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "c89d399ae0e21dd52e9fdfa2aef099e78eb7b74fe66950b58a66a0f745d7b3a4",
+      "source_digest": "6bd4a9fa429bc184e72157735c371268ef67f4033565faedc304dbe2566873d6",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-gemm-registry-tests",
@@ -984,7 +984,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "1f9361564779133824d1d4332568b3423ff6a257af2c92edf2363aa7bb232fec",
+      "source_digest": "0ae6e81c9dc433df6e809536d8f17feb45612d6ad77f58d3f36174820f2ab59a",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "gemm-sweep",
@@ -1015,7 +1015,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "317fc49435bf5dfa8ac326a9fb7f95e240ef874397fe626a1ef781d6608790b9",
+      "source_digest": "afe183ad0b3933f6c3e30511b66f81eb97dfa788a8805877d0a99ff3f24b5e25",
       "owner": "build-composition",
       "artifact_kind": "executable",
       "output_name": "generate_compat_headers",
@@ -1043,7 +1043,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "f72ff3a942cdc4b33e2a9319cca52d97f7c4bf7511975378b692ce81a6c7ca87",
+      "source_digest": "8388eea2c2db2a3d081da657351521d3135cd50a33d38eac6e326b2f51cb8a42",
       "owner": "build-composition",
       "artifact_kind": "executable",
       "output_name": "generate_kernel_coverage",
@@ -1071,7 +1071,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "327781dc08a5e94cd9d885313d9420a355572ac166cf87da67f383132a8ae706",
+      "source_digest": "d96908bf6608cd5fe13da29ec8d46cdbe7a499e2dcc10e5963c99aed1aa1c15e",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-header-smoke-tests",
@@ -1134,7 +1134,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "19486d96f22e3e21a89fde2d667b13c3442f01bb73245639e2d4f0cb3ac7a008",
+      "source_digest": "f32eeaef586ed31613f69a537f64f19180a19b73c664c873dd099a74746aa632",
       "artifact_role": "test-inventory-enumerator-factory",
       "expansion_relation": "one-per-applicable-logical-zig-root",
       "root_module_relation": "same-pointer",
@@ -1320,7 +1320,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "42e3cd555ffb94f8b14a37ac680429219cf0c6f0c05dc8c393d56eacd4de469d",
+      "source_digest": "83b0518f30327e23edd9650cea46e9cd42398effc280ee7b4f15b7cf61353b7b",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "level1-probe",
@@ -1351,7 +1351,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "4fb8999ef97aeaac6283adf6ddf3c75efda89e6629d3bf7d5429a7d054bd5c0f",
+      "source_digest": "df4154b3e3b8f9a5ddcf3d4d1fd3c4e3aa07c6d04cde66ebdd2c363bfe702bdc",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-level1-registry-tests",
@@ -1379,7 +1379,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "ae7a34c9df6067309bdb1a9c28a932ae7c4f77875f2ef63437342132a0da1f29",
+      "source_digest": "b388b7e7a884e6c2fb6cedf12fe9552e6b3a55d9ea5b73676e2eedd9f50c29cc",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-level2-compact-registry-tests",
@@ -1407,7 +1407,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "f712f6985e968b411012980d9f88a919a8a3b179138abdbf2fd5d0acd756e11b",
+      "source_digest": "b9d432ba2e2e45b6b596b0d8c727476f7142b7835a6f6e9b1c3dc5828c5027fb",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-level2-fused-registry-tests",
@@ -1452,7 +1452,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "65343411d51e0cd943ab23b05a86e7cbdb9d0cb4057091cc0f711c8a7a6a8fff",
+      "source_digest": "a25393fc716ec47ac66e314e9e17464af81e5161758ebaaabd7498b6d7acf3c0",
       "probe_contract_source": "test/build/level2_width_artifact_probe_contract.zig"
     },
     {
@@ -1483,7 +1483,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "3204a47d33f9b9842227daf4c607bbe396f24ac65d116fb3376e454c879c84d8"
+      "source_digest": "abc8a75606323dc11179c2ec5538bb32df1afd723ae041e48cee7c064240b634"
     },
     {
       "id": "compile:build.zig:build:level2_width_isolated_library",
@@ -1495,7 +1495,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "9f65ce36310115187457d2d0463e77b85c8b3046b575df7e3a3800d24565e80a",
+      "source_digest": "363c26b23821336981418dfeafb8491558f05de02e9663d96b7facad18734400",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-width-isolated",
@@ -1542,7 +1542,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "584e0a687a4f095d2ef8a54bd61a82b3eaa2e33ad65d14ba11f60279f8970720",
+      "source_digest": "02d1e43db407f3386572af3ad2e0eb7e95b538c27cd0fff33d516f1f7896eb47",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-width-isolated-test",
@@ -1589,7 +1589,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "5aa1e58ce6544dad1c8abcb1ad3d706f5952101a6f599ca6d2ab5b3971cea4cc",
+      "source_digest": "99e987b3ec3971e5fb79be27a560eef1faf491b55ca0931968a3e07a2de436c7",
       "owner": "build-composition",
       "artifact_kind": "library",
       "output_name": "zynum_blas",
@@ -1654,7 +1654,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "52eb177d2361453e59f5e667cf283c2272a08c9de8e045383a5f8d3465db94bb",
+      "source_digest": "136e45c156fc165524449176344d6b5c3c487c9ec86c4f8605a4deaa396fe514",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-modern-tests",
@@ -1682,7 +1682,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "7a95ab589da329ba5c3487c53e02ea7fccbd6705b61b6066469ff3f3bdd6a76d",
+      "source_digest": "d5489d9eddd155a7ce575f044f953297a232c615c392ff5e7b1a7613e60c7d02",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-packed-parallel-tests",
@@ -1710,7 +1710,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "72b7531ec44f8e17e4dfe8a9d9e6e0683f70c9e335ce1b26eaef954df2f6cf59",
+      "source_digest": "5022955e1672c6589bbf6e2675d543e2701c9dd6f9ff0cb7a1b58cdb07d53f9d",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "rank-k-probe",
@@ -1749,7 +1749,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "d7124dac14ba535bdc0a13a545d307396925de59a72925ea65575adfd395c156",
+      "source_digest": "66e497c0b7dbdd1b72a17631a48c12f7dd088d23182e03eb9468746e5c91e2aa",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "rotg-latency-probe",
@@ -1788,7 +1788,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "60f98e45bb53240c7fde0b647d135cb0007e5aacd2769df8b7b1a9f28e9fe88f",
+      "source_digest": "168d5d0fddef27d7440ad8b198de766178f24147ec193956aa3ae7bc7b58f4c3",
       "owner": "build-composition",
       "artifact_kind": "library",
       "output_name": "zynum_blas",
@@ -1846,7 +1846,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "c9018b15c25e94b29cc5ed3aedb5e3e9ba8120c321d91406540bbacc87ca16e6",
+      "source_digest": "7072d641da34f6ee31b116a7ccdd825dba3ced2bbf53cdadb5eb70b74212866d",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level1-x86-stride2-isolated",
@@ -1892,7 +1892,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "22d7aebdce16bb19ce60f2ffb53cc4b77eecd6ae2f5db129c712ab3e699049d3",
+      "source_digest": "11ea2fba5f10704dbd5eee9975374d2536bb2b4700c6ff347c72bc1c1242f4c4",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level1-x86-stride2-isolated-test",
@@ -1938,7 +1938,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "df8ca2027b9d95c34652f96b7f564b79c0b18d57d7f81eb24260cd3b5d7a2c00",
+      "source_digest": "13e83df5b9f8bba250c7e4fcf16bd49bb385d454168277db8c4a048508bcdda3",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-structured-blocked-tests",
@@ -1966,7 +1966,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "7c8f5965d054ff8784bbbb531d4fa0286d4c640ef44b184afbbfae77a186d20a",
+      "source_digest": "f94f0d62e7b753bb39b30ae26408d877269e48336c8f0b0813782b5e258423af",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level3-x86-structured-isolated",
@@ -2013,7 +2013,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "09cab35a73ec96361f94ebcf15d341bb25ba4219f19f26eadb3bbbf48e443940",
+      "source_digest": "439ecdaef6b587498c474e53c8c9f79c031c95ecd67e0115306bcc194cc38b73",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level3-x86-structured-isolated-test",
@@ -2059,7 +2059,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "d2820f6940519e9789af701f0ea05a0891673eb46499c558e62d16c81f908be0",
+      "source_digest": "e992c5bfc438eacab139b269bda44dece9b614aee71737c6062244ed3eeb718f",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-structured-object-tests",
@@ -2087,7 +2087,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "f6b084a3367cca5adef43f14a4b8888549a5f8377c526fb20a8ea636081670f2",
+      "source_digest": "9a110c93cb1e589fc81b89b527e8d28c7da80c117a57a5028a06af2618272b6b",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-symm-dense-gemm-tests",
@@ -2115,7 +2115,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "f7c8f74a613a530b857a026dbad461ca198e87e46ae35f006ed056311387c031",
+      "source_digest": "4c746bf754241b03d53b91af6c732b330dfe877527c7edb29fa7fd3c519a1ef7",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "symm-probe",
@@ -2186,7 +2186,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "55714c5b500d2a5f17474c65cc89a92c0b16dfe94dcf4c96bdf92a3c59458394"
+      "source_digest": "3c414447bf1f2e84e6dbb22df7619edaee4b81f36b8d4233cbb3c9797825470b"
     },
     {
       "id": "compile:build.zig:build:triangular_band_solve_tests",
@@ -2198,7 +2198,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "4d77060a7c603a9425df9881e714c5ddb3187aaf2d29a1961aaa9fdbb0704a70",
+      "source_digest": "8e6f5a0c18669a091a78d05596f42243bd0fe9f5e1899bed5389d846e42706a4",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-band-solve-tests",
@@ -2226,7 +2226,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "136576bec2171cf5cb2ed29de6ea4f084be1cb9acda3f3a824e7500058573e8f",
+      "source_digest": "c22566df65e42ea7948d5f219f28708e5e691d37d40d425666509f0aae28b9a2",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-band-window-tests",
@@ -2254,7 +2254,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "6dea7ed4ffa0e483ff02f8fb224cd097a1296268c8c081f39db2645e566d80ea",
+      "source_digest": "628ebec3f850c540ce73622f215c5a382478481848adda433f17e5599ccf59fe",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-dense-unit-tests",
@@ -2282,7 +2282,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "a536ed070751fad0052c49b1c55579123e667280ff2867f16948e4aba6a4cb58",
+      "source_digest": "e4f1fb51e7d02841d40ed82c80732fd14f37e1a77121c3a1c2e4ed39eeeeb8ec",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "triangular-matrix-probe",
@@ -2321,7 +2321,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "63412b75b32f8112f534d5aa2dc2c6ca8349f6dc0ebb2a44da2ed11248deee5f",
+      "source_digest": "e8425bac0d971c6bc7c23c67203fc00230183b82c7d28095d20972f13310ac47",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-packed-unit-tests",
@@ -2349,7 +2349,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "6963042bd5f5d093b989fec7d2a116bd572ec7368ce02a8bb857192cd4ada5e5",
+      "source_digest": "93ee74ba03fe95111f177e45dcc3b15a128d81993cf71e1b17e89d4cd4fbad81",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-parallel-tests",
@@ -2377,7 +2377,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "32cb0a514c651e775c3284920c0519306599b8e0a85d44e88dda1387d01923cb",
+      "source_digest": "448f41d43e5c646a7684cc8e89197e71fd834f6a51b7957a2bf298ca38975039",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "vector-matrix-sweep",
@@ -2408,7 +2408,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "ec10c832edd501bd12a698a8bff88b6bf7d4fb28fc6e786ba39a62275b845419",
+      "source_digest": "54143f1e1fe3ebe807c45bb52713fb984698d20b8600a9ad492afd171d25486a",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-vector-stride2-parallel-tests",
@@ -2436,7 +2436,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "be18eb34f3be6850518bf1e8f357eb9034c1e688e14fe627827210033703ab63",
+      "source_digest": "9facc9762c7018932713d7c0f39b173414bb1736dcbb469c1a6cf4800e5fe69d",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-public-surface-contract-tests",
@@ -2496,7 +2496,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "32710085385b68b274b7da858dca40d85d3f73dc5fc2e1f3d92b53a71ac3c023",
+      "source_digest": "ad8aef5c8329a3b367b9b417057f13204705415eef144c2a7f257b5e7c9b9e96",
       "artifact_role": "architecture-exclusive-kernel-tier-factory",
       "expansion_by_architecture": {
         "aarch64": [
@@ -2564,7 +2564,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "df7ebd32f1850264782b8eb1fc9a4bb4870ecb175782d68511be0f8ab39f6251",
+      "source_digest": "0de6b21a2f909e722cf23c40cc3a9641148fbe65b965260c260d6e37fef6b2da",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:bench",
       "source": "emitted artifact",
@@ -2584,7 +2584,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "8a4d8d8c52fd82543ca798f56410c7eac9f0d032502eaa1091098a2a2517df5b",
+      "source_digest": "e155a256d269fde9f5fab095a876b191ebae58d17ea3414c7ef76cd5f4e7dff9",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:dcopy_probe",
       "source": "emitted artifact",
@@ -2604,7 +2604,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "f9788d87170e6f2aa34992e7b4b41c4f6eeb6e56c5a7b8cbb6b3faee4f6de7ef",
+      "source_digest": "217f8e35fec6e0094da64722eca1018c000e9829ce522374eb06c7684bd985ee",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:gemm_sweep",
       "source": "emitted artifact",
@@ -2624,7 +2624,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "7ea52442b24702cc16a80a387ac0fcef03a5cc4da516a7bab2986aabd6cc1791",
+      "source_digest": "af707b626ca73561787e665504a4c368fcd5e969a40bd99a9be88ca826e0507c",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/abi_manifest.json",
@@ -2643,7 +2643,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "e204ec9a7123b70ad9fa51308086f7ff786926e326a09a3c3b3f319c33f3ceb1",
+      "source_digest": "5b9548169e3990d2e2b87b5e8862d315064418c20debefee5267ac371b1e5825",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/blas.f90",
@@ -2662,7 +2662,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "695b18e2fdf3bcf739928f0c3a4947f770beac196b297c14a1c26d7be25bc607",
+      "source_digest": "d2ae510e73b0c5f0947c3060cca732288a3cbef31cac4f6f5224833d018cb69a",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/blas.h",
@@ -2681,7 +2681,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "b86a20c111e53474cdf03a25d7a0477929b10e0f49cde9a04dd46fd1e23937be",
+      "source_digest": "551362c8e2381aa2839cbd54a981543fbf15b35da94f7688ac2867d43b827894",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/cblas.h",
@@ -2710,7 +2710,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "84ba1cab3790ccf58d9e4acb02af2570a490b64e9aa2fcc813dea687f39eb86a"
+      "source_digest": "b6dc24b6e0861f8554b8c686b94968a211bcbda0f71fd1ddfcbc57e87f2c4d55"
     },
     {
       "id": "install:build.zig:build:install_rank_k_probe",
@@ -2722,7 +2722,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "26803dd20134258a6d81cf05487500a73cef175df25b0e3ddf3051be1c91b9f0",
+      "source_digest": "0f0b0be6553f208b8036cbe8eca55f1ee401ae7a5dfa07826fa06f25cb835e57",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:rank_k_probe",
       "source": "emitted artifact",
@@ -2742,7 +2742,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "f634c163f2da0ffdef876c55941098e953de8bbf730c75f39f0a6d56cdd54dd1",
+      "source_digest": "279fead7839cb87138f6c7cce12f92578424527634bb81958e88cc43f0481f59",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:rotg_latency_probe",
       "source": "emitted artifact",
@@ -2770,7 +2770,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "1412850d8e03ee6e1f7e71c34d0b201c30c73413931d559458eee95b4eec023d"
+      "source_digest": "3b5e210c7a47db6af65799aded57d67abd21ba1a3700a4ca2a6e06257c4df1b3"
     },
     {
       "id": "install:build.zig:build:install_symm_probe",
@@ -2782,7 +2782,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "6ee3b0eda2176fc47b6d3f31b1f3c849eb28af57aa58fe7bc23136aa45521484",
+      "source_digest": "affa7a30b23a5c75c50429b8b3f44ad7511781d45d431c166517c5e7c34f1924",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:symm_probe",
       "source": "emitted artifact",
@@ -2802,7 +2802,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "2bf81100f1313727e5696bcdcdba0dfce2e11853106379ca2b96ca7c4e070347",
+      "source_digest": "ad72fd8536865bafd63a9bf8b021b73bc746dcf4b63f23d12fa571b9a9ea4204",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:triangular_matrix_probe",
       "source": "emitted artifact",
@@ -2822,7 +2822,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "1ff32c1f30e3d865c986867c5b1de2ab41bf507657097f870218a4c13351585e",
+      "source_digest": "7c935eb29452ecb8b5f09d92b34c3e9778e4a0fd15edf27e58a863f18cf13c47",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:level1_probe",
       "source": "emitted artifact",
@@ -2849,7 +2849,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "92a4d10959d5daf5c977ebf4984ed25e80062f648bc206123114fa235a6ce223"
+      "source_digest": "0e8b05ed38b207130e23687df5008b970e5c6c2a2af9b5b2a647d82519e0a167"
     },
     {
       "id": "install:build.zig:build:pkgconfig/zynum_blas.pc",
@@ -2861,7 +2861,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "08cbae90099878753ca9f3523b1e1518b6179b09c74123a488f7335314c69041",
+      "source_digest": "92f674f6b1b35d30187a6f7993d48641d9572673a00d14951a5da226b8bf0dba",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "pkgconfig/zynum_blas.pc",
@@ -2880,7 +2880,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "4511e3b119fefba9bdf0cff58935b0a4f437aab803cf682206c9e574fcf00113",
+      "source_digest": "44d8ebe0fd262dcae98e661f7d55e0fd3485d4e332866ed4755e865e73ee3305",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:vector_matrix_sweep",
       "source": "emitted artifact",
@@ -2920,7 +2920,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "53067d5152e09725cb871e7ef681a2c7ca27d0b74bdb521548706140b38d4dbc",
+      "source_digest": "523d54fbfd074ca3276c03a0be40cb886ee0c92f2748bb69ec2e10fdfa1998a2",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -2945,7 +2945,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "20cc635f66905b9bf67ca6bbc801b5592a31ca3357933216f2980e2c75336316",
+      "source_digest": "18e358858c34e02dda3ede181e23224f8f449e832895da3ca22ae74bf158918a",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -2976,7 +2976,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "65d75eb277575f3fd151fe16bbd20cd67fc831ff695b170a0947a302e204d174",
+      "source_digest": "16b5c92d88e279ac38af8a43d616a3091874e28f238b8811d3e65c3669c0b16e",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3002,7 +3002,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "6d7a9ffc82dc74dd67b0669b49a2035e036378c2c1c132f2802f93829bbe7b74",
+      "source_digest": "1580f7ef014ca862be333d3b81a22e0f52f26ed1c4d3e64f33c4c0c764419c6f",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3040,7 +3040,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "df3488f419934157568b8a1d690d6a6dc86245345cc223bdcd5c107a71f08029"
+      "source_digest": "47d368aa975cc5eff07bc399a672e2b2e8ab9920c280d66a328cc9174becfd73"
     },
     {
       "id": "launch:build.zig:build:c_header_smoke_test",
@@ -3052,7 +3052,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "01e246dcbf608ef8b46f5362e0afb2281c46b3327ff3e189a20cfc27a40926aa",
+      "source_digest": "a767d5821877eb6b5a0af8debe7b279d42465a676380a836c685ad8c6d1c036a",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3081,7 +3081,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "652f386099f4315818e3974577d688c2ab52a236e9cba4a7ab722e96e6163901",
+      "source_digest": "4d77879831749388827c7854d3de6f798005487ef3b37f4cf56cf6a2944d325c",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3110,7 +3110,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "a3cc45b033c2ef2a9daf305abb2c962110f664154931be1e2468cf1526a7d750",
+      "source_digest": "adf0d8277ddc6a38e7a7469d5b573a4fcb0cc8ac336506bece3f499f6ee3d0f1",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3139,7 +3139,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "63cf53f868c1db7e4aa7af4fbb50521c3553751037560ebdccd99657c34afab0",
+      "source_digest": "c0fc27e42d296c46907e3972c68c20128c6c81f4598b91b8f6acfba870b38ae2",
       "owner": "build-composition",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3162,7 +3162,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f64953b099880fd67925b17417ad0f96e792266bd686672612084dc2c11a0923",
+      "source_digest": "aeed64e6b9a99354d7b1817486def686b4f7e4e5f6b69d1ddc90a6cbb3be1a91",
       "owner": "build-composition",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3199,7 +3199,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "e4be41ab7e419765d61a74e1a981c583dbf2107ac5ae83c040c4d12301bd2aa6"
+      "source_digest": "8b895aded8ec090fa8542ff35cbb99fe3b0da23959a5b14d449e9105ab88ced5"
     },
     {
       "owner": "test-infrastructure",
@@ -3308,7 +3308,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "0fab9dbdce8621dd31af15f9d8569e65f7c221eedf063968e3045bc567e69c4c",
+      "source_digest": "1b339130cbada8672e06d3181828a9ada4c1f94cd0e9b3044738699af4fffa17",
       "windows_artifact_contract": {
         "condition": "canonical native Windows x86_64 baseline target",
         "emitted_artifact_id": "compile:build.zig:build:lib",
@@ -3349,7 +3349,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "29d5169bde6a65350dc023623b174f6bb2275178653dbee8d80dfc56a0ebcdb6"
+      "source_digest": "2460e5b18d280a423067a14d35a554126c873bda8e6bb9b997d29b92df1727f0"
     },
     {
       "id": "launch:build.zig:build:run",
@@ -3361,7 +3361,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "416fe1b3d5837a3c5260270666534f6a753f24ea6aae1d4f1dcae4695e685ce3",
+      "source_digest": "012d64b308e76f602efd995076e50702b7817fafe307c12d69d0cd6b322b98cb",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3386,7 +3386,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "64f88f6044f284d4ff3e44268b063e027de491b58e970e4c6c95e257fe790847",
+      "source_digest": "e8a69e888776276baa843ec00e2056be2105744348f229e8ddf361a24b5104b9",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3412,7 +3412,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "2b448e87676c78851ccda60b9283ac53aae3fca6027150fa5071be3b4b482037",
+      "source_digest": "981503b619085e00c03aa1d5a4b19dfe2fc234ce9a696200c31c8e00aa0a70d5",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3437,7 +3437,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "58439ec2bc0adbb2e7b6fd78104206c28980a1cf4b5e49830bea61f7fe18987c",
+      "source_digest": "87f46a6c2f5a5d758f98b20c7b40145b37c2f517118198bdd2fc81de052a5d65",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3462,7 +3462,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c705b47199127aff29824381106a8c5c2289122b18b2c9ef5fd896d4f5201377",
+      "source_digest": "19e8296ca8333d72bcc860a3688a1ccbe7e95f46f812148787b78ea280d68be3",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3496,7 +3496,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "89683c9a5ed9aa8e4c9e82598c5bae70987748a4226c06bb532fd9fb2b414ccf",
+      "source_digest": "d1feba846d874df070694ddcb54b905619590b23ec90c317911f97a3e35454da",
       "launch_role": "dynamic-dispatch-correctness-only"
     },
     {
@@ -3518,7 +3518,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "eaedef7f904720e926bc1551cf887a0068877bb648c07250f7067207d313f9b9",
+      "source_digest": "dcbe4e7b326de0950a35bc37981a757ba095346dca8d98e8e5c060ecaf9b72fd",
       "launch_role": "dynamic-dispatch-correctness-only"
     },
     {
@@ -3531,7 +3531,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "d42cea3829cfa8fb57c0ba0a17854649c1312e85b3901dbc5c55070369b0594c",
+      "source_digest": "56901da5e06d60cf745db6a6663ee10413a5ab0efbd01b96c0e85febeee3caab",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3556,7 +3556,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "7fcb5695d6178c370a6431665cec2f2fb53d0f9ddd855fb79a5b55e183f23132",
+      "source_digest": "299f5c11812b4537025cfcee0ec2d4a52cefa89bf6a79d87921394b6c539c257",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3581,7 +3581,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "6d5395c1c56608d41d12556939dc2ac0ea1701965a97bd66058adff999921cfc",
+      "source_digest": "5b1b5da380dd5c489537301fe843e13a74c8b789a2dd9b132703174ec56d08c4",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3609,7 +3609,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "d08dbed467b5b1809be369bc1677105d83f06bb2eebca560d1912abb34f5e474",
+      "source_digest": "066626ca920cfa5a75ea1c1e2a3d720d2a8c540f6b3af0aab1c7febfdea95a13",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3645,7 +3645,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "ddc511fc303f60e6a9638ba36c453d43434feb3f3805fe6cc7ab2fb2a7d2ff1d",
+      "source_digest": "e357683a581b8fe1056e7e099fa306c0bfed72adfd8b281da3a251e2fff0f71e",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3689,7 +3689,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "5e389a40ad86d9d34a5f414192140bbfb31734718f30ced2c003d3296a9da408",
+      "source_digest": "50104ac8abe825486eec380e48fd76cc48a4161480a4dc52d3ee9a0fb85d61ed",
       "launch_role": "test-inventory-enumerator-factory-run",
       "source_factory": "compile:build.zig:build:inventory_tests",
       "argument_contract": {
@@ -3744,7 +3744,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c2e768946bc608d07a21e6fda999056a64dd2998fed08832ab879734189627d7",
+      "source_digest": "66d198d8126bea4e51157e292daa5ddfa0d410e5b2540729624916785d0dc510",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3769,7 +3769,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "afb42286ab179fa21672ed7748fbcd0dfcda0a93e746d9e153e5ab35d4c2498d",
+      "source_digest": "194a8c501b81f4c38b1554fbbc323b5ece4b291972a4de365bf81422e5854232",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3794,7 +3794,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "1aec1f5042f47ee34c7eb5e7e66f71d2bafe0cd2ec7d093fff24ccb80b2ff55d",
+      "source_digest": "472bba2a7946a1b6c37199e55c9c853dfa66587c7cb89e95777bcf6e26fc7a5d",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3828,7 +3828,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c83602846ad231080a60742752e5f2801eca66824e907ed55d7a787404ba3795"
+      "source_digest": "b894d10894cc8eccb245a58eaad87e7ea4f55ae7c4c9739dc218ec0a3770f331"
     },
     {
       "id": "launch:build.zig:build:run_modern_tests",
@@ -3840,7 +3840,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "4f9d91d406ab59914c0d9b27cb7a8e21ed160e541ae1391aaf90ead177e28ea9",
+      "source_digest": "6c0a6d2d5b0b95dc7e08e65295f036f9b2802727a8275c8c2bff2f2cc29bf6b0",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -3874,7 +3874,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "ac038158a4de9a69e7941d083118ce3622a8840e31123c0a2411ef871d0affd2",
+      "source_digest": "1e0b0ef6c96dabe95678311016d0730b13c05df9f74af6842a6a4c26dc7bb204",
       "launch_role": "native-feature-correctness-only",
       "source_compile_relation": "same-logical-test-compile-and-root-module-pointer",
       "expansion_cases": [
@@ -4001,7 +4001,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "ca0de28ee84e96b61bef8d452b8d07370702932785df8d5e88d2a3d714cd21c9",
+      "source_digest": "30961db11331d4a2366ae60c2d03e23b68ae5e263acbc84ebfbe028b135ebff2",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4036,7 +4036,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c83602846ad231080a60742752e5f2801eca66824e907ed55d7a787404ba3795"
+      "source_digest": "b894d10894cc8eccb245a58eaad87e7ea4f55ae7c4c9739dc218ec0a3770f331"
     },
     {
       "id": "launch:build.zig:build:run_rank_k_report",
@@ -4048,7 +4048,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ac30bf09cc3871668c1065b4195743d1c7a7540eca81461d0b226e36f7c025aa",
+      "source_digest": "52cc1cdfbfb9d6b897ed1b0b00156981856fa38e472deba7015bfd32920c3c49",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4081,7 +4081,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "eaaba7b7f7a64211e2a7f2dd8cb059a08b01f1c09bebaba0734e1af1b2eadd96",
+      "source_digest": "4d120a35afcb1a94e81d9ac32f5782095a1d2e140d862619b066d5b83f9ba935",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4114,7 +4114,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "6aff5a931b6f2b0f0af1398a64a68cffaa5bc7b00842b69e494c87d5f91c923b",
+      "source_digest": "4458c0ddaf49051bffb03c19d2d33b84711e08feb6c78f202d6aa90cf2eb747e",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4139,7 +4139,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "144d6626daabd11f5bc0aea6bf04deeabd22a699576e8bfeb4d354f1fa2575ec",
+      "source_digest": "fb294d40c9a329a90d62bf46b32979828d52a7bdcae0173e0e14fd03047b562f",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4164,7 +4164,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "779e59360d26cb8e544018c1bbde9c3c5832cc9c35d5af68902bc90cedbfb7a7",
+      "source_digest": "7afffd69574dfccdeda7c55e455c17228985825e505f62a53793968db81ce1fa",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4197,7 +4197,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "0488018cef826daefc185e5e191b32e8ddf5daefc584e241153f54c723b18a12",
+      "source_digest": "1b4198223c23f9e9fb2a1da771ec81668f32bd1504c429b8fdaa64ed9714307c",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4222,7 +4222,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "83ec2c4afc3f9d06af0c8793bb5937d7f17d4e7a485b78ef1979116cd085a534",
+      "source_digest": "f954a8ee4301faaf8ddd8f818cc708d088f8b3f2aa0eca8c5083d483d72d8aae",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4247,7 +4247,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "ae20218dd432d24a3cf8d7f194887c2f824c8d4ef981bdd9ac6783dff94ef137",
+      "source_digest": "c2f1a11e5ba62b72e8df7366bf46cfb1db0560f8de7d325bef3702d0dc969196",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4272,7 +4272,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "23e1ee2a02965cdbbd522335d5f2d23373eab3aa5e0ae1e3c1e8ad2df4c088c1",
+      "source_digest": "f2e775644284027013541f9c3dc8a189dca6c3ace0767ce746cd0c2c122406c9",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4305,7 +4305,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "cbba3dde9dd6a303edc059c22c1e6801ea23ccc09ee67699a2d0bae67d989baa",
+      "source_digest": "68f322cf728d29000b00cadab34397ca2cbaed131d5d869b88259f331fb139ff",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4330,7 +4330,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c0f4ad35c02cd28603f325633317d7219dfbc6ce09db12eb18d77043dc3fd98b",
+      "source_digest": "28045bffde2db29fa9b0e2bb8b662b240007d210a1391fa8e8b125f9d287a31d",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4355,7 +4355,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "9dbdcccc08eca660042906591c7ac8de1a186faed5d6d1d9550507e778022694",
+      "source_digest": "a7bed7fb614c6bc44a2cae9f97423d8b8ee52cb6aaea0ae7fdc9cbbd3f93a44c",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4381,7 +4381,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f57887b1cf20956d922bd292ce12b96275d03753bba090196e9748ebcdd30393",
+      "source_digest": "b0a0385b9b3b5c68b515b46f9f0139fee60ff71d2f314a08906f0a366a305ca1",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4406,7 +4406,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "5e39de1a9e8058ffef049454b26e7e34ccdc376c2cfd35909fb722273f8d1013",
+      "source_digest": "96aa7898414b85f9ccbc363502272a210c78cd4ec5e89724f1ed1c1b4d4b8dc8",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -4444,7 +4444,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ec8ea7e1726ace8481e22b7c643a80170a2736c2e67780120a54dc317b9cdf6a"
+      "source_digest": "737654df09d2f72c192cd8d7e88706c17aa5bd5d3830c6003832fb757a4d5432"
     },
     {
       "owner": "test-infrastructure",
@@ -4472,7 +4472,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "a6e1592d0fc462477d6b6aa45a67560733f11f44678c3a169c5fbd6c72c922a7"
+      "source_digest": "dc67b1f5d176ae3474c510c90d7963828979e4d266713d91f124393e90dcb24a"
     },
     {
       "id": "launch:examples/zig/build.zig:build:run",
@@ -4507,7 +4507,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "2971bd94e767d2eed7137643b2b215496c089f25c35d1b2ea2ced505a14c19cd",
+      "source_digest": "aebc7b678421fd561ce2b1df9f46405974e3667b3003fd2b4d01615eb25b37a6",
       "owner": "build-composition",
       "consumer": "blas_compat_mod",
       "provider": "compact_triangular_isolated_library",
@@ -4528,7 +4528,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "98613a711c6106f08e4f8a386c8fe257fb0c5e098e257846a11a57431441d0dc",
+      "source_digest": "57351063aad1cb69f34151ca17cc2af8d8e8524a02999b5b62d501a93b4a639d",
       "guard_digest": "9f5e931c4f515553d83e3b2932fcdb11c211cb4c4c5f4ef6750f9dfb6d466c96"
     },
     {
@@ -4541,7 +4541,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "0ce4be578f5a79ad0d05dbf002edd96bc4955c905c88f1e6387847670635fc04",
+      "source_digest": "f67d4bb8fddd781a33cf354fe4fe64f9e69be0b013eba3a7e4e4616217631a19",
       "owner": "build-composition",
       "consumer": "blas_compat_mod",
       "provider": "level2_width_isolated_library",
@@ -4558,7 +4558,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "2ec9bec38656a0fc9d4f184ef7462e4b1863a03662848c54c927e676c1e53634",
+      "source_digest": "29b36dc147da35ca7f470a5502d4530ee63ef8c6a88f546ab8fb4472b100a0b5",
       "owner": "build-composition",
       "consumer": "blas_compat_mod",
       "provider": "stride2_isolated_library",
@@ -4575,7 +4575,7 @@
         "ordinal": 5
       },
       "call": "addObject",
-      "source_digest": "5f104375b7947f9f422623f28f5a00c173d4469ce669a2485e03d002db542d74",
+      "source_digest": "ac677705912b37601b0206795f68978501b2d9957723b062ce2f1bb82dfb8125",
       "owner": "build-composition",
       "consumer": "blas_compat_mod",
       "provider": "structured_isolated_library",
@@ -4596,7 +4596,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "98613a711c6106f08e4f8a386c8fe257fb0c5e098e257846a11a57431441d0dc",
+      "source_digest": "57351063aad1cb69f34151ca17cc2af8d8e8524a02999b5b62d501a93b4a639d",
       "guard_digest": "935f825b611c6f73dc089c75dd975d8e3d3a4d7d2fcb2dbc6bb3f78233db3ea8"
     },
     {
@@ -4613,7 +4613,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "e2e224cbde71e86afe26bf651b9db31a8e9fda55142b6826fd0f2a18e9e86d2b",
+      "source_digest": "a3519761a840f07a7179d1de2556f2717ff90f199a169c7106894fa8f44e304e",
       "guard_digest": "1f5c733b1da6dd7ccfd334b15a6f08629c6180248d0b21564d8ce7d3f351f369"
     },
     {
@@ -4630,7 +4630,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "63f57e5f7767ff2e8e26a688ce09ee90f1a69552227d8959c3d13ed30bd7cda8",
+      "source_digest": "c43731767c982813cfd5cb628d4389d8102a268055a4c0a030ab4e2a15e21ec4",
       "guard_digest": "b6f53b653b563de1be81bd48c63552502b941de3b8480488278fbaff8f4c2b6a"
     },
     {
@@ -4647,7 +4647,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "f41725315930078eab038b6329c5ba34456e6aeabf907484f2773587c73851d0",
+      "source_digest": "542d682d2c4ff6c635547be2035e0eba44a5a450bd52bff65ebd465e256636c2",
       "guard_digest": "8c7a9ff419035b747627650795c58c33493d367627869e85848c8a395286c88f"
     },
     {
@@ -4664,7 +4664,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "a404a9880fe4178c7d651d3b4a3b5c89557bb7fc68781bcd46c8e1e62e95cfcc",
+      "source_digest": "0ed4474426d211b1f21bf1803817b302acfed50c86079efdb70cbaa3dd279f5e",
       "guard_digest": "da7fefa0ba27303696ac70928d856ab5c02a2b080b10ec15e9e451f10c944dd7"
     },
     {
@@ -4681,7 +4681,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "98613a711c6106f08e4f8a386c8fe257fb0c5e098e257846a11a57431441d0dc",
+      "source_digest": "57351063aad1cb69f34151ca17cc2af8d8e8524a02999b5b62d501a93b4a639d",
       "guard_digest": "03ec1a9ad6fd4f4ff764ee9b69d1767d91dbbdaa29839d61aef2f39711f00bdf"
     },
     {
@@ -4698,7 +4698,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "ca6e659013c5a099b3e4314f40f6112955851b8538bf32f5aa916205b29136ec",
+      "source_digest": "c6b5fcb9bc44616f8e3da1e56fbaf4f60a2922505ec45a191fb3c3a55b21ab40",
       "guard_digest": "1cb7d956d90af570a7ef6187abd452749932bfb83588774cbcdd114449e719c3"
     },
     {
@@ -4715,7 +4715,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "4c1a82078059b12990f8debf7df447106720bf0f27519859b4db334f5ae93090",
+      "source_digest": "2c439b2476fb652b06438dc43e5883eeab2b2ca755e9ca2e2d7aee635996261c",
       "guard_digest": "4d98ade8a82af2d69f5f1a9f1c8c71ac0642b424e6a4c18b6dbb6bd1083b037d"
     },
     {
@@ -4732,7 +4732,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "4c1a82078059b12990f8debf7df447106720bf0f27519859b4db334f5ae93090",
+      "source_digest": "2c439b2476fb652b06438dc43e5883eeab2b2ca755e9ca2e2d7aee635996261c",
       "guard_digest": "51ff76100f72393eb4e305048cec26ec86ca3fe038620770989e294b3935bb39"
     },
     {
@@ -4749,7 +4749,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "e2e224cbde71e86afe26bf651b9db31a8e9fda55142b6826fd0f2a18e9e86d2b",
+      "source_digest": "a3519761a840f07a7179d1de2556f2717ff90f199a169c7106894fa8f44e304e",
       "guard_digest": "77f6089f96e7715bf95d1bf2457b136bc10306783eb20e9bf835a13e8aba87bf"
     },
     {
@@ -4766,7 +4766,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "63f57e5f7767ff2e8e26a688ce09ee90f1a69552227d8959c3d13ed30bd7cda8",
+      "source_digest": "c43731767c982813cfd5cb628d4389d8102a268055a4c0a030ab4e2a15e21ec4",
       "guard_digest": "eb0a922a9f7f962ff0ac0614485d3635305fb8deb08c19c8e76e6f9f9f0d6b7b"
     },
     {
@@ -4783,7 +4783,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "f41725315930078eab038b6329c5ba34456e6aeabf907484f2773587c73851d0",
+      "source_digest": "542d682d2c4ff6c635547be2035e0eba44a5a450bd52bff65ebd465e256636c2",
       "guard_digest": "c9e174d2589b6bd1e791d897af30228240cc30d24d57a60041b13adcd591963b"
     },
     {
@@ -4800,7 +4800,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "a404a9880fe4178c7d651d3b4a3b5c89557bb7fc68781bcd46c8e1e62e95cfcc",
+      "source_digest": "0ed4474426d211b1f21bf1803817b302acfed50c86079efdb70cbaa3dd279f5e",
       "guard_digest": "3c09ac0b39b8fe7adbb8e1fd2d540836a1097958dd22ff3e55716d799896b5fa"
     },
     {
@@ -4813,7 +4813,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "253f88398394cf40df9667f8a607b5e4caa58816ef616a742a6e39d47e6f145d",
+      "source_digest": "e1b0911a502f0b41083bdb780504adea1c2ccd10fe11aeacd7ee2e28e0dba127",
       "owner": "build-composition",
       "consumer": "structured_object_test_mod",
       "provider": "structured_isolated_test_library",
@@ -4834,7 +4834,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "ca6e659013c5a099b3e4314f40f6112955851b8538bf32f5aa916205b29136ec",
+      "source_digest": "c6b5fcb9bc44616f8e3da1e56fbaf4f60a2922505ec45a191fb3c3a55b21ab40",
       "guard_digest": "688e54ad1236fade4a98aed48b069a6689b3ecde35ec3057f3eca6357346930a"
     },
     {
@@ -4851,7 +4851,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "ca6e659013c5a099b3e4314f40f6112955851b8538bf32f5aa916205b29136ec",
+      "source_digest": "c6b5fcb9bc44616f8e3da1e56fbaf4f60a2922505ec45a191fb3c3a55b21ab40",
       "guard_digest": "87ab7e46711f7bccb65ace75ec9ccf77a7c5d39776f2e49dfce10aed5da6ffc1"
     },
     {
@@ -4868,7 +4868,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "ca6e659013c5a099b3e4314f40f6112955851b8538bf32f5aa916205b29136ec",
+      "source_digest": "c6b5fcb9bc44616f8e3da1e56fbaf4f60a2922505ec45a191fb3c3a55b21ab40",
       "guard_digest": "62b46bd1598ee7606b41c4e9621c2199932a8126ea188c8b69af06cbad7a9b05"
     },
     {
@@ -4881,7 +4881,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "2971bd94e767d2eed7137643b2b215496c089f25c35d1b2ea2ced505a14c19cd",
+      "source_digest": "aebc7b678421fd561ce2b1df9f46405974e3667b3003fd2b4d01615eb25b37a6",
       "owner": "build-composition",
       "consumer": "zynum_blas_mod",
       "provider": "compact_triangular_isolated_library",
@@ -4902,7 +4902,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "98613a711c6106f08e4f8a386c8fe257fb0c5e098e257846a11a57431441d0dc",
+      "source_digest": "57351063aad1cb69f34151ca17cc2af8d8e8524a02999b5b62d501a93b4a639d",
       "guard_digest": "7a707b11221f5f1865301afc40074e1b0f2de338ca7480f53fcdb55defd5d9ae"
     },
     {
@@ -4915,7 +4915,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "0ce4be578f5a79ad0d05dbf002edd96bc4955c905c88f1e6387847670635fc04",
+      "source_digest": "f67d4bb8fddd781a33cf354fe4fe64f9e69be0b013eba3a7e4e4616217631a19",
       "owner": "build-composition",
       "consumer": "zynum_blas_mod",
       "provider": "level2_width_isolated_library",
@@ -4932,7 +4932,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "2ec9bec38656a0fc9d4f184ef7462e4b1863a03662848c54c927e676c1e53634",
+      "source_digest": "29b36dc147da35ca7f470a5502d4530ee63ef8c6a88f546ab8fb4472b100a0b5",
       "owner": "build-composition",
       "consumer": "zynum_blas_mod",
       "provider": "stride2_isolated_library",
@@ -4949,7 +4949,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "2971bd94e767d2eed7137643b2b215496c089f25c35d1b2ea2ced505a14c19cd",
+      "source_digest": "aebc7b678421fd561ce2b1df9f46405974e3667b3003fd2b4d01615eb25b37a6",
       "owner": "build-composition",
       "consumer": "zynum_mod",
       "provider": "compact_triangular_isolated_library",
@@ -4970,7 +4970,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "98613a711c6106f08e4f8a386c8fe257fb0c5e098e257846a11a57431441d0dc",
+      "source_digest": "57351063aad1cb69f34151ca17cc2af8d8e8524a02999b5b62d501a93b4a639d",
       "guard_digest": "c8b192e4bb2afc9f41a2d974f6d6b123ea3d821fac4cd88cb8d98604307131af"
     },
     {
@@ -4983,7 +4983,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "0ce4be578f5a79ad0d05dbf002edd96bc4955c905c88f1e6387847670635fc04",
+      "source_digest": "f67d4bb8fddd781a33cf354fe4fe64f9e69be0b013eba3a7e4e4616217631a19",
       "owner": "build-composition",
       "consumer": "zynum_mod",
       "provider": "level2_width_isolated_library",
@@ -5000,7 +5000,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "2ec9bec38656a0fc9d4f184ef7462e4b1863a03662848c54c927e676c1e53634",
+      "source_digest": "29b36dc147da35ca7f470a5502d4530ee63ef8c6a88f546ab8fb4472b100a0b5",
       "owner": "build-composition",
       "consumer": "zynum_mod",
       "provider": "stride2_isolated_library",
@@ -5019,7 +5019,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "6600a79b1ff066b14b4335f5c9c358fefe0e35e225196600ffde921a601cccf5"
+      "source_digest": "e612d390cf1c393c12ba7fea1fefa4d0dad541edee1bed787d3b7ad698c17b3b"
     },
     {
       "id": "option:build.zig:build:bench-accelerate",
@@ -5031,7 +5031,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "a53d33d43f8e09013887e2f2ae71d8ff184ecac60a9364e93c943b7445d0005f",
+      "source_digest": "96716a6da4b96d884721704fcc294e4f16ab5d0818e5b8e950ca7c470d4fd4a4",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5045,7 +5045,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "a145b10a8846b6ae543808af0e4f6bc8cc902c051fc9eb5a8bcf47002edebc75",
+      "source_digest": "074908a3e0853dc265337d1f5b6f788e7c01e38e26eae6baa99bfcdb89513374",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5059,7 +5059,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "d01c2883a9f38fad689a68c7d02775e6a051a56f7f3379968c118283caa5c5f6",
+      "source_digest": "ff690bd57d6833432d9535e443cfd2250a4d2d164917884d45c1a1332a5a1a35",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5073,7 +5073,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "ae2ea482fd8dd99223cf40e606f5d416be99458aef291f377bca5d04d9447b29",
+      "source_digest": "6ac7527010d2b771b643aae5170ef2e6a23ce404af1367a90042f6f10b95d0e3",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5087,7 +5087,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "998a6eef796edae3e64e04c387e4260c0da317f1f8989d63ec491fe02e501add",
+      "source_digest": "ce58c325c6473d81b61f0bfa2aaf922f4861ac34cad9351a4722fdeb75c993b8",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5102,7 +5102,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "6898313c72b3b5b9aaba263be1c6e5c5418ee3e58b2443fd2e305ca9d5bcaee7"
+      "source_digest": "9fd563321e7495105fbd58ac4b88c18d284a6ce69abd73962af8b25b91e5f83b"
     },
     {
       "id": "option:build.zig:build:host-tool-smoke",
@@ -5114,7 +5114,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "68a86edef201651357981e14556b3675813bf64701a6204388c6dc92300c2475",
+      "source_digest": "48b143b12b1b1e4bd158eaacc9075eac8b626a19ae43034690abbe2935586411",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5128,7 +5128,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "5cdf53ad8e03ddd5b9e7ca621d929373ba4e7fe991e1d5e597a61e3e458d7969",
+      "source_digest": "b47fd1fa4124626403ab999c17cc83f256c4b343c454b471425e5cedb83bc543",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5142,7 +5142,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "ba28a8fe4186681da470c3df8526a098ee8dc7521ac56af87692179c5798ae91",
+      "source_digest": "3294ff0f917306dcedefa89fdf7c4f8fb6ef930e6a16895c437a70da7d473d49",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5156,7 +5156,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "30ef515f3e262d3a9c1e6e56cfb332134da8c1478a9bdcb64f2d2e3f9d059363",
+      "source_digest": "5e709302be98c462916a902a0bdc86c22ce2cb68085c2838c60101bddd307572",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5170,7 +5170,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "a20c7f20d1680b388bde50372def9ec3342f829898d9914442e5a9a115f18ba4",
+      "source_digest": "85a83515e74300d1dc3634b566a0fe86a2f9d678e42a33740c77ce57ff75a8da",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5184,7 +5184,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "539c2a1d1280a2db21973ab65831c3862cd5c413f272660574a1d18a54e46b24",
+      "source_digest": "c2e79cc41c7386ee11f27d1c3c90d5a5e5c764592bee535db3dfae5ce51f434f",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5198,7 +5198,7 @@
         "ordinal": 1
       },
       "call": "b.standardOptimizeOption",
-      "source_digest": "e061dfa03d63afc3345b04373bf35a902557e6de506189d5f8ce1effc808a5b3",
+      "source_digest": "a9c70208171291be738d8e0d2e38c0b3e1f182e37ec0ebe7d6a2458d90188bae",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5213,7 +5213,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "f5ff1f948520c67fd4453adb532bd114691d88efe9eec07bbb31f3f504deff0d"
+      "source_digest": "94916844406edefa3b572882f4f4fea2955796516afed9d22a977ce5cb49d15c"
     },
     {
       "id": "option:build.zig:build:structured-object-baseline",
@@ -5225,7 +5225,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "70119879843468f07b3cabbc3c5f8b2c7159ac5ba0debe0a8b3a880e9ad01a97",
+      "source_digest": "849e08c8973b0e93a21c3e56905c9b69d3253a54c35a1f63fa6d3b9faa5f3747",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5239,7 +5239,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "95a9295c61dd7d32b60fcfc2ac25b0cc60176b515c8abbecfe258844193d7fed",
+      "source_digest": "d5f938d5fb4a6908810b673a2d135f8fb4fb97255db4ea99a53de81e2df7f502",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5255,7 +5255,7 @@
         "ordinal": 1
       },
       "call": "b.standardTargetOptionsQueryOnly",
-      "source_digest": "ea64daf78fc4ccdbf7cad161065d353c34d196e3b392f61ca3aef9f790021dd3"
+      "source_digest": "6678293409ac38c610a9b40c3d4887caabefe18aa0fdbdb12bdfb2134b43da3d"
     },
     {
       "id": "option:build.zig:build:test-optimize",
@@ -5267,7 +5267,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "4bcef1e33fab9118dfd70237b42af19515192f7f5d46ce3a115807c158b47d9c",
+      "source_digest": "085971a241c93ef51343647ac07815ab5befa16331f9ca3bd177f405704bb551",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -5282,7 +5282,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "079395e842cce809fdb01e341fabbd6dd494eb8955310c547b6b23f3b503e308"
+      "source_digest": "ff6ad1b2814dac434aad1cf21cacf333fdcde32868f1a514a092e97c4a71fce4"
     },
     {
       "owner": "build-composition",
@@ -5335,7 +5335,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "3827150a41235e7c0617151c65522339200216e31b17888dbcde385b0adda322",
+      "source_digest": "07460737867daed79f79daadc268f21a80433e587fe4a1cf890b098f018766dc",
       "owner": "build-composition",
       "description": "Benchmark Zynum BLAS against Accelerate and OpenBLAS",
       "direct_dependencies": [
@@ -5360,7 +5360,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "57db95d6237095f6bbf3a4b2e50ec00bd26114692a24e4525d018c5164ff7bc8",
+      "source_digest": "3a695aa4f1dda139681e89e6fdb000db6b66341ca62071ce3a03e082efdca33d",
       "owner": "build-composition",
       "description": "Sweep GEMM shapes and write CSV results",
       "direct_dependencies": [
@@ -5385,7 +5385,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2801dacfceb26d9e1eb0f5ac6f555b0b7476a1622798e022a34a6abe1f0070ba",
+      "source_digest": "a1a74d26e582bec62817891fe499bf47f5a370679df893c29ba71808a27f661b",
       "owner": "build-composition",
       "description": "Run reportable fresh-process GEMM sweep with correctness checks",
       "direct_dependencies": [
@@ -5410,7 +5410,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "294436ee3de8e52a1a3364d92da602579d46e55988d210f6dd6d12f781e0bbcf",
+      "source_digest": "b41622cd927ab90dbbb71156bdd07eb6c75269e95adc78343cb6304dbfc0ef54",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process SYRK/HERK comparator report",
       "direct_dependencies": [
@@ -5435,7 +5435,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "72e776ebe57cd356dc3ad7ccd8be184f8921c7beed5977e3b8f2216579476419",
+      "source_digest": "735f4007a0d99ab8690438e5a021d3f9611e2fc312ac7e73675c8c7fed82e7e8",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process ROTG/ROTMG latency report",
       "direct_dependencies": [
@@ -5460,7 +5460,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "ccdec16cc82c6dbe8c34166fb5a7f7edc588f105477b958280753735b762f7fe",
+      "source_digest": "70128d71b55962c16ad67d8f41da83b0446f239df19ce732c7df745f5550d266",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process SYMM/HEMM comparator report",
       "direct_dependencies": [
@@ -5485,7 +5485,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f52e8a5fd85c63714d4f8a0dc1d3e118fca7962985cd0cbb4829aee843b488d3",
+      "source_digest": "5f048f9b8e2a600847c81a2df50d209c651efeb4b1406f828832bc37e063925b",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process TRMM/TRSM comparator report",
       "direct_dependencies": [
@@ -5510,7 +5510,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "8ee74c4b94a24fc30c9a895182cffd782177ba11f65ed8b3c913370bf3af8475",
+      "source_digest": "f6f267f8b05241d0bc1387fa7348728b33c71a94f57e2feb8e283230ae19bc82",
       "owner": "build-composition",
       "description": "Sweep representative BLAS Level 1/2 kernels",
       "direct_dependencies": [
@@ -5552,7 +5552,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2cf50437247631eddc296f30c2c9f5534c5e3d2ab18a8b87dee51aab2e56f399"
+      "source_digest": "87a253c27cff3c347c165769fd4194825ff2c95787301feef8a85a853d5e63ff"
     },
     {
       "id": "step:build.zig:build:build-rank-k-probe",
@@ -5564,7 +5564,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "edd38e9d9d726ee28f5a445bf1cd47325233238ab34d054d75da423d8605d6bb",
+      "source_digest": "1c111d509847176dd269f823634cd586452ce3021b569379699706e347efd95a",
       "owner": "build-composition",
       "description": "Build the opt-in Level 3 rank-k probe",
       "direct_dependencies": [
@@ -5589,7 +5589,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "8ed110d50f75eff4606cbb62091ae7563a78a330ca80f50165633d43717c3547",
+      "source_digest": "a785641665cdccbceada9d2c49359d49fc823c318f378591320f86247012a2e6",
       "owner": "build-composition",
       "description": "Build the opt-in Level 1 ROTG/ROTMG latency probe",
       "direct_dependencies": [
@@ -5614,7 +5614,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "10c61cb038c0cdd25526c183ef0e350c0fa7cf74c5f72cca6d9e42dc6e0a0b2a",
+      "source_digest": "97826c17f5f206923dbef7433bf7fa68f12e8472b627284b7f79ff05f46cda86",
       "owner": "build-composition",
       "description": "Build the opt-in Level 3 SYMM/HEMM probe",
       "direct_dependencies": [
@@ -5639,7 +5639,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "bb429353b84a5c5f8e7c3244c731a5496692870df24e07d7a5249b5de7983075",
+      "source_digest": "5486407d372b70594a3ad8e2bb4c399d742ee72c9d8f2ae152a51364868c490b",
       "owner": "build-composition",
       "description": "Build the opt-in Level 3 TRMM/TRSM probe",
       "direct_dependencies": [
@@ -5677,7 +5677,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f98f90bc8667669b93f8a72931939ac1a201be8b22c7709322ccb27012aeaf16"
+      "source_digest": "1c3ff89ec32eb941c7732a1a1d04ab5f645c944c75258ef84057882d336786f6"
     },
     {
       "id": "step:build.zig:build:generate-headers",
@@ -5689,7 +5689,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1ace96fdc7089f5446ea92aab27c1278384f30799363053172b6e0bc2966ec57",
+      "source_digest": "d3d177d443bd5abc6583f844d1b05cd7862c7c26a03fcc85aafdb17df7220d3d",
       "owner": "build-composition",
       "description": "Regenerate Zynum BLAS CBLAS and BLAS/Fortran compatibility headers/modules",
       "direct_dependencies": [
@@ -5714,7 +5714,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "6214a5a5cc5e8f46276ebe99f3d47fffa29e61891e4885461446948a71318581",
+      "source_digest": "3c206c9bdf15ff1256df8cda10e7517fda8463a3d8ff9c9368aee4e0e61dc8f1",
       "owner": "build-composition",
       "description": "Regenerate the normalized BLAS kernel coverage artifact",
       "direct_dependencies": [
@@ -5833,7 +5833,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "6ccf7f4dbcdaea1fb80a082f44e03b17c6fb98d3494a0772dffcd2c5d97b5ee2"
+      "source_digest": "4e47b290d8afa796cd5fd7401e576a73cdd3513e989de40194a62aa10aeffaf1"
     },
     {
       "id": "step:build.zig:build:test",
@@ -5845,7 +5845,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7f56ca8ddbda83ce4703610d492e584b8f1c7a781617d1e392709cbca56b19b6",
+      "source_digest": "2c69e11d84c8a751e934224f4408e6054758a2d01471339a86db1b844d59b8ed",
       "owner": "build-composition",
       "description": "Run correctness tests",
       "direct_dependencies": [
@@ -5962,7 +5962,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "ca167bb5726685bb273809861653fa10e26faf9d84edc83047c63d602a0f8e6e",
+      "source_digest": "ebca6cc5b3c46145d28b153a1e167caf17f63dce3f970388c474222a14757d69",
       "owner": "build-composition",
       "description": "Run fresh-artifact parity parser and verifier tests",
       "direct_dependencies": [
@@ -5987,7 +5987,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7deeda60c50a55abfb88bae7da2c340fc0cbf209a1596bb5122ca2853cff55e1",
+      "source_digest": "840117ca110468ff939456213dabb2e07954275d1c169be186610d43529e459f",
       "owner": "build-composition",
       "description": "Run whole-artifact ABI baseline observer tests",
       "direct_dependencies": [
@@ -6012,7 +6012,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "4e402b3957e20faa3cc0ef0e435ea140010dc9f3b2d39e94b44189655516faf1",
+      "source_digest": "8717a5401a952754b3cf8a263720cb344b757f0551f2b0b0e801cb68127ef3ee",
       "owner": "build-composition",
       "description": "Validate the repository build and launch inventory",
       "direct_dependencies": [
@@ -6050,7 +6050,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "3e0657472958d777e5416b7caff3fbebd48bd6d333e69722576f814d77bdf2d7"
+      "source_digest": "177cad762244eef363c6d6d2e2a265dfd655085d0a3ac26f2f6e814afc2bcd99"
     },
     {
       "owner": "build-composition",
@@ -6087,7 +6087,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "984624dd533379a1c41c5091a5063ee9292c38f053387aa588d38c16bac0d370"
+      "source_digest": "aaf65a448d5ee7229cead7e8ba719fa68766f1b9e40bc309bf3069f560186d71"
     },
     {
       "owner": "build-composition",
@@ -6107,7 +6107,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "7d73e92527d02a036835772481ebaf3ba87959ea7903866d678a353a81c151be"
+      "source_digest": "ae891d98fa7a1d6867fc09a9901b617609d982014291705f381219013a304bba"
     },
     {
       "id": "step:build.zig:build:test-gemm-registry",
@@ -6119,7 +6119,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "b66a4e8bbc7a476be304662fc497e970efdb8b856955015c11ce5c557c8e5e94",
+      "source_digest": "0881e0879ee4c85a15e9c9d447175ea551999b40fa4d455053cc50938e83ce73",
       "owner": "build-composition",
       "description": "Run real GEMM registry and forced-path correctness tests",
       "direct_dependencies": [
@@ -6185,7 +6185,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "a9707ae6dcd869c90aa768897ab975bc479213efaa5ecbc4186104c671240935"
+      "source_digest": "7206971a9b29026b26f790d0ad82c1889e1d5d4b5659df2951f0448fdc3517c6"
     },
     {
       "owner": "build-composition",
@@ -6203,7 +6203,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2e6c7c739d7d1295631a5f2080a55548947fcdaaae750d63fe45154a58b2f74a",
+      "source_digest": "80609a84806291d2527d0c18cb743c5a7bf963090fd6328378f98fa7378d6aa5",
       "step_role": "test-inventory-enumerator-run",
       "direct_dependencies": [
         {
@@ -6369,7 +6369,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f0ebd9e161cea4db8ac2e564c61aebb0efa96751b2914609d001dadf3cc36c4e",
+      "source_digest": "40d8f0f6a1e68637c6292526b4f318647c40019b056d95c5bd5f48713faf9ae8",
       "step_role": "test-inventory-enumerator-link",
       "direct_dependencies": [
         {
@@ -6402,7 +6402,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "0891d0bc6784c2502d24470dbdfb0dfa3584776f7f13a476d3aef554fa1c9e22",
+      "source_digest": "f1419ed3664160e4a5763a0eb7aa9a00806fc4145babde1ec9756ec5f159650b",
       "step_role": "windows-native-test-inventory-compile-link-smoke",
       "direct_dependencies": [
         {
@@ -6431,7 +6431,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "13c23cfd37abd1f1763f26a4793f6378409fe107b953e5bab5fa394143192931",
+      "source_digest": "73bb12946fed761fe7f84bfef7cb1f11083c062e38ca678ceeb9ffdcf147d481",
       "owner": "build-composition",
       "description": "Run Level 1 registry and forced-path correctness tests",
       "direct_dependencies": [
@@ -6456,7 +6456,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "b639f2d52d00ae872865a92e05334f7951d41500ef3004603fc6bb7c26d907c6",
+      "source_digest": "f80bde036b92293ef32d6cd826ba25a3d916705505b789b4369b36d9b2087746",
       "owner": "build-composition",
       "description": "Run isolated Level 1 stride-two bridge tests",
       "direct_dependencies": [
@@ -6481,7 +6481,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "b7ccc206e6bfe386c2557a6ad7a52f30f622266e023184b60704be3adabe0fc0",
+      "source_digest": "faee5b7018e889b8eef393568d13f3795b1e28af93a0e05270c3f095ffb94a19",
       "owner": "build-composition",
       "description": "Run compact packed/banded registry and forced-path tests",
       "direct_dependencies": [
@@ -6522,7 +6522,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f6bf89d89b48407e1c84c4bed0910f7299163f72b186424159f941f583448037",
+      "source_digest": "ad26dfa667b2a0319ca20477a8de22fdaa28344f44c0e61b89a5669c6c33e27b",
       "owner": "build-composition",
       "description": "Run Level 2 fused-body registry and forced-path tests",
       "direct_dependencies": [
@@ -6560,7 +6560,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "0a9554626dce9c5b789b3b4ab7d8f48be99f444150acafea414a41f263085a10"
+      "source_digest": "e9622453540c07071368f853238aeb46c3d8b70611e202d1fb2c6e92340cf085"
     },
     {
       "owner": "build-composition",
@@ -6589,7 +6589,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "89548883168b68e82575c0ebca02b7327bde3c216ac24ba9a2d8748ab99cce0b"
+      "source_digest": "5f6e417ccb91ab7969bc66dac7e4978705e132437d6ef47541f9bb366cf58412"
     },
     {
       "owner": "build-composition",
@@ -6607,7 +6607,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "236ad8731a46fcafdd3aec2bbc762ff8417e9ba4b96970dc5985ec820f8fb084",
+      "source_digest": "c04e72a68fd4eea0f819cff945eba7c4de02810e363de93ab190a915a35a413d",
       "step_role": "native-feature-correctness-only",
       "direct_dependencies": [
         {
@@ -6637,7 +6637,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "603120191127e77b74bbbe441e7072a83cecbb5519544a7ec59cb1d1dfdcba86",
+      "source_digest": "35543040234401ab013a0e74f8eea7200258576824a6330563393caa1cfc5c6f",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 3,
       "guard_condition": "QEMU, Rosetta, Wine, Darling, or Wasmtime execution is enabled",
@@ -6661,7 +6661,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "49906c24ca84ed9177db401707a964cea60a874112764a5f7f25fe35a62690a7",
+      "source_digest": "d51f96171273b752b36d33059e5050e36e015671e20908b018c0610df9c95335",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 4,
       "guard_condition": "build-host CPU features are not a superset of requested target CPU features",
@@ -6685,7 +6685,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "b8d2bf6b5e456e485571cc60084a45d14fb98b8ecdc9524a743c8c0d215e9e77",
+      "source_digest": "c4eeaf657e9202cb4fbd988861d536c298ebae67c401f442b54635ecd88611e3",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 1,
       "guard_condition": "requested CPU model is baseline or determined by arch/OS",
@@ -6709,7 +6709,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "d7d3bf1c800a167028bcfb4f3d984a78cfb7935d2a9342d98e1cd02cae7e1eb6",
+      "source_digest": "59aa1edaa587d74e861925ccf6d308b68e3ca0651945f2b8f4ea85dc128239ab",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 2,
       "guard_condition": "requested target arch, OS, ABI, or object format differs from the build host",
@@ -6727,7 +6727,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "32a191e317f3113850e2f6b5040879aa5bf81a3bf9e098d56abb4c9db950d46d",
+      "source_digest": "a8a71b505b3fa921b274f9ed510926ba163cfa3a89b289932aa6a56961fc764d",
       "owner": "build-composition",
       "description": "Run exhaustive public Zig surface inventory and reflection contracts",
       "direct_dependencies": [
@@ -6774,7 +6774,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "8f17755056747aba09ca087a74177998678c9f35ceca2d6f944d19be22e3b6d5"
+      "source_digest": "627de398409d1dbf26d6cfcc42a85eefa3e250e21b9b2aa16722f20136a1c93d"
     },
     {
       "id": "step:build.zig:build:test-structured-blocked",
@@ -6786,7 +6786,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "6bc843522a283a2a75f1193f9fbd5480e2399df02b14cd754ac2e0e7c06986a0",
+      "source_digest": "5b6c3e7c0b1bb183bc961b5510a41cce658cd9f0b7b25dd13fe51bb231021a85",
       "owner": "build-composition",
       "description": "Run blocked structured Level 3 packing and update tests",
       "direct_dependencies": [
@@ -6811,7 +6811,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "71e64335c9053a60d5ceb3b80c836026b29d229761424544ca932def15dc4986",
+      "source_digest": "4f3faace23bb8846048f04c120ded80e038edf8eb91efc06660b8df640b1206a",
       "owner": "build-composition",
       "description": "Run isolated x86 structured Level 3 ABI and correctness tests",
       "direct_dependencies": [
@@ -6849,7 +6849,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c0d86d4b01547c3194ee7ad43b5146b2057ee14309abc56281e16d2df6467fcf"
+      "source_digest": "88b95439bf7801dec0053cdd315cc8e5d97874847a8a4de50ddd4b9c6b313c67"
     },
     {
       "id": "step:build.zig:build:uninstall",
@@ -6889,7 +6889,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "baf5c7f99ebb0c1851765a259adbd1af0fe4236d86d668e51afc1e2bfd84742a"
+      "source_digest": "f1329709b4cf1d0e44ee93c2c4a8f5f57f69781fb43aa67b4a67d82cb261b40d"
     },
     {
       "owner": "build-composition",
@@ -6907,7 +6907,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "73cf6b5471a26548a7a1018d05fb04a36b79e7825fd241ad4b73d03740f59b60",
+      "source_digest": "fd892f325e06a461dc7c1bc98832ff4ff757090fe3940d2674dddd080b972b2b",
       "step_role": "unsupported-test-inventory-target-failure",
       "direct_dependencies": [],
       "error_message": "test inventory enumeration is unavailable for the requested target CPU profile"
@@ -6928,7 +6928,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "bf33b8f07f3e304a2c2edf3bfdd7a24d9ce22fa66200828aa6e767099d94a656",
+      "source_digest": "497e36b48e6bad0107c86ebce3717b326764b00a4613b994c8a334ac080985f0",
       "step_role": "unsupported-windows-native-inventory-link-failure",
       "direct_dependencies": [],
       "error_message": "test-inventory-link-windows-native-smoke requires an x86_64 Windows host and the exact x86_64-windows-gnu COFF target requested with -Dcpu=baseline and no CPU feature modifiers",
@@ -8723,7 +8723,7 @@
         "ordinal": 3
       },
       "call": "run",
-      "source_digest": "cb0939d3330d3d8074e4e2a34dd68f31dd219c9b42c1f15236a2edcbe2a8efaa",
+      "source_digest": "ea2050eb8e6a44f84d6e78ff0b1bf15f40f173b1bff6e1e69a6789587845485b",
       "condition": "always",
       "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
       "argv_shape": [
@@ -8757,7 +8757,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c"
+      "source_digest": "834fce7ee3204428120b3a1b2a6d87c1c0e13cc44951e79d146a729677f8d0b6"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:capability-builds:build-target-capability",
@@ -8775,7 +8775,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "6d31b17b626abb2039d1f34453d6e34035402e0b47d65a84fea84a4176d5ce74"
+      "source_digest": "1b765b5bdf2c2eae62e6dd3167c53526ce51e123f5d171b06f16a3e7c5a7e808"
     },
     {
       "owner": "release-validation",
@@ -8793,7 +8793,7 @@
         "ordinal": 6
       },
       "call": "run",
-      "source_digest": "04d1d757b32c7ed8a8cdd0559cc8c9d4fdc1ad02fb42702c71c5db6b6c9296a1"
+      "source_digest": "7f4b9c84728cc16963556c761b0173ed47c77a8ca22575c070b1179893ccdd9b"
     },
     {
       "owner": "release-validation",
@@ -8811,7 +8811,7 @@
         "ordinal": 1
       },
       "call": "run",
-      "source_digest": "eba1ea476a13aa53e7624af186f5ba7e46f35a9b2a03828b73eaaf2bafd22260"
+      "source_digest": "69a01bd253cdaf6e52df3c1e15c3c0601a5ff6cd444c1793e70d90349e254b26"
     },
     {
       "owner": "release-validation",
@@ -8846,7 +8846,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "967854fc7f10a5c5781dc7edbb4d3189578d840f642b27311f5c8213fe2824fe",
+      "source_digest": "a095e9ea1eaa37ffa985c87fc5ecfc66b6562603ff8387208319e5663015d167",
       "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}"
     },
     {
@@ -8872,7 +8872,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c"
+      "source_digest": "834fce7ee3204428120b3a1b2a6d87c1c0e13cc44951e79d146a729677f8d0b6"
     },
     {
       "owner": "release-validation",
@@ -8890,7 +8890,7 @@
         "ordinal": 7
       },
       "call": "run",
-      "source_digest": "48135b303acefda860296e5dcffb9901283cd0a621b7c30e7bf832646478b134"
+      "source_digest": "0d30d71416a615090959fc2501f18fb5dcdf06f93b173a35b8447a50842dd6a9"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:source-checks:check-formatting",
@@ -8908,7 +8908,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "11c9637eac08a701fe64e999b814df2840f42e14fe8368540079422e2ae5eec7"
+      "source_digest": "846fa460d4e73184c2010e97377a29dea46064587434b1c91345251c6b17f196"
     },
     {
       "owner": "release-validation",
@@ -8932,7 +8932,7 @@
         "ordinal": 11
       },
       "call": "run",
-      "source_digest": "c8e51be4ca793add97fe51aede04d30d99a1c60fc1185fed89ba3e938b2dbf3d"
+      "source_digest": "ef442a86a040998e531f2fe5d6c4a1c539d4cda099084e03652732278d376a10"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:source-checks:check-package-paths",
@@ -8950,7 +8950,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "763f9b378290774bb7f3a7423c043d3abb10940c96a8f9955b448c01588398e1"
+      "source_digest": "12d106e76e0814bc7a23d90435ea4646df3df36304a97798aa237adbc54d517b"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:source-checks:check-python-tools-compile",
@@ -8968,7 +8968,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "763824c55ee537b60abd431ada6d4682134e24518497b92d72ac6d9c73320567"
+      "source_digest": "239c37ec6befdb383425ec0bfd9f701b09421df66b8a7d7b233f157c90ed7395"
     },
     {
       "owner": "release-validation",
@@ -8986,7 +8986,7 @@
         "ordinal": 8
       },
       "call": "run",
-      "source_digest": "eb92ca007361adf4e92694c3d4166d6f9f05857164732162a5d33135b6f419d5"
+      "source_digest": "61bc66934fd953ff4977c36c70eb3e6dcae824e93f234a0cbc8b0dd9d52b3cc6"
     },
     {
       "owner": "release-validation",
@@ -9012,7 +9012,7 @@
         "ordinal": 10
       },
       "call": "run",
-      "source_digest": "1f4e1049ef4cfe290b45662776171b5d080fe9de7da13cc5c30aa6cf04da5f2f"
+      "source_digest": "12caf6e2c50bbefec91f595dede6050570c954e579f898597198c62ed88e0679"
     },
     {
       "owner": "release-validation",
@@ -9037,7 +9037,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "700a295f3e0331de008a2f12cd8a7bfaf2917b072ad282339200add1154198c6"
+      "source_digest": "9ebd845e8c9b95c1c53a3ef6583e8cd13de29b98571b82a7503a37c7465e70ca"
     },
     {
       "owner": "release-validation",
@@ -9062,7 +9062,7 @@
         "ordinal": 3
       },
       "call": "run",
-      "source_digest": "f2c6bec6d35a57c60637c22fe5a34b0fc190b5ed9901f6673ee734370d99e270"
+      "source_digest": "6e48e25fb88df1d223b0a0d234c3eede661bf23be7917f3fd2fe6435ae91985e"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:build-install-artifacts",
@@ -9071,7 +9071,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Build install artifacts",
-        "ordinal": 18
+        "ordinal": 19
       },
       "call": "run",
       "owner": "release-validation",
@@ -9080,7 +9080,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "5fe9acfadd3a4e16daac08b4aff12db6ce892b40ae4ea5498e0ab429c0b4960a"
+      "source_digest": "a2a71ac06de1a8d34a16f56f70462af69d60878073294bcca2b4a76c99b9aba0"
     },
     {
       "owner": "release-validation",
@@ -9098,7 +9098,7 @@
         "ordinal": 5
       },
       "call": "run",
-      "source_digest": "56c88d62e5d7cb9ebfa8d5356822d50b0c7c0d6cb4a69ddf68300fa08f6c0f15"
+      "source_digest": "5b46c0ebebfe0cc9497dbd0153270278dd59f0282be510034bb6241dfe64c001"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:check-abi-symbols",
@@ -9107,24 +9107,6 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Check ABI symbols",
-        "ordinal": 19
-      },
-      "call": "run",
-      "owner": "release-validation",
-      "launch_class": "workflow",
-      "detail_status": "process-lifecycle-out-of-scope",
-      "compile_for": "host",
-      "execute_on": "workflow-runner",
-      "cwd_shape": "workflow checkout",
-      "source_digest": "af04dcb56b2c53de2886ac78f1a91d1436a94dcbfe9d8e2f174ae35741c45d5d"
-    },
-    {
-      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata",
-      "category": "workflow-launch",
-      "anchor": {
-        "file": ".github/workflows/ci.yml",
-        "enclosing_function": "target-tests",
-        "symbol": "Check install metadata",
         "ordinal": 20
       },
       "call": "run",
@@ -9134,7 +9116,25 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "cfee0dca84309df47aca7d21b27c5a2a1c0d0e8cc9cc65c94d052b82bc002aa9"
+      "source_digest": "7880e15b64969741381720fd0fdbd9132c46105b0cf330c226a15cdd743f7480"
+    },
+    {
+      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata",
+      "category": "workflow-launch",
+      "anchor": {
+        "file": ".github/workflows/ci.yml",
+        "enclosing_function": "target-tests",
+        "symbol": "Check install metadata",
+        "ordinal": 21
+      },
+      "call": "run",
+      "owner": "release-validation",
+      "launch_class": "workflow",
+      "detail_status": "process-lifecycle-out-of-scope",
+      "compile_for": "host",
+      "execute_on": "workflow-runner",
+      "cwd_shape": "workflow checkout",
+      "source_digest": "39b4cf72c043ecdafc3c7a4b1918d83d3eea2a6f0db924f3f0f16647035b20e7"
     },
     {
       "owner": "release-validation",
@@ -9152,7 +9152,7 @@
         "ordinal": 6
       },
       "call": "run",
-      "source_digest": "5caf89217aacbb1861ae4a098b66d85aa9bb368136d13cc89fedac936653c584"
+      "source_digest": "62331a510d78a27701cdea52769ef41d2722dd3ae52045ca0c8711b406a1ab2b"
     },
     {
       "owner": "release-validation",
@@ -9180,10 +9180,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Link test inventory for Debug target (POSIX structure-gated)",
-        "ordinal": 12
+        "ordinal": 13
       },
       "call": "run",
-      "source_digest": "1638720087ac996adc6622c1bd44c8bf2c767d54073567dd2b0b3976054b349c"
+      "source_digest": "2be08f25b6da0741646cb184ac46f020c7f5ebdb18772c204d0e301b09c576de"
     },
     {
       "owner": "release-validation",
@@ -9212,10 +9212,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Link test inventory for ReleaseFast target (POSIX structure-gated)",
-        "ordinal": 14
+        "ordinal": 15
       },
       "call": "run",
-      "source_digest": "daaf7947167b3772d48e6fdca493d6a314240954191606de99766af340b9bec1"
+      "source_digest": "3524ca1f1552e2a51fe4e9b3d1feb0f33884b508bf6bbaab785c26c67dc242c0"
     },
     {
       "owner": "release-validation",
@@ -9244,10 +9244,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Link test inventory for ReleaseSafe target (POSIX structure-gated)",
-        "ordinal": 13
+        "ordinal": 14
       },
       "call": "run",
-      "source_digest": "9562bebe01cf898842b54b167a8c9ffbd22c1144e3b59633c94549143a692340"
+      "source_digest": "34b047723d15d1baf764aa83a207bc0bf5191e3166940e496b76d31fa6e85345"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-benchmark-executable-smoke-tests",
@@ -9265,7 +9265,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "55a9975d26c0ae006c9bacc8a4208d19e882d119d9537464ecbeae9fd6fee280"
+      "source_digest": "f85398bf0034a7948181cec4dcd60e2e974915c07967cda7cc6c3e120a58fcd1"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example",
@@ -9283,7 +9283,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "113e61da6876a83d260f7a968f613b04316d00df1c31f8db7dc742daf1000143"
+      "source_digest": "32cf54a8936b55bf45dee0344b84e8bfb8a4057ba6744736a9bc87ce0360f533"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example",
@@ -9301,7 +9301,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "db2b4ddc50d90799941aae82ab4ef6246e86d3baef00a1266f7d1a0d58a55c4d"
+      "source_digest": "30366bf813464f5dbe7fc9ac1dd05898d9b89d358fb97b15dd2185fc42e1e9c0"
     },
     {
       "owner": "release-validation",
@@ -9331,7 +9331,7 @@
         "ordinal": 8
       },
       "call": "run",
-      "source_digest": "0902be1f2389f04312f1da8dc42807bebbcb87d653d8690fe76a04046151379a"
+      "source_digest": "4dc188dd8cd146a931e228f98f936cc6b5605dd55da95a1f62357d569b46fcaf"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-probe-smoke-tests",
@@ -9349,7 +9349,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "3cb94afc0b07bfb9eb79498f9422e2af514be5c1b58a1584cfbb1facf095a83e"
+      "source_digest": "8d9cfb779588d64b6e74b6d0c0531c1109454c80437dedcc60ba13fd729d99e3"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests",
@@ -9367,7 +9367,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "a1bd4e81540e59ec1d75c4c3406947899aec93ad59f1625c544914e541975a9c"
+      "source_digest": "5979a507ed7b70d0db934d397723e5093ca5893a0dd06f746de78f71a024f413"
     },
     {
       "owner": "release-validation",
@@ -9392,7 +9392,7 @@
         "ordinal": 7
       },
       "call": "run",
-      "source_digest": "0254c79cebaaafa393aac024c04ca971c636492e99ff71dce4942a2058d17f7d"
+      "source_digest": "a179e13d0bedffce4cb28f869f849f131106dee0c5f1cce31615a3f55fcf33f3"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-zig-example",
@@ -9401,24 +9401,6 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Run Zig example",
-        "ordinal": 21
-      },
-      "call": "run",
-      "owner": "release-validation",
-      "launch_class": "workflow",
-      "detail_status": "process-lifecycle-out-of-scope",
-      "compile_for": "host",
-      "execute_on": "workflow-runner",
-      "cwd_shape": "workflow checkout",
-      "source_digest": "711e0ed9a3640158cb5cbf250facfdb2ff288bb9e257fc912bf0254106469f15"
-    },
-    {
-      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target",
-      "category": "workflow-launch",
-      "anchor": {
-        "file": ".github/workflows/ci.yml",
-        "enclosing_function": "target-tests",
-        "symbol": "Test Debug target",
         "ordinal": 9
       },
       "call": "run",
@@ -9428,7 +9410,25 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "c8f765255d524a2bd0b570a482ad56f8cb4849b06fe4db4fc99cbfdb93594cc2",
+      "source_digest": "ed47761155ef6a067836cbacdabed0943f12c810f87701203a86f5827eeffcff"
+    },
+    {
+      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target",
+      "category": "workflow-launch",
+      "anchor": {
+        "file": ".github/workflows/ci.yml",
+        "enclosing_function": "target-tests",
+        "symbol": "Test Debug target",
+        "ordinal": 10
+      },
+      "call": "run",
+      "owner": "release-validation",
+      "launch_class": "workflow",
+      "detail_status": "process-lifecycle-out-of-scope",
+      "compile_for": "host",
+      "execute_on": "workflow-runner",
+      "cwd_shape": "workflow checkout",
+      "source_digest": "d9be67f89af80870d6bf73154f5d559569e4e7c0673a12417d83b41b2f446414",
       "condition": "matrix.zig_gate == 'inventory-certified'",
       "argv_shape": [
         "zig",
@@ -9451,7 +9451,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Test ReleaseFast target",
-        "ordinal": 11
+        "ordinal": 12
       },
       "call": "run",
       "owner": "release-validation",
@@ -9460,7 +9460,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "d4da65d29a2bf7c3a9d453653fc58c7b98c81a77900cdb29c60a4535f00f4fa4",
+      "source_digest": "f5d4d8876958ddee62f3b859601b697ab364f154f3627626fcac42492fa7f359",
       "condition": "matrix.zig_gate == 'inventory-certified'",
       "argv_shape": [
         "zig",
@@ -9484,7 +9484,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Test ReleaseSafe target",
-        "ordinal": 10
+        "ordinal": 11
       },
       "call": "run",
       "owner": "release-validation",
@@ -9493,7 +9493,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "83eda2ea3659fb6cb80182b4dabf9f91f7ce990cf4877221a994e57ab7599179",
+      "source_digest": "31bd5777751f87707ef6219435c3de9cedd5e6023d8ee70c9f09bb021cfbfa88",
       "condition": "matrix.zig_gate == 'inventory-certified'",
       "argv_shape": [
         "zig",
@@ -9537,10 +9537,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)",
-        "ordinal": 15
+        "ordinal": 16
       },
       "call": "run",
-      "source_digest": "87d8453a897e97191dba1a2a6268691536febeb796e112899264f33f7d374de6"
+      "source_digest": "046d178c6654cecf511a3ed6db7cda0a4ea9f3417009bbb2844d3bb12a1f8604"
     },
     {
       "owner": "release-validation",
@@ -9570,10 +9570,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)",
-        "ordinal": 17
+        "ordinal": 18
       },
       "call": "run",
-      "source_digest": "44d41db72a811c0c67ceba8cbdf579a5c51e126c6665058ded93780e99a783b0"
+      "source_digest": "e90dd26fa5fa28ca670d775e712fdfd9626a5aa4fb78c2fc01b1fc1715163ebe"
     },
     {
       "owner": "release-validation",
@@ -9603,10 +9603,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)",
-        "ordinal": 16
+        "ordinal": 17
       },
       "call": "run",
-      "source_digest": "43a5cce17c71ef854a584b9987ac778827f26bd157a35b334ff1f4bb31f107a0"
+      "source_digest": "0035de235d1b1b4a8751691c934a7fd99eb5bf7ee2c8c4c42f2d332732e16f5d"
     },
     {
       "owner": "release-validation",
@@ -9624,7 +9624,7 @@
         "ordinal": 3
       },
       "call": "run",
-      "source_digest": "2fc9a2f00273b919e3d3bb7f9180555a6c2823521d8d2e6ac63cd8377c013616",
+      "source_digest": "8722c5d61d82e3bbddbda8aa5b1017eb852dc2daf2e654dfb6526a4b271d1178",
       "condition": "always",
       "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
       "argv_shape": [
@@ -10076,45 +10076,45 @@
     }
   ],
   "workflow_source_digests": {
-    "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": "cb0939d3330d3d8074e4e2a34dd68f31dd219c9b42c1f15236a2edcbe2a8efaa",
-    "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c",
-    "workflow-launch:.github/workflows/ci.yml:capability-builds:build-target-capability": "6d31b17b626abb2039d1f34453d6e34035402e0b47d65a84fea84a4176d5ce74",
-    "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe": "04d1d757b32c7ed8a8cdd0559cc8c9d4fdc1ad02fb42702c71c5db6b6c9296a1",
-    "workflow-launch:.github/workflows/ci.yml:ci-gate:require-every-ci-gate-to-succeed": "eba1ea476a13aa53e7624af186f5ba7e46f35a9b2a03828b73eaaf2bafd22260",
-    "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": "967854fc7f10a5c5781dc7edbb4d3189578d840f642b27311f5c8213fe2824fe",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory": "48135b303acefda860296e5dcffb9901283cd0a621b7c30e7bf832646478b134",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-formatting": "11c9637eac08a701fe64e999b814df2840f42e14fe8368540079422e2ae5eec7",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date": "c8e51be4ca793add97fe51aede04d30d99a1c60fc1185fed89ba3e938b2dbf3d",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-package-paths": "763f9b378290774bb7f3a7423c043d3abb10940c96a8f9955b448c01588398e1",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-python-tools-compile": "763824c55ee537b60abd431ada6d4682134e24518497b92d72ac6d9c73320567",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure": "eb92ca007361adf4e92694c3d4166d6f9f05857164732162a5d33135b6f419d5",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": "1f4e1049ef4cfe290b45662776171b5d080fe9de7da13cc5c30aa6cf04da5f2f",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": "700a295f3e0331de008a2f12cd8a7bfaf2917b072ad282339200add1154198c6",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths": "f2c6bec6d35a57c60637c22fe5a34b0fc190b5ed9901f6673ee734370d99e270",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:build-install-artifacts": "5fe9acfadd3a4e16daac08b4aff12db6ce892b40ae4ea5498e0ab429c0b4960a",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries": "56c88d62e5d7cb9ebfa8d5356822d50b0c7c0d6cb4a69ddf68300fa08f6c0f15",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:check-abi-symbols": "af04dcb56b2c53de2886ac78f1a91d1436a94dcbfe9d8e2f174ae35741c45d5d",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata": "cfee0dca84309df47aca7d21b27c5a2a1c0d0e8cc9cc65c94d052b82bc002aa9",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary": "5caf89217aacbb1861ae4a098b66d85aa9bb368136d13cc89fedac936653c584",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated": "1638720087ac996adc6622c1bd44c8bf2c767d54073567dd2b0b3976054b349c",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated": "daaf7947167b3772d48e6fdca493d6a314240954191606de99766af340b9bec1",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated": "9562bebe01cf898842b54b167a8c9ffbd22c1144e3b59633c94549143a692340",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-benchmark-executable-smoke-tests": "55a9975d26c0ae006c9bacc8a4208d19e882d119d9537464ecbeae9fd6fee280",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example": "113e61da6876a83d260f7a968f613b04316d00df1c31f8db7dc742daf1000143",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example": "db2b4ddc50d90799941aae82ab4ef6246e86d3baef00a1266f7d1a0d58a55c4d",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once": "0902be1f2389f04312f1da8dc42807bebbcb87d653d8690fe76a04046151379a",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-probe-smoke-tests": "3cb94afc0b07bfb9eb79498f9422e2af514be5c1b58a1584cfbb1facf095a83e",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests": "a1bd4e81540e59ec1d75c4c3406947899aec93ad59f1625c544914e541975a9c",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": "0254c79cebaaafa393aac024c04ca971c636492e99ff71dce4942a2058d17f7d",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-zig-example": "711e0ed9a3640158cb5cbf250facfdb2ff288bb9e257fc912bf0254106469f15",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "c8f765255d524a2bd0b570a482ad56f8cb4849b06fe4db4fc99cbfdb93594cc2",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "d4da65d29a2bf7c3a9d453653fc58c7b98c81a77900cdb29c60a4535f00f4fa4",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "83eda2ea3659fb6cb80182b4dabf9f91f7ce990cf4877221a994e57ab7599179",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": "87d8453a897e97191dba1a2a6268691536febeb796e112899264f33f7d374de6",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": "44d41db72a811c0c67ceba8cbdf579a5c51e126c6665058ded93780e99a783b0",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": "43a5cce17c71ef854a584b9987ac778827f26bd157a35b334ff1f4bb31f107a0",
-    "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": "2fc9a2f00273b919e3d3bb7f9180555a6c2823521d8d2e6ac63cd8377c013616",
+    "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": "ea2050eb8e6a44f84d6e78ff0b1bf15f40f173b1bff6e1e69a6789587845485b",
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths": "834fce7ee3204428120b3a1b2a6d87c1c0e13cc44951e79d146a729677f8d0b6",
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:build-target-capability": "1b765b5bdf2c2eae62e6dd3167c53526ce51e123f5d171b06f16a3e7c5a7e808",
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe": "7f4b9c84728cc16963556c761b0173ed47c77a8ca22575c070b1179893ccdd9b",
+    "workflow-launch:.github/workflows/ci.yml:ci-gate:require-every-ci-gate-to-succeed": "69a01bd253cdaf6e52df3c1e15c3c0601a5ff6cd444c1793e70d90349e254b26",
+    "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": "a095e9ea1eaa37ffa985c87fc5ecfc66b6562603ff8387208319e5663015d167",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": "834fce7ee3204428120b3a1b2a6d87c1c0e13cc44951e79d146a729677f8d0b6",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory": "0d30d71416a615090959fc2501f18fb5dcdf06f93b173a35b8447a50842dd6a9",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-formatting": "846fa460d4e73184c2010e97377a29dea46064587434b1c91345251c6b17f196",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date": "ef442a86a040998e531f2fe5d6c4a1c539d4cda099084e03652732278d376a10",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-package-paths": "12d106e76e0814bc7a23d90435ea4646df3df36304a97798aa237adbc54d517b",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-python-tools-compile": "239c37ec6befdb383425ec0bfd9f701b09421df66b8a7d7b233f157c90ed7395",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure": "61bc66934fd953ff4977c36c70eb3e6dcae824e93f234a0cbc8b0dd9d52b3cc6",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": "12caf6e2c50bbefec91f595dede6050570c954e579f898597198c62ed88e0679",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": "9ebd845e8c9b95c1c53a3ef6583e8cd13de29b98571b82a7503a37c7465e70ca",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths": "6e48e25fb88df1d223b0a0d234c3eede661bf23be7917f3fd2fe6435ae91985e",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:build-install-artifacts": "a2a71ac06de1a8d34a16f56f70462af69d60878073294bcca2b4a76c99b9aba0",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries": "5b46c0ebebfe0cc9497dbd0153270278dd59f0282be510034bb6241dfe64c001",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:check-abi-symbols": "7880e15b64969741381720fd0fdbd9132c46105b0cf330c226a15cdd743f7480",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata": "39b4cf72c043ecdafc3c7a4b1918d83d3eea2a6f0db924f3f0f16647035b20e7",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary": "62331a510d78a27701cdea52769ef41d2722dd3ae52045ca0c8711b406a1ab2b",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated": "2be08f25b6da0741646cb184ac46f020c7f5ebdb18772c204d0e301b09c576de",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated": "3524ca1f1552e2a51fe4e9b3d1feb0f33884b508bf6bbaab785c26c67dc242c0",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated": "34b047723d15d1baf764aa83a207bc0bf5191e3166940e496b76d31fa6e85345",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-benchmark-executable-smoke-tests": "f85398bf0034a7948181cec4dcd60e2e974915c07967cda7cc6c3e120a58fcd1",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example": "32cf54a8936b55bf45dee0344b84e8bfb8a4057ba6744736a9bc87ce0360f533",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example": "30366bf813464f5dbe7fc9ac1dd05898d9b89d358fb97b15dd2185fc42e1e9c0",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once": "4dc188dd8cd146a931e228f98f936cc6b5605dd55da95a1f62357d569b46fcaf",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-probe-smoke-tests": "8d9cfb779588d64b6e74b6d0c0531c1109454c80437dedcc60ba13fd729d99e3",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests": "5979a507ed7b70d0db934d397723e5093ca5893a0dd06f746de78f71a024f413",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": "a179e13d0bedffce4cb28f869f849f131106dee0c5f1cce31615a3f55fcf33f3",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-zig-example": "ed47761155ef6a067836cbacdabed0943f12c810f87701203a86f5827eeffcff",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "d9be67f89af80870d6bf73154f5d559569e4e7c0673a12417d83b41b2f446414",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "f5d4d8876958ddee62f3b859601b697ab364f154f3627626fcac42492fa7f359",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "31bd5777751f87707ef6219435c3de9cedd5e6023d8ee70c9f09bb021cfbfa88",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": "046d178c6654cecf511a3ed6db7cda0a4ea9f3417009bbb2844d3bb12a1f8604",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": "e90dd26fa5fa28ca670d775e712fdfd9626a5aa4fb78c2fc01b1fc1715163ebe",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": "0035de235d1b1b4a8751691c934a7fd99eb5bf7ee2c8c4c42f2d332732e16f5d",
+    "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": "8722c5d61d82e3bbddbda8aa5b1017eb852dc2daf2e654dfb6526a4b271d1178",
     "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux": "7ede1a76af88f4cf64a3778045cea92d662870c60dc6c54541e9311a3d0a149b",
     "workflow-launch:.github/workflows/release.yml:artifacts:build-install-tree": "6346089463984b244eb1fd93c0b3b9180613d3453f9bea7398b4e378b3325a24",
     "workflow-launch:.github/workflows/release.yml:artifacts:check-abi-manifest": "ca606d54c0c8340d2bf879f66aa2581ec21e20e96b6d15212d64461f20782dd5",
