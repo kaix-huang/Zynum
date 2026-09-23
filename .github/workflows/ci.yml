@@ -840,6 +840,137 @@ jobs:
           ENV: /dev/null
         run: zig build --build-file examples/zig/build.zig run
 
+      - name: Build install artifacts
+        if: matrix.install
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: zig build ${{ matrix.target_args }} --release=fast --summary failures
+
+      - name: Check ABI symbols
+        if: matrix.install
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          python3 tools/check_abi_manifest.py \
+            --manifest include/zynum/blas/abi_manifest.json \
+            --dynamic "${{ matrix.dynlib }}" \
+            --static zig-out/lib/libzynum_blas.a
+
+      - name: Check install metadata
+        if: matrix.install
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          pc = Path("zig-out/lib/pkgconfig/zynum_blas.pc")
+          text = pc.read_text()
+          assert "Name: zynum_blas" in text
+          assert "-lzynum_blas" in text
+          assert "Cflags:" in text
+          PY
+          if command -v pkg-config >/dev/null 2>&1; then
+            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --exists zynum_blas
+            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
+          fi
+
+      - name: Run CBLAS example
+        if: matrix.full_smoke
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          mkdir -p zig-out/examples
+          cc -std=c11 examples/cblas/dgemm.c \
+            -I zig-out/include -L zig-out/lib -lzynum_blas \
+            -Wl,-rpath,zig-out/lib \
+            -o zig-out/examples/cblas-dgemm
+          zig-out/examples/cblas-dgemm
+
+      - name: Run Fortran example
+        if: matrix.full_smoke && runner.os == 'Linux'
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          mkdir -p zig-out/examples/fortran-mod
+          gfortran -std=f2008 -J zig-out/examples/fortran-mod \
+            -c zig-out/include/zynum/blas/blas.f90 \
+            -o zig-out/examples/zynum_blas_fortran.o
+          gfortran -std=f2008 -I zig-out/examples/fortran-mod \
+            examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
+            -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
+            -o zig-out/examples/fortran-dgemm
+          zig-out/examples/fortran-dgemm
+
+      - name: Run benchmark executable smoke tests
+        if: matrix.full_smoke
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          zig build bench -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 2 --reps 1
+          zig build bench-gemm-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --kind dgemm --shape tiny:2:2:2 --reps 1
+          zig build bench-vector-matrix-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 4 --reps 1 --case dcopy
+
+      - name: Run probe smoke tests
+        if: matrix.full_smoke
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          zig-out/bin/level1-probe --lib "${{ matrix.dynlib }}" --op ddot --n 4 --seconds 0.001
+          zig-out/bin/dcopy-probe --lib "${{ matrix.dynlib }}" --kind d --n 4 --seconds 0.001
+
+      - name: Run Python benchmark tool smoke tests
+        if: matrix.full_smoke
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: |
+          mkdir -p zig-out/ci
+          python3 - <<'PY'
+          from pathlib import Path
+          Path("zig-out/ci/gemm_fixture.csv").write_text(
+              "kind,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,process_repeats,check\n"
+              "dgemm,0,tiny,2,2,2,zynum-blas,1.0,1,1,1,1,1,1,checked-ok\n"
+              "dgemm,0,tiny,2,2,2,OpenBLAS,0.5,2,2,2,2,1,1,checked-ok\n"
+          )
+          Path("zig-out/ci/level1_fixture.csv").write_text(
+              "group,op,library,metric,n,seconds,status,bandwidth_gbps,rate_gops\n"
+              "real_f64,ddot,Zynum,gops,4,1,ok,,1.0\n"
+              "real_f64,ddot,OpenBLAS,gops,4,1,ok,,0.5\n"
+          )
+          Path("zig-out/ci/level2_fixture.csv").write_text(
+              "case,kind,library,n,status,rate_gops\n"
+              "dgemv_n,real_f64,Zynum,4,ok,1.0\n"
+              "dgemv_n,real_f64,OpenBLAS,4,ok,0.5\n"
+          )
+          PY
+          python3 bench/tools/check_gemm_sweep.py zig-out/ci/gemm_fixture.csv --comparator OpenBLAS
+          python3 bench/tools/plot_gemm_sweep.py zig-out/ci/gemm_fixture.csv zig-out/ci/gemm_fixture.svg
+          python3 bench/tools/plot_level1_report.py zig-out/ci/level1_fixture.csv --bars-svg zig-out/ci/level1_bars.svg --ratio-svg zig-out/ci/level1_ratio.svg
+          python3 bench/tools/plot_level2_report.py zig-out/ci/level2_fixture.csv --bars-svg zig-out/ci/level2_bars.svg
+
       - name: Test Debug target
         if: matrix.zig_gate == 'inventory-certified'
         timeout-minutes: 60
@@ -942,136 +1073,6 @@ jobs:
           $ErrorActionPreference = 'Stop'
           & $env:TRUSTED_ZIG build -j1 --release=fast test-inventory-link-windows-native-smoke ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures
 
-      - name: Build install artifacts
-        if: matrix.install
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: zig build ${{ matrix.target_args }} --release=fast --summary failures
-
-      - name: Check ABI symbols
-        if: matrix.install
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          python3 tools/check_abi_manifest.py \
-            --manifest include/zynum/blas/abi_manifest.json \
-            --dynamic "${{ matrix.dynlib }}" \
-            --static zig-out/lib/libzynum_blas.a
-
-      - name: Check install metadata
-        if: matrix.install
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          pc = Path("zig-out/lib/pkgconfig/zynum_blas.pc")
-          text = pc.read_text()
-          assert "Name: zynum_blas" in text
-          assert "-lzynum_blas" in text
-          assert "Cflags:" in text
-          PY
-          if command -v pkg-config >/dev/null 2>&1; then
-            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --exists zynum_blas
-            PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
-          fi
-
-      - name: Run CBLAS example
-        if: matrix.full_smoke
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          mkdir -p zig-out/examples
-          cc -std=c11 examples/cblas/dgemm.c \
-            -I zig-out/include -L zig-out/lib -lzynum_blas \
-            -Wl,-rpath,zig-out/lib \
-            -o zig-out/examples/cblas-dgemm
-          zig-out/examples/cblas-dgemm
-
-      - name: Run Fortran example
-        if: matrix.full_smoke && runner.os == 'Linux'
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          mkdir -p zig-out/examples/fortran-mod
-          gfortran -std=f2008 -J zig-out/examples/fortran-mod \
-            -c zig-out/include/zynum/blas/blas.f90 \
-            -o zig-out/examples/zynum_blas_fortran.o
-          gfortran -std=f2008 -I zig-out/examples/fortran-mod \
-            examples/fortran/dgemm.f90 zig-out/examples/zynum_blas_fortran.o \
-            -L zig-out/lib -lzynum_blas -Wl,-rpath,zig-out/lib \
-            -o zig-out/examples/fortran-dgemm
-          zig-out/examples/fortran-dgemm
-
-      - name: Run benchmark executable smoke tests
-        if: matrix.full_smoke
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          zig build bench -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 2 --reps 1
-          zig build bench-gemm-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --kind dgemm --shape tiny:2:2:2 --reps 1
-          zig build bench-vector-matrix-sweep -Dbench-accelerate=none -Dbench-openblas=none --release=fast -- --size 4 --reps 1 --case dcopy
-
-      - name: Run probe smoke tests
-        if: matrix.full_smoke
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          zig-out/bin/level1-probe --lib "${{ matrix.dynlib }}" --op ddot --n 4 --seconds 0
-          zig-out/bin/dcopy-probe --lib "${{ matrix.dynlib }}" --kind d --n 4 --seconds 0
-
-      - name: Run Python benchmark tool smoke tests
-        if: matrix.full_smoke
-        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
-        env:
-          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
-          BASH_ENV: /dev/null
-          ENV: /dev/null
-        run: |
-          mkdir -p zig-out/ci
-          python3 - <<'PY'
-          from pathlib import Path
-          Path("zig-out/ci/gemm_fixture.csv").write_text(
-              "kind,shape_index,label,m,n,k,library,gflops,best_ns,median_ns,p95_ns,max_ns,reps,process_repeats,check\n"
-              "dgemm,0,tiny,2,2,2,zynum-blas,1.0,1,1,1,1,1,1,checked-ok\n"
-              "dgemm,0,tiny,2,2,2,OpenBLAS,0.5,2,2,2,2,1,1,checked-ok\n"
-          )
-          Path("zig-out/ci/level1_fixture.csv").write_text(
-              "group,op,library,metric,n,seconds,status,bandwidth_gbps,rate_gops\n"
-              "real_f64,ddot,Zynum,gops,4,1,ok,,1.0\n"
-              "real_f64,ddot,OpenBLAS,gops,4,1,ok,,0.5\n"
-          )
-          Path("zig-out/ci/level2_fixture.csv").write_text(
-              "case,kind,library,n,status,rate_gops\n"
-              "dgemv_n,real_f64,Zynum,4,ok,1.0\n"
-              "dgemv_n,real_f64,OpenBLAS,4,ok,0.5\n"
-          )
-          PY
-          python3 bench/tools/check_gemm_sweep.py zig-out/ci/gemm_fixture.csv --comparator OpenBLAS
-          python3 bench/tools/plot_gemm_sweep.py zig-out/ci/gemm_fixture.csv zig-out/ci/gemm_fixture.svg
-          python3 bench/tools/plot_level1_report.py zig-out/ci/level1_fixture.csv --bars-svg zig-out/ci/level1_bars.svg --ratio-svg zig-out/ci/level1_ratio.svg
-          python3 bench/tools/plot_level2_report.py zig-out/ci/level2_fixture.csv --bars-svg zig-out/ci/level2_bars.svg
 
   capability-builds:
     name: Capability build / ${{ matrix.name }}
