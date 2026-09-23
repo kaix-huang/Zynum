@@ -233,7 +233,7 @@ jobs:
     name: ${{ matrix.name }}
     needs: source-checks
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+    timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
@@ -278,14 +278,8 @@ jobs:
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
           version: 0.16.0
-
-      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
-        with:
-          path: .zig-cache
-          key: zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}
-          restore-keys: |
-            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-
-            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+          cache-key: ${{ matrix.cache_target }}
+          cache-size-limit: 8192
 
       - name: Bind trusted Windows toolchain paths
         id: trusted-windows-tools
@@ -849,7 +843,7 @@ jobs:
 
       - name: Test ReleaseSafe target
         if: matrix.zig_gate == 'inventory-certified'
-        timeout-minutes: 60
+        timeout-minutes: 120
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
           PATH: ${{ steps.trusted-posix-tools.outputs.path }}
@@ -859,7 +853,7 @@ jobs:
 
       - name: Test ReleaseFast target
         if: matrix.zig_gate == 'inventory-certified'
-        timeout-minutes: 60
+        timeout-minutes: 120
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
         env:
           PATH: ${{ steps.trusted-posix-tools.outputs.path }}

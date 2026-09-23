@@ -8723,7 +8723,7 @@
         "ordinal": 3
       },
       "call": "run",
-      "source_digest": "d589cc2dafa7e24b432f3850752b984ab973a8c9104bd1c45a2dcb5360e24c0c",
+      "source_digest": "cb0939d3330d3d8074e4e2a34dd68f31dd219c9b42c1f15236a2edcbe2a8efaa",
       "condition": "always",
       "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
       "argv_shape": [
@@ -8757,7 +8757,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "71d3f694b11ec50f979b9915a9aaa3e1b187ead390c8f3d2418b3a135a5f19a6"
+      "source_digest": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:capability-builds:build-target-capability",
@@ -8775,7 +8775,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "086549352a1f256ff15751e96fbe2ab311a775f346da20ff020ac77b8d1dac97"
+      "source_digest": "6d31b17b626abb2039d1f34453d6e34035402e0b47d65a84fea84a4176d5ce74"
     },
     {
       "owner": "release-validation",
@@ -8793,7 +8793,7 @@
         "ordinal": 6
       },
       "call": "run",
-      "source_digest": "6f94ec61cd9ca35a439a973bff5cb016db9e7bdf9dcc575b6dc0df745815bb6d"
+      "source_digest": "04d1d757b32c7ed8a8cdd0559cc8c9d4fdc1ad02fb42702c71c5db6b6c9296a1"
     },
     {
       "owner": "release-validation",
@@ -8811,7 +8811,7 @@
         "ordinal": 1
       },
       "call": "run",
-      "source_digest": "e777fd282606fdde2a0544be32ecede4e5d37b7b69d5e577ef2366cbaa7d5f11"
+      "source_digest": "eba1ea476a13aa53e7624af186f5ba7e46f35a9b2a03828b73eaaf2bafd22260"
     },
     {
       "owner": "release-validation",
@@ -8846,7 +8846,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "f24cca7bce95202953bdff8d6dcc19c6dfba1d8765ad6bfd2063ff8b5701159d",
+      "source_digest": "967854fc7f10a5c5781dc7edbb4d3189578d840f642b27311f5c8213fe2824fe",
       "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}"
     },
     {
@@ -8872,7 +8872,7 @@
         "ordinal": 4
       },
       "call": "run",
-      "source_digest": "71d3f694b11ec50f979b9915a9aaa3e1b187ead390c8f3d2418b3a135a5f19a6"
+      "source_digest": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c"
     },
     {
       "owner": "release-validation",
@@ -8890,7 +8890,7 @@
         "ordinal": 7
       },
       "call": "run",
-      "source_digest": "efb64a1a94a43e33a47787bd29e122cd3d7214ee5157ff57ac49bdf14bd973c4"
+      "source_digest": "48135b303acefda860296e5dcffb9901283cd0a621b7c30e7bf832646478b134"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:source-checks:check-formatting",
@@ -8908,7 +8908,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "a2e2d30d369a46f88e0d3c5c913e0dde0aba40fea8d3c5ba055815ced6335b65"
+      "source_digest": "11c9637eac08a701fe64e999b814df2840f42e14fe8368540079422e2ae5eec7"
     },
     {
       "owner": "release-validation",
@@ -8932,7 +8932,7 @@
         "ordinal": 11
       },
       "call": "run",
-      "source_digest": "1018a8640c70b1da03d568d4bb6e0b9a3512c2b5c5a17dc55bbc343dd972b706"
+      "source_digest": "c8e51be4ca793add97fe51aede04d30d99a1c60fc1185fed89ba3e938b2dbf3d"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:source-checks:check-package-paths",
@@ -8950,7 +8950,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "c5aa8b45650756a70e50347793d18a363dc902a6a3e6b1d9d402db74fb37863f"
+      "source_digest": "763f9b378290774bb7f3a7423c043d3abb10940c96a8f9955b448c01588398e1"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:source-checks:check-python-tools-compile",
@@ -8968,7 +8968,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "22420157313928e6043ecae3a4eb3f3d75597688edca34e6f1bb27ff2a558188"
+      "source_digest": "763824c55ee537b60abd431ada6d4682134e24518497b92d72ac6d9c73320567"
     },
     {
       "owner": "release-validation",
@@ -8986,7 +8986,7 @@
         "ordinal": 8
       },
       "call": "run",
-      "source_digest": "ca3a86f0fd7eb702ae1dd5ba0833743831955cea322c36144113c79d1aa39092"
+      "source_digest": "eb92ca007361adf4e92694c3d4166d6f9f05857164732162a5d33135b6f419d5"
     },
     {
       "owner": "release-validation",
@@ -9012,7 +9012,7 @@
         "ordinal": 10
       },
       "call": "run",
-      "source_digest": "6e30b22ed3463e615a56a35f1c44f51244897f89b97bdb4ed30a18a822fceada"
+      "source_digest": "1f4e1049ef4cfe290b45662776171b5d080fe9de7da13cc5c30aa6cf04da5f2f"
     },
     {
       "owner": "release-validation",
@@ -9034,10 +9034,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Bind trusted POSIX toolchain paths and require Fortran for full smoke",
-        "ordinal": 5
+        "ordinal": 4
       },
       "call": "run",
-      "source_digest": "08e2eccbdc07034f164100920a142f2af3b72ec41125bf290bffb2c22f108d78"
+      "source_digest": "700a295f3e0331de008a2f12cd8a7bfaf2917b072ad282339200add1154198c6"
     },
     {
       "owner": "release-validation",
@@ -9059,10 +9059,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Bind trusted Windows toolchain paths",
-        "ordinal": 4
+        "ordinal": 3
       },
       "call": "run",
-      "source_digest": "4b79d01174d9f2f256685f3a30b15616ddb48020d72eccbdf12761d699bd782b"
+      "source_digest": "f2c6bec6d35a57c60637c22fe5a34b0fc190b5ed9901f6673ee734370d99e270"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:build-install-artifacts",
@@ -9071,7 +9071,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Build install artifacts",
-        "ordinal": 19
+        "ordinal": 18
       },
       "call": "run",
       "owner": "release-validation",
@@ -9080,7 +9080,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "492898840b5313c58c47153c6c544cdd4d9133ecd9831bfa261de5ba31d363bc"
+      "source_digest": "5fe9acfadd3a4e16daac08b4aff12db6ce892b40ae4ea5498e0ab429c0b4960a"
     },
     {
       "owner": "release-validation",
@@ -9095,10 +9095,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Build Windows Python tooling executable fixtures and libraries",
-        "ordinal": 6
+        "ordinal": 5
       },
       "call": "run",
-      "source_digest": "35cab75c71c021a0a4357a5d8601094df26e6b05bc16f587d69ede7170dd9c93"
+      "source_digest": "56c88d62e5d7cb9ebfa8d5356822d50b0c7c0d6cb4a69ddf68300fa08f6c0f15"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:check-abi-symbols",
@@ -9107,6 +9107,24 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Check ABI symbols",
+        "ordinal": 19
+      },
+      "call": "run",
+      "owner": "release-validation",
+      "launch_class": "workflow",
+      "detail_status": "process-lifecycle-out-of-scope",
+      "compile_for": "host",
+      "execute_on": "workflow-runner",
+      "cwd_shape": "workflow checkout",
+      "source_digest": "af04dcb56b2c53de2886ac78f1a91d1436a94dcbfe9d8e2f174ae35741c45d5d"
+    },
+    {
+      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata",
+      "category": "workflow-launch",
+      "anchor": {
+        "file": ".github/workflows/ci.yml",
+        "enclosing_function": "target-tests",
+        "symbol": "Check install metadata",
         "ordinal": 20
       },
       "call": "run",
@@ -9116,25 +9134,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "56fff8c9473b681592916184ce3464885232194ee61bd6cdd4e8bb9e0b7688dc"
-    },
-    {
-      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata",
-      "category": "workflow-launch",
-      "anchor": {
-        "file": ".github/workflows/ci.yml",
-        "enclosing_function": "target-tests",
-        "symbol": "Check install metadata",
-        "ordinal": 21
-      },
-      "call": "run",
-      "owner": "release-validation",
-      "launch_class": "workflow",
-      "detail_status": "process-lifecycle-out-of-scope",
-      "compile_for": "host",
-      "execute_on": "workflow-runner",
-      "cwd_shape": "workflow checkout",
-      "source_digest": "5d4769ae0d9ec9f5b9eb1b4881a5a3bf187f9196b1ed26617c9d3fd94252f018"
+      "source_digest": "cfee0dca84309df47aca7d21b27c5a2a1c0d0e8cc9cc65c94d052b82bc002aa9"
     },
     {
       "owner": "release-validation",
@@ -9149,10 +9149,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Check Windows library layout and tooling fixture boundary",
-        "ordinal": 7
+        "ordinal": 6
       },
       "call": "run",
-      "source_digest": "5d74894e3ed2ba536f82522c3f16e457f7ceeb23e45f2d98a936b41a329997b5"
+      "source_digest": "5caf89217aacbb1861ae4a098b66d85aa9bb368136d13cc89fedac936653c584"
     },
     {
       "owner": "release-validation",
@@ -9180,10 +9180,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Link test inventory for Debug target (POSIX structure-gated)",
-        "ordinal": 13
+        "ordinal": 12
       },
       "call": "run",
-      "source_digest": "08e4e1aad80d2198ddbc12444172d836341d1c2a403b1b02758ff11d2cc8149d"
+      "source_digest": "1638720087ac996adc6622c1bd44c8bf2c767d54073567dd2b0b3976054b349c"
     },
     {
       "owner": "release-validation",
@@ -9212,10 +9212,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Link test inventory for ReleaseFast target (POSIX structure-gated)",
-        "ordinal": 15
+        "ordinal": 14
       },
       "call": "run",
-      "source_digest": "072a0fd3c4a1824dca6fe86e152b71fd8f19f5cfb23814e2a7dadabcc95852aa"
+      "source_digest": "daaf7947167b3772d48e6fdca493d6a314240954191606de99766af340b9bec1"
     },
     {
       "owner": "release-validation",
@@ -9244,10 +9244,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Link test inventory for ReleaseSafe target (POSIX structure-gated)",
-        "ordinal": 14
+        "ordinal": 13
       },
       "call": "run",
-      "source_digest": "775f314f3334e5426036766a24b20697abcdf537a30711eb7a3ff58039e3e2db"
+      "source_digest": "9562bebe01cf898842b54b167a8c9ffbd22c1144e3b59633c94549143a692340"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-benchmark-executable-smoke-tests",
@@ -9256,42 +9256,6 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Run benchmark executable smoke tests",
-        "ordinal": 25
-      },
-      "call": "run",
-      "owner": "release-validation",
-      "launch_class": "workflow",
-      "detail_status": "process-lifecycle-out-of-scope",
-      "compile_for": "host",
-      "execute_on": "workflow-runner",
-      "cwd_shape": "workflow checkout",
-      "source_digest": "f133ee8601e04329484e903d193c2ba592a06d895ebfce8579109e477b8fe404"
-    },
-    {
-      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example",
-      "category": "workflow-launch",
-      "anchor": {
-        "file": ".github/workflows/ci.yml",
-        "enclosing_function": "target-tests",
-        "symbol": "Run CBLAS example",
-        "ordinal": 23
-      },
-      "call": "run",
-      "owner": "release-validation",
-      "launch_class": "workflow",
-      "detail_status": "process-lifecycle-out-of-scope",
-      "compile_for": "host",
-      "execute_on": "workflow-runner",
-      "cwd_shape": "workflow checkout",
-      "source_digest": "51e19a1ba069f28b90d410cc3402af85aae2f0333d3fee69e033bffdc538d88a"
-    },
-    {
-      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example",
-      "category": "workflow-launch",
-      "anchor": {
-        "file": ".github/workflows/ci.yml",
-        "enclosing_function": "target-tests",
-        "symbol": "Run Fortran example",
         "ordinal": 24
       },
       "call": "run",
@@ -9301,7 +9265,43 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "816ee4f61650ac325e2d3ebaf580a0164eec57db888162f655dfc34e87b0f84f"
+      "source_digest": "55a9975d26c0ae006c9bacc8a4208d19e882d119d9537464ecbeae9fd6fee280"
+    },
+    {
+      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example",
+      "category": "workflow-launch",
+      "anchor": {
+        "file": ".github/workflows/ci.yml",
+        "enclosing_function": "target-tests",
+        "symbol": "Run CBLAS example",
+        "ordinal": 22
+      },
+      "call": "run",
+      "owner": "release-validation",
+      "launch_class": "workflow",
+      "detail_status": "process-lifecycle-out-of-scope",
+      "compile_for": "host",
+      "execute_on": "workflow-runner",
+      "cwd_shape": "workflow checkout",
+      "source_digest": "113e61da6876a83d260f7a968f613b04316d00df1c31f8db7dc742daf1000143"
+    },
+    {
+      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example",
+      "category": "workflow-launch",
+      "anchor": {
+        "file": ".github/workflows/ci.yml",
+        "enclosing_function": "target-tests",
+        "symbol": "Run Fortran example",
+        "ordinal": 23
+      },
+      "call": "run",
+      "owner": "release-validation",
+      "launch_class": "workflow",
+      "detail_status": "process-lifecycle-out-of-scope",
+      "compile_for": "host",
+      "execute_on": "workflow-runner",
+      "cwd_shape": "workflow checkout",
+      "source_digest": "db2b4ddc50d90799941aae82ab4ef6246e86d3baef00a1266f7d1a0d58a55c4d"
     },
     {
       "owner": "release-validation",
@@ -9328,10 +9328,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Run host tool smoke once",
-        "ordinal": 9
+        "ordinal": 8
       },
       "call": "run",
-      "source_digest": "68ff9848ae0918fee1edad699f651017028263dd94320e44f8d88f3486bffc43"
+      "source_digest": "0902be1f2389f04312f1da8dc42807bebbcb87d653d8690fe76a04046151379a"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-probe-smoke-tests",
@@ -9340,6 +9340,24 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Run probe smoke tests",
+        "ordinal": 25
+      },
+      "call": "run",
+      "owner": "release-validation",
+      "launch_class": "workflow",
+      "detail_status": "process-lifecycle-out-of-scope",
+      "compile_for": "host",
+      "execute_on": "workflow-runner",
+      "cwd_shape": "workflow checkout",
+      "source_digest": "3cb94afc0b07bfb9eb79498f9422e2af514be5c1b58a1584cfbb1facf095a83e"
+    },
+    {
+      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests",
+      "category": "workflow-launch",
+      "anchor": {
+        "file": ".github/workflows/ci.yml",
+        "enclosing_function": "target-tests",
+        "symbol": "Run Python benchmark tool smoke tests",
         "ordinal": 26
       },
       "call": "run",
@@ -9349,25 +9367,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "11883ea025b512479f4d0f92246a0b8bc10b22682e1cfc86706a0b0d3601fb91"
-    },
-    {
-      "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests",
-      "category": "workflow-launch",
-      "anchor": {
-        "file": ".github/workflows/ci.yml",
-        "enclosing_function": "target-tests",
-        "symbol": "Run Python benchmark tool smoke tests",
-        "ordinal": 27
-      },
-      "call": "run",
-      "owner": "release-validation",
-      "launch_class": "workflow",
-      "detail_status": "process-lifecycle-out-of-scope",
-      "compile_for": "host",
-      "execute_on": "workflow-runner",
-      "cwd_shape": "workflow checkout",
-      "source_digest": "5824146f84cb5800ac658127d179067a18bbae6f2785038f076803acd527b878"
+      "source_digest": "a1bd4e81540e59ec1d75c4c3406947899aec93ad59f1625c544914e541975a9c"
     },
     {
       "owner": "release-validation",
@@ -9389,10 +9389,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Run Windows DLL ABI and CBLAS L1-L3 compatibility smoke (not inventory evidence)",
-        "ordinal": 8
+        "ordinal": 7
       },
       "call": "run",
-      "source_digest": "51f9a0c821d732c969c6837e7de4eca7d04458133d5856711445febe31265ded"
+      "source_digest": "0254c79cebaaafa393aac024c04ca971c636492e99ff71dce4942a2058d17f7d"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:run-zig-example",
@@ -9401,7 +9401,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Run Zig example",
-        "ordinal": 22
+        "ordinal": 21
       },
       "call": "run",
       "owner": "release-validation",
@@ -9410,7 +9410,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "2963af57367a9ec6b61a3cd636d8b345646501b1dd6a417f59f232019fb8b102"
+      "source_digest": "711e0ed9a3640158cb5cbf250facfdb2ff288bb9e257fc912bf0254106469f15"
     },
     {
       "id": "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target",
@@ -9419,7 +9419,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Test Debug target",
-        "ordinal": 10
+        "ordinal": 9
       },
       "call": "run",
       "owner": "release-validation",
@@ -9428,7 +9428,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "e14dfd20b435443593876b5058484019201e2b0d2362df4a6f83b743946c2aab",
+      "source_digest": "c8f765255d524a2bd0b570a482ad56f8cb4849b06fe4db4fc99cbfdb93594cc2",
       "condition": "matrix.zig_gate == 'inventory-certified'",
       "argv_shape": [
         "zig",
@@ -9451,7 +9451,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Test ReleaseFast target",
-        "ordinal": 12
+        "ordinal": 11
       },
       "call": "run",
       "owner": "release-validation",
@@ -9460,7 +9460,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "96d9c09424b570e3b1c1d149561e005fd3247c9bf4a5a0fe8c09cfcd80865276",
+      "source_digest": "d4da65d29a2bf7c3a9d453653fc58c7b98c81a77900cdb29c60a4535f00f4fa4",
       "condition": "matrix.zig_gate == 'inventory-certified'",
       "argv_shape": [
         "zig",
@@ -9484,7 +9484,7 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Test ReleaseSafe target",
-        "ordinal": 11
+        "ordinal": 10
       },
       "call": "run",
       "owner": "release-validation",
@@ -9493,7 +9493,7 @@
       "compile_for": "host",
       "execute_on": "workflow-runner",
       "cwd_shape": "workflow checkout",
-      "source_digest": "98ef5436b27c13294a91b13cae59f861767499123fe81dc7fa2e9ee958504478",
+      "source_digest": "83eda2ea3659fb6cb80182b4dabf9f91f7ce990cf4877221a994e57ab7599179",
       "condition": "matrix.zig_gate == 'inventory-certified'",
       "argv_shape": [
         "zig",
@@ -9537,10 +9537,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)",
-        "ordinal": 16
+        "ordinal": 15
       },
       "call": "run",
-      "source_digest": "94ca92f7e1e566d71498513a77dce717f54f4440e0e1c14a7d31c69465062d10"
+      "source_digest": "87d8453a897e97191dba1a2a6268691536febeb796e112899264f33f7d374de6"
     },
     {
       "owner": "release-validation",
@@ -9570,10 +9570,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)",
-        "ordinal": 18
+        "ordinal": 17
       },
       "call": "run",
-      "source_digest": "65a5d4f482b5796365562a1116898e02d3f1dc6953da2e6ceeb82c526c382027"
+      "source_digest": "44d41db72a811c0c67ceba8cbdf579a5c51e126c6665058ded93780e99a783b0"
     },
     {
       "owner": "release-validation",
@@ -9603,10 +9603,10 @@
         "file": ".github/workflows/ci.yml",
         "enclosing_function": "target-tests",
         "symbol": "Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)",
-        "ordinal": 17
+        "ordinal": 16
       },
       "call": "run",
-      "source_digest": "a2448f861ebd5eb3b34f4115e9f5897168f6e5d92be8ff042b590007e88e9565"
+      "source_digest": "43a5cce17c71ef854a584b9987ac778827f26bd157a35b334ff1f4bb31f107a0"
     },
     {
       "owner": "release-validation",
@@ -9624,7 +9624,7 @@
         "ordinal": 3
       },
       "call": "run",
-      "source_digest": "1a4a8529c40d22d8a410ed98f27b63656525e2cd409efae370ad9f1f8cd0766d",
+      "source_digest": "2fc9a2f00273b919e3d3bb7f9180555a6c2823521d8d2e6ac63cd8377c013616",
       "condition": "always",
       "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
       "argv_shape": [
@@ -10076,45 +10076,45 @@
     }
   ],
   "workflow_source_digests": {
-    "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": "d589cc2dafa7e24b432f3850752b984ab973a8c9104bd1c45a2dcb5360e24c0c",
-    "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths": "71d3f694b11ec50f979b9915a9aaa3e1b187ead390c8f3d2418b3a135a5f19a6",
-    "workflow-launch:.github/workflows/ci.yml:capability-builds:build-target-capability": "086549352a1f256ff15751e96fbe2ab311a775f346da20ff020ac77b8d1dac97",
-    "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe": "6f94ec61cd9ca35a439a973bff5cb016db9e7bdf9dcc575b6dc0df745815bb6d",
-    "workflow-launch:.github/workflows/ci.yml:ci-gate:require-every-ci-gate-to-succeed": "e777fd282606fdde2a0544be32ecede4e5d37b7b69d5e577ef2366cbaa7d5f11",
-    "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": "f24cca7bce95202953bdff8d6dcc19c6dfba1d8765ad6bfd2063ff8b5701159d",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": "71d3f694b11ec50f979b9915a9aaa3e1b187ead390c8f3d2418b3a135a5f19a6",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory": "efb64a1a94a43e33a47787bd29e122cd3d7214ee5157ff57ac49bdf14bd973c4",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-formatting": "a2e2d30d369a46f88e0d3c5c913e0dde0aba40fea8d3c5ba055815ced6335b65",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date": "1018a8640c70b1da03d568d4bb6e0b9a3512c2b5c5a17dc55bbc343dd972b706",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-package-paths": "c5aa8b45650756a70e50347793d18a363dc902a6a3e6b1d9d402db74fb37863f",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-python-tools-compile": "22420157313928e6043ecae3a4eb3f3d75597688edca34e6f1bb27ff2a558188",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure": "ca3a86f0fd7eb702ae1dd5ba0833743831955cea322c36144113c79d1aa39092",
-    "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": "6e30b22ed3463e615a56a35f1c44f51244897f89b97bdb4ed30a18a822fceada",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": "08e2eccbdc07034f164100920a142f2af3b72ec41125bf290bffb2c22f108d78",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths": "4b79d01174d9f2f256685f3a30b15616ddb48020d72eccbdf12761d699bd782b",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:build-install-artifacts": "492898840b5313c58c47153c6c544cdd4d9133ecd9831bfa261de5ba31d363bc",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries": "35cab75c71c021a0a4357a5d8601094df26e6b05bc16f587d69ede7170dd9c93",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:check-abi-symbols": "56fff8c9473b681592916184ce3464885232194ee61bd6cdd4e8bb9e0b7688dc",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata": "5d4769ae0d9ec9f5b9eb1b4881a5a3bf187f9196b1ed26617c9d3fd94252f018",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary": "5d74894e3ed2ba536f82522c3f16e457f7ceeb23e45f2d98a936b41a329997b5",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated": "08e4e1aad80d2198ddbc12444172d836341d1c2a403b1b02758ff11d2cc8149d",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated": "072a0fd3c4a1824dca6fe86e152b71fd8f19f5cfb23814e2a7dadabcc95852aa",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated": "775f314f3334e5426036766a24b20697abcdf537a30711eb7a3ff58039e3e2db",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-benchmark-executable-smoke-tests": "f133ee8601e04329484e903d193c2ba592a06d895ebfce8579109e477b8fe404",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example": "51e19a1ba069f28b90d410cc3402af85aae2f0333d3fee69e033bffdc538d88a",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example": "816ee4f61650ac325e2d3ebaf580a0164eec57db888162f655dfc34e87b0f84f",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once": "68ff9848ae0918fee1edad699f651017028263dd94320e44f8d88f3486bffc43",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-probe-smoke-tests": "11883ea025b512479f4d0f92246a0b8bc10b22682e1cfc86706a0b0d3601fb91",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests": "5824146f84cb5800ac658127d179067a18bbae6f2785038f076803acd527b878",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": "51f9a0c821d732c969c6837e7de4eca7d04458133d5856711445febe31265ded",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:run-zig-example": "2963af57367a9ec6b61a3cd636d8b345646501b1dd6a417f59f232019fb8b102",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "e14dfd20b435443593876b5058484019201e2b0d2362df4a6f83b743946c2aab",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "96d9c09424b570e3b1c1d149561e005fd3247c9bf4a5a0fe8c09cfcd80865276",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "98ef5436b27c13294a91b13cae59f861767499123fe81dc7fa2e9ee958504478",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": "94ca92f7e1e566d71498513a77dce717f54f4440e0e1c14a7d31c69465062d10",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": "65a5d4f482b5796365562a1116898e02d3f1dc6953da2e6ceeb82c526c382027",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": "a2448f861ebd5eb3b34f4115e9f5897168f6e5d92be8ff042b590007e88e9565",
-    "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": "1a4a8529c40d22d8a410ed98f27b63656525e2cd409efae370ad9f1f8cd0766d",
+    "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": "cb0939d3330d3d8074e4e2a34dd68f31dd219c9b42c1f15236a2edcbe2a8efaa",
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:bind-trusted-posix-toolchain-paths": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c",
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:build-target-capability": "6d31b17b626abb2039d1f34453d6e34035402e0b47d65a84fea84a4176d5ce74",
+    "workflow-launch:.github/workflows/ci.yml:capability-builds:compile-enabled-level-2-width-production-artifact-probe": "04d1d757b32c7ed8a8cdd0559cc8c9d4fdc1ad02fb42702c71c5db6b6c9296a1",
+    "workflow-launch:.github/workflows/ci.yml:ci-gate:require-every-ci-gate-to-succeed": "eba1ea476a13aa53e7624af186f5ba7e46f35a9b2a03828b73eaaf2bafd22260",
+    "workflow-launch:.github/workflows/ci.yml:feature-compile:run-matrix-gate": "967854fc7f10a5c5781dc7edbb4d3189578d840f642b27311f5c8213fe2824fe",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": "972d5858971b123f2d443aed26b70390f8014cffc3eff8d687661c9b358abb5c",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-build-inventory": "48135b303acefda860296e5dcffb9901283cd0a621b7c30e7bf832646478b134",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-formatting": "11c9637eac08a701fe64e999b814df2840f42e14fe8368540079422e2ae5eec7",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date": "c8e51be4ca793add97fe51aede04d30d99a1c60fc1185fed89ba3e938b2dbf3d",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-package-paths": "763f9b378290774bb7f3a7423c043d3abb10940c96a8f9955b448c01588398e1",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-python-tools-compile": "763824c55ee537b60abd431ada6d4682134e24518497b92d72ac6d9c73320567",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:check-test-inventory-structure": "eb92ca007361adf4e92694c3d4166d6f9f05857164732162a5d33135b6f419d5",
+    "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": "1f4e1049ef4cfe290b45662776171b5d080fe9de7da13cc5c30aa6cf04da5f2f",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": "700a295f3e0331de008a2f12cd8a7bfaf2917b072ad282339200add1154198c6",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths": "f2c6bec6d35a57c60637c22fe5a34b0fc190b5ed9901f6673ee734370d99e270",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:build-install-artifacts": "5fe9acfadd3a4e16daac08b4aff12db6ce892b40ae4ea5498e0ab429c0b4960a",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:build-windows-python-tooling-executable-fixtures-and-libraries": "56c88d62e5d7cb9ebfa8d5356822d50b0c7c0d6cb4a69ddf68300fa08f6c0f15",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:check-abi-symbols": "af04dcb56b2c53de2886ac78f1a91d1436a94dcbfe9d8e2f174ae35741c45d5d",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:check-install-metadata": "cfee0dca84309df47aca7d21b27c5a2a1c0d0e8cc9cc65c94d052b82bc002aa9",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:check-windows-library-layout-and-tooling-fixture-boundary": "5caf89217aacbb1861ae4a098b66d85aa9bb368136d13cc89fedac936653c584",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-debug-target-posix-structure-gated": "1638720087ac996adc6622c1bd44c8bf2c767d54073567dd2b0b3976054b349c",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated": "daaf7947167b3772d48e6fdca493d6a314240954191606de99766af340b9bec1",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated": "9562bebe01cf898842b54b167a8c9ffbd22c1144e3b59633c94549143a692340",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-benchmark-executable-smoke-tests": "55a9975d26c0ae006c9bacc8a4208d19e882d119d9537464ecbeae9fd6fee280",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-cblas-example": "113e61da6876a83d260f7a968f613b04316d00df1c31f8db7dc742daf1000143",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-fortran-example": "db2b4ddc50d90799941aae82ab4ef6246e86d3baef00a1266f7d1a0d58a55c4d",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once": "0902be1f2389f04312f1da8dc42807bebbcb87d653d8690fe76a04046151379a",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-probe-smoke-tests": "3cb94afc0b07bfb9eb79498f9422e2af514be5c1b58a1584cfbb1facf095a83e",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-python-benchmark-tool-smoke-tests": "a1bd4e81540e59ec1d75c4c3406947899aec93ad59f1625c544914e541975a9c",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-windows-dll-abi-and-cblas-l1-l3-compatibility-smoke-not-inventory-evidence": "0254c79cebaaafa393aac024c04ca971c636492e99ff71dce4942a2058d17f7d",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:run-zig-example": "711e0ed9a3640158cb5cbf250facfdb2ff288bb9e257fc912bf0254106469f15",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "c8f765255d524a2bd0b570a482ad56f8cb4849b06fe4db4fc99cbfdb93594cc2",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "d4da65d29a2bf7c3a9d453653fc58c7b98c81a77900cdb29c60a4535f00f4fa4",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "83eda2ea3659fb6cb80182b4dabf9f91f7ce990cf4877221a994e57ab7599179",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": "87d8453a897e97191dba1a2a6268691536febeb796e112899264f33f7d374de6",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": "44d41db72a811c0c67ceba8cbdf579a5c51e126c6665058ded93780e99a783b0",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": "43a5cce17c71ef854a584b9987ac778827f26bd157a35b334ff1f4bb31f107a0",
+    "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": "2fc9a2f00273b919e3d3bb7f9180555a6c2823521d8d2e6ac63cd8377c013616",
     "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux": "7ede1a76af88f4cf64a3778045cea92d662870c60dc6c54541e9311a3d0a149b",
     "workflow-launch:.github/workflows/release.yml:artifacts:build-install-tree": "6346089463984b244eb1fd93c0b3b9180613d3453f9bea7398b4e378b3325a24",
     "workflow-launch:.github/workflows/release.yml:artifacts:check-abi-manifest": "ca606d54c0c8340d2bf879f66aa2581ec21e20e96b6d15212d64461f20782dd5",
