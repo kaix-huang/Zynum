@@ -5,5 +5,4 @@
 
 comptime {
     _ = @import("kernels/isolated/x86_64_stride2_object.zig");
-    _ = @import("kernels/isolated/task_runtime_host.zig");
 }

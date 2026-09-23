@@ -14347,6 +14347,7 @@ class BuildInventoryTests(unittest.TestCase):
             for item in self.inventory["repository_file_classifications"]
         }
         expected = {
+            "src/blas/task_runtime_host_object_root.zig": "zig-source",
             "test/build/level2_width_artifact_probe_contract.zig": "zig-source",
             "test/build/level2_width_default_artifact_probe.zig": "zig-source",
             "test/build/level2_width_enabled_artifact_probe.zig": "zig-source",

@@ -830,6 +830,22 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
     });
     header_smoke_mod.addIncludePath(b.path("include"));
+    if (target.result.cpu.arch == .x86_64) {
+        const task_runtime_host_test_library = b.addObject(.{
+            .name = "zynum-test-task-runtime-host",
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("src/blas/task_runtime_host_object_root.zig"),
+                .target = target,
+                .optimize = test_optimize,
+                .link_libc = true,
+            }),
+        });
+        task_runtime_host_test_library.root_module.addOptions("zynum-build-options", zynum_build_options);
+        header_smoke_mod.addObject(task_runtime_host_test_library);
+        triangular_band_window_tests.root_module.addObject(task_runtime_host_test_library);
+        triangular_packed_unit_test_mod.addObject(task_runtime_host_test_library);
+        triangular_band_solve_test_mod.addObject(task_runtime_host_test_library);
+    }
     const header_smoke_tests = b.addTest(.{
         .name = "zynum-blas-header-smoke-tests",
         .root_module = header_smoke_mod,

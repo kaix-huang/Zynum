@@ -393,7 +393,7 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "cbc5b37a79b8286869a6ae8fb50642ceb49811be64cd3541493f455fb7c21439"
+    "7379b9de8075a1609108c9e3627704d9e17ff11570af44f9959eb39cb9e77b0c"
 )
 NEXT_SOURCE_PROJECTION_SHA256 = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
@@ -483,7 +483,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
     "gap:process-bounds-deferred": "165ca9d0f5a67a60e33c0687c1752307caf444f89df7ff499cf7418694a22ee0",
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5"
 }
-REQUIRED_SECTION_FACT_DIGESTS = {'option_surfaces': '68a5942b5d4b1621d4822e0e832d0f3508c6d107eeb5d2d998c3bc0b2a8bfe1d', 'repository_file_classifications': 'f1808c52b4df3601e66b816ca117e82ae0c09fb96d9e9b30a32340919d20e982', 'derived_candidates': '8d60006f7d71f336e855774315149fe6f6632c7fe3d771da2f09b600a41acaf9', 'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd'}
+REQUIRED_SECTION_FACT_DIGESTS = {'option_surfaces': '68a5942b5d4b1621d4822e0e832d0f3508c6d107eeb5d2d998c3bc0b2a8bfe1d', 'repository_file_classifications': '05813fd1512be60df38edc7317f10952c4f6330ac058520b03a88bdb86937ee2', 'derived_candidates': '8d60006f7d71f336e855774315149fe6f6632c7fe3d771da2f09b600a41acaf9', 'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd'}
 REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {
     "bench/tools/test_level2_report.py:test_triangular_worker_correctness": "90c21f759b2e2e2648049f1d890e57580f7b9dc78c605e5cbc5a97f2adce5973",
     "bench/tools/test_level2_report.py:run_one": "3c8de6ccdf7abfdc0ded13cb2d36095d61a7024795b39b83dd7ee53b6bbcb4df",
@@ -2789,6 +2789,7 @@ DEFAULT_EXECUTABLE_INSTALL_IDS = {
 }
 NEW_REVIEWED_TEST_INFRASTRUCTURE_CLASSIFICATIONS = {
     LEVEL2_WIDTH_ARTIFACT_CONTRACT_PATH,
+    "src/blas/task_runtime_host_object_root.zig",
     "test/build/level2_width_enabled_artifact_probe.zig",
     WINDOWS_PYTHON_TOOLING_FIXTURE_PATH,
 }
@@ -14705,6 +14706,46 @@ def _new_test_inventory_observation(
             "consumer": "official_tests.root_module",
             "provider": isolated_test_links[identifier],
             "condition": "target.result.cpu.arch == .x86_64 and isolated test library is present",
+        }
+    if identifier == "compile:build.zig:build:task_runtime_host_test_library":
+        return {
+            "owner": "build-composition",
+            "artifact_kind": "object",
+            "output_name": "zynum-test-task-runtime-host",
+            "root_source": ["src/blas/task_runtime_host_object_root.zig"],
+            "linkage": "not-applicable",
+            "compile_for": "requested-target",
+            "execute_on": "not-executable",
+            "optimize_source": "test-optimize",
+            "condition": "requested target architecture is x86_64",
+            "produced_outputs": [
+                "zynum-test-task-runtime-host.o",
+                "zynum-test-task-runtime-host.obj",
+            ],
+            "install_destinations": [],
+            "produced_outputs_by_target": {
+                "elf": {"primary": "zynum-test-task-runtime-host.o"},
+                "macho": {"primary": "zynum-test-task-runtime-host.o"},
+                "windows": {"primary": "zynum-test-task-runtime-host.obj"},
+            },
+            "install_destinations_by_target": {
+                "elf": {},
+                "macho": {},
+                "windows": {},
+            },
+        }
+    test_host_links = {
+        "link:build.zig:build:header_smoke_mod<-task_runtime_host_test_library": "header_smoke_mod",
+        "link:build.zig:build:triangular_band_window_tests.root_module<-task_runtime_host_test_library": "triangular_band_window_tests.root_module",
+        "link:build.zig:build:triangular_packed_unit_test_mod<-task_runtime_host_test_library": "triangular_packed_unit_test_mod",
+        "link:build.zig:build:triangular_band_solve_test_mod<-task_runtime_host_test_library": "triangular_band_solve_test_mod",
+    }
+    if identifier in test_host_links:
+        return {
+            "owner": "build-composition",
+            "consumer": test_host_links[identifier],
+            "provider": "task_runtime_host_test_library",
+            "condition": "requested target architecture is x86_64",
         }
     raise InventoryError(f"no reviewed template for new observation {identifier}")
 

@@ -6,7 +6,7 @@
 const builtin = @import("builtin");
 
 const abi = @import("x86_64_stride2_abi.zig");
-const thread_pool = @import("../../core/execution/thread_pool.zig");
+const task_runtime_host = @import("task_runtime_host.zig");
 const types = @import("../../types.zig");
 
 pub const BlasInt = types.BlasInt;
@@ -16,7 +16,7 @@ pub const ComplexF64 = types.ComplexF64;
 extern fn zynum_internal_x86_64_stride2_execute(request: *abi.Request) callconv(.c) u8;
 
 comptime {
-    _ = thread_pool;
+    _ = task_runtime_host;
 }
 
 fn Real(comptime T: type) type {

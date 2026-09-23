@@ -6,8 +6,8 @@ const builtin = @import("builtin");
 const build_options = @import("zynum-build-options");
 
 comptime {
-    if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .windows and !@hasDecl(build_options, "kernel_entry"))
-        _ = @import("core/execution/thread_pool.zig");
+    if (builtin.cpu.arch == .x86_64 and !@hasDecl(build_options, "kernel_entry"))
+        _ = @import("kernels/isolated/task_runtime_host.zig");
 }
 
 pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";

@@ -1025,6 +1025,7 @@
         "src/blas/kernels/dispatch/vector_binary.zig",
         "src/blas/kernels/dispatch/vector_unary.zig",
         "src/blas/kernels/isolated/structured_gemm_host.zig",
+        "src/blas/kernels/isolated/task_runtime_host.zig",
         "src/blas/kernels/isolated/x86_64_compact_triangular_abi.zig",
         "src/blas/kernels/isolated/x86_64_compact_triangular_bridge.zig",
         "src/blas/kernels/isolated/x86_64_level2_width_abi.zig",
@@ -28443,7 +28444,7 @@
     },
     "correctness_only_roots": {
       "count": 1,
-      "digest": "9dc81b26ab46a811d0c128f2d3a9de4ebb2ce1f6ba9b35465026f588175e2938"
+      "digest": "ef350ff1947400823fe380b5e6b1e026cd87a72ce0bbce1d47ee2cc7a57c5c7d"
     },
     "zig_test_files": {
       "count": 53,
