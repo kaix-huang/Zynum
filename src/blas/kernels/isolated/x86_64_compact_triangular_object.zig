@@ -41,9 +41,9 @@ fn vectorPtr(comptime T: type, request: *const abi.Request) [*]T {
 }
 
 fn dispatchScalar(comptime T: type, operation: abi.Operation, request: *abi.Request) bool {
-    const uplo = coreUplo(@enumFromInt(request.uplo));
-    const trans = coreTranspose(@enumFromInt(request.transpose));
-    const diag = coreDiagonal(@enumFromInt(request.diagonal));
+    const uplo = coreUplo(@fromBackingInt(@intCast(request.uplo)));
+    const trans = coreTranspose(@fromBackingInt(@intCast(request.transpose)));
+    const diag = coreDiagonal(@fromBackingInt(@intCast(request.diagonal)));
     return switch (operation) {
         .tpmv => packed_unit.tryTpmv(T, uplo, trans, diag, @intCast(request.n), matrixPtr(T, request), vectorPtr(T, request), request.incx),
         .tpsv => packed_unit.tryTpsv(T, uplo, trans, diag, @intCast(request.n), matrixPtr(T, request), vectorPtr(T, request), request.incx),
@@ -53,8 +53,8 @@ fn dispatchScalar(comptime T: type, operation: abi.Operation, request: *abi.Requ
 
 fn execute(request: *abi.Request) callconv(.c) u8 {
     if (zynum_internal_x86_64_compact_triangular_enabled == 0) return 0;
-    const operation: abi.Operation = @enumFromInt(request.operation);
-    const scalar_tag: abi.Scalar = @enumFromInt(request.scalar);
+    const operation: abi.Operation = @fromBackingInt(@intCast(request.operation));
+    const scalar_tag: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     const handled = switch (scalar_tag) {
         .f32 => dispatchScalar(f32, operation, request),
         .f64 => dispatchScalar(f64, operation, request),

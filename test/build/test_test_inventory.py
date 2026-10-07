@@ -641,10 +641,10 @@ class TestInventoryTests(unittest.TestCase):
         }
         self.assertEqual(
             {
-                "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures",
-                "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures",
-                "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false --summary failures",
-                "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=debug -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=safe -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=fast -Dhost-tool-smoke=false --summary failures",
+                "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=safe -Dhost-tool-smoke=false --summary failures",
             },
             workflow_commands,
         )
@@ -674,7 +674,7 @@ class TestInventoryTests(unittest.TestCase):
         ]
         self.assertEqual(3, len(windows_build_inventory_rows))
         self.assertEqual(
-            {"mode:Debug", "mode:ReleaseSafe", "mode:ReleaseFast"},
+            {"mode:debug", "mode:safe", "mode:fast"},
             {row["optimize_mode_id"] for row in windows_build_inventory_rows},
         )
         for row in windows_build_inventory_rows:
@@ -794,7 +794,7 @@ class TestInventoryTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            63,
+            0,
             sum(
                 row["environment_id"] == "env:x86-64-linux-gnu-baseline"
                 and row["root_id"].startswith("zig-root:")
@@ -810,6 +810,7 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(
             {
                 "gap:native-test-enumeration:env-aarch64-linux-gnu-baseline": 60,
+                "gap:native-test-enumeration:env-x86-64-linux-gnu-baseline": 63,
                 "gap:native-test-enumeration:env-x86-64-windows-gnu-baseline": 63,
             },
             pending_gaps,
@@ -820,8 +821,16 @@ class TestInventoryTests(unittest.TestCase):
             if row["environment_id"] == "env:aarch64-macos-baseline"
             and row["root_id"] == "zig-root:gemm-registry-tests"
         }
-        self.assertNotEqual(gemm["mode:Debug"], gemm["mode:ReleaseSafe"])
-        self.assertEqual(gemm["mode:ReleaseSafe"], gemm["mode:ReleaseFast"])
+        self.assertEqual(gemm["mode:debug"], gemm["mode:safe"])
+        self.assertEqual(gemm["mode:safe"], gemm["mode:fast"])
+        triangular_band = {
+            row["optimize_mode_id"]: row["expected_test_set_id"]
+            for row in rows
+            if row["environment_id"] == "env:aarch64-macos-baseline"
+            and row["root_id"] == "zig-root:triangular-band-solve-tests"
+        }
+        self.assertNotEqual(triangular_band["mode:debug"], triangular_band["mode:safe"])
+        self.assertEqual(triangular_band["mode:safe"], triangular_band["mode:fast"])
 
     def test_duplicate_json_key_and_unknown_key_fail(self) -> None:
         original = self.inventory_path.read_text(encoding="utf-8")
@@ -4044,7 +4053,7 @@ class TestInventoryTests(unittest.TestCase):
             if row["expectation_state"] == CHECKER.FROZEN_STATE
             and row["root_id"].startswith("zig-root:")
         )
-        row["optimize_mode_id"] = "mode:ReleaseFast"
+        row["optimize_mode_id"] = "mode:fast"
         self._write(inventory)
         self.assertIn("immutable matrix fields", self._errors())
 
@@ -7266,6 +7275,18 @@ class TestInventoryTests(unittest.TestCase):
         self.assertIn("IDs/order", self._errors())
 
     def test_pending_gap_closure_and_default_cli_fail_closed(self) -> None:
+        executor_cases = [
+            (["--check-native-executors"], 0),
+            (["--native-executor=qemu"], 2),
+            (["--check-native-executors", "--structure-only"], 2),
+            *(
+                (["--check-native-executors", "--native-executor=" + executor], 1)
+                for executor in ("qemu", "rosetta", "wine", "darling", "wasmtime")
+            ),
+        ]
+        for arguments, expected_status in executor_cases:
+            with self.subTest(native_executor=arguments), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(expected_status, CHECKER.main(arguments))
         inventory = copy.deepcopy(self.inventory)
         native_gap = next(
             gap
@@ -7325,12 +7346,12 @@ class TestInventoryTests(unittest.TestCase):
         workflow = self.root / ".github/workflows/ci.yml"
         text = workflow.read_text(encoding="utf-8")
         workflow.write_text(
-            text.replace("-Dtest-optimize=Debug ", "", 1), encoding="utf-8"
+            text.replace("-Dtest-optimize=debug ", "", 1), encoding="utf-8"
         )
         self.assertIn("explicit test optimize", self._errors())
 
         workflow.write_text(
-            text.replace("-Dtest-optimize=ReleaseFast ", "", 1), encoding="utf-8"
+            text.replace("-Dtest-optimize=fast ", "", 1), encoding="utf-8"
         )
         self.assertIn("explicit test optimize", self._errors())
 
@@ -7339,9 +7360,9 @@ class TestInventoryTests(unittest.TestCase):
         row = next(
             row
             for row in inventory["test_mode_rows"]
-            if row["expected_actual_module_optimize"] == "Debug"
+            if row["expected_actual_module_optimize"] == "debug"
         )
-        row["expected_actual_module_optimize"] = "ReleaseFast"
+        row["expected_actual_module_optimize"] = "fast"
         self._write(inventory)
         self.assertIn("immutable matrix fields", self._errors())
 
@@ -7361,9 +7382,9 @@ class TestInventoryTests(unittest.TestCase):
             REPOSITORY_ROOT / "docs/contributors/README.md",
         )
         expected_modes = (
-            ("Debug", None),
-            ("ReleaseSafe", "--release=safe"),
-            ("ReleaseFast", "--release=fast"),
+            ("debug", None),
+            ("safe", "--release=safe"),
+            ("fast", "--release=fast"),
         )
         for document in documents:
             document_commands = commands(document)
@@ -7403,7 +7424,7 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(1, len(performance_commands))
         self.assertIn("-Dcpu=baseline", performance_commands[0])
         self.assertIn("--release=fast", performance_commands[0])
-        self.assertIn("-Dtest-optimize=ReleaseFast", performance_commands[0])
+        self.assertIn("-Dtest-optimize=fast", performance_commands[0])
 
         direct_checker_blocks: list[tuple[Path, str]] = []
         for document in sorted((REPOSITORY_ROOT / "docs").rglob("*.md")):
@@ -7764,7 +7785,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in vector_inventory["test_mode_rows"]
             if row["environment_id"] == vector_environment_id
             and row["root_id"] == vector_root_id
-            and row["optimize_mode_id"] == "mode:Debug"
+            and row["optimize_mode_id"] == "mode:debug"
         ]
         self.assertEqual(1, len(vector_rows), vector_rows)
         vector_row = vector_rows[0]
@@ -7889,7 +7910,7 @@ class TestInventoryTests(unittest.TestCase):
                 "--name",
                 "digest_vectors",
                 "-O",
-                "Debug",
+                "debug",
                 "-target",
                 vector_profile["target"],
                 "-mcpu",
@@ -7919,7 +7940,7 @@ class TestInventoryTests(unittest.TestCase):
                     "--inventory-root",
                     vector_root_id,
                     "--inventory-mode",
-                    "Debug",
+                    "debug",
                     "--inventory-class",
                     vector_class_id,
                 ],
@@ -7983,7 +8004,7 @@ class TestInventoryTests(unittest.TestCase):
                             "--inventory-root",
                             vector_root_id,
                             "--inventory-mode",
-                            "Debug",
+                            "debug",
                             "--inventory-class",
                             vector_class_id,
                         ],
@@ -8119,7 +8140,7 @@ class TestInventoryTests(unittest.TestCase):
         shutil.copy2(REPOSITORY_ROOT / "tools/test_inventory_runner.zig", runner)
         runner.write_text(
             runner.read_text(encoding="utf-8").replace(
-                "@tagName(builtin.mode)", '"Debug"'
+                "@tagName(builtin.mode)", '"debug"'
             ),
             encoding="utf-8",
         )

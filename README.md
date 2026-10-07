@@ -1,6 +1,6 @@
 # Zynum
 
-[![Zig 0.16](https://img.shields.io/badge/Zig-0.16-f7a41d?logo=zig&logoColor=white)](https://ziglang.org/)
+[![Zig 0.17](https://img.shields.io/badge/Zig-0.17-f7a41d?logo=zig&logoColor=white)](https://ziglang.org/)
 [![status: beta](https://img.shields.io/badge/status-beta-orange)](#stability)
 [![license: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
 
@@ -11,7 +11,7 @@ kernels for AArch64 and x86_64.
 
 ## Quick start
 
-Requires **Zig 0.16.x**. Build the shared and static libraries, C headers,
+Requires **Zig 0.17.x**. Build the shared and static libraries, C headers,
 Fortran module, and pkg-config metadata:
 
 ```sh
@@ -19,9 +19,10 @@ zig build --release=fast -Ddispatch=dynamic
 ```
 
 Artifacts are installed under `zig-out/`. Dynamic dispatch selects kernels
-supported by the CPU and operating system. Use `-Dcpu=...` for an explicit
-specialized build. Set `ZYNUM_MAXIMUM_THREADS` before the first call to cap
-workers; otherwise Zynum uses the available CPU count as its ceiling.
+supported by the CPU and operating system. For a build specialized to the local
+CPU, use `zig build -Dcpu=native --release=fast`. Zig 0.17 recognizes Apple M5
+and its SME features directly. Set `ZYNUM_MAXIMUM_THREADS` before the first call
+to cap workers; otherwise Zynum uses the available CPU count as its ceiling.
 
 For C and C++, include `<zynum/blas/cblas.h>` and link `zynum_blas`:
 
@@ -40,8 +41,10 @@ See the [build and API guide](docs/development_and_usage.md),
 
 ## Performance
 
-Apple M5, macOS 27.0, Zig 0.16.0; baseline-CPU dynamic-dispatch ReleaseFast
-build. Charts compare **Zynum, Accelerate, and OpenBLAS** using six interleaved
+The published charts retain the earlier Zig 0.16.0 measurements on Apple M5,
+macOS 27.0, with a baseline-CPU dynamic-dispatch ReleaseFast build. They do not
+measure the Zig 0.17 migration. Charts compare **Zynum, Accelerate, and OpenBLAS**
+using six interleaved
 fresh-process measurements. **Higher is better.** Zynum uses its default
 thread policy; comparator thread caps are 10.
 

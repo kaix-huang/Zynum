@@ -63,7 +63,7 @@ fn packTransposedAF64(m: usize, k: usize, a: [*]const f64, lda: gemm_task.BlasIn
 }
 
 pub fn packTransposedA(comptime T: type, m: usize, k: usize, a: [*]const T, lda: gemm_task.BlasInt, a_pack: []T) void {
-    if (@import("builtin").cpu.arch == .x86_64 and T == f64 and m >= 64 and k >= 1024) {
+    if (@import("builtin").target.cpu.arch == .x86_64 and T == f64 and m >= 64 and k >= 1024) {
         // Bound simultaneous input/output pages and keep partial cache lines
         // nearby instead of revisiting all columns for every vector of K.
         var p0: usize = 0;

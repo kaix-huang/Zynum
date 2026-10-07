@@ -39,7 +39,7 @@ useful for kernel work but are not part of the public API contract.
 | BLAS Level 1 | [`common/level1_optimization_notes.md`](common/level1_optimization_notes.md) |
 | BLAS Level 2 | [`common/level2_optimization_notes.md`](common/level2_optimization_notes.md) |
 | GEMM | [`common/gemm_optimization_notes.md`](common/gemm_optimization_notes.md) |
-| Zig 0.16 threading | [`common/zig_0_16_std_io_threading.md`](common/zig_0_16_std_io_threading.md) |
+| Zig `std.Io` threading | [`common/zig_std_io_threading.md`](common/zig_std_io_threading.md) |
 | AArch64 GEMM | [`aarch64/gemm_aarch64_optimization_notes.md`](aarch64/gemm_aarch64_optimization_notes.md) |
 | x86_64 GEMM | [`x86_64/gemm_x86_64_optimization_notes.md`](x86_64/gemm_x86_64_optimization_notes.md) |
 
@@ -52,8 +52,12 @@ tool compilation, inventory gates, all baseline correctness modes, both
 generators and their drift check, formatting, and the default build.
 
 Inventory-dependent tests require the exact `-Dcpu=baseline` query; ordinary
-`zig build` remains host-native. For target applicability, compile-only steps,
-and the distinction between native evidence and cross-compilation, see
+`zig build` uses the target's baseline CPU with runtime-selected kernels.
+See the [Zig 0.17 migration notes](development_and_usage.md#zig-017-migration)
+for current build options and the
+[platform evidence table](development_and_usage.md#test-inventory) for pending
+native observations. For target applicability, compile-only steps, and the
+distinction between native evidence and cross-compilation, see
 [Architecture: Validation Boundaries](architecture.md#validation-boundaries).
 The inventory checker is authoritative for pending native rows.
 

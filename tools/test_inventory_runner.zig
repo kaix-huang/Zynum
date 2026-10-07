@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 const Io = std.Io;
 const runner_io: Io = Io.Threaded.global_single_threaded.io();
 const maximum_inventory_bytes = 4 * 1024 * 1024;
-const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "0c8664aac749034b82c606bc63cb3c0446e99dd4e3751cb430830265ca28b7b6";
+const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "10563ab5eb3df8440e3735f9e60f63e6951dd843b93e5f4a1f310a8f56b92a63";
 const NEXT_TEST_INVENTORY_SHA256: ?[]const u8 = null;
 
 const Inventory = struct {
@@ -294,7 +294,7 @@ fn validateInventory(allocator: std.mem.Allocator, arguments: Arguments) !Invent
         !std.mem.eql(u8, binding.enumeration_class_id, row.enumeration_class_id) or
         !std.mem.eql(u8, binding.optimize_mode_id, row.optimize_mode_id) or
         !std.mem.eql(u8, binding.expected_test_set_id, expected_set_id) or
-        !std.mem.eql(u8, binding.enumeration_source, "zig-0.16-builtin-test-functions"))
+        !std.mem.eql(u8, binding.enumeration_source, "zig-0.17-builtin-test-functions"))
     {
         return error.NativeObservationBindingMismatch;
     }
@@ -318,7 +318,7 @@ fn validateInventory(allocator: std.mem.Allocator, arguments: Arguments) !Invent
     const root_slug = try slugAlloc(allocator, arguments.root_id);
     defer allocator.free(root_slug);
     for (expected.tests, builtin.test_functions, 0..) |expected_test, actual_test, ordinal| {
-        const expected_test_id = try std.fmt.allocPrint(allocator, "test:{s}:{d}", .{ root_slug, ordinal });
+        const expected_test_id = try allocator.print("test:{s}:{d}", .{ root_slug, ordinal });
         defer allocator.free(expected_test_id);
         if (!std.mem.eql(u8, expected_test.id, expected_test_id) or
             expected_test.ordinal != ordinal or
@@ -329,7 +329,7 @@ fn validateInventory(allocator: std.mem.Allocator, arguments: Arguments) !Invent
     }
     const digest = try canonicalDigest(allocator, expected.tests);
     if (!std.mem.eql(u8, expected.digest, &digest)) return error.ExpectedTestSetDigestMismatch;
-    const canonical_set_id = try std.fmt.allocPrint(allocator, "set:{s}:{s}", .{ expected.root_id, digest });
+    const canonical_set_id = try allocator.print("set:{s}:{s}", .{ expected.root_id, digest });
     defer allocator.free(canonical_set_id);
     if (!std.mem.eql(u8, expected.id, canonical_set_id) or
         !std.mem.eql(u8, expected_set_id, canonical_set_id))
@@ -398,7 +398,7 @@ fn inventoryMetadataStable(before: Io.File.Stat, after: Io.File.Stat) bool {
 }
 
 fn openInventoryFile(directory: Io.Dir, basename: []const u8) !Io.File {
-    return switch (builtin.os.tag) {
+    return switch (builtin.target.os.tag) {
         .windows => directory.openFile(runner_io, basename, .{
             .follow_symlinks = false,
         }),
@@ -442,13 +442,13 @@ fn validateRowIdentity(allocator: std.mem.Allocator, row: *const TestModeRow, ar
     defer allocator.free(environment_slug);
     const root_slug = try slugAlloc(allocator, arguments.root_id);
     defer allocator.free(root_slug);
-    const row_id = try std.fmt.allocPrint(allocator, "row:{s}:{s}:{s}", .{
+    const row_id = try allocator.print("row:{s}:{s}:{s}", .{
         environment_slug,
         root_slug,
         arguments.mode,
     });
     defer allocator.free(row_id);
-    const evidence_slot_id = try std.fmt.allocPrint(allocator, "evidence-slot:{s}", .{row_id["row:".len..]});
+    const evidence_slot_id = try allocator.print("evidence-slot:{s}", .{row_id["row:".len..]});
     defer allocator.free(evidence_slot_id);
     if (!std.mem.eql(u8, row.id, row_id) or
         !std.mem.eql(u8, row.evidence_slot_id, evidence_slot_id))
@@ -470,14 +470,14 @@ fn findEnvironmentProfile(profiles: []const EnvironmentProfile, environment_id: 
 
 fn validateEnvironmentProfile(profile: *const EnvironmentProfile) !void {
     if (!std.mem.eql(u8, profile.cpu, "baseline")) return error.InvalidEnvironmentCpu;
-    const baseline_cpu = std.Target.Cpu.baseline(builtin.cpu.arch, builtin.os);
-    if (builtin.cpu.model != baseline_cpu.model or
-        !builtin.cpu.features.eql(baseline_cpu.features))
+    const baseline_cpu = std.Target.Cpu.baseline(builtin.target.cpu.arch, builtin.target.os);
+    if (builtin.target.cpu.model != baseline_cpu.model or
+        !builtin.target.cpu.features.eql(baseline_cpu.features))
     {
         return error.NonCanonicalBaselineCpu;
     }
 
-    const expected = if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and builtin.target.abi == .none)
+    const expected = if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and builtin.target.abi == .none)
         EnvironmentProfile{
             .id = "env:aarch64-macos-baseline",
             .target = "aarch64-macos",
@@ -489,7 +489,7 @@ fn validateEnvironmentProfile(profile: *const EnvironmentProfile) !void {
             .cpu_feature_policy = "canonical-baseline-resolved-features",
             .host_tool_smoke = true,
         }
-    else if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .linux and builtin.target.abi == .gnu)
+    else if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .linux and builtin.target.abi == .gnu)
         EnvironmentProfile{
             .id = "env:aarch64-linux-gnu-baseline",
             .target = "aarch64-linux-gnu",
@@ -501,7 +501,7 @@ fn validateEnvironmentProfile(profile: *const EnvironmentProfile) !void {
             .cpu_feature_policy = "canonical-baseline-resolved-features",
             .host_tool_smoke = true,
         }
-    else if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .linux and builtin.target.abi == .gnu)
+    else if (builtin.target.cpu.arch == .x86_64 and builtin.target.os.tag == .linux and builtin.target.abi == .gnu)
         EnvironmentProfile{
             .id = "env:x86-64-linux-gnu-baseline",
             .target = "x86_64-linux-gnu",
@@ -513,7 +513,7 @@ fn validateEnvironmentProfile(profile: *const EnvironmentProfile) !void {
             .cpu_feature_policy = "canonical-baseline-resolved-features",
             .host_tool_smoke = true,
         }
-    else if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .windows and builtin.target.abi == .gnu)
+    else if (builtin.target.cpu.arch == .x86_64 and builtin.target.os.tag == .windows and builtin.target.abi == .gnu)
         EnvironmentProfile{
             .id = "env:x86-64-windows-gnu-baseline",
             .target = "x86_64-windows-gnu",
@@ -565,7 +565,7 @@ fn validateBindingIdentity(allocator: std.mem.Allocator, binding: *const NativeO
     };
     const digest = try canonicalDigest(allocator, facts);
     if (!std.mem.eql(u8, binding.digest, &digest)) return error.NativeObservationBindingDigestMismatch;
-    const binding_id = try std.fmt.allocPrint(allocator, "native-observation:{s}", .{digest});
+    const binding_id = try allocator.print("native-observation:{s}", .{digest});
     defer allocator.free(binding_id);
     if (!std.mem.eql(u8, binding.id, binding_id)) return error.NativeObservationBindingIdentityMismatch;
 }
@@ -614,21 +614,21 @@ fn slugAlloc(allocator: std.mem.Allocator, value: []const u8) ![]u8 {
 }
 
 fn actualEnumerationClassId() ![]const u8 {
-    if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and builtin.object_format == .macho) {
+    if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and builtin.target.ofmt == .macho) {
         return "enumeration-class:aarch64-macos-system-macho";
     }
-    if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .linux and
-        builtin.target.abi == .gnu and builtin.object_format == .elf)
+    if (builtin.target.cpu.arch == .x86_64 and builtin.target.os.tag == .linux and
+        builtin.target.abi == .gnu and builtin.target.ofmt == .elf)
     {
         return "enumeration-class:x86-64-linux-gnu-elf";
     }
-    if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .linux and
-        builtin.target.abi == .gnu and builtin.object_format == .elf)
+    if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .linux and
+        builtin.target.abi == .gnu and builtin.target.ofmt == .elf)
     {
         return "enumeration-class:aarch64-linux-gnu-elf";
     }
-    if (builtin.cpu.arch == .x86_64 and builtin.os.tag == .windows and
-        builtin.target.abi == .gnu and builtin.object_format == .coff)
+    if (builtin.target.cpu.arch == .x86_64 and builtin.target.os.tag == .windows and
+        builtin.target.abi == .gnu and builtin.target.ofmt == .coff)
     {
         return "enumeration-class:x86-64-windows-gnu-coff";
     }
@@ -636,19 +636,19 @@ fn actualEnumerationClassId() ![]const u8 {
 }
 
 fn validateEnumerationClass(class: *const TestEnumerationClass) !void {
-    const architecture = switch (builtin.cpu.arch) {
+    const architecture = switch (builtin.target.cpu.arch) {
         .aarch64 => "aarch64",
         .x86_64 => "x86_64",
         else => return error.UnsupportedEnumerationArchitecture,
     };
-    const os = switch (builtin.os.tag) {
+    const os = switch (builtin.target.os.tag) {
         .macos => "macos",
         .linux => "linux",
         .windows => "windows",
         else => return error.UnsupportedEnumerationOs,
     };
-    const libc = if (builtin.os.tag == .macos) "system" else if (builtin.target.abi == .gnu) "gnu" else return error.UnsupportedEnumerationLibc;
-    const object_format = switch (builtin.object_format) {
+    const libc = if (builtin.target.os.tag == .macos) "system" else if (builtin.target.abi == .gnu) "gnu" else return error.UnsupportedEnumerationLibc;
+    const object_format = switch (builtin.target.ofmt) {
         .macho => "macho",
         .elf => "elf",
         .coff => "coff",
@@ -660,7 +660,7 @@ fn validateEnumerationClass(class: *const TestEnumerationClass) !void {
         !optionalEquals(class.os, os) or
         !optionalEquals(class.libc, libc) or
         !optionalEquals(class.object_format, object_format) or
-        !std.mem.eql(u8, class.enumeration_source, "zig-0.16-builtin-test-functions") or
+        !std.mem.eql(u8, class.enumeration_source, "zig-0.17-builtin-test-functions") or
         class.environment_ids.len == 0)
     {
         return error.InvalidEnumerationClass;

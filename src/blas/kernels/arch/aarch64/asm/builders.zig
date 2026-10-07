@@ -4070,12 +4070,37 @@ fn smeAxpbyZaAccumulate(comptime lane: []const u8, comptime za_row: []const u8) 
 
 fn smeAxpyZaMainBlock(comptime lane: []const u8) []const u8 {
     comptime var text: []const u8 = "";
-    inline for (0..8) |pair| {
-        const row = pair / 2;
-        if (pair % 2 == 0) text = text ++ smeZaSelectPair(row, 8 + row);
-        text = text ++ smePtrAtVl("x10", "x1", pair * 4) ++ smePtrAtVl("x12", "x2", pair * 4) ++
-            smeVgx4Ld1(lane, 4, "pn8", "x10") ++ smeVgx4Ld1(lane, 16, "pn8", "x12") ++
-            smeAxpyZaAccumulate(lane, if (pair % 2 == 0) "w8" else "w11");
+    if (comptime !std.mem.eql(u8, lane, "s")) {
+        inline for (0..8) |pair| {
+            const row = pair / 2;
+            if (pair % 2 == 0) text = text ++ smeZaSelectPair(row, 8 + row);
+            text = text ++ smePtrAtVl("x10", "x1", pair * 4) ++ smePtrAtVl("x12", "x2", pair * 4) ++
+                smeVgx4Ld1(lane, 4, "pn8", "x10") ++ smeVgx4Ld1(lane, 16, "pn8", "x12") ++
+                smeAxpyZaAccumulate(lane, if (pair % 2 == 0) "w8" else "w11");
+        }
+        return text;
+    }
+    // Initialize independent ZA rows before consuming them in the FMA pass.
+    // Retain the original zero-plus-y arithmetic, including signed-zero and NaN behavior.
+    inline for (0..2) |pass| {
+        inline for (0..8) |pair| {
+            const row = pair / 2;
+            if (pair % 2 == 0) text = text ++ smeZaSelectPair(row, 8 + row);
+            const za_row = if (pair % 2 == 0) "w8" else "w11";
+            if (pass == 0) {
+                text = text ++ smePtrAtVl("x12", "x2", pair * 4) ++
+                    smeVgx4Ld1(lane, 16, "pn8", "x12") ++ std.fmt.comptimePrint(
+                    \\
+                    \\fadd za.{s}[{s}, 0, vgx4], {{ z16.{s} - z19.{s} }}
+                , .{ lane, za_row, lane, lane });
+            } else {
+                text = text ++ smePtrAtVl("x10", "x1", pair * 4) ++
+                    smeVgx4Ld1(lane, 4, "pn8", "x10") ++ std.fmt.comptimePrint(
+                    \\
+                    \\fmla za.{s}[{s}, 0, vgx4], {{ z4.{s} - z7.{s} }}, z0.{s}
+                , .{ lane, za_row, lane, lane, lane });
+            }
+        }
     }
     return text;
 }

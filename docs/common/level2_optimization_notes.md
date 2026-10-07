@@ -259,7 +259,7 @@ change must include boundary controls on both sides of every new predicate.
 ## Parallel Planning
 
 All new parallel paths use the shared Zig task runtime described in
-[`zig_0_16_std_io_threading.md`](zig_0_16_std_io_threading.md).
+[`zig_std_io_threading.md`](zig_std_io_threading.md).
 
 - Base concurrency on the CPU capacity available to the process.
 - Prefer disjoint output ownership; otherwise use bounded private deltas.
@@ -330,3 +330,20 @@ Rollback or narrow the route when:
 
 Public notes should keep the mechanism and decision boundary, not individual run
 chronology. Detailed raw evidence belongs in ignored private storage.
+
+## Aligned Single-Precision GER Panels
+
+On AArch64 ASIMD, unit-stride real GER uses a 16-row, 8-column body for
+panels with 64–256 rows and 16–256 columns when rows are divisible by 16,
+columns by four, and the leading dimension covers the rows. A four-column
+remainder completes panels produced by the existing column task partition.
+The same body also serves 512-by-128 panels. Other shapes retain the general
+vector route; the task count and partition policy are unchanged.
+
+Process a full 16-row span of each column before moving to the next column,
+reusing the loaded input vector across columns. Preserve `alpha*y` followed
+by fused accumulation into the matrix, including the four-column remainder.
+Native regression checks cover panel boundaries, unaligned inputs, padded
+leading dimensions, unchanged source vectors, and complete output guards.
+Keep the route only while nearby shapes and the general fallback meet the
+performance and numerical gates above.

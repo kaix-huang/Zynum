@@ -86,7 +86,7 @@ fn expectForcedPackedColumns(comptime T: type, uplo: Uplo) !void {
     try std.testing.expectEqual(catalog.CompletionScope.output_region, descriptor.completion);
     try std.testing.expect(descriptor.lifecycle.defaultEligible());
     const candidate = tuning.fixed_candidates_2026_07_17.symmetric;
-    const expected_id = if (@import("builtin").cpu.arch == .aarch64) new_id else old_id;
+    const expected_id = if (@import("builtin").target.cpu.arch == .aarch64) new_id else old_id;
     try std.testing.expectEqual(expected_id, candidate.selectRealPackedImplementation(T));
     var production = tuning.production_2026_07_17.symmetric;
     try std.testing.expect(production.enable_fused_real_packed_single);

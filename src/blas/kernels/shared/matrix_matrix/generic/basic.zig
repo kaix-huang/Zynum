@@ -54,7 +54,7 @@ inline fn writeScalarEpilogue(comptime T: type, task: gemm_task.Task(T), comptim
 fn kernelVec(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), row: usize, col: usize) void {
     const V = @Vector(cfg.vector_lanes, T);
     const zero: V = @splat(0);
-    var acc: [cfg.tile_n]V = [_]V{zero} ** cfg.tile_n;
+    var acc: [cfg.tile_n]V = @splat(zero);
 
     var p: usize = 0;
     while (p + cfg.k_unroll <= task.k) : (p += cfg.k_unroll) {
@@ -86,7 +86,7 @@ fn kernelVec(comptime T: type, comptime cfg: Config, comptime direct_store: bool
 fn kernelScalarRows(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), row_start: usize, col: usize) void {
     var row = row_start;
     while (row < task.m) : (row += 1) {
-        var acc: [cfg.tile_n]T = [_]T{0} ** cfg.tile_n;
+        var acc: [cfg.tile_n]T = @splat(0);
         var p: usize = 0;
         while (p + cfg.k_unroll <= task.k) : (p += cfg.k_unroll) {
             inline for (0..cfg.k_unroll) |u| {

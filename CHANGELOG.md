@@ -12,6 +12,28 @@ The `0.1.x` line is the BLAS-completion and performance line.
 
 ### Maintenance
 
+- Require Zig 0.17.x and pin CI to 0.17.0. Specialized builds on Apple M5
+  now use `-Dcpu=native`; explicit cross-compilation uses `-Dcpu=apple_m5`.
+- Migrate build argument forwarding, lazy paths, optimization modes
+  (`debug`, `safe`, `fast`, `small`), reflection, and array initialization to
+  the Zig 0.17 APIs. Keep native-only test executor checks at build execution
+  time, including when the configuration is cached.
+- Translate compatibility headers through the build graph for Zig 0.17's C
+  import workflow; keep the public C/Fortran interfaces and 311 BLAS exports.
+- Preserve complex vector memory order under Zig 0.17's endian-independent
+  `@bitCast` semantics, and use overflow-safe `@divCeil` for panel counts.
+  Retain the x86 debug-backend workarounds verified to remain necessary.
+- Recollect the AArch64 macOS baseline test inventory with Zig 0.17. Linux and
+  Windows native observations remain pending; Linux release artifacts retain
+  their native inventory gate. Document the
+  [platform evidence](docs/development_and_usage.md#test-inventory) and keep
+  published Zig 0.16 benchmark and ABI records labeled with their original
+  compiler version.
+- Refine single-precision SME AXPY scheduling, double-precision SME GEMM row
+  tails, and aligned single-precision GER panels, with boundary and padding
+  regression coverage. These kernel changes do not update the published
+  benchmark measurements.
+
 - Reject conflicting experimental build profile flags instead of silently
   selecting the first enabled profile. Default and single-profile builds keep
   their existing behavior; exhaustive configuration checks run in host-tool

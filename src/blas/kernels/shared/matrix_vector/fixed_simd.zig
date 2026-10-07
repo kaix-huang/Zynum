@@ -585,8 +585,8 @@ fn complexDotUnit(
     const re_sign: V = if (do_conj) @splat(1) else pairPatternVector(R, cfg.lane_count, 1, -1);
     const im_sign: V = if (do_conj) pairPatternVector(R, cfg.lane_count, 1, -1) else @splat(1);
 
-    var re_accs: [cfg.row_unroll_vectors]V = [_]V{@splat(0)} ** cfg.row_unroll_vectors;
-    var im_accs: [cfg.row_unroll_vectors]V = [_]V{@splat(0)} ** cfg.row_unroll_vectors;
+    var re_accs: [cfg.row_unroll_vectors]V = @splat(@splat(0));
+    var im_accs: [cfg.row_unroll_vectors]V = @splat(@splat(0));
     var i: usize = 0;
     while (i + rowUnroll(cfg) <= real_m) : (i += rowUnroll(cfg)) {
         inline for (0..cfg.row_unroll_vectors) |u| {
@@ -974,7 +974,7 @@ fn realDotUnit(
     x: [*]const T,
 ) T {
     const V = @Vector(cfg.lane_count, T);
-    var accs: [cfg.row_unroll_vectors]V = [_]V{@splat(0)} ** cfg.row_unroll_vectors;
+    var accs: [cfg.row_unroll_vectors]V = @splat(@splat(0));
     var i: usize = 0;
     while (i + rowUnroll(cfg) <= n) : (i += rowUnroll(cfg)) {
         inline for (0..cfg.row_unroll_vectors) |u| {
@@ -1028,7 +1028,7 @@ pub fn symmetricAxpyDotUnitReal(
 
     const V = @Vector(cfg.lane_count, T);
     const scale: V = @splat(coefficient);
-    var accs: [cfg.row_unroll_vectors]V = [_]V{@splat(0)} ** cfg.row_unroll_vectors;
+    var accs: [cfg.row_unroll_vectors]V = @splat(@splat(0));
     var i: usize = 0;
     while (i + rowUnroll(cfg) <= n) : (i += rowUnroll(cfg)) {
         inline for (0..cfg.row_unroll_vectors) |u| {

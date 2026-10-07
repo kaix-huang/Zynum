@@ -19,10 +19,10 @@ const Uplo = scalar.Uplo;
 const Diag = scalar.Diag;
 
 pub noinline fn tpmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n > 0 and incx != 0 and isolated.tryTpmv(T, uplo, trans_, diag, n, ap, x, incx)) return;
     }
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and (T == f32 or T == f64)) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and (T == f32 or T == f64)) {
         const profile = level2_tuning.active.triangular;
         if (profile.selectFiniteTpmv(T, n) == .compact_triangular_packed_finite)
             return tpmvFiniteCandidate(T, uplo, trans_, diag, n, ap, x, incx);
@@ -44,10 +44,10 @@ noinline fn tpmvFiniteCandidate(comptime T: type, uplo: Uplo, trans_: Order, dia
 // Compile-time selection adds no runtime wrapper or branch. Measured Mac
 // leaves have explicit layouts; other leaves retain the default.
 inline fn legacyTpmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and (T == f32 or T == f64)) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and (T == f32 or T == f64)) {
         return legacyTpmvAligned(T, uplo, trans_, diag, n, ap, x, incx);
     }
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and T == scalar.ComplexF64) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and T == scalar.ComplexF64) {
         return legacyComplexTpmvAligned(T, uplo, trans_, diag, n, ap, x, incx);
     }
     return legacyTpmvDefault(T, uplo, trans_, diag, n, ap, x, incx);
@@ -70,14 +70,14 @@ noinline fn legacyTpmvDefault(comptime T: type, uplo: Uplo, trans_: Order, diag:
 }
 
 pub noinline fn tpsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n > 0 and incx != 0 and isolated.tryTpsv(T, uplo, trans_, diag, n, ap, x, incx)) return;
     }
     triangular.tpsv(T, uplo, trans_, diag, n, ap, x, incx);
 }
 
 pub noinline fn tbsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, k: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n > 0 and incx != 0 and k >= 0 and isolated.tryTbsv(T, uplo, trans_, diag, n, k, a, lda, x, incx)) return;
     }
     if (comptime T == f32 or T == f64) {
@@ -121,7 +121,7 @@ noinline fn tryFiniteTbsv(
 // Negative zero, subnormals and nonfinite values retain their original arithmetic.
 noinline fn tryNormalUnitDiagonal(comptime T: type, max_bytes: usize, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]const T, incx: BlasInt) bool {
     if (comptime T != f32 and T != f64) return false;
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos or n_ < 128 or lda < 1 or incx == 0) return false;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos or n_ < 128 or lda < 1 or incx == 0) return false;
     const n: usize = @intCast(n_);
     const bytes = std.math.mul(usize, n, @sizeOf(T)) catch return false;
     if (bytes > max_bytes) return false;
@@ -137,7 +137,7 @@ noinline fn tryNormalUnitDiagonal(comptime T: type, max_bytes: usize, n_: BlasIn
     if (x_addr >= a_addr) {
         if (x_addr - a_addr < a_bytes) return false;
     } else if (a_addr - x_addr < x_bytes) return false;
-    const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+    const Bits = @Int(.unsigned, @bitSizeOf(T));
     const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
     // The predicate is independent of logical order; scan physical strides.
     var i: usize = 0;
@@ -179,7 +179,7 @@ inline fn identityPreservesPositiveZero() bool {
 }
 
 inline fn initTbsvSolvedSigns(comptime T: type, upper: bool, solved: usize, n: usize, work: []const T, first_iteration: *[2]usize, first_index: *[2]usize) void {
-    const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+    const Bits = @Int(.unsigned, @bitSizeOf(T));
     var found: usize = 0;
     for (0..solved) |iteration| {
         const i = if (upper) n - iteration - 1 else iteration;
@@ -211,7 +211,7 @@ noinline fn tryFiniteTbsvImpl(
 ) bool {
     @setFloatMode(.strict);
     if (comptime T != f32 and T != f64) return false;
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos or n_ < 128 or k_ < 0 or incx == 0 or lda < 1) return false;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos or n_ < 128 or k_ < 0 or incx == 0 or lda < 1) return false;
     if (k_ > @divTrunc(n_, 4)) return false;
     const n: usize = @intCast(n_);
     const k: usize = @intCast(k_);
@@ -334,7 +334,7 @@ noinline fn tryFiniteTbsvImpl(
         }
         // Real conjugate-transpose equals transpose. Unit diagonal is never read.
         if (diag == .non_unit) value = value / a[i * ld + (if (uplo == .upper) k else @as(usize, 0))];
-        const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+        const Bits = @Int(.unsigned, @bitSizeOf(T));
         const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
         if ((@as(Bits, @bitCast(value)) & exponent) == exponent) return false;
         work[i] = value;
@@ -422,7 +422,7 @@ noinline fn stagedSmallTpmv(comptime T: type, allocator: std.mem.Allocator, max_
 noinline fn tryFiniteTpmv(comptime T: type, comptime stack_small: bool, allocator: std.mem.Allocator, max_bytes: usize, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) bool {
     @setFloatMode(.strict);
     if (comptime T != f32 and T != f64) return false;
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos or n_ < 64 or incx == 0) return false;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos or n_ < 64 or incx == 0) return false;
     const n: usize = @intCast(n_);
     const bytes = std.math.mul(usize, n, @sizeOf(T)) catch return false;
     if (bytes > max_bytes) return false;
@@ -443,7 +443,7 @@ noinline fn tryFiniteTpmv(comptime T: type, comptime stack_small: bool, allocato
     if (stack_small and T == f32 and n <= 1024 and trans_ != .no_trans and incx != 1 and bytes <= max_bytes / 2) {
         return stagedSmallTpmv(T, allocator, max_bytes - bytes, uplo, trans_, diag, n_, ap, x, incx, stride, last);
     }
-    const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+    const Bits = @Int(.unsigned, @bitSizeOf(T));
     const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
     if (stride == 1) {
         var i: usize = 0;
@@ -554,7 +554,7 @@ noinline fn tryFiniteTpmv(comptime T: type, comptime stack_small: bool, allocato
 // Four independent long-tail outputs retain each row's ascending term order.
 noinline fn finiteTpmvLowerTailFour(comptime T: type, comptime transposed: bool, first: usize, diag: Diag, n: usize, ap: [*]const T, x: [*]const T, incx: BlasInt, stride: usize, last: usize, output: []T) align(64) bool {
     @setFloatMode(.strict);
-    const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+    const Bits = @Int(.unsigned, @bitSizeOf(T));
     const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
     var sums: @Vector(4, T) = @splat(0);
     var bases: [4]usize = undefined;
@@ -588,7 +588,7 @@ noinline fn finiteTpmvLowerTailFour(comptime T: type, comptime transposed: bool,
 // two independent, ordered sums; neither a reduction nor FMA is introduced.
 noinline fn finiteTpmvTransPairs(comptime T: type, first_row: usize, uplo: Uplo, diag: Diag, n: usize, ap: [*]const T, x: [*]const T, incx: BlasInt, stride: usize, last: usize, output: []T) align(64) bool {
     @setFloatMode(.strict);
-    const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+    const Bits = @Int(.unsigned, @bitSizeOf(T));
     const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
     var i: usize = first_row;
     while (i + 1 < n) : (i += 2) {
@@ -640,7 +640,7 @@ noinline fn finiteTpmvTransPairs(comptime T: type, first_row: usize, uplo: Uplo,
 // private output is written here; the caller commits after every row succeeds.
 noinline fn finiteTpmvNoTransPairs(comptime T: type, first_row: usize, uplo: Uplo, diag: Diag, n: usize, ap: [*]const T, x: [*]const T, incx: BlasInt, stride: usize, last: usize, output: []T) align(64) bool {
     @setFloatMode(.strict);
-    const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+    const Bits = @Int(.unsigned, @bitSizeOf(T));
     const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
     var i: usize = first_row;
     while (i + 1 < n) : (i += 2) {
@@ -851,13 +851,13 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
             const uplo = selected_uplo orelse uplo_arg;
             @setFloatMode(.strict);
             const diag: Diag = if (unit_diagonal) .unit else diagonal_arg;
-            const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+            const Bits = @Int(.unsigned, @bitSizeOf(T));
             const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
             var i: usize = first_row;
             while (i + width - 1 < n) : (i += width) {
                 // Keep derived matrix addresses local to each row block. The tied
                 // operand preserves the pointer without adding a machine instruction.
-                const ap = if (comptime T == f32 and width == 16 and unit_stride and unit_diagonal and selected_uplo == .lower and builtin.cpu.arch == .aarch64)
+                const ap = if (comptime T == f32 and width == 16 and unit_stride and unit_diagonal and selected_uplo == .lower and builtin.target.cpu.arch == .aarch64)
                     asm volatile (""
                         : [base] "=r" (-> [*]const T),
                         : [source] "0" (ap_storage),
@@ -895,7 +895,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                         }
                         if (grouped_rows) {
                             // Share one input-pair load across the row groups.
-                            const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32)
+                            const input_pair: @Vector(2, T) = if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32)
                                 asm volatile ("ldr %[pair:d], [%[ptr]]"
                                     : [pair] "=w" (-> @Vector(2, f32)),
                                     : [ptr] "r" (x + column),
@@ -906,7 +906,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                             inline for (0..2) |group| {
                                 const offset = group * 8;
                                 var split: struct { first: @Vector(8, T), second: @Vector(8, T) } = undefined;
-                                if (comptime T == f32 and builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 })) {
+                                if (comptime T == f32 and builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 })) {
                                     var joined: [4]@Vector(4, T) = undefined;
                                     inline for (0..4) |pair| {
                                         var address: usize = undefined;
@@ -944,7 +944,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                             sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
                         } else {
                             if (T == f64 and width == 8 and unit_stride and !unit_diagonal) {
-                                const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
+                                const input_pair: @Vector(2, T) = if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
                                     asm volatile ("ldr %[pair:q], [%[ptr]]"
                                         : [pair] "=w" (-> @Vector(2, f64)),
                                         : [ptr] "r" (x + column),
@@ -974,14 +974,14 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                                 const split = splitTpmvColumnPairs(T, width, pairs);
                                 const first = split.first;
                                 const second = split.second;
-                                if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and width == 16 and unit_stride) {
+                                if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and width == 16 and unit_stride) {
                                     const input_pair = asm volatile ("ldr %[pair:d], [%[ptr]]"
                                         : [pair] "=w" (-> @Vector(2, f32)),
                                         : [ptr] "r" (x + column),
                                         : .{ .memory = true });
                                     sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(input_pair[0]));
                                     sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(input_pair[1]));
-                                } else if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f64 and (width == 8 or width == 16) and unit_stride) {
+                                } else if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f64 and (width == 8 or width == 16) and unit_stride) {
                                     const input_pair = asm volatile ("ldr %[pair:q], [%[ptr]]"
                                         : [pair] "=w" (-> @Vector(2, f64)),
                                         : [ptr] "r" (x + column),
@@ -1035,7 +1035,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                         }
                     }
                     var column: usize = i + width;
-                    const shared_row_sources = comptime T == f32 and width == 16 and unit_stride and !unit_diagonal and selected_uplo == .lower and builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 });
+                    const shared_row_sources = comptime T == f32 and width == 16 and unit_stride and !unit_diagonal and selected_uplo == .lower and builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 });
                     var row_sources: [width][*]const T = undefined;
                     if (comptime shared_row_sources) {
                         // Keep complete row addresses shared by the paired loop
@@ -1055,13 +1055,13 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                         }
                         if (T == f32 and width == 16 and unit_stride) {
                             // Share one input-pair load across the row groups.
-                            const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and unit_diagonal)
+                            const input_pair: @Vector(2, T) = if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and unit_diagonal)
                                 asm volatile ("ldr %[pair:d], [%[ptr], %[index]]"
                                     : [pair] "=w" (-> @Vector(2, f32)),
                                     : [ptr] "r" (x),
                                       [index] "r" (column * 4),
                                     : .{ .memory = true })
-                            else if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32)
+                            else if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32)
                                 asm volatile ("ldr %[pair:d], [%[ptr]]"
                                     : [pair] "=w" (-> @Vector(2, f32)),
                                     : [ptr] "r" (x + column),
@@ -1072,7 +1072,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                             inline for (0..2) |group| {
                                 const offset = group * 8;
                                 var split: struct { first: @Vector(8, T), second: @Vector(8, T) } = undefined;
-                                if (comptime T == f32 and builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 })) {
+                                if (comptime T == f32 and builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 })) {
                                     var joined: [4]@Vector(4, T) = undefined;
                                     inline for (0..4) |pair| {
                                         var value: @Vector(4, T) = undefined;
@@ -1136,7 +1136,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                             }
                             sums = @shuffle(T, groups[0], groups[1], @Vector(16, i32){ 0, 1, 2, 3, 4, 5, 6, 7, -1, -2, -3, -4, -5, -6, -7, -8 });
                         } else if (T == f64 and width == 8 and unit_stride and !unit_diagonal) {
-                            const input_pair: @Vector(2, T) = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
+                            const input_pair: @Vector(2, T) = if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
                                 asm volatile ("ldr %[pair:q], [%[ptr]]"
                                     : [pair] "=w" (-> @Vector(2, f64)),
                                     : [ptr] "r" (x + column),
@@ -1166,7 +1166,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                             const split = splitTpmvColumnPairs(T, width, pairs);
                             const first = split.first;
                             const second = split.second;
-                            if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and width == 16 and unit_stride) {
+                            if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f32 and width == 16 and unit_stride) {
                                 // Keep the pair in one load instead of separate broadcast/scalar
                                 // loads. The paired-column bound guarantees both inputs exist.
                                 const input_pair = asm volatile ("ldr %[pair:d], [%[ptr]]"
@@ -1175,7 +1175,7 @@ fn FiniteTpmvTransRowsLeaf(comptime T: type, comptime width: usize, comptime uni
                                     : .{ .memory = true });
                                 sums = sums + @as(@Vector(width, T), first) * @as(@Vector(width, T), @splat(input_pair[0]));
                                 sums = sums + @as(@Vector(width, T), second) * @as(@Vector(width, T), @splat(input_pair[1]));
-                            } else if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f64 and width == 8 and unit_stride) {
+                            } else if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }) and T == f64 and width == 8 and unit_stride) {
                                 const input_pair = asm volatile ("ldr %[pair:q], [%[ptr]]"
                                     : [pair] "=w" (-> @Vector(2, f64)),
                                     : [ptr] "r" (x + column),
@@ -1253,7 +1253,7 @@ fn FiniteTpmvLowerStridedRowsLeaf(comptime width: usize) type {
                 while (remaining != 0) : (remaining -= 1) {
                     // Keep a scalar load: the compiler's post-index LD1R form
                     // was slower in the measured strided lower-triangle cases.
-                    const xj = if (comptime builtin.cpu.arch == .aarch64 and builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
+                    const xj = if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 }))
                         asm volatile ("ldr %[value:s], [%[source]]"
                             : [value] "=w" (-> f32),
                             : [source] "r" (x + input_index),
@@ -1562,7 +1562,7 @@ fn FiniteTpmvRowsLeaf(comptime T: type, comptime width: usize, comptime unit_str
             if (comptime T == f32 and width == 16 and !unit_stride) {
                 if (first_row == 0 and uplo == .lower and incx == 1 and n >= 768) return finiteTpmvLowerF32Panels(diag, n, ap, x, output);
             }
-            const Bits = std.meta.Int(.unsigned, @bitSizeOf(T));
+            const Bits = @Int(.unsigned, @bitSizeOf(T));
             const exponent: Bits = if (T == f32) 0x7f800000 else 0x7ff0000000000000;
             var i: usize = first_row;
             while (i + width - 1 < n) : (i += width) {

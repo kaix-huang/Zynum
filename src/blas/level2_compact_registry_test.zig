@@ -223,7 +223,7 @@ test "compact registry cells remain explicit execution leaves" {
         var profile = tuning.production_2026_07_17.symmetric;
         try std.testing.expect(fused.lifecycle.defaultEligible());
         try std.testing.expect(profile.enable_fused_real_band);
-        const expected = if (@import("builtin").cpu.arch == .aarch64) catalog.Implementation.compact_symmetric_band_fused else catalog.Implementation.compact_symmetric_band;
+        const expected = if (@import("builtin").target.cpu.arch == .aarch64) catalog.Implementation.compact_symmetric_band_fused else catalog.Implementation.compact_symmetric_band;
         try std.testing.expectEqual(expected, profile.selectRealBandImplementation(T, 512, 8));
         try std.testing.expectEqual(catalog.Implementation.compact_symmetric_band, profile.selectRealBandImplementation(T, 511, 8));
         try std.testing.expectEqual(catalog.Implementation.compact_symmetric_band, profile.selectRealBandImplementation(T, 512, 7));

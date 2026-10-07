@@ -30,8 +30,8 @@ fn verifyStubGemvWitness() ProbeError!void {
     var output_storage = [_]f32{ 1001, 10, 20, 30, 40, 50, 60, 70, 80, -1003 };
     const before = output_storage;
     var request: contract.Request = .{
-        .operation = @intFromEnum(contract.Operation.gemv_no_trans_unit),
-        .scalar = @intFromEnum(contract.Scalar.f32),
+        .operation = @backingInt(contract.Operation.gemv_no_trans_unit),
+        .scalar = @backingInt(contract.Scalar.f32),
         .flags = 0,
         .lda = 8,
         .m = 8,
@@ -57,8 +57,8 @@ fn verifyStubGerWitness() ProbeError!void {
     var output_storage = [_]f32{ 2001, 11, 12, 13, 14, 15, 16, 17, 18, -2003 };
     const before = output_storage;
     var request: contract.Request = .{
-        .operation = @intFromEnum(contract.Operation.ger_real),
-        .scalar = @intFromEnum(contract.Scalar.f32),
+        .operation = @backingInt(contract.Operation.ger_real),
+        .scalar = @backingInt(contract.Scalar.f32),
         .flags = 0,
         .lda = 8,
         .m = 8,
@@ -80,7 +80,7 @@ fn verifyStubGerWitness() ProbeError!void {
 
 pub fn main() ProbeError!void {
     if (builtin.is_test) return error.BuiltAsTest;
-    if (builtin.cpu.arch != .x86_64) return error.UnexpectedTarget;
+    if (builtin.target.cpu.arch != .x86_64) return error.UnexpectedTarget;
     if (contract.zynum_internal_x86_64_level2_width_enabled != 0) return error.CandidateEnabled;
 
     try verifyStubGemvWitness();

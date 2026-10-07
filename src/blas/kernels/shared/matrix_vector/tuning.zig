@@ -336,7 +336,7 @@ pub const SymmetricProfile = struct {
 
     pub fn selectRealBandImplementation(self: SymmetricProfile, comptime T: type, n: usize, k: usize) catalog.Implementation {
         if (comptime T == f32 or T == f64) {
-            if (self.enable_fused_real_band and builtin.cpu.arch == .aarch64 and self.preferBandUnit(n, k)) {
+            if (self.enable_fused_real_band and builtin.target.cpu.arch == .aarch64 and self.preferBandUnit(n, k)) {
                 return .compact_symmetric_band_fused;
             }
         }
@@ -349,14 +349,14 @@ pub const SymmetricProfile = struct {
 
     pub fn selectRealPackedSingleImplementation(self: SymmetricProfile, comptime T: type) catalog.Implementation {
         if (comptime T == f32 or T == f64) {
-            if (self.enable_fused_real_packed_single and builtin.cpu.arch == .aarch64) return .compact_symmetric_packed_fused;
+            if (self.enable_fused_real_packed_single and builtin.target.cpu.arch == .aarch64) return .compact_symmetric_packed_fused;
         }
         return .compact_symmetric_packed;
     }
 
     pub fn selectRealPackedImplementation(self: SymmetricProfile, comptime T: type) catalog.Implementation {
         if (comptime T == f32 or T == f64) {
-            if (self.enable_fused_real_packed and builtin.cpu.arch == .aarch64) return .compact_symmetric_packed_fused;
+            if (self.enable_fused_real_packed and builtin.target.cpu.arch == .aarch64) return .compact_symmetric_packed_fused;
         }
         return .compact_symmetric_packed;
     }
@@ -479,14 +479,14 @@ pub const TriangularProfile = struct {
 
     pub fn selectFiniteTpmv(self: TriangularProfile, comptime T: type, n: types.BlasInt) catalog.Implementation {
         if (comptime T != f32 and T != f64) return .portable_scalar;
-        if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and self.enable_finite_tpmv and n >= 64 and
+        if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and self.enable_finite_tpmv and n >= 64 and
             @as(usize, @intCast(n)) >= self.finite_tpmv_min_n) return .compact_triangular_packed_finite;
         return .portable_scalar;
     }
 
     pub fn selectFiniteTbsv(self: TriangularProfile, comptime T: type, n: types.BlasInt, k: types.BlasInt) catalog.Implementation {
         if (comptime T != f32 and T != f64) return .portable_scalar;
-        if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and self.enable_finite_tbsv and n >= 128 and k >= 0 and
+        if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and self.enable_finite_tbsv and n >= 128 and k >= 0 and
             @as(usize, @intCast(n)) >= self.finite_tbsv_min_n and k <= @divTrunc(n, 4)) return .compact_triangular_band_finite;
         return .portable_scalar;
     }
@@ -512,12 +512,12 @@ pub const TriangularProfile = struct {
         incx: types.BlasInt,
     ) bool {
         if (incx != 1 or n <= 0 or k < 0) return false;
-        if (require_x86 and builtin.cpu.arch != .x86_64) return false;
+        if (require_x86 and builtin.target.cpu.arch != .x86_64) return false;
         return self.preferBandWindow(@intCast(n), @intCast(k));
     }
 
     pub fn preferPackedX86(self: TriangularProfile, n: usize) bool {
-        return builtin.cpu.arch == .x86_64 and n >= self.packed_x86_min_n;
+        return builtin.target.cpu.arch == .x86_64 and n >= self.packed_x86_min_n;
     }
 };
 

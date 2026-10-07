@@ -467,7 +467,7 @@ fn parallelSymvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]
     }
 
     const runner = if (T == f32) runSymvTaskF32 else runSymvTaskF64;
-    const ran = if (builtin.cpu.arch == .x86_64 or tuning.useRealLowLatency(T, n))
+    const ran = if (builtin.target.cpu.arch == .x86_64 or tuning.useRealLowLatency(T, n))
         core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)
     else
         core_pool.run(runner, @ptrCast(&tasks), task_count);
@@ -706,7 +706,7 @@ fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1
     )) return;
     if (uplo == .upper) {
         var first = j0;
-        if (builtin.cpu.arch == .x86_64 and n >= 128) {
+        if (builtin.target.cpu.arch == .x86_64 and n >= 128) {
             while (first + 1 < j1) : (first += 2) {
                 hermvUpperPair(T, first, alpha, a + indexing.matIndex(lda, 0, first), a + indexing.matIndex(lda, 0, first + 1), x, y_delta);
             }

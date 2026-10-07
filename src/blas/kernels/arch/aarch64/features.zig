@@ -53,7 +53,7 @@ pub fn testStreamingEntries() TestStreamingDepths {
 // it explicitly at both state boundaries.  In particular, this prevents a
 // scalar coefficient held in the low lane of a Z register from being reused
 // after entering streaming mode.
-const streaming_mode_clobbers: std.builtin.assembly.Clobbers = if (builtin.cpu.arch == .aarch64) .{
+const streaming_mode_clobbers: std.lang.assembly.Clobbers = if (builtin.target.cpu.arch == .aarch64) .{
     .z0 = true,
     .z1 = true,
     .z2 = true,
@@ -107,39 +107,39 @@ const streaming_mode_clobbers: std.builtin.assembly.Clobbers = if (builtin.cpu.a
 } else .{ .memory = true };
 
 pub const has_asimd: bool =
-    builtin.cpu.arch == .aarch64 and
-    builtin.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 });
+    builtin.target.cpu.arch == .aarch64 and
+    builtin.target.cpu.hasAll(.aarch64, &.{ .neon, .fp_armv8 });
 
 pub const has_sve: bool =
-    builtin.cpu.arch == .aarch64 and
-    builtin.cpu.has(.aarch64, .sve);
+    builtin.target.cpu.arch == .aarch64 and
+    builtin.target.cpu.has(.aarch64, .sve);
 
 pub const has_sve2: bool =
-    has_sve and builtin.cpu.has(.aarch64, .sve2);
+    has_sve and builtin.target.cpu.has(.aarch64, .sve2);
 
 pub const has_sme: bool =
-    builtin.cpu.arch == .aarch64 and
-    builtin.cpu.has(.aarch64, .sme);
+    builtin.target.cpu.arch == .aarch64 and
+    builtin.target.cpu.has(.aarch64, .sme);
 
 pub const has_sme2: bool =
-    has_sme and builtin.cpu.has(.aarch64, .sme2);
+    has_sme and builtin.target.cpu.has(.aarch64, .sme2);
 
 pub const has_sme2p1: bool =
-    has_sme2 and builtin.cpu.has(.aarch64, .sme2p1);
+    has_sme2 and builtin.target.cpu.has(.aarch64, .sme2p1);
 
 pub const has_mops: bool =
-    builtin.cpu.arch == .aarch64 and
-    builtin.cpu.has(.aarch64, .mops);
+    builtin.target.cpu.arch == .aarch64 and
+    builtin.target.cpu.has(.aarch64, .mops);
 
 pub const has_complxnum: bool =
-    builtin.cpu.arch == .aarch64 and
-    builtin.cpu.has(.aarch64, .complxnum);
+    builtin.target.cpu.arch == .aarch64 and
+    builtin.target.cpu.has(.aarch64, .complxnum);
 
 pub const has_sme_f64f64: bool =
-    has_sme and builtin.cpu.has(.aarch64, .sme_f64f64);
+    has_sme and builtin.target.cpu.has(.aarch64, .sme_f64f64);
 
 pub const has_sme_tmop: bool =
-    has_sme2 and builtin.cpu.has(.aarch64, .sme_tmop);
+    has_sme2 and builtin.target.cpu.has(.aarch64, .sme_tmop);
 
 pub fn sveVectorBytes() usize {
     if (comptime !has_sve) return 16;

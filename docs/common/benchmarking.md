@@ -90,7 +90,7 @@ and compiler default are not substitutes:
 python3 bench/tools/run_level2_report.py \
   --build-target x86_64-linux-gnu \
   --build-cpu x86_64_v3 \
-  --build-optimize ReleaseFast \
+  --build-optimize fast \
   ...
 ```
 
@@ -315,17 +315,17 @@ Retain each family summary so aggregate failures map to logical cases.
 
 ## Native Windows Local Benchmarks
 
-Build real Windows probes with Zig 0.16 and run the local diagnostic controller
+Build real Windows probes with Zig 0.17 and run the local diagnostic controller
 with Python 3.11 or newer:
 
 ```powershell
-zig build -Doptimize=ReleaseFast install build-rank-k-probe build-symm-probe build-triangular-matrix-probe build-rotg-latency-probe
-python bench/tools/run_windows_benchmark.py --output zig-out/windows-local --build-command "zig build -Doptimize=ReleaseFast install build-rank-k-probe build-symm-probe build-triangular-matrix-probe build-rotg-latency-probe"
+zig build -Doptimize=fast install build-rank-k-probe build-symm-probe build-triangular-matrix-probe build-rotg-latency-probe
+python bench/tools/run_windows_benchmark.py --output zig-out/windows-local --build-command "zig build -Doptimize=fast install build-rank-k-probe build-symm-probe build-triangular-matrix-probe build-rotg-latency-probe"
 python bench/tools/plot_windows_benchmark.py zig-out/windows-local
 ```
 
 Windows probes keep loaded DLLs mapped until process exit. They still invoke
-Zynum's shutdown hook where applicable, but Zig 0.16 detached worker epilogues
+Zynum's shutdown hook where applicable, but Zig 0.17 detached worker epilogues
 can outlive that hook, so immediate `FreeLibrary` is not an unload barrier.
 Fresh-process execution bounds these retained module references.
 
@@ -475,7 +475,7 @@ Earlier single-call results that clamped zero clock ticks to one nanosecond
 must be remeasured before comparing very small matrices.
 
 For a build specialized to the current Windows CPU, use
-`zig build install-libraries -Doptimize=ReleaseFast -Dcpu=native --prefix zig-out/native`.
+`zig build install-libraries -Doptimize=fast -Dcpu=native --prefix zig-out/native`.
 The resulting `zig-out/native/bin/zynum_blas.dll` can require this CPU's ISA;
 omit `-Dcpu=native` for the portable build. Record this choice in benchmark
 metadata. Native compilation also specializes core fallback loops, beyond
@@ -487,7 +487,7 @@ The existing current-thread cache cleanup hook releases these workspaces.
 
 The local comparison runner also supports Linux/WSL: it selects ELF probe
 names and supplies comparator dependency directories through `LD_LIBRARY_PATH`.
-Build on the Linux filesystem with `-Doptimize=ReleaseFast -Dcpu=native`, then
+Build on the Linux filesystem with `-Doptimize=fast -Dcpu=native`, then
 pass `zig-out/native/lib/libzynum_blas.so` and the Linux comparator libraries
 to `bench/tools/run_windows_comparison.py`. The `readme` profile and four
 process repetitions retain the same case plan and rotating library order as

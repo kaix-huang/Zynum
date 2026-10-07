@@ -52,8 +52,8 @@ fn addOptionalIsolatedBenchLibrary(run: *std.Build.Step.Run, flag: []const u8, e
 
 pub fn build(b: *std.Build) void {
     var target_query = b.standardTargetOptionsQueryOnly(.{ .default_target = .{ .cpu_model = .baseline } });
-    const optimize = b.option(std.builtin.OptimizeMode, "optimize", "Explicit optimization mode (also accepted from Zig dependencies)") orelse
-        b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseFast });
+    const optimize = b.option(std.lang.Optimize, "optimize", "Explicit optimization mode (also accepted from Zig dependencies)") orelse
+        b.standardOptimizeOption(.{ .preferred_optimize_mode = .fast });
     const dispatch_mode = b.option(DispatchMode, "dispatch", "auto: dynamic by default, specialized when -Dcpu is explicit; or select dynamic/specialized") orelse .auto;
     const explicit_cpu = b.user_input_options.contains("cpu");
     const dynamic_dispatch = switch (dispatch_mode) {
@@ -70,7 +70,7 @@ pub fn build(b: *std.Build) void {
     }
     const target = b.resolveTargetQuery(target_query);
     const thread_limit = b.option(usize, "thread-limit", "Compile-time ceiling for worker threads; zero uses runtime hardware capacity") orelse 0;
-    const test_optimize = b.option(std.builtin.OptimizeMode, "test-optimize", "Optimize mode for correctness tests") orelse .ReleaseSafe;
+    const test_optimize = b.option(std.lang.Optimize, "test-optimize", "Optimize mode for correctness tests") orelse .safe;
     const host_tool_smoke = b.option(bool, "host-tool-smoke", "Include the test-host-tool-smoke aggregate in the default test step") orelse true;
     const apple_amx = b.option(
         bool,
@@ -446,11 +446,11 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/generate_compat_headers.zig"),
             .target = b.graph.host,
-            .optimize = .ReleaseSafe,
+            .optimize = .safe,
         }),
     });
     const generate_headers = b.addRunArtifact(generate_headers_tool);
-    generate_headers.addArg(b.pathFromRoot("."));
+    generate_headers.addDirectoryArg2(b.path("."), .{});
     const generate_headers_step = b.step("generate-headers", "Regenerate Zynum BLAS CBLAS and BLAS/Fortran compatibility headers/modules");
     generate_headers_step.dependOn(&generate_headers.step);
 
@@ -459,19 +459,19 @@ pub fn build(b: *std.Build) void {
         .target = b.graph.host,
         // The generator materializes every descriptor for reporting. Debug
         // avoids spending release-optimization time on a host-only tool.
-        .optimize = .Debug,
+        .optimize = .debug,
     });
     const generate_kernel_coverage_tool = b.addExecutable(.{
         .name = "generate_kernel_coverage",
         .root_module = b.createModule(.{
             .root_source_file = b.path("tools/generate_kernel_coverage.zig"),
             .target = b.graph.host,
-            .optimize = .Debug,
+            .optimize = .debug,
             .imports = &.{.{ .name = "kernel-coverage", .module = kernel_coverage_mod }},
         }),
     });
     const generate_kernel_coverage = b.addRunArtifact(generate_kernel_coverage_tool);
-    generate_kernel_coverage.addArg(b.pathFromRoot("."));
+    generate_kernel_coverage.addDirectoryArg2(b.path("."), .{});
     generate_kernel_coverage.addArg("64");
     const generate_kernel_coverage_step = b.step("generate-kernel-coverage", "Regenerate the normalized BLAS kernel coverage artifact");
     generate_kernel_coverage_step.dependOn(&generate_kernel_coverage.step);
@@ -783,7 +783,7 @@ pub fn build(b: *std.Build) void {
     if (run_level2_width_default_artifact_probe) |run| level2_width_default_artifact_probe_step.dependOn(&run.step);
 
     const target_has_avx512f = target.result.cpu.arch == .x86_64 and
-        target.result.cpu.features.isEnabled(@intFromEnum(std.Target.x86.Feature.avx512f));
+        target.result.cpu.features.isEnabled(@backingInt(std.Target.x86.Feature.avx512f));
     const level2_width_enabled_artifact_probe_mod = if (target_has_avx512f and level2_width_selected)
         b.createModule(.{
             .root_source_file = b.path("test/build/level2_width_enabled_artifact_probe.zig"),
@@ -823,13 +823,19 @@ pub fn build(b: *std.Build) void {
         run_level2_width_enabled_artifact_probe_step.dependOn(&unsupported_probe.step);
     }
 
+    const translated_headers = b.addTranslateC(.{
+        .root_source_file = b.path("test/headers/compat_headers.h"),
+        .target = target,
+        .optimize = test_optimize,
+    });
+    translated_headers.addIncludePath(b.path("include"));
     const header_smoke_mod = b.createModule(.{
         .root_source_file = b.path("test/headers/compat_headers_smoke.zig"),
         .target = target,
         .optimize = test_optimize,
         .link_libc = true,
     });
-    header_smoke_mod.addIncludePath(b.path("include"));
+    header_smoke_mod.addImport("compat-headers", translated_headers.createModule());
     if (target.result.cpu.arch == .x86_64) {
         const task_runtime_host_test_library = b.addObject(.{
             .name = "zynum-test-task-runtime-host",
@@ -855,38 +861,29 @@ pub fn build(b: *std.Build) void {
         "python3",
         "-c",
         "import json, pathlib, sys; data=json.loads(pathlib.Path(sys.argv[1]).read_text()); assert data['schema'] == 1; assert data['blas_integer_abi'] == 'LP64'; assert data['fortran']['export_count'] == 161; assert data['cblas']['export_count'] == 150; names={item['name'] for section in ('fortran','cblas') for item in data[section]['exports']}; assert {'dgemm_', 'cdotc_sub_', 'cblas_dgemm', 'cblas_zher2k'} <= names",
-        b.pathFromRoot("include/zynum/blas/abi_manifest.json"),
     });
-    const c_header_smoke_test = b.addSystemCommand(&.{
-        "sh",
-        "-c",
-        b.fmt("mkdir -p '{s}' && cc -std=c11 -I '{s}' -c '{s}' -o '{s}'", .{
-            b.pathFromRoot("zig-out/header-smoke"),
-            b.pathFromRoot("include"),
-            b.pathFromRoot("test/headers/compat_headers_c_smoke.c"),
-            b.pathFromRoot("zig-out/header-smoke/compat_headers_c_smoke.o"),
-        }),
-    });
-    const cpp_header_smoke_test = b.addSystemCommand(&.{
-        "sh",
-        "-c",
-        b.fmt("mkdir -p '{s}' && c++ -std=c++17 -I '{s}' -c '{s}' -o '{s}'", .{
-            b.pathFromRoot("zig-out/header-smoke"),
-            b.pathFromRoot("include"),
-            b.pathFromRoot("test/headers/compat_headers_cpp_smoke.cpp"),
-            b.pathFromRoot("zig-out/header-smoke/compat_headers_cpp_smoke.o"),
-        }),
-    });
+    abi_manifest_smoke_test.addFileArg2(b.path("include/zynum/blas/abi_manifest.json"), .{});
+    const c_header_smoke_test = b.addSystemCommand(&.{ "cc", "-std=c11", "-I" });
+    c_header_smoke_test.addDirectoryArg2(b.path("include"), .{});
+    c_header_smoke_test.addArg("-c");
+    c_header_smoke_test.addFileArg2(b.path("test/headers/compat_headers_c_smoke.c"), .{});
+    c_header_smoke_test.addArg("-o");
+    _ = c_header_smoke_test.addOutputFileArg2("compat_headers_c_smoke.o", .{});
+    const cpp_header_smoke_test = b.addSystemCommand(&.{ "c++", "-std=c++17", "-I" });
+    cpp_header_smoke_test.addDirectoryArg2(b.path("include"), .{});
+    cpp_header_smoke_test.addArg("-c");
+    cpp_header_smoke_test.addFileArg2(b.path("test/headers/compat_headers_cpp_smoke.cpp"), .{});
+    cpp_header_smoke_test.addArg("-o");
+    _ = cpp_header_smoke_test.addOutputFileArg2("compat_headers_cpp_smoke.o", .{});
     const fortran_module_smoke_test = b.addSystemCommand(&.{
         "sh",
         "-c",
-        b.fmt("if command -v gfortran >/dev/null 2>&1; then mkdir -p '{s}' && gfortran -std=f2008 -J '{s}' -fsyntax-only '{s}' '{s}'; fi", .{
-            b.pathFromRoot("zig-out/fortran-mod"),
-            b.pathFromRoot("zig-out/fortran-mod"),
-            b.pathFromRoot("include/zynum/blas/blas.f90"),
-            b.pathFromRoot("test/headers/fortran_module_smoke.f90"),
-        }),
+        "if command -v gfortran >/dev/null 2>&1; then mkdir -p \"$1\" && gfortran -std=f2008 -J \"$1\" -fsyntax-only \"$2\" \"$3\"; fi",
+        "zynum-fortran-smoke",
     });
+    _ = fortran_module_smoke_test.addOutputDirectoryArg2("fortran-mod", .{});
+    fortran_module_smoke_test.addFileArg2(b.path("include/zynum/blas/blas.f90"), .{});
+    fortran_module_smoke_test.addFileArg2(b.path("test/headers/fortran_module_smoke.f90"), .{});
     const abi_baseline_observer_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
@@ -906,8 +903,8 @@ pub fn build(b: *std.Build) void {
     const abi_artifact_parity_verifier_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
-        b.pathFromRoot("test/abi/baseline/test_abi_artifact_parity.py"),
     });
+    abi_artifact_parity_verifier_tests.addFileArg2(b.path("test/abi/baseline/test_abi_artifact_parity.py"), .{});
     const abi_artifact_parity_verifier_test_step = b.step(
         "test-abi-artifact-parity-verifier",
         "Run fresh-artifact parity parser and verifier tests",
@@ -916,8 +913,8 @@ pub fn build(b: *std.Build) void {
     const build_profile_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
-        b.pathFromRoot("test/build/test_build_profiles.py"),
     });
+    build_profile_tests.addFileArg2(b.path("test/build/test_build_profiles.py"), .{});
     const build_profile_test_step = b.step(
         "test-build-profiles",
         "Check default, single, and conflicting experimental build profiles",
@@ -926,8 +923,8 @@ pub fn build(b: *std.Build) void {
     const build_inventory_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
-        b.pathFromRoot("test/build/test_build_inventory.py"),
     });
+    build_inventory_tests.addFileArg2(b.path("test/build/test_build_inventory.py"), .{});
     const build_inventory_test_step = b.step(
         "test-build-inventory",
         "Validate the repository build and launch inventory",
@@ -936,18 +933,18 @@ pub fn build(b: *std.Build) void {
     const test_inventory_structure_check = b.addSystemCommand(&.{
         "python3",
         "-B",
-        b.pathFromRoot("tools/check_test_inventory.py"),
-        "--root",
-        b.pathFromRoot("."),
-        "--structure-only",
     });
+    test_inventory_structure_check.addFileArg2(b.path("tools/check_test_inventory.py"), .{});
+    test_inventory_structure_check.addArg("--root");
+    test_inventory_structure_check.addDirectoryArg2(b.path("."), .{});
+    test_inventory_structure_check.addArg("--structure-only");
     test_inventory_structure_check.removeEnvironmentVariable("GIT_PAGER");
     test_inventory_structure_check.removeEnvironmentVariable("PAGER");
     const test_inventory_security_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
-        b.pathFromRoot("test/build/test_test_inventory.py"),
     });
+    test_inventory_security_tests.addFileArg2(b.path("test/build/test_test_inventory.py"), .{});
     test_inventory_security_tests.removeEnvironmentVariable("GIT_PAGER");
     test_inventory_security_tests.removeEnvironmentVariable("PAGER");
     const test_inventory_security_test_step = b.step(
@@ -958,14 +955,14 @@ pub fn build(b: *std.Build) void {
     const python_tooling_tests = b.addSystemCommand(&.{
         "python3",
         "-B",
-        b.pathFromRoot("tools/check_test_inventory.py"),
-        "--root",
-        b.pathFromRoot("."),
-        "--inventory",
-        b.pathFromRoot("tools/test_inventory.json"),
-        "--run-python-tooling-root",
-        "python-root:benchmark-tools-discovery",
     });
+    python_tooling_tests.addFileArg2(b.path("tools/check_test_inventory.py"), .{});
+    python_tooling_tests.addArg("--root");
+    python_tooling_tests.addDirectoryArg2(b.path("."), .{});
+    python_tooling_tests.addArg("--inventory");
+    python_tooling_tests.addFileArg2(b.path("tools/test_inventory.json"), .{});
+    python_tooling_tests.addArg("--run-python-tooling-root");
+    python_tooling_tests.addArg("python-root:benchmark-tools-discovery");
     python_tooling_tests.setCwd(b.path("."));
     python_tooling_tests.removeEnvironmentVariable("PYTHONHOME");
     python_tooling_tests.removeEnvironmentVariable("PYTHONPATH");
@@ -1105,14 +1102,18 @@ pub fn build(b: *std.Build) void {
         target.result.os.tag == b.graph.host.result.os.tag and
         target.result.abi == b.graph.host.result.abi and
         target.result.ofmt == b.graph.host.result.ofmt;
-    const native_feature_external_executor_enabled = b.enable_qemu or
-        b.enable_rosetta or b.enable_wine or b.enable_darling or b.enable_wasmtime;
+    // Executor flags are make-time inputs in Zig 0.17. Check them in a Run
+    // step so cached build configurations cannot bypass native-only evidence.
+    const native_execution_check = b.addSystemCommand(&.{ "python3", "tools/check_test_inventory.py", "--check-native-executors" });
+    native_execution_check.addThirdPartyEnabledArgQemu(.{ .enabled = "--native-executor=qemu" });
+    native_execution_check.addThirdPartyEnabledArgRosetta(.{ .enabled = "--native-executor=rosetta" });
+    native_execution_check.addThirdPartyEnabledArgWine(.{ .enabled = "--native-executor=wine" });
+    native_execution_check.addThirdPartyEnabledArgDarling(.{ .enabled = "--native-executor=darling" });
+    native_execution_check.addThirdPartyEnabledArgWasmtime(.{ .enabled = "--native-executor=wasmtime" });
     const native_feature_profile_guard: *std.Build.Step = if (!explicit_non_baseline_cpu_profile)
         &b.addFail("test-native-feature requires an explicit non-baseline CPU profile").step
     else if (!native_feature_target_matches_host)
         &b.addFail("test-native-feature requires target arch/os/abi/ofmt to match the build host exactly").step
-    else if (native_feature_external_executor_enabled)
-        &b.addFail("test-native-feature forbids external target executors").step
     else if (!b.graph.host.result.cpu.features.isSuperSetOf(target.result.cpu.features))
         &b.addFail("test-native-feature requested CPU features are not supported by the build host").step
     else
@@ -1121,6 +1122,7 @@ pub fn build(b: *std.Build) void {
         const official_tests = inventory_case.logical_tests orelse continue;
         const run_native_feature_tests = b.addRunArtifact(official_tests);
         run_native_feature_tests.step.dependOn(native_feature_profile_guard);
+        run_native_feature_tests.step.dependOn(&native_execution_check.step);
         test_native_feature_step.dependOn(&run_native_feature_tests.step);
     }
 
@@ -1168,7 +1170,9 @@ pub fn build(b: *std.Build) void {
     run_dynamic_baseline_tests.setEnvironmentVariable("ZYNUM_MAX_ISA", "baseline");
     // Fresh processes make the cached capability ceiling independently testable.
     const test_dynamic_step = b.step("test-dynamic-dispatch", "Run native dynamic-dispatch correctness and forced-baseline checks; not inventory evidence");
-    if (dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled) {
+    if (dynamic_dispatch and native_feature_target_matches_host) {
+        run_dynamic_tests.step.dependOn(&native_execution_check.step);
+        run_dynamic_baseline_tests.step.dependOn(&native_execution_check.step);
         test_dynamic_step.dependOn(&run_dynamic_tests.step);
         test_dynamic_step.dependOn(&run_dynamic_baseline_tests.step);
         test_dynamic_step.dependOn(check_multiversion_step);
@@ -1230,7 +1234,7 @@ pub fn build(b: *std.Build) void {
     addOptionalBenchLibrary(run_bench, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     addOptionalBenchLibrary(run_bench, "--mkl", bench_mkl, null);
     addOptionalBenchLibrary(run_bench, "--aocl-blis", bench_aocl_blis, null);
-    if (b.args) |args| run_bench.addArgs(args);
+    run_bench.addPassthruArgs();
     // The emitted library argument supplies the dependency; unrelated installed
     // probes and the static library are not prerequisites for a benchmark run.
 
@@ -1252,12 +1256,12 @@ pub fn build(b: *std.Build) void {
     run_gemm_sweep.addArg("--zynum-blas");
     run_gemm_sweep.addFileArg(lib.getEmittedBin());
     run_gemm_sweep.addArg("--csv");
-    run_gemm_sweep.addArg(b.getInstallPath(.prefix, "gemm_sweep.csv"));
+    run_gemm_sweep.addFileArg2(b.graph.path(.install_prefix, "gemm_sweep.csv"), .{});
     addOptionalBenchLibrary(run_gemm_sweep, "--openblas", bench_openblas, if (target.result.os.tag == .macos) "/opt/homebrew/opt/openblas/lib/libopenblas.dylib" else null);
     addOptionalBenchLibrary(run_gemm_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     addOptionalBenchLibrary(run_gemm_sweep, "--mkl", bench_mkl, null);
     addOptionalBenchLibrary(run_gemm_sweep, "--aocl-blis", bench_aocl_blis, null);
-    if (b.args) |args| run_gemm_sweep.addArgs(args);
+    run_gemm_sweep.addPassthruArgs();
     // Installing only the shared library also creates the selected output prefix
     // before the sweep opens its default CSV on a clean checkout.
     run_gemm_sweep.step.dependOn(&install_dynamic_lib.step);
@@ -1283,7 +1287,7 @@ pub fn build(b: *std.Build) void {
     run_gemm_sweep_isolated.addArg("2");
     run_gemm_sweep_isolated.addArg("--check");
     run_gemm_sweep_isolated.addArg("--skip-missing");
-    if (b.args) |args| run_gemm_sweep_isolated.addArgs(args);
+    run_gemm_sweep_isolated.addPassthruArgs();
 
     const gemm_sweep_isolated_step = b.step("bench-gemm-sweep-isolated", "Run reportable fresh-process GEMM sweep with correctness checks");
     gemm_sweep_isolated_step.dependOn(&run_gemm_sweep_isolated.step);
@@ -1306,7 +1310,7 @@ pub fn build(b: *std.Build) void {
     addOptionalBenchLibrary(run_vector_matrix_sweep, "--accelerate", bench_accelerate, if (target.result.os.tag == .macos) "/System/Library/Frameworks/Accelerate.framework/Accelerate" else null);
     addOptionalBenchLibrary(run_vector_matrix_sweep, "--mkl", bench_mkl, null);
     addOptionalBenchLibrary(run_vector_matrix_sweep, "--aocl-blis", bench_aocl_blis, null);
-    if (b.args) |args| run_vector_matrix_sweep.addArgs(args);
+    run_vector_matrix_sweep.addPassthruArgs();
 
     const vector_matrix_sweep_step = b.step("bench-vector-matrix-sweep", "Sweep representative BLAS Level 1/2 kernels");
     vector_matrix_sweep_step.dependOn(&run_vector_matrix_sweep.step);
@@ -1342,7 +1346,7 @@ pub fn build(b: *std.Build) void {
     run_rank_k_report.addArg("--csv");
     run_rank_k_report.addArg("zig-out/rank_k_report.csv");
     run_rank_k_report.addArg("--skip-missing");
-    if (b.args) |args| run_rank_k_report.addArgs(args);
+    run_rank_k_report.addPassthruArgs();
 
     const rank_k_report_step = b.step("bench-rank-k-report", "Run the opt-in fresh-process SYRK/HERK comparator report");
     rank_k_report_step.dependOn(&run_rank_k_report.step);
@@ -1378,7 +1382,7 @@ pub fn build(b: *std.Build) void {
     run_symm_report.addArg("--csv");
     run_symm_report.addArg("zig-out/symm_report.csv");
     run_symm_report.addArg("--skip-missing");
-    if (b.args) |args| run_symm_report.addArgs(args);
+    run_symm_report.addPassthruArgs();
 
     const symm_report_step = b.step("bench-symm-report", "Run the opt-in fresh-process SYMM/HEMM comparator report");
     symm_report_step.dependOn(&run_symm_report.step);
@@ -1414,7 +1418,7 @@ pub fn build(b: *std.Build) void {
     run_triangular_matrix_report.addArg("--csv");
     run_triangular_matrix_report.addArg("zig-out/triangular_matrix_report.csv");
     run_triangular_matrix_report.addArg("--skip-missing");
-    if (b.args) |args| run_triangular_matrix_report.addArgs(args);
+    run_triangular_matrix_report.addPassthruArgs();
 
     const triangular_matrix_report_step = b.step("bench-triangular-matrix-report", "Run the opt-in fresh-process TRMM/TRSM comparator report");
     triangular_matrix_report_step.dependOn(&run_triangular_matrix_report.step);
@@ -1439,7 +1443,7 @@ pub fn build(b: *std.Build) void {
         python_tooling_tests.addArg("--windows-zynum-blas-build-output");
         python_tooling_tests.addFileArg(lib.getEmittedBin());
         python_tooling_tests.addArg("--windows-zynum-blas-installed-output");
-        python_tooling_tests.addArg(b.getInstallPath(.bin, "zynum_blas.dll"));
+        python_tooling_tests.addFileArg2(b.graph.path(.install_bin, "zynum_blas.dll"), .{});
         python_tooling_tests.step.dependOn(&install_dynamic_lib.step);
         python_tooling_tests.step.dependOn(&install_rank_k_probe.step);
         python_tooling_tests.step.dependOn(&install_rotg_latency_probe.step);
@@ -1462,7 +1466,7 @@ pub fn build(b: *std.Build) void {
     run_rotg_latency_report.addArg("--csv");
     run_rotg_latency_report.addArg("zig-out/perf-report/rotg_latency_report.csv");
     run_rotg_latency_report.addArg("--skip-missing");
-    if (b.args) |args| run_rotg_latency_report.addArgs(args);
+    run_rotg_latency_report.addPassthruArgs();
 
     const rotg_latency_report_step = b.step("bench-rotg-latency-report", "Run the opt-in fresh-process ROTG/ROTMG latency report");
     rotg_latency_report_step.dependOn(&run_rotg_latency_report.step);
@@ -1493,7 +1497,7 @@ pub fn build(b: *std.Build) void {
 fn buildKernelTiers(
     b: *std.Build,
     baseline: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     apple_amx: bool,
     level1_sve: bool,
     level1_fixed: bool,
@@ -1547,8 +1551,8 @@ fn buildKernelTiers(
         libraries[index] = b.addObject(.{
             .name = b.fmt("zynum-kernel-{s}-{s}", .{ name, @tagName(optimize) }),
             .root_module = module,
-            // Zig 0.16's self-hosted Debug backend cannot assemble vmovntdq.
-            .use_llvm = if (baseline.result.cpu.arch == .x86_64 and index == 2 and optimize == .Debug) true else null,
+            // Zig 0.17's self-hosted debug backend cannot assemble vmovntdq.
+            .use_llvm = if (baseline.result.cpu.arch == .x86_64 and index == 2 and optimize == .debug) true else null,
         });
         // ISA objects must remain separate code-generation units. Never LTO
         // target-specific instructions into the baseline resolver or scheduler.

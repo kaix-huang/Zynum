@@ -220,7 +220,7 @@ fn expectDenseBetaZeroCase(comptime T: type, herm: bool) !void {
 }
 
 test "dense GEMM SYMM preserves s d c z side uplo and leading dimensions" {
-    if (comptime builtin.cpu.arch != .x86_64) return error.SkipZigTest;
+    if (comptime builtin.target.cpu.arch != .x86_64) return error.SkipZigTest;
     try expectDenseGemmFamily(f32, false);
     try expectDenseGemmFamily(f64, false);
     try expectDenseGemmFamily(ComplexF32, false);
@@ -228,13 +228,13 @@ test "dense GEMM SYMM preserves s d c z side uplo and leading dimensions" {
 }
 
 test "dense GEMM HEMM ignores unstored values and imaginary diagonals" {
-    if (comptime builtin.cpu.arch != .x86_64) return error.SkipZigTest;
+    if (comptime builtin.target.cpu.arch != .x86_64) return error.SkipZigTest;
     try expectDenseGemmFamily(ComplexF32, true);
     try expectDenseGemmFamily(ComplexF64, true);
 }
 
 test "dense GEMM SYMM and HEMM cover tall and wide order-512 operands" {
-    if (comptime builtin.cpu.arch != .x86_64) return error.SkipZigTest;
+    if (comptime builtin.target.cpu.arch != .x86_64) return error.SkipZigTest;
     try expectDenseGemmCase(f32, 512, 128, .left, .lower, false);
     try expectDenseGemmCase(ComplexF64, 128, 512, .right, .upper, true);
 }
@@ -247,7 +247,7 @@ test "SYMM alpha zero scales C without reading A or B" {
 }
 
 test "dense GEMM beta zero does not read C" {
-    if (comptime builtin.cpu.arch != .x86_64) return error.SkipZigTest;
+    if (comptime builtin.target.cpu.arch != .x86_64) return error.SkipZigTest;
     inline for (.{ f32, f64, ComplexF32, ComplexF64 }) |T| try expectDenseBetaZeroCase(T, false);
     try expectDenseBetaZeroCase(ComplexF32, true);
     try expectDenseBetaZeroCase(ComplexF64, true);

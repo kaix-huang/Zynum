@@ -157,7 +157,7 @@ fn runParallelRight(comptime T: type, tasks: []const RightTask(T)) bool {
 }
 
 fn rightTaskCount(m: usize, n: usize) usize {
-    if (comptime builtin.cpu.arch != .x86_64) return 1;
+    if (comptime builtin.target.cpu.arch != .x86_64) return 1;
     const work = m *| n *| n;
     if (work < parallel_min_work) return 1;
     return @min(core_pool.taskCount(m, parallel_min_rows_per_task), parallel_max_tasks);
@@ -308,7 +308,7 @@ test "right row-parallel gate switches at 511 and 512 rows" {
     if (runtime.maxThreads() <= 1) return error.SkipZigTest;
 
     try std.testing.expectEqual(@as(usize, 1), rightTaskCount(128, 128));
-    if (comptime builtin.cpu.arch != .x86_64) {
+    if (comptime builtin.target.cpu.arch != .x86_64) {
         try std.testing.expectEqual(@as(usize, 1), rightTaskCount(512, 128));
         return;
     }

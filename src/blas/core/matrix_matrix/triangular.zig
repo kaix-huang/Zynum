@@ -225,7 +225,7 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
 
     // Candidate: bounded panels preserve the original in-place dependency
     // order. AArch64 never enters the queued x86 workspace branch.
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_trmm_candidate;
         if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, runtime.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
             const capability = gemm_dispatch.activeCapability();
@@ -235,7 +235,7 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
         }
     }
     // Large parallel updates need enough work per GEMM to amortize dispatch.
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
             if (blocked.tryTrmm(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
         }
@@ -243,7 +243,7 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
-    if (comptime use_isolated_structured and builtin.cpu.arch == .x86_64) {
+    if (comptime use_isolated_structured and builtin.target.cpu.arch == .x86_64) {
         if (side == .right and structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n) and
             isolated_structured.tryTrmmRight(T, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
     }
@@ -280,7 +280,7 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
 
     // Candidate: bounded panels preserve the original in-place dependency
     // order. AArch64 never enters the queued x86 workspace branch.
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_trsm_candidate;
         if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, runtime.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
             const capability = gemm_dispatch.activeCapability();
@@ -290,7 +290,7 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
         }
     }
     // Shared diagonal solves and trailing GEMM updates amortize work across RHS.
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
             if (blocked.tryTrsm(T, .{}, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
         }
@@ -298,7 +298,7 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
-    if (comptime use_isolated_structured and builtin.cpu.arch == .x86_64) {
+    if (comptime use_isolated_structured and builtin.target.cpu.arch == .x86_64) {
         if (side == .right and structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n) and
             isolated_structured.tryTrsmRight(T, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
     }

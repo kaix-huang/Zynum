@@ -83,7 +83,7 @@ fn init(
 }
 
 fn execute(request: *abi.Request) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     return zynum_internal_x86_64_stride2_execute(request) != 0;
 }
 

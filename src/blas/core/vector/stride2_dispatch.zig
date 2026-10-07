@@ -13,7 +13,7 @@ pub const ComplexF64 = scalar.ComplexF64;
 pub const minimum_elements: usize = tuning.active.x86_64.stride2_parallel_min_elements;
 
 fn targetUnary(n: BlasInt, incx: BlasInt) ?usize {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     if (n <= 0 or incx != 2) return null;
     const count: usize = @intCast(n);
     if (!tuning.active.x86_64.preferStride2Parallel(count)) return null;

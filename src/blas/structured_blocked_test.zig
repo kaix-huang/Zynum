@@ -505,10 +505,10 @@ test "blocked rank-k and rank-2k preserve the unstored triangle and Hermitian di
             for ([_]f64{ 0, 1 }) |alpha_real| {
                 for ([_]f64{ 0, 1, 2 }) |beta_real| {
                     for ([_]f64{ std.math.nan(f64), std.math.inf(f64) }) |ignored_imaginary| {
-                        const a = [_]T{if (alpha_real == 0) value(T, std.math.nan(f64), std.math.nan(f64)) else value(T, 1, 0)} ** 4;
+                        const a: [4]T = @splat(if (alpha_real == 0) value(T, std.math.nan(f64), std.math.nan(f64)) else value(T, 1, 0));
                         for ([_]scalar.Uplo{ .upper, .lower }) |uplo| {
                             const prior = value(T, if (beta_real == 0) std.math.nan(f64) else 3, ignored_imaginary);
-                            var actual = [_]T{prior} ** 4;
+                            var actual: [4]T = @splat(prior);
                             var ordinary = actual;
                             const alpha = value(T, alpha_real, 0);
                             const beta = value(T, beta_real, 0);

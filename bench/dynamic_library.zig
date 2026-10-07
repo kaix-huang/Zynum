@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 // unload barrier: Linux OpenMP and Windows detached workers may still execute
 // library epilogues after timing completes. The fresh-process harness bounds
 // the handles; retain them until exit on every platform.
-pub const DynLib = if (builtin.os.tag == .windows) WindowsDynLib else ProcessDynLib;
+pub const DynLib = if (builtin.target.os.tag == .windows) WindowsDynLib else ProcessDynLib;
 
 const ProcessDynLib = struct {
     inner: std.DynLib,
@@ -44,7 +44,7 @@ const WindowsDynLib = struct {
     }
 
     pub fn close(self: *WindowsDynLib) void {
-        // Benchmark DLLs have process lifetime on Windows. Zig 0.16's
+        // Benchmark DLLs have process lifetime on Windows. Zig 0.17's
         // Io.Threaded workers are detached: deinit waits for work completion,
         // but their OS-thread epilogues can still execute inside the DLL.
         // FreeLibrary here can unmap that code and crash after a valid timing.
@@ -55,7 +55,7 @@ const WindowsDynLib = struct {
 };
 
 pub fn processId() u32 {
-    if (builtin.os.tag == .windows) {
+    if (builtin.target.os.tag == .windows) {
         const Win32 = struct {
             extern "kernel32" fn GetCurrentProcessId() callconv(.winapi) u32;
         };

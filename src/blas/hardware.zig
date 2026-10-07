@@ -63,7 +63,7 @@ pub const Capabilities = struct {
 };
 
 comptime {
-    if (std.meta.fields(Capabilities).len > 31) @compileError("capability cache needs a wider atomic");
+    if (@typeInfo(Capabilities).@"struct".field_names.len > 31) @compileError("capability cache needs a wider atomic");
 }
 
 const initialized: u32 = 1 << 31;
@@ -71,16 +71,16 @@ var cache = std.atomic.Value(u32).init(0);
 
 fn encode(value: Capabilities) u32 {
     var bits: u32 = initialized;
-    inline for (std.meta.fields(Capabilities), 0..) |field, index| {
-        if (@field(value, field.name)) bits |= @as(u32, 1) << index;
+    inline for (@typeInfo(Capabilities).@"struct".field_names, 0..) |field, index| {
+        if (@field(value, field)) bits |= @as(u32, 1) << index;
     }
     return bits;
 }
 
 fn decode(bits: u32) Capabilities {
     var result: Capabilities = .{};
-    inline for (std.meta.fields(Capabilities), 0..) |field, index| {
-        @field(result, field.name) = (bits & (@as(u32, 1) << index)) != 0;
+    inline for (@typeInfo(Capabilities).@"struct".field_names, 0..) |field, index| {
+        @field(result, field) = (bits & (@as(u32, 1) << index)) != 0;
     }
     return result;
 }
@@ -195,9 +195,9 @@ fn detectX86() Capabilities {
 }
 
 fn detect() Capabilities {
-    if (comptime builtin.cpu.arch == .x86_64) return detectX86();
-    if (comptime builtin.cpu.arch != .aarch64) return .{};
-    if (comptime builtin.os.tag == .linux) {
+    if (comptime builtin.target.cpu.arch == .x86_64) return detectX86();
+    if (comptime builtin.target.cpu.arch != .aarch64) return .{};
+    if (comptime builtin.target.os.tag == .linux) {
         // Shared libraries do not run Zig executable startup, so its private
         // auxv pointer is unset. Use libc's process auxv when libc is linked.
         const getauxval = if (builtin.link_libc) std.c.getauxval else std.os.linux.getauxval;
@@ -206,7 +206,7 @@ fn detect() Capabilities {
             getauxval(std.elf.AT_HWCAP2),
         );
     }
-    if (comptime builtin.os.tag == .macos) {
+    if (comptime builtin.target.os.tag == .macos) {
         const sve = sysctlFeature("hw.optional.arm.FEAT_SVE");
         const sme = sysctlFeature("hw.optional.arm.FEAT_SME");
         const sme2 = sme and sysctlFeature("hw.optional.arm.FEAT_SME2");
@@ -288,10 +288,10 @@ test "capability cache representation preserves empty and complete snapshots" {
     try std.testing.expect(encode(empty) != 0);
     try std.testing.expectEqualDeep(empty, decode(encode(empty)));
     var all: Capabilities = .{};
-    inline for (std.meta.fields(Capabilities)) |field| @field(all, field.name) = true;
+    inline for (@typeInfo(Capabilities).@"struct".field_names) |field| @field(all, field) = true;
     try std.testing.expectEqualDeep(all, decode(encode(all)));
     try std.testing.expectEqualDeep(detected(), detected());
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .linux and builtin.link_libc) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .linux and builtin.link_libc) {
         // This also checks the library-safe provider against libc directly.
         const expected = fromLinuxAarch64Hwcap(
             std.c.getauxval(std.elf.AT_HWCAP),

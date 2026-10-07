@@ -5,7 +5,7 @@
 //!
 //! Views describe caller-owned buffers; they never allocate or copy data. In
 //! all builds they validate cheap structural invariants such as lengths, strides,
-//! and leading dimensions. Debug, ReleaseSafe, and ReleaseSmall builds also check
+//! and leading dimensions. debug, safe, and small builds also check
 //! backing slice capacity before operations cross into the unchecked core layer.
 //! Matrices use BLAS-style column-major storage with an explicit leading dimension.
 
@@ -31,8 +31,8 @@ pub const Error = error{
 
 /// Backwards-compatible alias for the public BLAS API error set.
 pub const BlasError = Error;
-/// True for Debug, ReleaseSafe, and ReleaseSmall builds; false only in ReleaseFast.
-pub const runtime_checks_enabled = builtin.mode != .ReleaseFast;
+/// True for debug, safe, and small builds; false only in fast.
+pub const runtime_checks_enabled = builtin.mode != .fast;
 
 /// Logical matrix operation applied by multiplication APIs without changing storage.
 pub const MatrixTransform = enum {

@@ -714,7 +714,7 @@ fn expectUnitGbmvCase(comptime T: type, trans: ref.Trans) !void {
     const lda: usize = kl + ku + 4;
     const lenx = if (trans == .no_trans) n else m;
     const leny = if (trans == .no_trans) m else n;
-    var rng = ref.Rng.init(@as(u64, 0xbaad_1001) + @intFromEnum(trans));
+    var rng = ref.Rng.init(@as(u64, 0xbaad_1001) + @backingInt(trans));
     const a = try std.testing.allocator.alloc(T, lda * n);
     defer std.testing.allocator.free(a);
     const x = try std.testing.allocator.alloc(T, lenx);
@@ -746,7 +746,7 @@ fn expectUnitSbmvCase(comptime T: type, uplo: ref.Uplo, herm: bool) !void {
     const n: usize = 29;
     const k: usize = 7;
     const lda: usize = k + 3;
-    var rng = ref.Rng.init(@as(u64, 0xbaad_2001) + @intFromEnum(uplo));
+    var rng = ref.Rng.init(@as(u64, 0xbaad_2001) + @backingInt(uplo));
     const a = try std.testing.allocator.alloc(T, lda * n);
     defer std.testing.allocator.free(a);
     const x = try std.testing.allocator.alloc(T, n);

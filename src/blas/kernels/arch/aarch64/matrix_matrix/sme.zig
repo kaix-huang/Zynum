@@ -317,14 +317,35 @@ noinline fn tailRowsF32Fixed(comptime columns: usize, task: gemm_task.Task(f32),
     }
 }
 
+noinline fn tailRowsF64Fixed(comptime columns: usize, task: gemm_task.Task(f64), b_pack: []const f64, row_start: usize, j: usize) void {
+    const V = @Vector(2, f64);
+    for (row_start..task.m) |row| {
+        var sums: [columns / 2]V = @splat(@splat(0));
+        for (0..task.k) |p| {
+            const av: V = @splat(task.a[matIndex(task.lda, row, p)]);
+            inline for (0..columns / 2) |group| {
+                const bv = @as(*align(1) const V, @ptrCast(b_pack.ptr + p * columns + group * 2)).*;
+                sums[group] = @mulAdd(V, av, bv, sums[group]);
+            }
+        }
+        inline for (0..columns / 2) |group| {
+            inline for (0..2) |lane| task.c[matIndex(task.ldc, row, j + group * 2 + lane)] = sums[group][lane];
+        }
+    }
+}
+
 fn tailRowsDirect(comptime T: type, task: gemm_task.Task(T), b_pack: []const T, row_start: usize, j: usize, tile: usize) void {
     if (row_start >= task.m) return;
     if (T == f32) {
         if (tile == 16) return tailRowsF32Fixed(16, task, b_pack, row_start, j);
         if (tile == 32) return tailRowsF32Fixed(32, task, b_pack, row_start, j);
     }
+    if (T == f64) {
+        if (tile == 8) return tailRowsF64Fixed(8, task, b_pack, row_start, j);
+        if (tile == 16) return tailRowsF64Fixed(16, task, b_pack, row_start, j);
+    }
     // Finish rows below one SME tile after the assembly kernels. Four-column
-    // f32 groups preserve each output's ascending-K fused accumulation order.
+    // f32 and two-column f64 groups preserve ascending-K fused accumulation.
     var acc_storage: [maxSmeTile(T)]T = undefined;
     var i = row_start;
     while (i < task.m) : (i += 1) {

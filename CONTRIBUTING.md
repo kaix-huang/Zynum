@@ -10,27 +10,36 @@ security issues through `SECURITY.md` rather than a public issue.
 
 ## Development Setup
 
-Use Zig 0.16.0 or newer in the 0.16 series and Python 3.10 or newer.
+Use Zig 0.17.0 or newer in the 0.17 series and Python 3.10 or newer.
 Repository validation rejects inherited environment variables whose names start
 with `GIT_`. Run the canonical sanitized validation sequence from the
 [Contributor Guide](docs/contributors/README.md#required-checks). That is the
 authoritative list for Python tooling, inventories, generated files, baseline
 correctness modes, formatting, and the default build.
 
+The [platform evidence table](docs/development_and_usage.md#test-inventory)
+records which Zig 0.17 targets can run the canonical baseline suite. Linux and
+Windows native inventory observations remain pending; compile/link checks and
+separate native correctness tests do not close those rows.
+
 Inventory-dependent tests require the exact `-Dcpu=baseline` query. Ordinary
-`zig build` remains host-native and unrestricted by the inventory. For AArch64
-performance work, build the feature tier being tuned and run the separate
-native-feature correctness step on a matching host:
+`zig build` produces a baseline library with runtime dispatch and is unrestricted
+by the inventory. For AArch64 performance work, build the feature tier being
+tuned and run the separate native-feature correctness step on a matching host:
 
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_AARCH64_CHECKS'
 set -eu
-zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
-zig build test -Dtarget=aarch64-macos -Dcpu=baseline -Dtest-optimize=ReleaseFast --release=fast --summary failures
-zig build test-native-feature -Dcpu=native -Dtest-optimize=ReleaseSafe --release=safe --summary failures
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m5 --release=fast --summary failures
+zig build test -Dtarget=aarch64-macos -Dcpu=baseline -Dtest-optimize=fast --release=fast --summary failures
+zig build test-native-feature -Dcpu=native -Dtest-optimize=safe --release=safe --summary failures
 ZYNUM_AARCH64_CHECKS
 ```
+
+Zig 0.17 recognizes Apple M5 through `-Dcpu=native`, including its SME feature
+set. The explicit `apple_m5` build above is compile coverage; local specialized
+builds can use `zig build -Dcpu=native --release=fast`.
 
 `test-native-feature` reuses the official test bodies but is correctness-only;
 it does not create or satisfy frozen inventory evidence. It rejects baseline,
@@ -119,13 +128,13 @@ correctness or performance. See `docs/architecture.md`,
 - `zig fmt --check build.zig build.zig.zon src test bench examples tools` passes.
 - `python3 -m py_compile bench/tools/*.py tools/*.py` passes when Python tooling
   changes.
-- Debug baseline tests pass when checked API behavior changes:
-  `zig build -Dcpu=baseline -Dtest-optimize=Debug test --summary failures`.
-- ReleaseSafe baseline tests pass when checked API behavior changes:
-  `zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe test --summary failures`.
-- ReleaseFast baseline tests pass when dispatch, kernels, or ReleaseFast-only
+- `debug` baseline tests pass when checked API behavior changes:
+  `zig build -Dcpu=baseline -Dtest-optimize=debug test --summary failures`.
+- `safe` baseline tests pass when checked API behavior changes:
+  `zig build --release=safe -Dcpu=baseline -Dtest-optimize=safe test --summary failures`.
+- `fast` baseline tests pass when dispatch, kernels, or `fast`-only
   paths change:
-  `zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast test --summary failures`.
+  `zig build --release=fast -Dcpu=baseline -Dtest-optimize=fast test --summary failures`.
 - `zig build generate-headers --summary failures` has been run after ABI export
   changes.
 - `zig build generate-kernel-coverage --summary failures` has been run after a

@@ -1,6 +1,6 @@
-# Zig 0.16 `std.Io` And Threading
+# Zig `std.Io` And Threading
 
-Zynum BLAS uses Zig 0.16 `std.Io` as the single lifecycle for optional parallel
+Zynum BLAS uses Zig 0.17 `std.Io` as the single lifecycle for optional parallel
 CPU work. BLAS calls can be shorter than general asynchronous scheduling
 overhead, so task composition and low-latency publication remain measured
 internal policy.

@@ -11,7 +11,7 @@ rules.
 | Module boundaries and ownership | [`../architecture.md`](../architecture.md) |
 | Public API checks and aliasing model | [`../development_and_usage.md`](../development_and_usage.md) |
 | ABI and generated compatibility files | [`../fortran_compatibility.md`](../fortran_compatibility.md) |
-| Zig 0.16 `std.Io` threading notes | [`../common/zig_0_16_std_io_threading.md`](../common/zig_0_16_std_io_threading.md) |
+| Zig `std.Io` threading notes | [`../common/zig_std_io_threading.md`](../common/zig_std_io_threading.md) |
 | CPU affinity and heterogeneous scheduling | [`../common/cpu_affinity_and_heterogeneous_scheduling.md`](../common/cpu_affinity_and_heterogeneous_scheduling.md) |
 | BLAS Level 1 implementation notes | [`../common/level1_optimization_notes.md`](../common/level1_optimization_notes.md) |
 | BLAS Level 2 implementation notes | [`../common/level2_optimization_notes.md`](../common/level2_optimization_notes.md) |

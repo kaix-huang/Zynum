@@ -6,6 +6,10 @@ Zynum is built with `-Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast`;
 the baseline compilation target still permits runtime selection of supported
 ISA kernels.
 
+These measurements predate the Zig 0.17 migration. Its correctness and build
+checks do not establish a performance improvement; fresh measurements are
+required before replacing this bundle or making a Zig 0.17 comparison.
+
 ## Scope and statistics
 
 Each case has six cyclically interleaved fresh-process measurements per library.
@@ -54,13 +58,15 @@ observations and will vary when reproduced.
 
 ## Reproduce
 
-Use the source contents and host/toolchain identified by the manifest. The
-commands collect their own Git identity and binary hashes. Run the three
-families sequentially on an otherwise idle machine; keep outputs local until
-the data and metadata have been reviewed for publication.
+For the published measurements, use the source contents and Zig 0.16.0
+toolchain identified by the manifest. The commands below use the current Zig
+0.17 spelling (`fast`); historical checkouts use `ReleaseFast`. New runs collect
+their own Git identity and binary hashes. Run the three families sequentially
+on an otherwise idle machine; keep outputs local until the data and metadata
+have been reviewed for publication.
 
 ```sh
-zig build -Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast
+zig build -Dcpu=baseline -Ddispatch=dynamic -Doptimize=fast
 unset ZYNUM_MAXIMUM_THREADS
 export OPENBLAS_NUM_THREADS=10 OPENBLAS_DYNAMIC=0 VECLIB_MAXIMUM_THREADS=10
 export MKL_NUM_THREADS=10 MKL_DYNAMIC=FALSE OMP_NUM_THREADS=10 BLIS_NUM_THREADS=10
@@ -77,18 +83,18 @@ python3 bench/tools/run_level1_report.py \
   --op scnrm2 --op csrot --op zdscal --op zscal --op zaxpy --op zdotu \
   --op zdotc --op dzasum --op dznrm2 --op zdrot --op scopy --op dcopy \
   --process-repeats 6 --process-schedule interleaved \
-  --build-target aarch64-macos --build-cpu baseline --build-optimize ReleaseFast \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize fast \
   --csv zig-out/benchmarks/level1.csv --zynum zig-out/lib/libzynum_blas.dylib
 python3 bench/tools/run_level2_report.py \
   --n 128 --n 256 --n 512 --op legacy --reps-small 100 --reps-large 30 \
   --process-repeats 6 --process-schedule interleaved \
-  --build-target aarch64-macos --build-cpu baseline --build-optimize ReleaseFast \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize fast \
   --csv zig-out/benchmarks/level2.csv --zynum zig-out/lib/libzynum_blas.dylib
 python3 bench/tools/run_gemm_sweep_isolated.py \
   --gemm-sweep zig-out/bin/gemm-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib \
   --reps 30 --process-repeats 6 --process-schedule interleaved \
   --isolate-kind --isolate-shape --check \
-  --build-target aarch64-macos --build-cpu baseline --build-optimize ReleaseFast \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize fast \
   --csv zig-out/benchmarks/gemm.csv
 python3 bench/tools/plot_level1_report.py zig-out/benchmarks/level1.csv \
   --bars-svg zig-out/benchmarks/level1.svg \

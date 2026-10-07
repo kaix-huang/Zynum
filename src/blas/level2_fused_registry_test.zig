@@ -107,7 +107,45 @@ fn differentialGer(comptime T: type, conjugate_y: bool) !void {
     };
 }
 
+fn differentialAlignedGerPanels() !void {
+    if (comptime @import("builtin").target.cpu.arch != .aarch64) return;
+    for ([_][2]usize{
+        .{ 64, 16 },   .{ 64, 20 },  .{ 128, 128 }, .{ 240, 84 }, .{ 256, 84 },
+        .{ 256, 88 },  .{ 256, 92 }, .{ 256, 256 }, .{ 255, 85 }, .{ 272, 84 },
+        .{ 512, 128 },
+    }) |shape| {
+        const m = shape[0];
+        const n = shape[1];
+        const lda = m + 3;
+        const a = try std.testing.allocator.alloc(f32, lda * n + 2);
+        defer std.testing.allocator.free(a);
+        const x = try std.testing.allocator.alloc(f32, m + 2);
+        defer std.testing.allocator.free(x);
+        const y = try std.testing.allocator.alloc(f32, n + 2);
+        defer std.testing.allocator.free(y);
+        @memset(a, 777);
+        @memset(x, 888);
+        @memset(y, 999);
+        for (0..m) |i| x[i + 1] = @as(f32, @floatFromInt(i % 13)) - 6;
+        for (0..n) |j| y[j + 1] = @as(f32, @floatFromInt(j % 7)) - 3;
+        try std.testing.expect(matrix_vector_kernels.gerUnitReal(f32, m, n, 0.75, x.ptr + 1, y.ptr + 1, a.ptr + 1, @intCast(lda)));
+        for (0..n) |j| {
+            for (0..m) |i| try std.testing.expectEqual(@mulAdd(f32, x[i + 1], 0.75 * y[j + 1], 777), a[1 + j * lda + i]);
+            for (m..lda) |i| try std.testing.expectEqual(@as(f32, 777), a[1 + j * lda + i]);
+        }
+        try std.testing.expectEqual(@as(f32, 777), a[0]);
+        try std.testing.expectEqual(@as(f32, 777), a[a.len - 1]);
+        for (0..m) |i| try std.testing.expectEqual(@as(f32, @floatFromInt(i % 13)) - 6, x[i + 1]);
+        for (0..n) |j| try std.testing.expectEqual(@as(f32, @floatFromInt(j % 7)) - 3, y[j + 1]);
+        try std.testing.expectEqual(@as(f32, 888), x[0]);
+        try std.testing.expectEqual(@as(f32, 888), x[x.len - 1]);
+        try std.testing.expectEqual(@as(f32, 999), y[0]);
+        try std.testing.expectEqual(@as(f32, 999), y[y.len - 1]);
+    }
+}
+
 test "forced fused GER GERU and GERC columns match scalar references" {
+    try differentialAlignedGerPanels();
     try differentialGer(f32, false);
     try differentialGer(f64, false);
     try differentialGer(types.ComplexF32, false);

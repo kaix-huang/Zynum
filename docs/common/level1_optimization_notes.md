@@ -162,7 +162,7 @@ Level 1 parallelism is useful only when saved memory or arithmetic time exceeds
 task submission, wake-up, synchronization, and final-reduction cost.
 
 - Use the shared `std.Io` task runtime described in
-  [`zig_0_16_std_io_threading.md`](zig_0_16_std_io_threading.md).
+  [`zig_std_io_threading.md`](zig_std_io_threading.md).
 - Derive usable concurrency from the runtime's assigned CPU capacity; do not
   assume the physical-machine total.
 - Split contiguous ranges at element boundaries and keep write ownership
@@ -268,3 +268,18 @@ Native regression coverage checks complete outputs, padding, FPSR and preserved
 FPCR across size boundaries, rounding/flush modes, exceptional inputs, valid
 SROTM flags, and thread caps. Persistent workers must observe changes to the
 caller's floating-point environment between calls.
+
+### Single-precision SME AXPY scheduling
+
+The f32 streaming AXPY body initializes all eight independent ZA groups from
+`y` before applying the `alpha*x` pass. This separates dependent writes to each
+group while preserving the original zero-plus-`y`, then fused multiply-add
+arithmetic. Keep the existing streaming capability and vector-length gates,
+memory accesses, stores, tails, and thread policy. The f64 body retains its
+interleaved load-and-accumulate schedule.
+
+Validate complete outputs and floating-point status against the original
+arithmetic, including signed zeros, subnormals, NaNs, rounding modes, exact
+aliasing, unaligned inputs, and streaming boundaries. Gains depend on vector
+length and cache residency; retain the schedule only while adjacent sizes and
+strided, complex, and f64 controls remain within the regression allowance.

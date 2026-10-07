@@ -32,7 +32,7 @@ jobs:
 
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.16.0
+          version: 0.17.0
 
       - name: Bind trusted POSIX toolchain paths
         id: trusted-posix-tools
@@ -82,8 +82,8 @@ jobs:
           trusted_zig="$(resolve_trusted_tool zig)"
           trusted_python="$(resolve_trusted_tool python3)"
           zig_version="$("$trusted_zig" version)"
-          if [[ "$zig_version" != 0.16.0 ]]; then
-            echo 'trusted Zig must report exactly version 0.16.0' >&2
+          if [[ "$zig_version" != 0.17.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.17.0' >&2
             exit 1
           fi
           python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
@@ -136,7 +136,7 @@ jobs:
 
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.16.0
+          version: 0.17.0
 
       - name: Bind trusted POSIX toolchain paths
         id: trusted-posix-tools
@@ -186,8 +186,8 @@ jobs:
           trusted_zig="$(resolve_trusted_tool zig)"
           trusted_python="$(resolve_trusted_tool python3)"
           zig_version="$("$trusted_zig" version)"
-          if [[ "$zig_version" != 0.16.0 ]]; then
-            echo 'trusted Zig must report exactly version 0.16.0' >&2
+          if [[ "$zig_version" != 0.17.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.17.0' >&2
             exit 1
           fi
           python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
@@ -241,14 +241,14 @@ jobs:
 
       - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1
         with:
-          version: 0.16.0
+          version: 0.17.0
 
       - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: .zig-cache
-          key: zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
+          key: zig-release-${{ runner.os }}-${{ runner.arch }}-0.17.0-${{ hashFiles('build.zig', 'build.zig.zon') }}
           restore-keys: |
-            zig-release-${{ runner.os }}-${{ runner.arch }}-0.16.0-
+            zig-release-${{ runner.os }}-${{ runner.arch }}-0.17.0-
 
       - name: Bind trusted POSIX toolchain paths and require Fortran on Linux
         id: trusted-posix-tools
@@ -299,8 +299,8 @@ jobs:
           trusted_zig="$(resolve_trusted_tool zig)"
           trusted_python="$(resolve_trusted_tool python3)"
           zig_version="$("$trusted_zig" version)"
-          if [[ "$zig_version" != 0.16.0 ]]; then
-            echo 'trusted Zig must report exactly version 0.16.0' >&2
+          if [[ "$zig_version" != 0.17.0 ]]; then
+            echo 'trusted Zig must report exactly version 0.17.0' >&2
             exit 1
           fi
           python_version="$("$trusted_python" -I -B -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
@@ -378,7 +378,7 @@ jobs:
           PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
-        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false --summary failures
+        run: zig build test ${{ matrix.target_args }} -Dtest-optimize=safe -Dhost-tool-smoke=false --summary failures
 
       - name: Build install tree
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}

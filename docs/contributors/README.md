@@ -6,6 +6,13 @@ journals.
 
 ## Required Checks
 
+The canonical baseline sequence below currently has Zig 0.17 native inventory
+evidence on AArch64 macOS. See the
+[platform evidence table](../development_and_usage.md#test-inventory) before
+running it on another target. Pending targets use compile/link checks and,
+where supported, separate native-feature and dynamic-dispatch correctness runs;
+these do not satisfy the missing inventory rows.
+
 Repository validation fails closed when any inherited environment name starts
 with `GIT_`. If a change intentionally updates generated files, stage those
 expected outputs before running this block. The generator rerun below then
@@ -23,9 +30,9 @@ python3 -B tools/check_test_inventory.py --root . --structure-only
 zig build test-build-inventory --summary failures
 zig build test-test-inventory --summary failures
 zig build test-host-tool-smoke -Dcpu=baseline --summary failures
-zig build -Dcpu=baseline -Dtest-optimize=Debug -Dhost-tool-smoke=false test --summary failures
-zig build --release=safe -Dcpu=baseline -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false test --summary failures
-zig build --release=fast -Dcpu=baseline -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false test --summary failures
+zig build -Dcpu=baseline -Dtest-optimize=debug -Dhost-tool-smoke=false test --summary failures
+zig build --release=safe -Dcpu=baseline -Dtest-optimize=safe -Dhost-tool-smoke=false test --summary failures
+zig build --release=fast -Dcpu=baseline -Dtest-optimize=fast -Dhost-tool-smoke=false test --summary failures
 zig build generate-headers --summary failures
 zig build generate-kernel-coverage --summary failures
 if ! git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json; then
@@ -43,8 +50,9 @@ zig build --summary failures
 ZYNUM_VALIDATION
 ```
 
-By default, `zig build test` runs the test-inventory gate, all applicable Zig
-correctness tests, and the `test-host-tool-smoke` aggregate. Set
+With explicit `-Dcpu=baseline`, the `test` step runs the test-inventory gate,
+all applicable Zig correctness tests, and the `test-host-tool-smoke` aggregate.
+Without `-Dcpu`, it runs dynamic-dispatch correctness and host-tool smoke. Set
 `-Dhost-tool-smoke=false` when that aggregate has already run; invoking
 `zig build test-host-tool-smoke` explicitly always runs it. The aggregate
 includes the inventory-declared Python tooling tests, ABI manifest, C/C++ header
@@ -55,8 +63,11 @@ Run the independent `test-build-inventory` and `test-test-inventory` steps
 separately, as shown above.
 
 CI runs the inventory validators and representative fail-closed security cases
-for each change. Native correctness runs on macOS and x86_64 Linux; ARM Linux
-and Windows receive compile/link checks. The release workflow runs both complete
+for each change. Native correctness runs on macOS and x86_64 Linux; the Linux
+baseline inventory job is compile/link-only while native observations are
+pending. ARM Linux receives compile/link checks. Windows adds installed DLL
+export and representative-call smoke checks to its compile/link coverage.
+The release workflow runs both complete
 inventory security suites. All CI jobs feed the final gate; a security-case
 failure does not skip platform testing.
 

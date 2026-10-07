@@ -3,10 +3,7 @@
 
 const std = @import("std");
 
-const c = @cImport({
-    @cInclude("zynum/blas/cblas.h");
-    @cInclude("zynum/blas/blas.h");
-});
+const c = @import("compat-headers");
 
 test "compatibility headers import through Zig" {
     comptime {

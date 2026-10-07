@@ -64,8 +64,8 @@ fn dispatchComplex(comptime T: type, operation: abi.Operation, request: *abi.Req
 
 fn execute(request: *abi.Request) callconv(.c) u8 {
     if (zynum_internal_x86_64_level2_width_enabled == 0 or comptime !simd_config.has_avx512_width) return 0;
-    const operation: abi.Operation = @enumFromInt(request.operation);
-    const scalar: abi.Scalar = @enumFromInt(request.scalar);
+    const operation: abi.Operation = @fromBackingInt(@intCast(request.operation));
+    const scalar: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     const handled = switch (scalar) {
         .f32 => dispatchReal(f32, operation, request),
         .f64 => false,

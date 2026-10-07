@@ -36,73 +36,73 @@ fn expectGenericFunction(
     comptime expected_params: []const ExpectedFnParam,
 ) !void {
     const info = @typeInfo(@TypeOf(function_value)).@"fn";
-    switch (info.calling_convention) {
+    switch (info.attrs.@"callconv") {
         .auto => {},
         else => return error.TestUnexpectedResult,
     }
     try std.testing.expect(info.is_generic);
-    try std.testing.expect(!info.is_var_args);
-    try std.testing.expectEqual(expected_params.len, info.params.len);
+    try std.testing.expect(!info.attrs.varargs);
+    try std.testing.expectEqual(expected_params.len, info.param_types.len);
     if (expected_return_type) |ExpectedReturn| {
         try std.testing.expect(info.return_type != null);
         expectType(ExpectedReturn, info.return_type.?);
     } else {
         try std.testing.expect(info.return_type == null);
     }
-    inline for (expected_params, info.params) |expected, actual| {
-        try std.testing.expectEqual(expected.is_generic, actual.is_generic);
-        try std.testing.expectEqual(expected.is_noalias, actual.is_noalias);
+    inline for (expected_params, info.param_types, info.param_attrs) |expected, actual_type, actual_attrs| {
+        try std.testing.expectEqual(expected.is_generic, actual_type == null);
+        try std.testing.expectEqual(expected.is_noalias, actual_attrs.@"noalias");
         if (expected.param_type) |ExpectedParam| {
-            try std.testing.expect(actual.type != null);
-            expectType(ExpectedParam, actual.type.?);
+            try std.testing.expect(actual_type != null);
+            expectType(ExpectedParam, actual_type.?);
         } else {
-            try std.testing.expect(actual.type == null);
+            try std.testing.expect(actual_type == null);
         }
     }
 }
 
 fn expectExactDeclarations(comptime Namespace: type, comptime expected: []const []const u8) !void {
     @setEvalBranchQuota(10_000);
-    const declarations = @typeInfo(Namespace).@"struct".decls;
+    const declarations = @typeInfo(Namespace).@"struct".decl_names;
     try std.testing.expectEqual(expected.len, declarations.len);
     inline for (expected) |name| try std.testing.expect(@hasDecl(Namespace, name));
     inline for (declarations) |declaration| {
         var listed = false;
-        inline for (expected) |name| listed = listed or std.mem.eql(u8, declaration.name, name);
+        inline for (expected) |name| listed = listed or std.mem.eql(u8, declaration, name);
         try std.testing.expect(listed);
     }
 }
 
 fn expectExactErrorSet(comptime ErrorSet: type, comptime expected: []const []const u8) !void {
-    const errors = @typeInfo(ErrorSet).error_set orelse @compileError("global error set is not a public API contract");
+    const errors = @typeInfo(ErrorSet).error_set.error_names orelse @compileError("global error set is not a public API contract");
     try std.testing.expectEqual(expected.len, errors.len);
     inline for (expected) |name| {
         var found = false;
-        inline for (errors) |entry| found = found or std.mem.eql(u8, entry.name, name);
+        inline for (errors) |entry| found = found or std.mem.eql(u8, entry, name);
         try std.testing.expect(found);
     }
     inline for (errors) |entry| {
         var listed = false;
-        inline for (expected) |name| listed = listed or std.mem.eql(u8, entry.name, name);
+        inline for (expected) |name| listed = listed or std.mem.eql(u8, entry, name);
         try std.testing.expect(listed);
     }
 }
 
 fn expectStruct(
     comptime Struct: type,
-    comptime layout: std.builtin.Type.ContainerLayout,
+    comptime layout: std.lang.Type.ContainerLayout,
     comptime expected: []const ExpectedField,
 ) !void {
     const info = @typeInfo(Struct).@"struct";
     try std.testing.expectEqual(layout, info.layout);
     try std.testing.expect(!info.is_tuple);
-    try std.testing.expectEqual(expected.len, info.fields.len);
+    try std.testing.expectEqual(expected.len, info.field_names.len);
     inline for (expected, 0..) |field, index| {
-        try std.testing.expectEqualStrings(field.name, info.fields[index].name);
-        expectType(field.field_type, info.fields[index].type);
-        try std.testing.expect(!info.fields[index].is_comptime);
-        try std.testing.expect(info.fields[index].alignment == null);
-        try std.testing.expectEqual(field.has_default, info.fields[index].defaultValue() != null);
+        try std.testing.expectEqualStrings(field.name, info.field_names[index]);
+        expectType(field.field_type, info.field_types[index]);
+        try std.testing.expect(!info.field_attrs[index].@"comptime");
+        try std.testing.expect(info.field_attrs[index].@"align" == null);
+        try std.testing.expectEqual(field.has_default, info.field_attrs[index].defaultValue(info.field_types[index]) != null);
     }
 }
 
@@ -113,15 +113,15 @@ fn expectEnum(
 ) !void {
     const info = @typeInfo(Enum).@"enum";
     expectType(Tag, info.tag_type);
-    try std.testing.expect(info.is_exhaustive);
+    try std.testing.expect(info.mode == .exhaustive);
     try std.testing.expectEqual(@sizeOf(Tag), @sizeOf(Enum));
     try std.testing.expectEqual(@alignOf(Tag), @alignOf(Enum));
-    try std.testing.expectEqual(expected.len, info.fields.len);
+    try std.testing.expectEqual(expected.len, info.field_names.len);
     inline for (expected, 0..) |field, index| {
-        try std.testing.expectEqualStrings(field.name, info.fields[index].name);
-        try std.testing.expectEqual(field.value, info.fields[index].value);
+        try std.testing.expectEqualStrings(field.name, info.field_names[index]);
+        try std.testing.expectEqual(field.value, info.field_values[index]);
     }
-    try std.testing.expectEqual(@as(usize, 0), info.decls.len);
+    try std.testing.expectEqual(@as(usize, 0), info.decl_names.len);
 }
 
 fn namespaceForRole(comptime Root: type, comptime role: inventory.NamespaceRole) type {
@@ -586,14 +586,14 @@ fn expectViewStructs(comptime Views: type, comptime T: type) !void {
     try std.testing.expectEqual(slice_size + @sizeOf(Views.BlasInt), @offsetOf(Matrix, "column_count"));
     try std.testing.expectEqual(slice_size + 2 * @sizeOf(Views.BlasInt), @offsetOf(Matrix, "leading_dimension"));
 
-    const const_vector_fields = @typeInfo(ConstVector).@"struct".fields;
-    const vector_fields = @typeInfo(Vector).@"struct".fields;
-    const const_matrix_fields = @typeInfo(ConstMatrix).@"struct".fields;
-    try std.testing.expect(const_vector_fields[0].defaultValue() == null);
-    try std.testing.expect(const_vector_fields[1].defaultValue() == null);
-    try std.testing.expectEqual(@as(Views.BlasInt, 1), const_vector_fields[2].defaultValue().?);
-    try std.testing.expectEqual(@as(Views.BlasInt, 1), vector_fields[2].defaultValue().?);
-    try std.testing.expectEqual(Views.MatrixTransform.normal, const_matrix_fields[4].defaultValue().?);
+    const const_vector_fields = @typeInfo(ConstVector).@"struct";
+    const vector_fields = @typeInfo(Vector).@"struct";
+    const const_matrix_fields = @typeInfo(ConstMatrix).@"struct";
+    try std.testing.expect(const_vector_fields.field_attrs[0].defaultValue(const_vector_fields.field_types[0]) == null);
+    try std.testing.expect(const_vector_fields.field_attrs[1].defaultValue(const_vector_fields.field_types[1]) == null);
+    try std.testing.expectEqual(@as(Views.BlasInt, 1), const_vector_fields.field_attrs[2].defaultValue(const_vector_fields.field_types[2]).?);
+    try std.testing.expectEqual(@as(Views.BlasInt, 1), vector_fields.field_attrs[2].defaultValue(vector_fields.field_types[2]).?);
+    try std.testing.expectEqual(Views.MatrixTransform.normal, const_matrix_fields.field_attrs[4].defaultValue(const_matrix_fields.field_types[4]).?);
 }
 
 fn expectViewContract(comptime Facade: type, comptime T: type) !void {
@@ -649,8 +649,8 @@ fn expectTransposeClosure(comptime Facade: type) !void {
     const Views = Facade.api.views;
     const function = @typeInfo(@TypeOf(Views.toCoreTranspose)).@"fn";
     const TransposeMode = function.return_type.?;
-    try std.testing.expectEqual(@as(usize, 1), function.params.len);
-    expectType(Views.MatrixTransform, function.params[0].type.?);
+    try std.testing.expectEqual(@as(usize, 1), function.param_types.len);
+    expectType(Views.MatrixTransform, function.param_types[0].?);
     expectType(fn (Views.MatrixTransform) TransposeMode, @TypeOf(Views.toCoreTranspose));
     expectType(TransposeMode, @TypeOf(Views.toCoreTranspose(.normal)));
     try std.testing.expectEqualStrings("blas.core.shared.scalar.TransposeMode", @typeName(TransposeMode));
@@ -1527,7 +1527,7 @@ fn expectFacadeContract(comptime Facade: type) !void {
         "AliasingNotAllowed",
     };
     try expectExactErrorSet(Views.Error, expected_errors);
-    try std.testing.expectEqual(builtin.mode != .ReleaseFast, Views.runtime_checks_enabled);
+    try std.testing.expectEqual(builtin.mode != .fast, Views.runtime_checks_enabled);
     try std.testing.expectEqualStrings("blas.api.views.MatrixTransform", @typeName(Views.MatrixTransform));
     try expectEnum(Views.MatrixTransform, u2, &.{
         .{ .name = "normal", .value = 0 },
@@ -1637,7 +1637,7 @@ test "inventory is a complete three-surface partition" {
     try expectRecordedOwnerContract("blas.types", "complexF32", "fn (re: f32, im: f32) ComplexF32", &.{ "result.re = re", "result.im = im" });
     try expectRecordedOwnerContract("blas.types", "complexF64", "fn (re: f64, im: f64) ComplexF64", &.{ "result.re = re", "result.im = im" });
     try expectRecordedOwnerContract("blas.api.views", "optionField", "fn (options: anytype, comptime name: []const u8, fallback: anytype) @TypeOf(fallback)", &.{ "runtime generic values", "name is comptime", "result type exactly @TypeOf(fallback)" });
-    try expectRecordedOwnerContract("blas.api.views", "ConstVector", "fn (comptime T: type) type", &.{ "stride: BlasInt = 1", "capacity outside ReleaseFast" });
+    try expectRecordedOwnerContract("blas.api.views", "ConstVector", "fn (comptime T: type) type", &.{ "stride: BlasInt = 1", "capacity outside fast" });
     try expectRecordedOwnerContract("blas.api.views", "Vector", "fn (comptime T: type) type", &.{ "asConst preserves storage, length, and stride", "stride: BlasInt = 1" });
     try expectRecordedOwnerContract("blas.api.views", "ConstMatrix", "fn (comptime T: type) type", &.{ "operation = .normal", "transposed/adjoint preserve storage shape", "effective counts swap" });
     try expectRecordedOwnerContract("blas.api.views", "Matrix", "fn (comptime T: type) type", &.{ "asConst preserves fields", "operation to .normal" });

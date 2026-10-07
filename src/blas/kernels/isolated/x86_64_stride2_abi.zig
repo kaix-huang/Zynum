@@ -42,15 +42,15 @@ pub const Request = extern struct {
 
 pub fn init(operation: Operation, scalar: Scalar, n: usize, x: *anyopaque, y: ?*anyopaque) Request {
     return .{
-        .operation = @intFromEnum(operation),
-        .scalar = @intFromEnum(scalar),
+        .operation = @backingInt(operation),
+        .scalar = @backingInt(scalar),
         .flags = 0,
         .reserved = 0,
         .n = n,
         .x = x,
         .y = y,
-        .args = [_]u64{0} ** 8,
-        .result = [_]u64{0} ** 2,
+        .args = @as([8]u64, @splat(0)),
+        .result = @as([2]u64, @splat(0)),
         .result_index = 0,
     };
 }

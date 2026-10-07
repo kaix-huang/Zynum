@@ -5,7 +5,7 @@ const builtin = @import("builtin");
 
 /// Writable data section spelling for the object formats supported by isolated
 /// x86_64 objects. Mach-O requires both the segment and section name.
-pub const writable_data = switch (builtin.object_format) {
+pub const writable_data = switch (builtin.target.ofmt) {
     .elf, .coff => ".data",
     .macho => "__DATA,__data",
     else => @compileError("isolated x86_64 objects require ELF, COFF, or Mach-O"),

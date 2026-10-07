@@ -63,11 +63,11 @@ pub fn init(
     incx: i32,
 ) Request {
     return .{
-        .operation = @intFromEnum(operation),
-        .scalar = @intFromEnum(scalar),
-        .uplo = @intFromEnum(uplo),
-        .transpose = @intFromEnum(transpose),
-        .diagonal = @intFromEnum(diagonal),
+        .operation = @backingInt(operation),
+        .scalar = @backingInt(scalar),
+        .uplo = @backingInt(uplo),
+        .transpose = @backingInt(transpose),
+        .diagonal = @backingInt(diagonal),
         .reserved = .{ 0, 0, 0 },
         .n = n,
         .k = k,

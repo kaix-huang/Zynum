@@ -52,7 +52,7 @@ class BuildProfileTests(unittest.TestCase):
         for arguments in (("-Dcpu=baseline",), ("-Ddispatch=dynamic",), ("-Ddispatch=specialized",), ("-Ddispatch=specialized", "-Dcpu=baseline")):
             with self.subTest(dispatch=arguments):
                 self._assert_configures(*arguments)
-        self._assert_configures("-Doptimize=ReleaseSafe")
+        self._assert_configures("-Doptimize=safe")
         self._assert_configures("-Ddispatch=dynamic", "-Dcpu=baseline")
         self.assertIn("target_query.cpu_features_add = .empty", source)
         self.assertIn("target_query.cpu_features_sub = .empty", source)
@@ -70,7 +70,7 @@ class BuildProfileTests(unittest.TestCase):
                 self.assertNotIn(f"{runner}.step.dependOn(b.getInstallStep())", source)
                 self.assertIn(f"{runner}.addFileArg(lib.getEmittedBin())", source)
         self.assertIn("run_gemm_sweep.step.dependOn(&install_dynamic_lib.step)", source)
-        self.assertIn('b.getInstallPath(.prefix, "gemm_sweep.csv")', source)
+        self.assertIn('b.graph.path(.install_prefix, "gemm_sweep.csv")', source)
         # Standalone runs stay narrow while the default install still ships both
         # libraries and the benchmark executables.
         self.assertIn("b.getInstallStep().dependOn(install_static_lib)", source)

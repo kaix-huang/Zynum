@@ -9,7 +9,7 @@ fn freeWorkerCaches() void {
     // scheduler independent of the matrix kernel graph (and its test roots).
     const builtin = @import("builtin");
     if (comptime @import("zynum-build-options").dynamic_dispatch or
-        (builtin.cpu.arch == .aarch64 and builtin.cpu.features.isEnabled(@intFromEnum(std.Target.aarch64.Feature.sme))))
+        (builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.features.isEnabled(@backingInt(std.Target.aarch64.Feature.sme))))
     {
         @import("../../kernels/dispatch/matrix_matrix.zig").freeCurrentThreadCaches();
     }
@@ -30,8 +30,8 @@ var persistent_group: std.Io.Group = .init;
 var persistent_worker_count = std.atomic.Value(u32).init(0);
 var persistent_ready_count = std.atomic.Value(u32).init(0);
 var persistent_exited_count = std.atomic.Value(u32).init(0);
-var persistent_worker_generation = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** max_tasks;
-var persistent_worker_waiting = [_]std.atomic.Value(u8){std.atomic.Value(u8).init(0)} ** max_tasks;
+var persistent_worker_generation: [max_tasks]std.atomic.Value(u32) = @splat(std.atomic.Value(u32).init(0));
+var persistent_worker_waiting: [max_tasks]std.atomic.Value(u8) = @splat(std.atomic.Value(u8).init(0));
 var persistent_active_helpers = std.atomic.Value(u32).init(0);
 var persistent_first_helper = std.atomic.Value(u32).init(0);
 var persistent_done_target = std.atomic.Value(u32).init(0);
@@ -107,13 +107,13 @@ fn runPersistentWorker(worker_id: usize) void {
             current = persistent_worker_generation[worker_id].load(.acquire);
         }
         if (current == seen) {
-            if (comptime @import("builtin").os.tag == .macos) persistent_worker_waiting[worker_id].store(1, .release);
+            if (comptime @import("builtin").target.os.tag == .macos) persistent_worker_waiting[worker_id].store(1, .release);
             current = persistent_worker_generation[worker_id].load(.acquire);
             while (current == seen) {
                 io.futexWaitUncancelable(u32, &persistent_worker_generation[worker_id].raw, seen);
                 current = persistent_worker_generation[worker_id].load(.acquire);
             }
-            if (comptime @import("builtin").os.tag == .macos) persistent_worker_waiting[worker_id].store(0, .release);
+            if (comptime @import("builtin").target.os.tag == .macos) persistent_worker_waiting[worker_id].store(0, .release);
         }
         seen = current;
         if (persistent_shutdown_requested.load(.acquire) != 0) break;
@@ -215,7 +215,7 @@ fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
     // Wake sleeping macOS subset helpers before the caller starts its tile,
     // but avoid a syscall for hot helpers. This flag is only a latency hint:
     // the unconditional late wake below also covers a stale or racing hint.
-    const wake_waiting_helpers = @import("builtin").os.tag == .macos and
+    const wake_waiting_helpers = @import("builtin").target.os.tag == .macos and
         (first_helper != 0 or active_helpers != workers);
     for (0..active_helpers) |worker_id| {
         const target_worker = first_helper + worker_id;
@@ -396,7 +396,7 @@ pub fn shutdown() void {
 
 test "queued jobs execute exactly once and refusal leaves output untouched" {
     const Jobs = struct {
-        counters: [257]std.atomic.Value(u32) = [_]std.atomic.Value(u32){.init(0)} ** 257,
+        counters: [257]std.atomic.Value(u32) = @as([257]std.atomic.Value(u32), @splat(.init(0))),
         fn execute(raw: *const anyopaque, index: usize) void {
             const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
             _ = self.counters[index].fetchAdd(1, .monotonic);
@@ -459,7 +459,7 @@ test "runLowLatency refuses partial execution when helpers cannot cover tasks" {
         try std.testing.expect(ensurePersistentWorkers());
         const workers = persistent_worker_count.load(.acquire);
         try std.testing.expect(workers > 0);
-        var counters = [_]std.atomic.Value(u32){std.atomic.Value(u32).init(0)} ** 5;
+        var counters: [5]std.atomic.Value(u32) = @splat(std.atomic.Value(u32).init(0));
         var distinct_tasks: [5]CounterTask = undefined;
         for (&distinct_tasks, &counters) |*task, *task_counter| task.* = .{ .counter = task_counter };
 

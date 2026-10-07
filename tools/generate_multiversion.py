@@ -147,7 +147,7 @@ pub const Operation = enum(u32) {''']
               "pub fn Args(comptime operation: Operation, comptime T: type) type {",
               '    if (!validScalar(operation, T)) @compileError("unsupported scalar for kernel operation");',
               "    return switch (operation) {"]
-    lines.extend(f"        .{f.operation} => std.meta.Tuple(&.{{ " + ", ".join(t for _, t in f.parameters) + " })," for f in functions)
+    lines.extend(f"        .{f.operation} => @Tuple(&.{{ " + ", ".join(t for _, t in f.parameters) + " })," for f in functions)
     lines += ["    };", "}", '''pub fn Packet(comptime operation: Operation, comptime T: type) type {
     return struct {
         args: Args(operation, T),
@@ -187,10 +187,10 @@ def object_source(functions: list[Function]) -> str:
 fn execute(operation: u32, scalar_id: u32, raw_packet: *anyopaque) callconv(.c) void {
     switch (operation) {''']
     for function in functions:
-        lines += [f"        @intFromEnum(protocol.Operation.{function.operation}) => switch (scalar_id) {{"]
+        lines += [f"        @backingInt(protocol.Operation.{function.operation}) => switch (scalar_id) {{"]
         for scalar_type in function.scalar_types:
             arguments = ".{T} ++ packet.args" if function.generic else "packet.args"
-            lines += [f"            @intFromEnum(protocol.scalarId({scalar_type})) => {{",
+            lines += [f"            @backingInt(protocol.scalarId({scalar_type})) => {{",
                       f"                const T = {scalar_type};",
                       f"                const packet: *protocol.Packet(.{function.operation}, T) = @ptrCast(@alignCast(raw_packet));",
                       f"                packet.result = @call(.auto, {function.module}.{function.name}, {arguments});",

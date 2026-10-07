@@ -30,7 +30,7 @@ const dense_symm_min_dimension = 128;
 const dense_symm_max_workspace_bytes = 64 * 1024 * 1024;
 
 fn useDenseSymmGemm(comptime T: type, m: usize, n: usize, order: usize) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     if (comptime T == scalar.ComplexF64) {
         if (m != n and order < 256) return false;
     }

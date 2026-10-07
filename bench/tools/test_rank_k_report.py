@@ -152,7 +152,7 @@ class RankKRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value=identity,
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(runner, "publish_outputs") as publisher,
                 redirect_stderr(io.StringIO()),
             ):
@@ -201,7 +201,7 @@ class RankKRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value={"source": {}, "invalid": float("nan")},
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(runner, "publish_outputs") as publisher,
                 redirect_stderr(io.StringIO()),
             ):
@@ -233,7 +233,7 @@ class RankKRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value={"source": {}},
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(
                     runner, "publish_outputs", side_effect=OSError("publish failed")
                 ) as publisher,
@@ -269,7 +269,7 @@ class RankKRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value={"source": {}},
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(
                     runner, "publish_outputs", side_effect=fail_publication
                 ),
@@ -329,7 +329,7 @@ class RankKRunnerTests(unittest.TestCase):
                     side_effect=collect_identity,
                 ),
                 mock.patch.object(runner, "run_one_process", side_effect=run_one),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 redirect_stderr(io.StringIO()),
             ):
                 runner.run_controller(args)
@@ -392,7 +392,7 @@ class RankKRunnerTests(unittest.TestCase):
                     "capture",
                     side_effect=capture_in_temp,
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(runner, "publish_outputs") as publisher,
                 redirect_stderr(io.StringIO()),
             ):
@@ -445,7 +445,7 @@ class RankKRunnerTests(unittest.TestCase):
                 mock.patch.object(
                     runner, "run_one_process", return_value=report_row("Zynum")
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(
                     runner.benchmark_artifacts.ArtifactSnapshotSet,
                     "close",
@@ -737,7 +737,7 @@ class RankKRunnerTests(unittest.TestCase):
                     runner, "collect_repeats", wraps=runner.collect_repeats
                 ) as collect_samples,
                 mock.patch.object(
-                    runner, "command_output", return_value="0.16.0"
+                    runner, "command_output", return_value="0.17.0"
                 ) as command_output,
                 redirect_stderr(io.StringIO()),
             ):
@@ -938,7 +938,7 @@ class RankKRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value=identity,
                 ) as collect_identity,
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 redirect_stderr(io.StringIO()),
             ):
                 runner.run_controller(args)

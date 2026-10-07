@@ -6,6 +6,7 @@ const builtin = @import("builtin");
 
 const dispatch = @import("core/vector/stride2_dispatch.zig");
 const ops = @import("core/vector/operations.zig");
+const scalar = @import("core/shared/scalar.zig");
 const runtime = @import("runtime.zig");
 const types = @import("types.zig");
 
@@ -22,7 +23,7 @@ fn asBlasInt(value: usize) BlasInt {
 }
 
 fn targetAvailable() bool {
-    return builtin.cpu.arch == .x86_64 and runtime.totalThreadCount() > 1;
+    return builtin.target.cpu.arch == .x86_64 and runtime.totalThreadCount() > 1;
 }
 
 fn Real(comptime T: type) type {
@@ -570,6 +571,28 @@ test "stride-two real updates match single-thread fallback with odd exact storag
 }
 
 test "stride-two complex updates match single-thread fallback with odd exact storage" {
+    // Validate each conversion against scalar storage, not just a round trip:
+    // reversing the real/imaginary lanes twice would otherwise go unnoticed.
+    const component_bits = [16]u32{
+        0x3f800000, 0x40000000, 0x80000000, 0x00000000,
+        0x7f800000, 0xff800000, 0x7fc12345, 0xffc54321,
+        0x00000001, 0x80000001, 0x3e800000, 0xbf000000,
+        0x40400000, 0xc0800000, 0x40800000, 0xc0400000,
+    };
+    var pairs: [8]ComplexF32 = undefined;
+    for (&pairs, 0..) |*pair, i| pair.* = .{
+        .re = @bitCast(component_bits[2 * i]),
+        .im = @bitCast(component_bits[2 * i + 1]),
+    };
+    const native_bits: @Vector(8, u64) = @as(*align(1) const [8]u64, @ptrCast(&pairs)).*;
+    const lanes = scalar.complexF32Lanes(8, native_bits);
+    const actual_bits: [16]u32 = @as(@Vector(16, u32), @bitCast(lanes));
+    try std.testing.expectEqualSlices(u32, &component_bits, &actual_bits);
+    const expected_lanes: @Vector(16, f32) = @bitCast(@as(@Vector(16, u32), component_bits));
+    const encoded: [8]u64 = scalar.complexF32Bits(8, expected_lanes);
+    const expected: [8]u64 = native_bits;
+    try std.testing.expectEqualSlices(u64, &expected, &encoded);
+
     if (!targetAvailable()) return;
     try checkComplexUpdates(ComplexF32);
     try checkComplexUpdates(ComplexF64);

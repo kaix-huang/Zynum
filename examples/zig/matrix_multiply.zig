@@ -17,7 +17,7 @@ pub fn main(init: std.process.Init) !void {
         7.0, 9.0,  11.0,
         8.0, 10.0, 12.0,
     };
-    var c_values = [_]f64{0.0} ** 4;
+    var c_values: [4]f64 = @splat(0.0);
 
     const a = try blas.constMatrix(f64, a_values[0..], .{
         .row_count = 2,

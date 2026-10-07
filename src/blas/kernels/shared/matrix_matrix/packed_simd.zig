@@ -229,7 +229,7 @@ fn kernelPacked(
 fn tailRowsScalarPacked(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), b_pack: []const T, row_start: usize, j: usize) void {
     var i = row_start;
     while (i < task.m) : (i += 1) {
-        var acc: [cfg.tile_n]T = [_]T{@as(T, 0)} ** cfg.tile_n;
+        var acc: [cfg.tile_n]T = @splat(@as(T, 0));
         for (0..task.k) |p| {
             const av = task.a[matIndex(task.lda, i, p)];
             const b_base = p * cfg.tile_n;
@@ -321,7 +321,7 @@ fn noTransRealWithPack(comptime T: type, comptime cfg: Config, comptime direct_s
 // contiguous stream. Reuse each packed A panel across all assigned B columns.
 fn withPackedA(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), b_pack: []T) bool {
     const mr = cfg.lane_count * cfg.row_groups;
-    const blocks = (task.m + mr - 1) / mr;
+    const blocks = @divCeil(task.m, mr);
     const a_pack = std.heap.c_allocator.alloc(T, blocks * mr * task.k) catch return false;
     defer std.heap.c_allocator.free(a_pack);
     for (0..blocks) |block| {

@@ -45,8 +45,8 @@ fn execute(
     const alpha_parts = components(T, alpha);
     const beta_parts = components(T, beta);
     var request: abi.Request = .{
-        .operation = @intFromEnum(operation),
-        .scalar = @intFromEnum(scalarTag(T)),
+        .operation = @backingInt(operation),
+        .scalar = @backingInt(scalarTag(T)),
         .flags = flags,
         .lda = lda,
         .m = m,

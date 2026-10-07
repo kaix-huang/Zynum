@@ -6,12 +6,12 @@ const builtin = @import("builtin");
 const build_options = @import("zynum-build-options");
 
 comptime {
-    if (builtin.cpu.arch == .x86_64 and !@hasDecl(build_options, "kernel_entry"))
+    if (builtin.target.cpu.arch == .x86_64 and !@hasDecl(build_options, "kernel_entry"))
         _ = @import("kernels/isolated/task_runtime_host.zig");
 }
 
 pub const maximum_threads_env_name = "ZYNUM_MAXIMUM_THREADS";
-// pthread stack reservations include static TLS on ELF. Debug and ReleaseSafe
+// pthread stack reservations include static TLS on ELF. debug and safe
 // test binaries can exceed 512 KiB of TLS before a worker executes any code.
 pub const worker_stack_size: usize = 2 * 1024 * 1024;
 
@@ -77,7 +77,7 @@ pub fn hasExplicitThreadLimit() bool {
 }
 
 fn sysctlInt(comptime name: [:0]const u8) usize {
-    if (comptime builtin.os.tag != .macos) return 0;
+    if (comptime builtin.target.os.tag != .macos) return 0;
 
     var value: c_int = 0;
     var len: usize = @sizeOf(c_int);
@@ -132,7 +132,7 @@ pub fn cacheLineBytes() usize {
 fn ensureWorkerQoS() void {
     if (worker_qos_configured) return;
     worker_qos_configured = true;
-    if (comptime builtin.os.tag == .macos) {
+    if (comptime builtin.target.os.tag == .macos) {
         _ = std.c.pthread_set_qos_class_self_np(.USER_INITIATED, 0);
     }
 }
@@ -167,11 +167,11 @@ fn pickAllowedCpu(allowed: std.posix.cpu_set_t, ordinal: usize) ?usize {
 fn ensureWorkerAffinity(ordinal: usize) void {
     if (worker_affinity_configured) return;
     worker_affinity_configured = true;
-    if (comptime builtin.os.tag != .linux) return;
+    if (comptime builtin.target.os.tag != .linux) return;
 
     const allowed = std.posix.sched_getaffinity(0) catch return;
     const cpu = pickAllowedCpu(allowed, ordinal) orelse return;
-    var pinned: std.posix.cpu_set_t = [_]usize{0} ** (std.os.linux.CPU_SETSIZE / @sizeOf(usize));
+    var pinned: std.posix.cpu_set_t = @splat(0);
     cpuSetAdd(&pinned, cpu);
     std.os.linux.sched_setaffinity(0, &pinned) catch {};
 }

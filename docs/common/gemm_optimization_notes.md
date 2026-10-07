@@ -149,7 +149,7 @@ fallback, not as an ABI-level shortcut.
 ## Threading
 
 All matrix-matrix parallelism uses the process-wide `std.Io` runtime described in
-[`zig_0_16_std_io_threading.md`](zig_0_16_std_io_threading.md).
+[`zig_std_io_threading.md`](zig_std_io_threading.md).
 
 - Partition by disjoint output tiles whenever possible.
 - Keep packed-panel ownership and lifetime explicit.
@@ -327,8 +327,16 @@ bits without changing accumulation.
 Row tails group four independent output columns with vector FMA. Fixed
 16- and 32-column panels keep four or eight vector accumulators in registers
 inside an out-of-line helper; no-tail calls skip it. Each output retains
-ascending-K fused accumulation. Other panel widths, incomplete column groups,
-and f64 have their corresponding fallback bodies.
+ascending-K fused accumulation. Other panel widths and incomplete column groups
+use their corresponding fallback bodies.
+
+### f64 SME row tails
+
+The direct double-precision SME path finishes residual rows in fixed eight- or
+sixteen-column panels with two-lane vector accumulators. Each output retains
+ascending-K fused accumulation, and other panel widths use the general tail.
+Kernel selection, coefficient eligibility, workspace fallback, and thread
+partitioning retain their existing contracts.
 
 ### Low-K f64 ASIMD remainder loads
 

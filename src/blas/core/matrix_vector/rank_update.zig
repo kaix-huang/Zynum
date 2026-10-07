@@ -172,7 +172,7 @@ fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]con
 
     const runner = if (T == f32) runGerTaskF32 else runGerTaskF64;
     if (tuning.useRealGerLowLatency(T, n)) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 
@@ -447,12 +447,12 @@ const DenseRankOperation = enum {
 };
 
 fn preferPackedColumns(n: usize) bool {
-    if (comptime builtin.cpu.arch == .x86_64) return n >= 128;
+    if (comptime builtin.target.cpu.arch == .x86_64) return n >= 128;
     return tuning.preferPackedStructuredParallel(n);
 }
 
 fn rankUpdateTaskLimit(comptime T: type, comptime operation: DenseRankOperation, comptime is_packed: bool, n: usize, requested: usize) usize {
-    if (comptime builtin.cpu.arch != .x86_64) return requested;
+    if (comptime builtin.target.cpu.arch != .x86_64) return requested;
     var limit = requested;
     if (n >= 4096) {
         if (comptime T == scalar.ComplexF64 and operation == .her2) limit = @min(limit, 8);
@@ -467,7 +467,7 @@ fn rankUpdateTaskLimit(comptime T: type, comptime operation: DenseRankOperation,
 // Rank-two updates share one read/modify/write of the destination column.
 // In particular, avoid a second pass over a column larger than L1.
 fn rankTwoColumn(comptime T: type, n: usize, cx: T, x: [*]const T, cy: T, y: [*]const T, dest: [*]T) void {
-    if (comptime builtin.cpu.arch != .x86_64) {
+    if (comptime builtin.target.cpu.arch != .x86_64) {
         if (!isZero(T, cx)) vector_ops.axpy(T, @intCast(n), cx, x, 1, dest, 1);
         if (!isZero(T, cy)) vector_ops.axpy(T, @intCast(n), cy, y, 1, dest, 1);
         return;
@@ -642,7 +642,7 @@ fn tiledRankTwoColumnsImpl(comptime T: type, comptime is_packed: bool, comptime 
 }
 
 fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) void {
-    const first = if (comptime builtin.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
+    const first = if (comptime builtin.target.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
         tiledRankTwoColumns(T, false, uplo, n, j0, j1, alpha, x, y, a, lda)
     else
         j0;
@@ -744,7 +744,7 @@ fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperat
     if (!tuning.preferDenseStructuredParallel(n)) return false;
 
     var task_count = core_pool.taskCount(n, tuning.structuredMinColumns());
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         task_count = level2_tuning.capTaskCountByWork(task_count, n *| n, 64 * 1024);
     }
     task_count = rankUpdateTaskLimit(T, operation, false, n, tuning.capStructuredTasks(n, task_count));
@@ -771,12 +771,12 @@ fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperat
         .syr2 => if (T == f32) runSyr2TaskF32 else runSyr2TaskF64,
         .her2 => if (T == scalar.ComplexF32) runHer2TaskC32 else runHer2TaskC64,
     };
-    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 
 fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) void {
-    const first = if (comptime builtin.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
+    const first = if (comptime builtin.target.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
         tiledRankTwoColumns(T, true, uplo, n, j0, j1, alpha, x, y, ap, 0)
     else
         j0;
@@ -870,7 +870,7 @@ noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: Dense
     if (!tuning.preferPackedTaskComposition(n)) return false;
 
     var task_count = core_pool.taskCount(n, tuning.structuredMinColumns());
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         task_count = level2_tuning.capTaskCountByWork(task_count, packedRankElementCount(n), 64 * 1024);
     }
     task_count = rankUpdateTaskLimit(T, operation, true, n, tuning.capStructuredTasks(n, task_count));
@@ -896,7 +896,7 @@ noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: Dense
         .syr2 => if (T == f32) runPackedSyr2TaskF32 else runPackedSyr2TaskF64,
         .her2 => if (T == scalar.ComplexF32) runPackedHer2TaskC32 else runPackedHer2TaskC64,
     };
-    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return core_pool.run(runner, @ptrCast(&tasks), task_count);
 }
 

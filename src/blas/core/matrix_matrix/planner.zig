@@ -60,7 +60,7 @@ fn alignedColumnSplit(n: usize, task_index: usize, task_count: usize, column_blo
     // Keep task boundaries aligned to the backend's preferred column
     // block so each worker can run whole packed-B panels.  Splitting
     // through a panel would increase tail work and repeat packing.
-    const panels = (n + block - 1) / block;
+    const panels = @divCeil(n, block);
     const p0 = task_index * panels / task_count;
     const p1 = (task_index + 1) * panels / task_count;
     return .{
@@ -78,7 +78,7 @@ fn splitRows(m: usize, task_index: usize, task_count: usize) RowSplit {
 
 fn ceilDiv(a: usize, b: usize) usize {
     if (b == 0) return 0;
-    return (a + b - 1) / b;
+    return @divCeil(a, b);
 }
 
 fn columnBlockForPlan(desc: catalog.Descriptor, execution: gemm_kernels.ExecutionPlan) usize {
@@ -285,7 +285,7 @@ fn makeTask(comptime T: type, plan: Plan, m: usize, n0: usize, n1: usize, k: usi
 }
 
 fn runSharedTasks(comptime T: type, tasks: []const gemm_kernels.Task(T)) bool {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (T == f32) return core_pool.runTypedLowLatency(gemm_kernels.Task(f32), gemm_kernels.noTransRealF32, tasks);
         if (T == f64) return core_pool.runTypedLowLatency(gemm_kernels.Task(f64), gemm_kernels.noTransRealF64, tasks);
     }

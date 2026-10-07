@@ -7,39 +7,46 @@ not internal source layout or dispatch thresholds.
 
 ## Local Setup
 
-Use Zig 0.16.0 or newer in the 0.16 series and Python 3.10 or newer. Repository
+Use Zig 0.17.0 or newer in the 0.17 series and Python 3.10 or newer. Repository
 validation rejects inherited environment variables whose names start with
 `GIT_`. The complete validation sequence is maintained in the
 [Contributor Guide](contributors/README.md#required-checks).
 
-For a quick local build and baseline smoke test:
+For a quick local build and dynamic-dispatch correctness check:
 
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_SMOKE'
-zig build test -Dcpu=baseline --summary failures
+set -eu
+zig build test --summary failures
 zig build --summary failures
 ZYNUM_SMOKE
 ```
 
 For native dynamic-dispatch checks, use `zig build test-dynamic-dispatch`;
 `zig build test` without `-Dcpu` selects that path plus host tooling smoke tests.
-Use explicit `-Dcpu=baseline` for the full canonical inventory suite.
+Use explicit `-Dcpu=baseline` for the full canonical inventory suite on a target
+with reviewed native evidence, as listed in [Test Inventory](#test-inventory).
 
 Useful target checks:
 
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_TARGET_CHECKS'
-zig build -Dtarget=aarch64-macos -Dcpu=apple_m4+sme+sme2+sme2p1 --release=fast --summary failures
-zig build test-native-feature -Dtarget=aarch64-macos \
-  -Dcpu=apple_m4+sme+sme2+sme2p1 \
-  -Dtest-optimize=ReleaseSafe --release=safe --summary failures
+set -eu
+zig build -Dtarget=aarch64-macos -Dcpu=apple_m5 --release=fast --summary failures
+zig build test-native-feature -Dcpu=native \
+  -Dtest-optimize=safe --release=safe --summary failures
 zig build test-inventory-link -Dtarget=x86_64-linux-gnu -Dcpu=baseline \
-  -Dtest-optimize=ReleaseSafe --summary failures
+  -Dtest-optimize=safe --summary failures
 zig build -Dtarget=x86_64-linux-gnu -Dcpu=x86_64_v3 --release=fast --summary failures
 ZYNUM_TARGET_CHECKS
 ```
+
+On Apple M5, Zig 0.17 resolves `-Dcpu=native` to `apple_m5` with SME, SME2,
+and SME2.1 enabled. Use `zig build -Dcpu=native --release=fast` for a local
+specialized build; the explicit `apple_m5` command above is useful for
+cross-compilation coverage.
 
 Feature-specific build commands provide compile coverage. `test-native-feature`
 runs the same official test bodies for an explicit non-baseline profile only
@@ -47,6 +54,38 @@ when the target matches the host and the host supports all requested features.
 It is native correctness evidence, not frozen inventory evidence. Performance
 claims still require measurements on hardware that provides the advertised
 feature tier.
+
+### Zig 0.17 Migration
+
+CI and release workflows pin Zig 0.17.0. Package manifests require at least
+0.17.0; repository tooling supports the 0.17 series. Build scripts and fresh
+benchmark metadata use the new optimization-mode names:
+
+| Previous name | Zig 0.17 name | Build option |
+| --- | --- | --- |
+| `Debug` | `debug` | Default, or `-Doptimize=debug` |
+| `ReleaseSafe` | `safe` | `--release=safe` |
+| `ReleaseFast` | `fast` | `--release=fast` |
+| `ReleaseSmall` | `small` | `--release=small` |
+
+For correctness runs, pair `-Dtest-optimize=safe` or `fast` with the matching
+`--release` option so test modules and library artifacts use the same mode.
+The [contributor checks](contributors/README.md#required-checks) show all three
+supported test modes. `small` remains a build mode outside the frozen test matrix.
+
+The migration updates reflection and target APIs, array initialization, lazy
+build paths, argument forwarding, and C header translation. Complex vector
+loads preserve native memory order under the new endian-independent `@bitCast`
+semantics, and panel counts use overflow-safe `@divCeil`. Native-only tests
+check executor settings at execution time, including cached configurations.
+Existing x86 backend workarounds remain where Zig 0.17 still requires them.
+
+On Apple M5, baseline, native-feature, and dynamic-dispatch correctness checks
+passed in `debug`, `safe`, and `fast`. Host tooling, C/C++ and Fortran smoke
+checks, ABI export checks, and the Zig example also passed. Linux and Windows
+cross-build checks establish compile/link coverage; the native inventory gaps
+below remain open. Published [performance data](performance/README.md) and
+archived ABI observations retain their original Zig 0.16 provenance.
 
 ## Test Inventory
 
@@ -68,7 +107,7 @@ native execution:
 ```sh
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
   sh <<'ZYNUM_FOREIGN_LINK'
-zig build test-inventory-link -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dtest-optimize=Debug --summary failures
+zig build test-inventory-link -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dtest-optimize=debug --summary failures
 python3 -B tools/check_test_inventory.py --structure-only
 ZYNUM_FOREIGN_LINK
 ```
@@ -78,7 +117,24 @@ native x86_64 Windows GNU baseline instead uses
 `test-inventory-link-windows-native-smoke`, a compatibility-only compile/link
 step that omits the POSIX structure checker and executes no inventory runner or
 test body. It does not provide inventory certification, native enumeration, or
-correctness evidence; all 63 Windows rows remain pending.
+correctness evidence.
+
+Zig 0.17 requires fresh compiler observations for each target. The current
+baseline matrix counts one row per logical Zig test root and optimization mode:
+
+| Target | Observed | Pending | Inapplicable | CI coverage |
+| --- | ---: | ---: | ---: | --- |
+| AArch64 macOS | 60 | 0 | 3 | Inventory-certified baseline correctness; native-feature correctness |
+| x86_64 Linux GNU | 0 | 63 | 0 | Baseline compile/link; separate native-feature correctness |
+| AArch64 Linux GNU | 0 | 60 | 3 | Baseline compile/link |
+| x86_64 Windows GNU | 0 | 63 | 0 | Compatibility compile/link; installed DLL smoke checks |
+
+The three inapplicable rows on each AArch64 target belong to the x86-only
+structured-object test root. There are 186 pending rows overall. Restoring
+inventory certification requires reviewing native Zig 0.17 protocol logs;
+Zig 0.16 records cannot certify the new compiler. The Linux release artifact
+job retains its baseline native inventory gate, so its artifacts remain blocked
+until those Zig 0.17 observations have been collected and reviewed.
 
 The checker without `--structure-only` is the full native-matrix gate. It exits
 nonzero while applicable rows remain pending. Inventory checkers use bounded,
@@ -101,9 +157,8 @@ semantics of all 311 exports, Fortran compatibility, inventory evidence, native
 enumeration, attestation, or performance. The nonce-bound completion record
 only detects an accidental early exit; a malicious DLL running on the same
 runner with the same permissions could still forge process state, and
-adversarial attestation would require an isolated execution boundary. All 63
-Windows native-enumeration rows remain explicitly pending, and the structure
-checker is the authoritative source for the current incomplete native matrix.
+adversarial attestation would require an isolated execution boundary. The
+structure checker is authoritative for the current native matrix above.
 
 Inventory refresh is a dedicated maintenance operation. Validate the full
 candidate, inspect the inventory and checker/runner changes together, and keep
@@ -133,6 +188,13 @@ python3 -B test/build/test_test_inventory.py
 ZYNUM_PYTHON_TESTS
 ```
 
+The archived ABI observations and the pinned artifact configuration in
+`tools/observe_abi_baseline.py` describe the Zig 0.16 baseline. Their compiler
+version, generated-input hashes, and optimization spelling remain part of that
+historical evidence. The tests validate that evidence; it must not be relabeled
+as a Zig 0.17 artifact observation. A new artifact baseline requires a separate
+reviewed capture with the current compiler.
+
 The benchmark-tool discovery command runs controller and parser unit tests; it
 does not launch a performance measurement.
 
@@ -145,7 +207,7 @@ does not launch a performance measurement.
 | `-Ddispatch=specialized` | No runtime ISA resolver; baseline unless a CPU is specified |
 | `-Dthread-limit=N` | Build-time worker ceiling, capped by CPU capacity and stricter runtime limits |
 
-`-Doptimize=ReleaseFast` takes precedence over the `--release` preset.
+`-Doptimize=fast` takes precedence over the `--release` preset.
 Each build targets one architecture, OS, and ABI. For a portable Zig dependency,
 pass `.dispatch = "dynamic"` explicitly because Zig forwards a CPU option with
 `.target`.
@@ -228,7 +290,7 @@ together. In `build.zig.zon`:
 .{
     .name = .my_app,
     .version = "0.0.0",
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .zynum = .{
             .path = "../Zynum",
@@ -330,8 +392,8 @@ try blas.matrixMultiply(.{
 ```
 
 All builds check structural fields such as dimensions, strides, and leading
-dimensions. Debug, ReleaseSafe, and ReleaseSmall also check backing capacity and
-unsupported aliasing; ReleaseFast omits those capacity and alias checks.
+dimensions. debug, safe, and small also check backing capacity and
+unsupported aliasing; fast omits those capacity and alias checks.
 
 ## Aliasing Model
 

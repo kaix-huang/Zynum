@@ -615,8 +615,8 @@ fn complexScalF32Stride2(n: usize, alpha_re: f32, alpha_im: f32, x: [*]ComplexF3
     var i: usize = 0;
     while (i + packed_complexes < n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const result: PackedBits = @bitCast(complexMulPackedF32(xv, alpha_re, alpha_im));
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const result: PackedBits = scalar.complexF32Bits(packed_complexes, complexMulPackedF32(xv, alpha_re, alpha_im));
         storeStride2Block(u64, packed_complexes, x_bits, i, xb, result);
     }
     const alpha: ComplexF32 = .{ .re = alpha_re, .im = alpha_im };
@@ -633,9 +633,9 @@ fn complexAxpyF32Stride2(n: usize, alpha: ComplexF32, x: [*]const ComplexF32, y:
     while (i + packed_complexes < n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
         const yb = loadStride2Block(u64, packed_complexes, y_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const yv: PackedReal = @bitCast(yb.active);
-        const result: PackedBits = @bitCast(complexMulPackedF32(xv, alpha.re, alpha.im) + yv);
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const yv: PackedReal = scalar.complexF32Lanes(packed_complexes, yb.active);
+        const result: PackedBits = scalar.complexF32Bits(packed_complexes, complexMulPackedF32(xv, alpha.re, alpha.im) + yv);
         storeStride2Block(u64, packed_complexes, y_bits, i, yb, result);
     }
     while (i < n) : (i += 1) {
@@ -662,9 +662,9 @@ fn complexAxpbyF32Stride2(
     while (i + packed_complexes < n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
         const yb = loadStride2Block(u64, packed_complexes, y_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const yv: PackedReal = @bitCast(yb.active);
-        const result: PackedBits = @bitCast(complexMulPackedF32(xv, alpha_re, alpha_im) + complexMulPackedF32(yv, beta_re, beta_im));
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const yv: PackedReal = scalar.complexF32Lanes(packed_complexes, yb.active);
+        const result: PackedBits = scalar.complexF32Bits(packed_complexes, complexMulPackedF32(xv, alpha_re, alpha_im) + complexMulPackedF32(yv, beta_re, beta_im));
         storeStride2Block(u64, packed_complexes, y_bits, i, yb, result);
     }
     const alpha: ComplexF32 = .{ .re = alpha_re, .im = alpha_im };
@@ -945,10 +945,10 @@ fn rotComplexF32Stride2(n: usize, x: [*]ComplexF32, y: [*]ComplexF32, c: f32, s:
     while (i + packed_complexes < n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
         const yb = loadStride2Block(u64, packed_complexes, y_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const yv: PackedReal = @bitCast(yb.active);
-        const x_result: PackedBits = @bitCast(@mulAdd(PackedReal, xv, c_v, yv * s_v));
-        const y_result: PackedBits = @bitCast(@mulAdd(PackedReal, -xv, s_v, yv * c_v));
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const yv: PackedReal = scalar.complexF32Lanes(packed_complexes, yb.active);
+        const x_result: PackedBits = scalar.complexF32Bits(packed_complexes, @mulAdd(PackedReal, xv, c_v, yv * s_v));
+        const y_result: PackedBits = scalar.complexF32Bits(packed_complexes, @mulAdd(PackedReal, -xv, s_v, yv * c_v));
         storeStride2Block(u64, packed_complexes, x_bits, i, xb, x_result);
         storeStride2Block(u64, packed_complexes, y_bits, i, yb, y_result);
     }
@@ -1059,7 +1059,7 @@ fn parallelTaskCount(n: usize, min_items_per_task: usize, max_task_count: usize)
 }
 
 fn runLevel1Tasks(task_fn: core_pool.TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(task_fn, tasks, count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(task_fn, tasks, count);
     return core_pool.run(task_fn, tasks, count);
 }
 
@@ -1134,7 +1134,7 @@ fn runSwapStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 pub noinline fn parallelSwapStride2(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1199,7 +1199,7 @@ fn runRotStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 pub noinline fn parallelRotStride2(comptime T: type, n: usize, x: [*]T, y: [*]T, c: Real(T), s: T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1250,7 +1250,7 @@ fn runRotmStride2TaskF64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 pub noinline fn parallelRotmStride2Real(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1305,7 +1305,7 @@ fn runComplexScalStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void 
 }
 
 pub noinline fn parallelScalStride2Real(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1326,7 +1326,7 @@ pub noinline fn parallelScalStride2Real(comptime T: type, n: usize, alpha: T, x:
 }
 
 pub noinline fn parallelComplexScalStride2(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1370,7 +1370,7 @@ fn runComplexRealScalStride2TaskC64(raw_tasks: *const anyopaque, index: usize) v
 }
 
 pub noinline fn parallelComplexRealScalStride2(comptime T: type, n: usize, alpha: Real(T), x: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1414,7 +1414,7 @@ fn runComplexAxpyStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void 
 }
 
 pub noinline fn parallelAxpyStride2Real(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1435,7 +1435,7 @@ pub noinline fn parallelAxpyStride2Real(comptime T: type, n: usize, alpha: T, x:
 }
 
 pub noinline fn parallelComplexAxpyStride2C32(n: usize, alpha: ComplexF32, x: [*]const ComplexF32, y: [*]ComplexF32) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1455,7 +1455,7 @@ pub noinline fn parallelComplexAxpyStride2C32(n: usize, alpha: ComplexF32, x: [*
 }
 
 pub noinline fn parallelComplexAxpyStride2C64(n: usize, alpha: ComplexF64, x: [*]const ComplexF64, y: [*]ComplexF64) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1515,7 +1515,7 @@ fn runComplexAxpbyStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void
 }
 
 pub noinline fn parallelAxpbyStride2Real(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1536,7 +1536,7 @@ pub noinline fn parallelAxpbyStride2Real(comptime T: type, n: usize, alpha: T, x
 }
 
 pub noinline fn parallelComplexAxpbyStride2(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return false;
 
@@ -1595,7 +1595,7 @@ fn runDotF32AccF64Stride2Task(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 pub noinline fn parallelDotF32AccF64Stride2(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
 
@@ -1619,7 +1619,7 @@ pub noinline fn parallelDotF32AccF64Stride2(n: usize, x: [*]const f32, y: [*]con
 }
 
 pub noinline fn parallelDotStride2Real(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
 
@@ -1669,7 +1669,7 @@ fn runDotComplexStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 pub noinline fn parallelDotStride2Complex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
 
@@ -1732,7 +1732,7 @@ fn runComplexAsumStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void 
 }
 
 pub noinline fn parallelAsumStride2Real(comptime T: type, n: usize, x: [*]const T) ?T {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
 
@@ -1759,7 +1759,7 @@ pub noinline fn parallelAsumStride2Real(comptime T: type, n: usize, x: [*]const 
 }
 
 pub noinline fn parallelAsumStride2Complex(comptime T: type, n: usize, x: [*]const T) ?Real(T) {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const R = Real(T);
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
@@ -1862,7 +1862,7 @@ fn combineNrm2Partials(comptime T: type, partial: []const T) T {
 }
 
 pub noinline fn parallelNrm2Stride2Real(comptime T: type, n: usize, x: [*]const T) ?T {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
 
@@ -1887,7 +1887,7 @@ pub noinline fn parallelNrm2Stride2Real(comptime T: type, n: usize, x: [*]const 
 }
 
 pub noinline fn parallelNrm2Stride2Complex(comptime T: type, n: usize, x: [*]const T) ?Real(T) {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const R = Real(T);
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
@@ -1955,7 +1955,7 @@ fn runIamaxStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 pub noinline fn parallelIamaxStride2(comptime T: type, n: usize, x: [*]const T) ?BlasInt {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
     const task_count = parallelTaskCount(n, 32 * 1024, 32);
     if (task_count <= 1) return null;
     if (std.math.isNan(abs1(T, x[0]))) return 1;

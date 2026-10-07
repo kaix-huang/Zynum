@@ -63,7 +63,7 @@ MAX_PACKAGE_PATH_BYTES = 4096
 MAX_TOTAL_PACKAGE_PATH_BYTES = 1024 * 1024
 PACKAGE_PATH_SCHEMA_VERSION = 1
 # Add a series only after its parser APIs and emitted schema have been audited.
-PACKAGE_PATH_COMPATIBLE_ZIG_SERIES = frozenset({("0", "16")})
+PACKAGE_PATH_COMPATIBLE_ZIG_SERIES = frozenset({("0", "17")})
 MAX_PACKAGE_PATH_OUTPUT_BYTES = 7 * 1024 * 1024
 _AUTO_REPOSITORY = object()
 
@@ -237,7 +237,7 @@ def package_paths(zon_path: Path, *, root: Path | None = None) -> PackagePaths:
 
     zig = shutil.which("zig", path=os.environ.get("PATH", os.defpath))
     if zig is None:
-        raise RuntimeError("Zig 0.16.x is required to parse build.zig.zon")
+        raise RuntimeError("Zig 0.17.x is required to parse build.zig.zon")
     try:
         zig_executable = Path(zig).resolve(strict=True)
         helper = (

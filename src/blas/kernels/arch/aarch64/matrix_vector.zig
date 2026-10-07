@@ -722,6 +722,22 @@ noinline fn gerF32x16Rows8Vector(
             gerF32x16Rows8VectorColumn(x_vec0, x_vec1, s7, c7, i);
         }
     }
+    if (j < n) {
+        var scalars: [4]V = undefined;
+        var columns: [4][*]f32 = undefined;
+        inline for (0..4) |col| {
+            scalars[col] = @splat(alpha * y[j + col]);
+            columns[col] = a + lda_elems * (j + col);
+        }
+        var i: usize = 0;
+        while (i + 16 <= m) : (i += 16) {
+            const x_vec0 = loadF32x8(x, i);
+            const x_vec1 = loadF32x8(x, i + 8);
+            inline for (0..4) |col| {
+                gerF32x16Rows8VectorColumn(x_vec0, x_vec1, scalars[col], columns[col], i);
+            }
+        }
+    }
 }
 
 inline fn gerF64x8Rows8VectorColumn(
@@ -933,9 +949,10 @@ fn gerUnitRealAsimdF32(
     if (m == 0 or n == 0 or lda <= 0) return false;
     if (alpha == 0) return false;
     if (comptime !enable_asimd_sger or !features.has_asimd) return false;
-    const sger128_shape = m == 128 and n == 128 and lda >= 128;
+    const aligned_panel = m >= 64 and m <= 256 and (m & 15) == 0 and
+        n >= 16 and n <= 256 and (n & 3) == 0 and lda >= m;
     const sger512_task_shape = m == 512 and n == 128 and lda >= 512;
-    if (!sger128_shape and !sger512_task_shape) return false;
+    if (!aligned_panel and !sger512_task_shape) return false;
     gerF32x16Rows8Vector(m, n, alpha, x, y, a, lda);
     return true;
 }

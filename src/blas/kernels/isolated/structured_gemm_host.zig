@@ -20,7 +20,7 @@ fn scalarValue(comptime T: type, re: u64, im: u64) T {
 }
 
 fn order(raw: u8) scalar.Order {
-    return switch (@as(abi.Transpose, @enumFromInt(raw))) {
+    return switch (@as(abi.Transpose, @fromBackingInt(@intCast(raw)))) {
         .no_trans => .no_trans,
         .trans => .trans,
         .conj_trans => .conj_trans,
@@ -50,7 +50,7 @@ fn run(comptime T: type, request: *abi.GemmRequest) void {
 }
 
 fn execute(request: *abi.GemmRequest) callconv(.c) void {
-    const scalar_tag: abi.Scalar = @enumFromInt(request.scalar);
+    const scalar_tag: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     switch (scalar_tag) {
         .f32 => run(f32, request),
         .f64 => run(f64, request),

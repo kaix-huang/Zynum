@@ -184,7 +184,7 @@ Parallel paths must:
 Affinity and heterogeneous scheduling are platform constraints, not kernel
 semantics. See
 [`common/cpu_affinity_and_heterogeneous_scheduling.md`](common/cpu_affinity_and_heterogeneous_scheduling.md)
-and [`common/zig_0_16_std_io_threading.md`](common/zig_0_16_std_io_threading.md).
+and [`common/zig_std_io_threading.md`](common/zig_std_io_threading.md).
 
 ## Runtime Configuration
 
@@ -226,8 +226,9 @@ CPU profile.
 non-baseline CPU profiles. It reuses the official test bodies, requires the
 target ABI and object format to match the host, and requires the host feature
 set to cover the requested profile. It neither invokes the inventory runner nor
-creates inventory evidence; the default `test` step remains inventory-certified
-and fail-closed.
+creates inventory evidence. The `test` step with explicit `-Dcpu=baseline`
+remains inventory-certified and fail-closed. Without `-Dcpu`, `test` selects
+dynamic-dispatch correctness and host-tool smoke.
 
 The build and test inventory checkers use bounded, fail-closed file admission
 and code-reviewed digests. Those controls establish repository consistency;
@@ -241,14 +242,14 @@ In GitHub Actions, the same-SHA Linux source and test-inventory-security jobs,
 together with the Linux/macOS build-inventory-security matrix, own inventory
 and repository-security evidence.
 Each inventory-certified target row invokes `test-host-tool-smoke` once in a
-dedicated step; its Debug, ReleaseSafe, and ReleaseFast test steps explicitly
+dedicated step; its debug, safe, and fast test steps explicitly
 disable host-tool smoke, while link-only steps do not request it. This keeps
 the independent build-inventory suite and the ABI-baseline/Python-tooling host
 aggregate out of the three per-mode target invocations.
-The Linux ARM link-only row keeps ordinary POSIX structure-gated
+The Linux x86_64 and ARM link-only rows keep ordinary POSIX structure-gated
 `test-inventory-link`. The exact native x86_64 Windows GNU row instead invokes
-`test-inventory-link-windows-native-smoke` for Debug, ReleaseSafe, and
-ReleaseFast. That compatibility-only step omits the POSIX structure checker and
+`test-inventory-link-windows-native-smoke` for debug, safe, and
+fast. That compatibility-only step omits the POSIX structure checker and
 executes no inventory runner or test body. It does not provide inventory
 certification, native enumeration, or correctness evidence.
 
@@ -367,8 +368,9 @@ and vice versa. The same objects serve the checked Zig API and C/Fortran ABI.
 `hardware.zig` detects OS-usable features: macOS AArch64 uses sysctl (including
 SME, SME2, SME2p1, FP16 and BF16); Linux AArch64 uses HWCAP/HWCAP2; x86_64 uses
 CPUID plus OSXSAVE/XCR0. Compiler-implied dependencies are also required. Unknown
-ARM OS capabilities fall back conservatively. In particular, Zig identifying an
-M5 as `apple_m1` no longer prevents the dynamic library from using its SME tier.
+ARM OS capabilities fall back conservatively. Zig 0.17 recognizes Apple M5
+directly for specialized `-Dcpu=native` builds; dynamic dispatch continues to
+admit kernels from runtime CPU and OS capabilities.
 
 The admitted tiers are `baseline`, `aarch64_sve2`, `aarch64_sme`,
 `aarch64_sme2`, `aarch64_sme2p1`, `x86_avx`, `x86_avx2_fma`, and `x86_avx512`.

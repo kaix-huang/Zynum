@@ -53,7 +53,7 @@ fn expectStreamingCall(before: aarch_features.TestStreamingDepths, uses_za: bool
 }
 
 fn checkStreamingRotEnvironment(modified_flag: ?f32) !void {
-    if (comptime builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos or !aarch_features.has_sme2) return;
+    if (comptime builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos or !aarch_features.has_sme2) return;
     const old_cr = asm volatile ("mrs %[value], fpcr"
         : [value] "=r" (-> u64),
     );
@@ -146,7 +146,7 @@ test "forced contiguous real kernel covers exact width, tail, and misalignment" 
 }
 
 test "native SME2 Level 1 catalog cells enter and balance declared state" {
-    if (comptime builtin.cpu.arch != .aarch64 or !aarch_features.has_sme2) return;
+    if (comptime builtin.target.cpu.arch != .aarch64 or !aarch_features.has_sme2) return;
     if (aarch_features.streamingVectorBytes() != 64) return;
     try checkStreamingSwapAlignment();
     try checkStreamingRotEnvironment(null);
@@ -341,7 +341,7 @@ test "forced contiguous complex update and reduction cover odd tails" {
 
 test "forced reductions preserve IAMAX first-index ties" {
     const n: usize = 13;
-    var storage: [20]f64 align(64) = [_]f64{0} ** 20;
+    var storage: [20]f64 align(64) = @splat(0);
     const x = storage[1..].ptr;
     for (0..n) |i| x[i] = @as(f64, @floatFromInt(i)) * 0.25 - 1;
     x[2] = 9;
@@ -381,7 +381,7 @@ test "forced mixed precision dot accumulates in f64 across tails" {
 
 test "forced complex IAMAX uses abs1 and preserves first-index ties" {
     const n: usize = 13;
-    var storage: [20]types.ComplexF64 align(64) = [_]types.ComplexF64{.{ .re = 0, .im = 0 }} ** 20;
+    var storage: [20]types.ComplexF64 align(64) = @splat(.{ .re = 0, .im = 0 });
     const x = storage[1..].ptr;
     for (0..n) |i| {
         const value: f64 = @floatFromInt(i);
@@ -433,8 +433,8 @@ test "forced ROTM covers all flags, tails, and the identity flag" {
         try std.testing.expectEqualSlices(f64, before_y[n + 1 ..], y_storage[n + 1 ..]);
     }
 
-    var x: [8]f64 = [_]f64{1} ** 8;
-    var y: [8]f64 = [_]f64{2} ** 8;
+    var x: [8]f64 = @splat(1);
+    var y: [8]f64 = @splat(2);
     const before_x = x;
     const before_y = y;
     try std.testing.expect(fixed_simd.rotmUnitReal(f64, cfg, x.len, &x, &y, -2, 0, 0, 0, 0));
@@ -443,7 +443,7 @@ test "forced ROTM covers all flags, tails, and the identity flag" {
 }
 
 test "forced SVE f32 counterparts cover empty exact-VL and predicated tails" {
-    if (comptime builtin.cpu.arch != .aarch64 or !aarch_features.has_sve) return;
+    if (comptime builtin.target.cpu.arch != .aarch64 or !aarch_features.has_sve) return;
 
     const lane_count = aarch_features.sveVectorBytes() / @sizeOf(f32);
     const cases = [_]usize{ 0, 1, lane_count, lane_count + 3, lane_count * 4 + 1 };
@@ -513,7 +513,7 @@ test "forced SVE f32 counterparts cover empty exact-VL and predicated tails" {
 }
 
 test "forced SVE extended update reduction copy and tie families use predicated tails" {
-    if (comptime builtin.cpu.arch != .aarch64 or !aarch_features.has_sve) return;
+    if (comptime builtin.target.cpu.arch != .aarch64 or !aarch_features.has_sve) return;
 
     const n: usize = 19;
     var x: [32]f64 align(64) = undefined;
@@ -623,7 +623,7 @@ test "fixed candidates instantiate 128 256 and 512 bit accumulator geometries" {
         for (0..n) |i| expected_dot = @mulAdd(f64, @as(f64, dot_x[i]), @as(f64, dot_y[i]), expected_dot);
         try std.testing.expectApproxEqAbs(expected_dot, fixed_simd.dotF32AccF64Unit(candidate_cfg, n, &dot_x, &dot_y).?, 1e-13);
 
-        var complex_x: [24]types.ComplexF32 align(64) = [_]types.ComplexF32{.{ .re = 0, .im = 0 }} ** 24;
+        var complex_x: [24]types.ComplexF32 align(64) = @splat(.{ .re = 0, .im = 0 });
         for (0..n) |i| {
             const value: f32 = @floatFromInt(i);
             complex_x[i] = .{ .re = value * 0.25 - 1, .im = value * -0.125 + 0.5 };
@@ -670,8 +670,8 @@ test "fixed candidates instantiate 128 256 and 512 bit accumulator geometries" {
 }
 
 test "native architecture candidate entrypoints preserve fixed kernel semantics" {
-    if (comptime builtin.cpu.arch == .aarch64) try checkSwapParallelBoundaries();
-    if (comptime builtin.cpu.arch != .aarch64 and builtin.cpu.arch != .x86_64) return;
+    if (comptime builtin.target.cpu.arch == .aarch64) try checkSwapParallelBoundaries();
+    if (comptime builtin.target.cpu.arch != .aarch64 and builtin.target.cpu.arch != .x86_64) return;
     const n: usize = 21;
     var dot_x: [24]f32 align(64) = undefined;
     var dot_y: [24]f32 align(64) = undefined;
@@ -683,7 +683,7 @@ test "native architecture candidate entrypoints preserve fixed kernel semantics"
     }
     for (0..n) |i| expected_dot = @mulAdd(f64, @as(f64, dot_x[i]), @as(f64, dot_y[i]), expected_dot);
 
-    var complex_x: [24]types.ComplexF32 align(64) = [_]types.ComplexF32{.{ .re = 0, .im = 0 }} ** 24;
+    var complex_x: [24]types.ComplexF32 align(64) = @splat(.{ .re = 0, .im = 0 });
     for (0..n) |i| {
         const value: f32 = @floatFromInt(i);
         complex_x[i] = .{ .re = value * 0.25 - 1, .im = value * -0.125 + 0.5 };
@@ -699,7 +699,7 @@ test "native architecture candidate entrypoints preserve fixed kernel semantics"
         yv.* = value * -0.125 + 1;
     }
 
-    if (comptime builtin.cpu.arch == .aarch64) {
+    if (comptime builtin.target.cpu.arch == .aarch64) {
         try std.testing.expectApproxEqAbs(expected_dot, aarch_binary.fixedDotF32AccF64UnitCandidate(n, &dot_x, &dot_y).?, 1e-13);
         try std.testing.expectEqual(@as(types.BlasInt, 4), aarch_unary.fixedIamaxUnitComplexCandidate(types.ComplexF32, n, &complex_x).?);
         try std.testing.expect(aarch_binary.fixedRotmUnitRealCandidate(f32, n, &rotm_x, &rotm_y, 0, 0.75, -0.5, 0.25, 1.25));
@@ -711,12 +711,12 @@ test "native architecture candidate entrypoints preserve fixed kernel semantics"
 }
 
 test "native production complex IAMAX selection respects measured profile" {
-    var x: [257]types.ComplexF32 align(64) = [_]types.ComplexF32{.{ .re = 1, .im = -1 }} ** 257;
+    var x: [257]types.ComplexF32 align(64) = @splat(.{ .re = 1, .im = -1 });
     x[17] = .{ .re = 8, .im = -7 };
-    if (comptime builtin.cpu.arch == .aarch64) {
+    if (comptime builtin.target.cpu.arch == .aarch64) {
         try std.testing.expectEqual(@as(types.BlasInt, 18), aarch_unary.iamaxUnitComplex(types.ComplexF32, 256, &x).?);
         try std.testing.expect(aarch_unary.iamaxUnitComplex(types.ComplexF32, 257, &x) == null);
-    } else if (comptime builtin.cpu.arch == .x86_64) {
+    } else if (comptime builtin.target.cpu.arch == .x86_64) {
         try std.testing.expect(x86_unary.iamaxUnitComplex(types.ComplexF32, 256, &x) == null);
     }
 }

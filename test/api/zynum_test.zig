@@ -72,7 +72,7 @@ test "modern API rejects structural shape errors in all build modes" {
 }
 
 test "modern checked API rejects short backing storage" {
-    if (builtin.mode == .ReleaseFast) return error.SkipZigTest;
+    if (builtin.mode == .fast) return error.SkipZigTest;
 
     var short = [_]f64{ 1, 2, 3 };
     try std.testing.expectError(error.BufferTooSmall, zynum.constVector(f64, &short, .{ .length = 3, .stride = 2 }));
@@ -95,7 +95,7 @@ test "modern vector Into operations write out of place" {
 }
 
 test "modern matrix vector multiply rejects aliasing without workspace" {
-    if (builtin.mode == .ReleaseFast) return error.SkipZigTest;
+    if (builtin.mode == .fast) return error.SkipZigTest;
 
     var matrix_data = [_]f64{ 1, 2, 3, 4 };
     var vector_data = [_]f64{ 20, 10 };
@@ -131,7 +131,7 @@ test "modern matrix vector multiply workspace supports in-place result" {
 }
 
 test "modern matrix multiply rejects aliasing without workspace" {
-    if (builtin.mode == .ReleaseFast) return error.SkipZigTest;
+    if (builtin.mode == .fast) return error.SkipZigTest;
 
     var left_data = [_]f64{ 1, 2, 3, 4 };
     var right_data = [_]f64{ 5, 6, 7, 8 };

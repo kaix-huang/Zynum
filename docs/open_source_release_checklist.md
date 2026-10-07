@@ -47,8 +47,10 @@ zig build --summary failures
 ZYNUM_RELEASE_VALIDATION
 ```
 
-The default `test` step includes the test-inventory gate, all applicable Zig
-correctness tests, and `test-host-tool-smoke`. The
+With explicit `-Dcpu=baseline`, the `test` step includes the test-inventory
+gate, all applicable Zig correctness tests, and `test-host-tool-smoke`.
+Without `-Dcpu`, it selects dynamic-dispatch correctness and host-tool smoke.
+The
 `-Dhost-tool-smoke=false` option only omits that aggregate from the default
 step; an explicit `zig build test-host-tool-smoke` command always runs the
 inventory-declared Python tooling tests, ABI manifest and C/C++ header smoke
@@ -64,6 +66,13 @@ also require an exact `-Dcpu=baseline` query. A pending native row remains a
 documented evidence gap: cross-compilation, emulation, or another target class
 cannot satisfy it. Do not claim a complete native matrix while applicable rows
 remain pending.
+
+For Zig 0.17, only AArch64 macOS currently has reviewed baseline native
+observations. Linux and Windows remain pending, as detailed in the
+[platform evidence table](development_and_usage.md#test-inventory). The Linux
+release artifact job still requires native baseline certification and cannot
+complete until its new observations are reviewed. CI compile/link coverage and
+separate native-feature checks do not bypass this release gate.
 
 The build and test inventory checkers use bounded, fail-closed input admission
 and code-pinned review controls. They do not prove signer identity, remote

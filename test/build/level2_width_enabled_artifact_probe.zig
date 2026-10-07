@@ -53,8 +53,8 @@ fn verifyMinimalRealWitnesses() ProbeError!void {
         var output_storage = [_]f32{ 1001, 10, 20, 30, 40, 50, 60, 70, 80, -1003 };
         const expected = [_]f32{ 11, 18, 33, 36, 55, 54, 77, 72 };
         var request: contract.Request = .{
-            .operation = @intFromEnum(contract.Operation.gemv_no_trans_unit),
-            .scalar = @intFromEnum(contract.Scalar.f32),
+            .operation = @backingInt(contract.Operation.gemv_no_trans_unit),
+            .scalar = @backingInt(contract.Scalar.f32),
             .flags = 0,
             .lda = 8,
             .m = 8,
@@ -80,8 +80,8 @@ fn verifyMinimalRealWitnesses() ProbeError!void {
         var output_storage = [_]f32{ 2001, 11, 12, 13, 14, 15, 16, 17, 18, -2003 };
         const expected = [_]f32{ 12, 10, 16, 10, 20, 10, 24, 10 };
         var request: contract.Request = .{
-            .operation = @intFromEnum(contract.Operation.ger_real),
-            .scalar = @intFromEnum(contract.Scalar.f32),
+            .operation = @backingInt(contract.Operation.ger_real),
+            .scalar = @backingInt(contract.Scalar.f32),
             .flags = 0,
             .lda = 8,
             .m = 8,
@@ -175,8 +175,8 @@ fn verifyRealGemv() ProbeError!void {
             }
         }
         var request: contract.Request = .{
-            .operation = @intFromEnum(operation),
-            .scalar = @intFromEnum(contract.Scalar.f32),
+            .operation = @backingInt(operation),
+            .scalar = @backingInt(contract.Scalar.f32),
             .flags = 0,
             .lda = lda,
             .m = m,
@@ -218,8 +218,8 @@ fn verifyRealGer() ProbeError!void {
         for (0..m) |row| expected[row + col * lda] += alpha * x[row] * y[col];
     }
     var request: contract.Request = .{
-        .operation = @intFromEnum(contract.Operation.ger_real),
-        .scalar = @intFromEnum(contract.Scalar.f32),
+        .operation = @backingInt(contract.Operation.ger_real),
+        .scalar = @backingInt(contract.Scalar.f32),
         .flags = 0,
         .lda = lda,
         .m = m,
@@ -310,8 +310,8 @@ fn verifyComplex(comptime T: type, scalar: contract.Scalar) !void {
                 }
             }
             var request: contract.Request = .{
-                .operation = @intFromEnum(operation),
-                .scalar = @intFromEnum(scalar),
+                .operation = @backingInt(operation),
+                .scalar = @backingInt(scalar),
                 .flags = flag,
                 .lda = lda,
                 .m = m,
@@ -347,8 +347,8 @@ fn verifyComplex(comptime T: type, scalar: contract.Scalar) !void {
             }
         }
         var request: contract.Request = .{
-            .operation = @intFromEnum(contract.Operation.ger_complex),
-            .scalar = @intFromEnum(scalar),
+            .operation = @backingInt(contract.Operation.ger_complex),
+            .scalar = @backingInt(scalar),
             .flags = flag,
             .lda = lda,
             .m = m,
@@ -377,8 +377,8 @@ fn verifyF64RejectedWithoutMutation() ProbeError!void {
     var output = [_]f64{ 91, 92, 93, 94 };
     const before = output;
     var request: contract.Request = .{
-        .operation = @intFromEnum(contract.Operation.gemv_no_trans_full),
-        .scalar = @intFromEnum(contract.Scalar.f64),
+        .operation = @backingInt(contract.Operation.gemv_no_trans_full),
+        .scalar = @backingInt(contract.Scalar.f64),
         .flags = 0,
         .lda = 4,
         .m = 4,
@@ -397,8 +397,8 @@ fn verifyF64RejectedWithoutMutation() ProbeError!void {
 
 pub fn main() !void {
     if (builtin.is_test) return error.BuiltAsTest;
-    if (builtin.cpu.arch != .x86_64 or !builtin.cpu.features.isEnabled(
-        @intFromEnum(std.Target.x86.Feature.avx512f),
+    if (builtin.target.cpu.arch != .x86_64 or !builtin.target.cpu.features.isEnabled(
+        @backingInt(std.Target.x86.Feature.avx512f),
     )) return error.UnexpectedTarget;
     if (contract.zynum_internal_x86_64_level2_width_enabled != 1) return error.CandidateDisabled;
 

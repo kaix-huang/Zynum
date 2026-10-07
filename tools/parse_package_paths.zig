@@ -26,13 +26,14 @@ pub fn main(init: std.process.Init) !void {
         0,
     );
 
-    const manifest = try std.zon.parse.fromSliceAlloc(
-        Manifest,
-        allocator,
-        source,
-        null,
-        .{ .ignore_unknown_fields = true },
-    );
+    var diagnostics: std.zon.parse.Diagnostics = undefined;
+    const manifest = try std.zon.parse.fromSlice(Manifest, .{
+        .gpa = allocator,
+        .arena = allocator,
+        .source = source,
+        .diagnostics = &diagnostics,
+        .ignore_unknown_fields = true,
+    });
     if (manifest.paths.len == 0 or manifest.paths.len > max_paths) {
         return error.InvalidPathCount;
     }

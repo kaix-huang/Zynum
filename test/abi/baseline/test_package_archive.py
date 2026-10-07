@@ -633,7 +633,7 @@ class PackageArchiveTests(unittest.TestCase):
             result = subprocess.CompletedProcess(
                 args=("zig",),
                 returncode=0,
-                stdout=b'{"schema_version":1,"zig_version":"0.16.0","paths":["payload"]}\n',
+                stdout=b'{"schema_version":1,"zig_version":"0.17.0","paths":["payload"]}\n',
                 stderr=b"",
             )
 
@@ -834,7 +834,7 @@ class PackageArchiveTests(unittest.TestCase):
     def test_package_path_decoder_accepts_compatible_zig_patch_releases(
         self,
     ) -> None:
-        for version in ("0.16.0", "0.16.1", "0.16.999"):
+        for version in ("0.17.0", "0.17.1", "0.17.999"):
             with self.subTest(version=version):
                 output = (
                     json.dumps(
@@ -853,13 +853,13 @@ class PackageArchiveTests(unittest.TestCase):
         self,
     ) -> None:
         versions = (
-            "0.15.9",
-            "0.17.0",
-            "1.16.0",
-            "0.16",
-            "0.16.0.1",
-            "0.16.01",
-            "0.16.0-dev.1",
+            "0.16.9",
+            "0.18.0",
+            "1.17.0",
+            "0.17",
+            "0.17.0.1",
+            "0.17.01",
+            "0.17.0-dev.1",
             16,
         )
         for version in versions:
@@ -881,7 +881,7 @@ class PackageArchiveTests(unittest.TestCase):
     def test_package_paths_rejects_untrusted_helper_output(self) -> None:
         valid = {
             "schema_version": 1,
-            "zig_version": "0.16.0",
+            "zig_version": "0.17.0",
             "paths": ["payload"],
         }
         invalid_outputs = (
@@ -890,7 +890,7 @@ class PackageArchiveTests(unittest.TestCase):
             b"not-json\n",
             json.dumps({**valid, "extra": True}, separators=(",", ":")).encode()
             + b"\n",
-            b'{"schema_version":1,"schema_version":1,"zig_version":"0.16.0","paths":["payload"]}\n',
+            b'{"schema_version":1,"schema_version":1,"zig_version":"0.17.0","paths":["payload"]}\n',
             json.dumps(
                 {**valid, "schema_version": True}, separators=(",", ":")
             ).encode()
@@ -898,7 +898,7 @@ class PackageArchiveTests(unittest.TestCase):
             json.dumps({**valid, "schema_version": 2}, separators=(",", ":")).encode()
             + b"\n",
             json.dumps(
-                {**valid, "zig_version": "0.17.0"}, separators=(",", ":")
+                {**valid, "zig_version": "0.18.0"}, separators=(",", ":")
             ).encode()
             + b"\n",
             json.dumps({**valid, "paths": "payload"}, separators=(",", ":")).encode()
@@ -909,7 +909,7 @@ class PackageArchiveTests(unittest.TestCase):
             ).encode()
             + b"\n",
             json.dumps({**valid, "paths": [1]}, separators=(",", ":")).encode() + b"\n",
-            b'{"schema_version":1,"zig_version":"0.16.0","paths":["\\ud800"]}\n',
+            b'{"schema_version":1,"zig_version":"0.17.0","paths":["\\ud800"]}\n',
         )
         with tempfile.TemporaryDirectory() as name:
             zon = Path(name) / "build.zig.zon"

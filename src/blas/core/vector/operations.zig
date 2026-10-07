@@ -63,8 +63,8 @@ fn unroll(comptime T: type) comptime_int {
     return 4 * lanes(T);
 }
 
-/// Zig 0.16 Debug x86_64 may widen sub-128-bit vector pointer accesses and
-/// propagate poisoned high lanes. Keep vector tails at 16 bytes or wider; the
+/// Zig 0.17 Debug x86_64 still widens sub-128-bit vector pointer accesses and
+/// can propagate poisoned high lanes. Keep vector tails at 16 bytes or wider; the
 /// scalar remainder owns every narrower suffix.
 fn safeTailLaneCounts(comptime lane_count: comptime_int) [2]comptime_int {
     return .{ lane_count / 2, lane_count / 4 };
@@ -894,8 +894,8 @@ fn complexScalF32Stride2(n: usize, alpha_re: f32, alpha_im: f32, x: [*]ComplexF3
     var i: usize = 0;
     while (i + packed_complexes <= n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const result: PackedBits = @bitCast(complexMulPackedF32(xv, alpha_re, alpha_im));
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const result: PackedBits = scalar.complexF32Bits(packed_complexes, complexMulPackedF32(xv, alpha_re, alpha_im));
         storeStride2Block(u64, packed_complexes, x_bits, i, xb, result);
     }
     const alpha: ComplexF32 = .{ .re = alpha_re, .im = alpha_im };
@@ -912,9 +912,9 @@ fn complexAxpyF32Stride2(n: usize, alpha: ComplexF32, x: [*]const ComplexF32, y:
     while (i + packed_complexes <= n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
         const yb = loadStride2Block(u64, packed_complexes, y_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const yv: PackedReal = @bitCast(yb.active);
-        const result: PackedBits = @bitCast(complexMulPackedF32(xv, alpha.re, alpha.im) + yv);
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const yv: PackedReal = scalar.complexF32Lanes(packed_complexes, yb.active);
+        const result: PackedBits = scalar.complexF32Bits(packed_complexes, complexMulPackedF32(xv, alpha.re, alpha.im) + yv);
         storeStride2Block(u64, packed_complexes, y_bits, i, yb, result);
     }
     while (i < n) : (i += 1) {
@@ -941,9 +941,9 @@ fn complexAxpbyF32Stride2(
     while (i + packed_complexes <= n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
         const yb = loadStride2Block(u64, packed_complexes, y_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const yv: PackedReal = @bitCast(yb.active);
-        const result: PackedBits = @bitCast(complexMulPackedF32(xv, alpha_re, alpha_im) + complexMulPackedF32(yv, beta_re, beta_im));
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const yv: PackedReal = scalar.complexF32Lanes(packed_complexes, yb.active);
+        const result: PackedBits = scalar.complexF32Bits(packed_complexes, complexMulPackedF32(xv, alpha_re, alpha_im) + complexMulPackedF32(yv, beta_re, beta_im));
         storeStride2Block(u64, packed_complexes, y_bits, i, yb, result);
     }
     const alpha: ComplexF32 = .{ .re = alpha_re, .im = alpha_im };
@@ -1528,10 +1528,10 @@ fn rotComplexF32Stride2(n: usize, x: [*]ComplexF32, y: [*]ComplexF32, c: f32, s:
     while (i + packed_complexes <= n) : (i += packed_complexes) {
         const xb = loadStride2Block(u64, packed_complexes, x_bits, i);
         const yb = loadStride2Block(u64, packed_complexes, y_bits, i);
-        const xv: PackedReal = @bitCast(xb.active);
-        const yv: PackedReal = @bitCast(yb.active);
-        const x_result: PackedBits = @bitCast(@mulAdd(PackedReal, xv, c_v, yv * s_v));
-        const y_result: PackedBits = @bitCast(@mulAdd(PackedReal, -xv, s_v, yv * c_v));
+        const xv: PackedReal = scalar.complexF32Lanes(packed_complexes, xb.active);
+        const yv: PackedReal = scalar.complexF32Lanes(packed_complexes, yb.active);
+        const x_result: PackedBits = scalar.complexF32Bits(packed_complexes, @mulAdd(PackedReal, xv, c_v, yv * s_v));
+        const y_result: PackedBits = scalar.complexF32Bits(packed_complexes, @mulAdd(PackedReal, -xv, s_v, yv * c_v));
         storeStride2Block(u64, packed_complexes, x_bits, i, xb, x_result);
         storeStride2Block(u64, packed_complexes, y_bits, i, yb, y_result);
     }
@@ -1789,7 +1789,7 @@ fn x86StreamTaskLimit(working_bytes: usize, cache_limit: usize) usize {
 }
 
 fn parallelCopyTaskCount(n_bytes: usize) usize {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         const min_bytes_per_task: usize = if (n_bytes < 1024 * 1024) 64 * 1024 else 256 * 1024;
         const limit: usize = if (n_bytes < 32 * 1024 * 1024) 32 else if (n_bytes >= 64 * 1024 * 1024 and n_bytes < 128 * 1024 * 1024) 16 else 8;
         return @min(core_pool.taskCount(n_bytes, min_bytes_per_task), limit);
@@ -1798,12 +1798,12 @@ fn parallelCopyTaskCount(n_bytes: usize) usize {
 }
 
 fn runLevel1Tasks(task_fn: core_pool.TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (comptime builtin.cpu.arch == .x86_64) return core_pool.runLowLatency(task_fn, tasks, count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(task_fn, tasks, count);
     return core_pool.run(task_fn, tasks, count);
 }
 
 fn parallelScalTaskCount(comptime T: type, n: usize) usize {
-    if (comptime builtin.cpu.arch == .x86_64) return parallelTaskCount(n, 32 * 1024, x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16));
+    if (comptime builtin.target.cpu.arch == .x86_64) return parallelTaskCount(n, 32 * 1024, x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16));
     if (n < 2 * 1024 * 1024) return 1;
     return parallelTaskCount(n, 170 * 1024, 6);
 }
@@ -1891,9 +1891,9 @@ fn runSwapStride2TaskC32(raw_tasks: *const anyopaque, index: usize) void {
 fn parallelSwapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, if (T == f32) 24 else 16) else 32)
-    else if (comptime builtin.cpu.arch == .aarch64) task_count: {
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, if (T == f32) 24 else 16) else 32)
+    else if (comptime builtin.target.cpu.arch == .aarch64) task_count: {
         if (n_bytes < 4 * 1024 * 1024 or n_bytes > 16 * 1024 * 1024) return false;
         const max_task_count: usize = if (n_bytes <= 8 * 1024 * 1024) 4 else 2;
         break :task_count @min(core_pool.taskCount(n, 128 * 1024), max_task_count);
@@ -1904,7 +1904,7 @@ fn parallelSwapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
     // Keep AArch64 worker boundaries on whole 128-byte blocks. Splitting an
     // odd real-lane count can otherwise put neighboring workers on the same
     // cache line and misalign their vector loops. The final task owns the tail.
-    const grain = if (comptime builtin.cpu.arch == .aarch64) 128 / @sizeOf(T) else 1;
+    const grain = if (comptime builtin.target.cpu.arch == .aarch64) 128 / @sizeOf(T) else 1;
     for (0..task_count) |task_index| {
         tasks[task_index] = .{
             .n0 = task_index * n / task_count / grain * grain,
@@ -1918,7 +1918,7 @@ fn parallelSwapUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T) bool {
 }
 
 fn parallelSwapStride2F64(n: usize, x: [*]f64, y: [*]f64) bool {
-    if (comptime builtin.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64) return false;
     if (n < 512 * 1024) return false;
     const task_count = @min(core_pool.taskCount(n, 256 * 1024), 2);
     if (task_count <= 1) return false;
@@ -1936,7 +1936,7 @@ fn parallelSwapStride2F64(n: usize, x: [*]f64, y: [*]f64) bool {
 }
 
 fn parallelSwapStride2C32(n: usize, x: [*]ComplexF32, y: [*]ComplexF32) bool {
-    if (comptime builtin.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64) return false;
     if (n < 512 * 1024) return false;
     const task_count = @min(core_pool.taskCount(n, 256 * 1024), 2);
     if (task_count <= 1) return false;
@@ -2004,7 +2004,7 @@ fn runStreamingRotTask(raw: *const anyopaque, index: usize) void {
 }
 
 fn parallelStreamingRot(n: usize, x: [*]f32, y: [*]f32, c: f32, s: f32) bool {
-    if (comptime builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return false;
     if (n < 512 * 1024 or n > 1024 * 1024) return false;
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n * @sizeOf(f32))) return false;
     const count = @min(core_pool.taskCount(n, 128 * 1024), 3);
@@ -2063,7 +2063,7 @@ fn runStreamingRotmTask(raw: *const anyopaque, index: usize) void {
 }
 
 fn parallelStreamingRotm(n: usize, x: [*]f32, y: [*]f32, flag: f32, h11: f32, h21: f32, h12: f32, h22: f32) bool {
-    if (comptime builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return false;
     if (n < 512 * 1024 or n > 1024 * 1024) return false;
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n * @sizeOf(f32))) return false;
     const count = @min(core_pool.taskCount(n, 128 * 1024), 3);
@@ -2085,9 +2085,9 @@ fn parallelStreamingRotm(n: usize, x: [*]f32, y: [*]f32, flag: f32, h11: f32, h2
 fn parallelRotUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, c: T, s: T) bool {
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
-    else if (comptime builtin.cpu.arch == .aarch64) task_count: {
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
+    else if (comptime builtin.target.cpu.arch == .aarch64) task_count: {
         if (n_bytes < 4 * 1024 * 1024 or n_bytes > 16 * 1024 * 1024) return false;
         const max_task_count: usize = if (n_bytes <= 8 * 1024 * 1024) 4 else 2;
         break :task_count @min(core_pool.taskCount(n, 128 * 1024), max_task_count);
@@ -2126,9 +2126,9 @@ fn runRotmTaskF64(raw_tasks: *const anyopaque, index: usize) void {
 fn parallelRotmUnitReal(comptime T: type, n: usize, x: [*]T, y: [*]T, flag: T, h11: T, h21: T, h12: T, h22: T) bool {
     const n_bytes = n * @sizeOf(T);
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) return false;
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
-    else if (comptime builtin.cpu.arch == .aarch64) task_count: {
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
+    else if (comptime builtin.target.cpu.arch == .aarch64) task_count: {
         if (n_bytes < 4 * 1024 * 1024 or n_bytes > 8 * 1024 * 1024) return false;
         break :task_count @min(core_pool.taskCount(n, 128 * 1024), 4);
     } else return false;
@@ -2187,7 +2187,7 @@ fn runComplexScalStride2TaskF64(raw_tasks: *const anyopaque, index: usize) void 
 }
 
 fn parallelScalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) {
+    if (comptime builtin.target.cpu.arch != .x86_64) {
         if (T == f32 and n <= 2 * 1024 * 1024) return false;
     }
     const task_count = parallelScalTaskCount(T, n);
@@ -2206,17 +2206,17 @@ fn parallelScalUnitReal(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
         };
     }
     const runner = if (T == f32) runScalTaskF32 else runScalTaskF64;
-    if (comptime builtin.cpu.arch == .aarch64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .aarch64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return runLevel1Tasks(runner, @ptrCast(&tasks), task_count);
 }
 
 fn parallelComplexScalUnit(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64 and builtin.cpu.arch != .aarch64) return false;
-    if (comptime builtin.cpu.arch == .aarch64) {
+    if (comptime builtin.target.cpu.arch != .x86_64 and builtin.target.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch == .aarch64) {
         if (n < 512 * 1024) return false;
     }
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16) else 32)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16) else 32)
     else
         parallelTaskCount(n, 128 * 1024, 10);
     if (task_count <= 1) return false;
@@ -2234,12 +2234,12 @@ fn parallelComplexScalUnit(comptime T: type, n: usize, alpha: T, x: [*]T) bool {
         };
     }
     const runner = if (T == ComplexF32) runComplexScalTaskC32 else runComplexScalTaskC64;
-    if (comptime builtin.cpu.arch == .aarch64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .aarch64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return runLevel1Tasks(runner, @ptrCast(&tasks), task_count);
 }
 
 fn parallelComplexScalStride2F64(n: usize, alpha_re: f64, alpha_im: f64, x: [*]ComplexF64) bool {
-    if (comptime builtin.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64) return false;
     if (n < 512 * 1024) return false;
     const task_count = @min(core_pool.taskCount(n, 256 * 1024), 2);
     if (task_count <= 1) return false;
@@ -2276,7 +2276,7 @@ fn runCopyBytesTask(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 fn parallelCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n_bytes <= 128 * 1024) return false;
     } else if (n_bytes < 4 * 1024 * 1024 or (n_bytes > 5 * 1024 * 1024 and n_bytes != 8 * 1024 * 1024)) return false;
     if (byteRangesOverlap(x, y, n_bytes)) return false;
@@ -2284,7 +2284,7 @@ fn parallelCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]ByteCopyTask = undefined;
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n_bytes == 256 * 1024 and task_count == 4) {
             const chunk: usize = 64 * 1024;
             const chunk_order = .{ 1, 0, 2, 3 };
@@ -2315,11 +2315,11 @@ fn parallelCopyBytes(n_bytes: usize, x: [*]const u8, y: [*]u8) bool {
             .n1 = n1,
             .x = x,
             .y = y,
-            .use_fixed = builtin.cpu.arch == .aarch64 and n_bytes == 8 * 1024 * 1024,
-            .use_streaming = builtin.cpu.arch == .x86_64 and n_bytes >= @import("../../kernels/shared/vector/tuning.zig").streaming_copy_min_bytes,
+            .use_fixed = builtin.target.cpu.arch == .aarch64 and n_bytes == 8 * 1024 * 1024,
+            .use_streaming = builtin.target.cpu.arch == .x86_64 and n_bytes >= @import("../../kernels/shared/vector/tuning.zig").streaming_copy_min_bytes,
         };
     }
-    if (comptime builtin.cpu.arch == .aarch64) return core_pool.runLowLatency(runCopyBytesTask, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .aarch64) return core_pool.runLowLatency(runCopyBytesTask, @ptrCast(&tasks), task_count);
     return runLevel1Tasks(runCopyBytesTask, @ptrCast(&tasks), task_count);
 }
 
@@ -2378,11 +2378,11 @@ fn runComplexAxpyStride2TaskC64(raw_tasks: *const anyopaque, index: usize) void 
 }
 
 fn parallelAxpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) {
+    if (comptime builtin.target.cpu.arch != .x86_64) {
         if (T == f32 and n < 2 * 1024 * 1024) return false;
     }
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else
         parallelTaskCount(n, 170 * 1024, 6);
     if (task_count <= 1) return false;
@@ -2404,7 +2404,7 @@ fn parallelAxpyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, y: 
 }
 
 fn parallelAxpyStride2Real(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64) return false;
     if (n < 512 * 1024) return false;
     const max_task_count: usize = if (T == f64) 3 else 2;
     const task_count = @min(core_pool.taskCount(n, 256 * 1024), max_task_count);
@@ -2427,8 +2427,8 @@ fn parallelAxpyStride2Real(comptime T: type, n: usize, alpha: T, x: [*]const T, 
 }
 
 fn parallelComplexAxpyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64 and builtin.cpu.arch != .aarch64) return false;
-    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32);
+    if (comptime builtin.target.cpu.arch != .x86_64 and builtin.target.cpu.arch != .aarch64) return false;
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]RangeTask(T) = undefined;
@@ -2448,7 +2448,7 @@ fn parallelComplexAxpyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, 
 }
 
 fn parallelComplexAxpyStride2C32(n: usize, alpha: ComplexF32, x: [*]const ComplexF32, y: [*]ComplexF32) bool {
-    if (comptime builtin.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64) return false;
     if (n < 512 * 1024) return false;
     const task_count = @min(core_pool.taskCount(n, 256 * 1024), 3);
     if (task_count <= 1) return false;
@@ -2469,7 +2469,7 @@ fn parallelComplexAxpyStride2C32(n: usize, alpha: ComplexF32, x: [*]const Comple
 }
 
 fn parallelComplexAxpyStride2C64(n: usize, alpha: ComplexF64, x: [*]const ComplexF64, y: [*]ComplexF64) bool {
-    if (comptime builtin.cpu.arch != .aarch64) return false;
+    if (comptime builtin.target.cpu.arch != .aarch64) return false;
     if (n < 512 * 1024) return false;
     const task_count = @min(core_pool.taskCount(n, 256 * 1024), 2);
     if (task_count <= 1) return false;
@@ -2519,9 +2519,9 @@ fn runComplexAxpbyTaskC64(raw_tasks: *const anyopaque, index: usize) void {
 
 fn parallelAxpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
     if (byteRangesOverlap(@ptrCast(x), @ptrCast(y), n * @sizeOf(T))) return false;
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
-    else if (comptime builtin.cpu.arch == .aarch64)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
+    else if (comptime builtin.target.cpu.arch == .aarch64)
         parallelTaskCount(n, 128 * 1024, 4)
     else
         parallelTaskCount(n, 170 * 1024, 6);
@@ -2540,13 +2540,13 @@ fn parallelAxpbyUnitReal(comptime T: type, n: usize, alpha: T, x: [*]const T, be
         };
     }
     const runner = if (T == f32) runAxpbyTaskF32 else runAxpbyTaskF64;
-    if (comptime builtin.cpu.arch == .aarch64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .aarch64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
     return runLevel1Tasks(runner, @ptrCast(&tasks), task_count);
 }
 
 fn parallelComplexAxpbyUnit(comptime T: type, n: usize, alpha: T, x: [*]const T, beta: T, y: [*]T) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
-    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32);
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32);
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]RangeTask(T) = undefined;
@@ -2604,8 +2604,8 @@ fn runDotF32AccF64Task(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 fn parallelDotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
-    if (comptime builtin.cpu.arch != .x86_64) return null;
-    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(f32) * 2, 16) else 32);
+    if (comptime builtin.target.cpu.arch != .x86_64) return null;
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(f32) * 2, 16) else 32);
     if (task_count <= 1) return null;
 
     var partial: [core_pool.max_tasks]f64 = undefined;
@@ -2628,11 +2628,11 @@ fn parallelDotF32AccF64Unit(n: usize, x: [*]const f32, y: [*]const f32) ?f64 {
 }
 
 fn parallelDotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) ?T {
-    if (comptime builtin.cpu.arch != .x86_64) {
+    if (comptime builtin.target.cpu.arch != .x86_64) {
         if (T == f32 and n <= 2 * 1024 * 1024) return null;
     }
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
-        parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
+        parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 16) else 32)
     else
         parallelTaskCount(n, 128 * 1024, 10);
     if (task_count <= 1) return null;
@@ -2683,11 +2683,11 @@ fn runDotComplexTaskC64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 fn parallelDotUnitComplex(comptime T: type, n: usize, x: [*]const T, y: [*]const T, conjx: bool) ?T {
-    if (comptime builtin.cpu.arch != .x86_64) {
+    if (comptime builtin.target.cpu.arch != .x86_64) {
         if (T == ComplexF32) return null;
     }
     if (n < 512 * 1024) return null;
-    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 24) else 32);
+    const task_count = parallelTaskCount(n, 32 * 1024, if (comptime builtin.target.cpu.arch == .x86_64) x86StreamTaskLimit(n * @sizeOf(T) * 2, 24) else 32);
     if (task_count <= 1) return null;
 
     var partial: [core_pool.max_tasks]T = undefined;
@@ -2734,13 +2734,13 @@ fn runAsumComplexComponentsTaskF64(raw_tasks: *const anyopaque, index: usize) vo
 }
 
 fn parallelAsumUnit(comptime T: type, comptime category: AsumOperandCategory, n: usize, x: [*]const T) ?T {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n < 128 * 1024) return null;
     } else {
         if (T == f32 and n <= 2 * 1024 * 1024) return null;
         if (n < 2 * 1024 * 1024) return null;
     }
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
         @min(core_pool.taskCount(n, 32 * 1024), x86StreamTaskLimit(n * @sizeOf(T), if (T == f32 and n > 2 * 1024 * 1024) 24 else 16))
     else
         parallelTaskCount(n, 96 * 1024, 10);
@@ -2820,7 +2820,7 @@ fn combineNrm2Partials(comptime T: type, partial: []const T) T {
 
 fn parallelNrm2UnitReal(comptime T: type, n: usize, x: [*]const T) ?T {
     if (n < 512 * 1024) return null;
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
         parallelTaskCount(n, 32 * 1024, x86ReadTaskLimit(true, T, n * @sizeOf(T)))
     else
         parallelTaskCount(n, 128 * 1024, 10);
@@ -2928,7 +2928,7 @@ pub fn swap(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, inc
             const n_bytes = real_n * @sizeOf(R);
             // Honor the existing parallel gate before a serial streaming leaf.
             if (parallelSwapUnitReal(R, real_n, real_x, real_y)) return;
-            if (comptime builtin.cpu.arch == .aarch64) {
+            if (comptime builtin.target.cpu.arch == .aarch64) {
                 if (!byteRangesOverlap(@ptrCast(real_x), @ptrCast(real_y), n_bytes)) {
                     // Single-task fallback owns one streaming-mode lifetime.
                     if (vector_binary_kernels.swapUnitRealStreaming(R, real_n, real_x, real_y)) return;
@@ -2951,7 +2951,7 @@ pub fn swap(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, inc
             const n_bytes = n * @sizeOf(T);
             // Honor the existing parallel gate before a serial streaming leaf.
             if (parallelSwapUnitReal(T, n, x, y)) return;
-            if (comptime builtin.cpu.arch == .aarch64) {
+            if (comptime builtin.target.cpu.arch == .aarch64) {
                 if (!byteRangesOverlap(@ptrCast(x), @ptrCast(y), n_bytes)) {
                     if (vector_binary_kernels.swapUnitRealStreaming(T, n, x, y)) return;
                 }
@@ -3045,7 +3045,7 @@ pub fn axpby(comptime T: type, n_: BlasInt, alpha: T, x: [*]const T, incx_: Blas
         if (incx_ == 1 and incy_ == 1) {
             // The large Apple f32 path owns SM/ZA once for the full vector.
             // Do not split it into helpers that each pay a state transition.
-            if (comptime builtin.cpu.arch == .aarch64 and T == f32) {
+            if (comptime builtin.target.cpu.arch == .aarch64 and T == f32) {
                 if (vector_binary_kernels.axpbyUnitReal(T, n, alpha, x, beta, y)) return;
             }
             if (parallelAxpbyUnitReal(T, n, alpha, x, beta, y)) return;
@@ -3242,9 +3242,9 @@ fn runIamaxTaskC64(raw_tasks: *const anyopaque, index: usize) void {
 }
 
 fn parallelIamaxUnit(comptime T: type, n: usize, x: [*]const T) ?BlasInt {
-    const task_count = if (comptime builtin.cpu.arch == .x86_64)
+    const task_count = if (comptime builtin.target.cpu.arch == .x86_64)
         (if (n < 128 * 1024) 1 else @min(core_pool.taskCount(n, 32 * 1024), x86ReadTaskLimit(false, T, n * @sizeOf(T))))
-    else if (comptime builtin.cpu.arch == .aarch64 and isComplex(T)) task_count: {
+    else if (comptime builtin.target.cpu.arch == .aarch64 and isComplex(T)) task_count: {
         if (n < 256 * 1024) return null;
         const min_items_per_task: usize = if (T == ComplexF32) 64 * 1024 else 128 * 1024;
         break :task_count @min(core_pool.taskCount(n, min_items_per_task), 4);
@@ -3292,8 +3292,8 @@ fn parallelIamaxUnit(comptime T: type, n: usize, x: [*]const T) ?BlasInt {
 noinline fn iamaxStridedReal(comptime T: type, n: usize, x: [*]const T, stride: usize) BlasInt {
     const first = @abs(x[0]);
     if (std.math.isNan(first)) return 1;
-    var magnitudes = [_]T{first} ** 4;
-    var indices = [_]usize{0} ** 4;
+    var magnitudes: [4]T = @splat(first);
+    var indices: [4]usize = @splat(0);
     var i: usize = 1;
     while (n - i >= 4) : (i += 4) {
         inline for (0..4) |lane| {
@@ -3327,7 +3327,7 @@ pub fn iamax(comptime T: type, n_: BlasInt, x: [*]const T, incx_: BlasInt) BlasI
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (incx_ == 1) return parallelIamaxUnit(T, n, x) orelse iamaxUnitReal(T, n, x);
-        if (comptime builtin.cpu.arch == .aarch64) {
+        if (comptime builtin.target.cpu.arch == .aarch64) {
             if (n >= 32) return iamaxStridedReal(T, n, x, @intCast(incx_));
         }
     } else if (comptime isComplex(T)) {
@@ -3355,7 +3355,7 @@ pub fn rot(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, incy
         if (incx_ == 1 and incy_ == 1) {
             // Keep the SME arithmetic in each chunk; non-streaming ROT has
             // different NaN and floating-point status behavior.
-            if (comptime builtin.cpu.arch == .aarch64 and T == f32) {
+            if (comptime builtin.target.cpu.arch == .aarch64 and T == f32) {
                 if (parallelStreamingRot(n, x, y, c, s)) return;
                 if (vector_binary_kernels.rotUnitRealStreaming(T, n, x, y, c, s)) return;
             }
@@ -3374,7 +3374,7 @@ pub fn rot(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, incy
             const real_n = 2 * n;
             const real_x = asRealPtr(T, x);
             const real_y = asRealPtr(T, y);
-            if (comptime builtin.cpu.arch == .aarch64 and R == f32) {
+            if (comptime builtin.target.cpu.arch == .aarch64 and R == f32) {
                 if (vector_binary_kernels.rotUnitRealStreaming(R, real_n, real_x, real_y, c, realPart(T, s))) return;
             }
             if (parallelRotUnitReal(R, real_n, real_x, real_y, c, realPart(T, s))) return;
@@ -3463,7 +3463,7 @@ pub fn rotm(comptime T: type, n_: BlasInt, x: [*]T, incx_: BlasInt, y: [*]T, inc
     if (comptime isReal(T)) {
         if (incx_ == 1 and incy_ == 1) {
             // Preserve the streaming arithmetic and caller FPCR in each chunk.
-            if (comptime builtin.cpu.arch == .aarch64 and T == f32) {
+            if (comptime builtin.target.cpu.arch == .aarch64 and T == f32) {
                 if (parallelStreamingRotm(n, x, y, flag, h11, h21, h12, h22)) return;
                 if (vector_binary_kernels.rotmUnitReal(T, n, x, y, flag, h11, h21, h12, h22)) return;
             }

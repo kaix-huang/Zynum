@@ -152,7 +152,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value=identity,
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(runner, "publish_outputs") as publisher,
                 redirect_stderr(io.StringIO()),
             ):
@@ -201,7 +201,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value={"source": {}, "invalid": float("nan")},
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(runner, "publish_outputs") as publisher,
                 redirect_stderr(io.StringIO()),
             ):
@@ -233,7 +233,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value={"source": {}},
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(
                     runner, "publish_outputs", side_effect=OSError("publish failed")
                 ) as publisher,
@@ -269,7 +269,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value={"source": {}},
                 ),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 mock.patch.object(
                     runner, "publish_outputs", side_effect=fail_publication
                 ),
@@ -389,7 +389,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     side_effect=collect_identity,
                 ),
                 mock.patch.object(runner, "publish_outputs", side_effect=publish),
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 redirect_stderr(io.StringIO()),
             ):
                 runner.run_controller(args)
@@ -492,7 +492,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                         ),
                         mock.patch.object(runner, "publish_outputs"),
                         mock.patch.object(
-                            runner, "command_output", return_value="0.16.0"
+                            runner, "command_output", return_value="0.17.0"
                         ),
                         mock.patch.object(
                             runner.benchmark_artifacts.ArtifactSnapshotSet,
@@ -778,7 +778,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     runner, "collect_repeats", wraps=runner.collect_repeats
                 ) as collect_samples,
                 mock.patch.object(
-                    runner, "command_output", return_value="0.16.0"
+                    runner, "command_output", return_value="0.17.0"
                 ) as command_output,
                 redirect_stderr(io.StringIO()),
             ):
@@ -983,7 +983,7 @@ class RotgLatencyRunnerTests(unittest.TestCase):
                     "collect_benchmark_identity_from_frozen",
                     return_value=identity,
                 ) as collect_identity,
-                mock.patch.object(runner, "command_output", return_value="0.16.0"),
+                mock.patch.object(runner, "command_output", return_value="0.17.0"),
                 redirect_stderr(io.StringIO()),
             ):
                 runner.run_controller(args)

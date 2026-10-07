@@ -168,8 +168,8 @@ fn dispatchScalar(comptime T: type, operation: abi.Operation, request: *abi.Requ
 }
 
 fn execute(request: *abi.Request) callconv(.c) u8 {
-    const operation: abi.Operation = @enumFromInt(request.operation);
-    const scalar: abi.Scalar = @enumFromInt(request.scalar);
+    const operation: abi.Operation = @fromBackingInt(@intCast(request.operation));
+    const scalar: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     const handled = switch (scalar) {
         .f32 => dispatchScalar(f32, operation, request),
         .f64 => dispatchScalar(f64, operation, request),

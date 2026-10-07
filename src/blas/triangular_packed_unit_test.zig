@@ -149,7 +149,7 @@ fn expectPaddingNan(comptime T: type, storage: []const T, active_start: usize, a
 }
 
 fn invokeTpmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, ap: []const T, input: []const T, x: []T) !void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         try std.testing.expect(packed_unit.tryTpmv(T, uplo, trans_, diag, n, ap.ptr, x.ptr, 1));
     } else {
         try std.testing.expect(!packed_unit.tryTpmv(T, uplo, trans_, diag, n, ap.ptr, x.ptr, 1));
@@ -159,7 +159,7 @@ fn invokeTpmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize,
 }
 
 fn invokeTpsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, ap: []const T, input: []const T, x: []T) !void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         try std.testing.expect(packed_unit.tryTpsv(T, uplo, trans_, diag, n, ap.ptr, x.ptr, 1));
     } else {
         try std.testing.expect(!packed_unit.tryTpsv(T, uplo, trans_, diag, n, ap.ptr, x.ptr, 1));
@@ -267,7 +267,7 @@ test "matrix-vector facade routes compact TPMV and TPSV" {
 
 test "packed-column production gates fail without modifying x" {
     inline for (.{ f32, f64, ComplexF32, ComplexF64 }) |T| {
-        try std.testing.expectEqual(builtin.cpu.arch == .x86_64, packed_unit.testing.gateAllows(T, 128, 1));
+        try std.testing.expectEqual(builtin.target.cpu.arch == .x86_64, packed_unit.testing.gateAllows(T, 128, 1));
         try std.testing.expect(!packed_unit.testing.gateAllows(T, 127, 1));
         try std.testing.expect(!packed_unit.testing.gateAllows(T, 128, 2));
         try expectGateMissUnchanged(T, 127, 1);
@@ -351,10 +351,10 @@ fn finitePackedCases(comptime T: type) !void {
     var profile = tuning.production_2026_07_17.triangular;
     profile.enable_finite_tpmv = true;
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTpmv(T, 63));
-    try std.testing.expectEqual(if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) id else .portable_scalar, profile.selectFiniteTpmv(T, 64));
+    try std.testing.expectEqual(if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) id else .portable_scalar, profile.selectFiniteTpmv(T, 64));
     profile.enable_finite_tpmv = false;
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTpmv(T, 128));
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     try finitePanelCases(T);
     var ap: [140000]T = undefined;
     var x: [1060]T = undefined;
@@ -494,7 +494,7 @@ fn finitePackedCases(comptime T: type) !void {
 }
 
 test "finite f64 transpose preserves exact results across large prefetch threshold" {
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
     const allocator = std.testing.allocator;
     for ([_]usize{ 4095, 4096, 4097 }) |n| {
@@ -530,7 +530,7 @@ test "finite f64 transpose preserves exact results across large prefetch thresho
 }
 
 test "production TPMV preserves staged results across small workspace threshold" {
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
     // Probe both sides of the two-buffer budget gate using the production
     // stack policy. Refusal must leave every caller byte unchanged.
@@ -618,7 +618,7 @@ test "production TPMV preserves staged results across small workspace threshold"
 }
 
 test "finite TPMV rejects exceptional inputs before allocating across scan tails" {
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
     inline for (.{ f32, f64 }) |T| {
         var ap: [8385]T = undefined;

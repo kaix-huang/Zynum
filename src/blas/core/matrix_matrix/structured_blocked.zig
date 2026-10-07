@@ -112,7 +112,7 @@ fn zeroGeneral(comptime T: type, m: usize, n: usize, b: [*]T, ldb: BlasInt) void
 }
 
 fn blockCount(size: usize, block_size: usize) usize {
-    return (size + block_size - 1) / block_size;
+    return @divCeil(size, block_size);
 }
 
 fn blockExtent(size: usize, block_size: usize, block_index: usize) struct { start: usize, len: usize } {
@@ -122,7 +122,7 @@ fn blockExtent(size: usize, block_size: usize, block_index: usize) struct { star
 
 fn tryFullSymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     const order = if (side == .left) m else n;
-    if (builtin.cpu.arch != .x86_64 or @import("../../runtime.zig").maxThreads() <= 1 or order < 256 or order > 1024) return false;
+    if (builtin.target.cpu.arch != .x86_64 or @import("../../runtime.zig").maxThreads() <= 1 or order < 256 or order > 1024) return false;
     if (!validOptions(options) or !options.workspace_available) return false;
     const workspace = std.heap.c_allocator.alloc(T, order * order) catch return false;
     defer std.heap.c_allocator.free(workspace);
@@ -417,8 +417,8 @@ fn commitRankTile(comptime T: type, uplo: Uplo, hermitian: bool, row0: usize, co
 }
 
 fn rankDiagonal(comptime T: type, comptime rank_two: bool, uplo: Uplo, trans: Order, hermitian: bool, start: usize, size: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, workspace: []T) void {
-    // Both tile widths are at most 256. An explicit u32 product prevents Zig
-    // 0.16 ReleaseSafe on x86 from narrowing the area to an overflowing u8.
+    // Both tile widths are at most 256. Widen before multiplying: @min may
+    // infer a narrow integer for a bounded width, which cannot hold its square.
     const second_alpha = if (hermitian) scalar.conj(T, alpha) else alpha;
     // Complex 3M needs larger tiles to amortize conversion. Only real,
     // single-thread diagonal updates benefited from smaller subtiles.
@@ -454,7 +454,7 @@ fn rankDiagonal(comptime T: type, comptime rank_two: bool, uplo: Uplo, trans: Or
 }
 
 fn tryQueuedRank(comptime T: type, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
-    if (builtin.cpu.arch != .x86_64 or n < 256 or k < 64 or @import("../../runtime.zig").maxThreads() <= 1) return false;
+    if (builtin.target.cpu.arch != .x86_64 or n < 256 or k < 64 or @import("../../runtime.zig").maxThreads() <= 1) return false;
     if (!validOptions(options) or !options.workspace_available) return false;
     const bs: usize = if (n < 384) 32 else 64;
     const nb = blockCount(n, bs);
@@ -510,7 +510,7 @@ pub fn trySyrk(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_:
         return true;
     }
     if (options.packed_rank_panels) return executePackedRank(T, selectedPackedRankKernel(T, options, if (hermitian) .herk else .syrk), options, uplo, trans, n_, k_, alpha, a, lda, a, lda, beta, c, ldc);
-    if (comptime builtin.cpu.arch == .x86_64 and (T == f32 or T == f64)) {
+    if (comptime builtin.target.cpu.arch == .x86_64 and (T == f32 or T == f64)) {
         if (trans != .no_trans and n >= 128 and k_ >= 64 and (@import("../../runtime.zig").maxThreads() == 1 or n < 384) and options.workspace_available and validOptions(options)) {
             const count = std.math.mul(usize, n, toUsize(k_)) catch return false;
             const converted = std.heap.c_allocator.alloc(T, count) catch return false;
@@ -530,7 +530,7 @@ pub fn trySyrk(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_:
     var j0: usize = 0;
     while (j0 < n) : (j0 += bs) {
         const jb = @min(bs, n - j0);
-        if (builtin.cpu.arch == .x86_64 or options.direct_rank_panels) {
+        if (builtin.target.cpu.arch == .x86_64 or options.direct_rank_panels) {
             // A whole off-diagonal column panel lies inside the stored
             // triangle. Update it directly, reusing packing across rows.
             const first = if (uplo == .upper) 0 else j0 + jb;
@@ -560,7 +560,7 @@ pub fn trySyr2k(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_
         return true;
     }
     if (options.packed_rank_panels) return executePackedRank(T, selectedPackedRankKernel(T, options, if (hermitian) .her2k else .syr2k), options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-    if (comptime builtin.cpu.arch == .x86_64 and (T == f32 or T == f64)) {
+    if (comptime builtin.target.cpu.arch == .x86_64 and (T == f32 or T == f64)) {
         if (trans != .no_trans and n >= 128 and k_ >= 64 and (@import("../../runtime.zig").maxThreads() == 1 or n < 384) and options.workspace_available and validOptions(options)) {
             const count = std.math.mul(usize, n, toUsize(k_)) catch return false;
             const total = std.math.mul(usize, count, 2) catch return false;
@@ -581,7 +581,7 @@ pub fn trySyr2k(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_
     var j0: usize = 0;
     while (j0 < n) : (j0 += bs) {
         const jb = @min(bs, n - j0);
-        if (builtin.cpu.arch == .x86_64 or options.direct_rank_panels) {
+        if (builtin.target.cpu.arch == .x86_64 or options.direct_rank_panels) {
             const first = if (uplo == .upper) 0 else j0 + jb;
             const rows = if (uplo == .upper) j0 else n - first;
             if (rows > 0) {
@@ -625,7 +625,7 @@ fn storeScaledTile(comptime T: type, rows: usize, cols: usize, alpha: T, tile: [
 /// Blocked TRMM. Effective triangular panels are packed, multiplied into a
 /// private output tile, then committed in dependency-preserving block order.
 fn tryQueuedTriangular(comptime T: type, comptime solve: bool, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
-    if (builtin.cpu.arch != .x86_64 or m < 256 or n < 256 or @import("../../runtime.zig").maxThreads() <= 1) return false;
+    if (builtin.target.cpu.arch != .x86_64 or m < 256 or n < 256 or @import("../../runtime.zig").maxThreads() <= 1) return false;
     if (!validOptions(options) or !options.workspace_available) return false;
     const bs = 64;
     const rhs_width = 32;
@@ -735,7 +735,7 @@ fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
     const output = workspace[block_elements .. 2 * block_elements];
     const effective = packing.effectiveTriangle(packTriangle(uplo), packTranspose(trans));
 
-    if (builtin.cpu.arch == .x86_64 and @import("../../runtime.zig").maxThreads() > 1) {
+    if (builtin.target.cpu.arch == .x86_64 and @import("../../runtime.zig").maxThreads() > 1) {
         const dimension = if (side == .left) m else n;
         const rhs = if (side == .left) n else m;
         const blocks = blockCount(dimension, bs);
@@ -889,7 +889,7 @@ fn updateRightPanel(comptime T: type, comptime columns: usize, rows: usize, pivo
 }
 
 fn solvePackedLeft(comptime T: type, triangle: packing.Triangle, diag: Diag, rows: usize, cols: usize, diagonal_block: []const T, b: [*]T, ldb: BlasInt, row0: usize, col0: usize) void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         var reciprocal: [256]T = undefined;
         for (0..rows) |i| reciprocal[i] = if (diag == .unit) scalar.one(T) else scalar.divv(T, scalar.one(T), diagonal_block[i + i * rows]);
         const columns = if (comptime scalar.isComplex(T)) 2 else 4;
@@ -902,7 +902,7 @@ fn solvePackedLeft(comptime T: type, triangle: packing.Triangle, diag: Diag, row
 }
 
 fn solvePackedRight(comptime T: type, triangle: packing.Triangle, diag: Diag, rows: usize, cols: usize, diagonal_block: []const T, b: [*]T, ldb: BlasInt, row0: usize, col0: usize) void {
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         const columns = if (comptime scalar.isComplex(T)) 2 else 4;
         for (0..cols) |step| {
             const p = if (triangle == .upper) step else cols - 1 - step;
@@ -947,7 +947,7 @@ fn trsmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
     // Solve a diagonal block for all right-hand sides, then update the
     // remaining matrix once. Off-diagonal rectangles are already valid dense
     // operands; only the diagonal triangle needs materialization.
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         const dimension = if (side == .left) m else n;
         const blocks = blockCount(dimension, bs);
         for (0..blocks) |step| {

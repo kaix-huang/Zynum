@@ -222,7 +222,7 @@ test "NRM2 reciprocal overflow falls back for nonunit tiny inputs" {
         const norm = if (T == f32) fortran.snrm2_ else if (T == f64) fortran.dnrm2_ else if (T == api.ComplexF32) fortran.scnrm2_ else fortran.dznrm2_;
         const magnitude: R = if (R == f32) 1e-40 else 1e-310;
         const v: T = if (complex) .{ .re = magnitude, .im = -magnitude } else magnitude;
-        const x = [_]T{v} ** 66;
+        const x: [66]T = @splat(v);
         const expected: R = @floatCast(@as(f64, magnitude) * @sqrt(@as(f64, if (complex) 66 else 33)));
         for ([_]i32{ 2, -1 }) |inc| {
             try std.testing.expectApproxEqAbs(expected, norm(&n, &x, &inc), @max(expected * 0.00003, 2 * std.math.floatTrueMin(R)));
@@ -290,12 +290,12 @@ test "ROTM preserves guards and all elements across SIMD and task boundaries" {
 
 fn allCapabilities() hardware.Capabilities {
     var cap: hardware.Capabilities = .{};
-    inline for (std.meta.fields(hardware.Capabilities)) |field| @field(cap, field.name) = true;
+    inline for (@typeInfo(hardware.Capabilities).@"struct".field_names) |field| @field(cap, field) = true;
     return cap;
 }
 
 fn maximumTier() client.Tier {
-    return switch (builtin.cpu.arch) {
+    return switch (builtin.target.cpu.arch) {
         .aarch64 => .aarch64_sme2p1,
         .x86_64 => .x86_avx512,
         else => .baseline,
@@ -327,11 +327,11 @@ test "ISA ceilings never grant features and baseline always stays baseline" {
     }
     try std.testing.expectEqual(client.Tier.baseline, client.select(full, .baseline));
     try std.testing.expectEqual(maximumTier(), client.select(full, maximumTier()));
-    if (builtin.cpu.arch == .aarch64) {
+    if (builtin.target.cpu.arch == .aarch64) {
         try std.testing.expectEqual(client.Tier.aarch64_sve2, client.select(full, .aarch64_sve2));
         try std.testing.expectEqual(client.Tier.aarch64_sme, client.select(full, .aarch64_sme));
         try std.testing.expectEqual(client.Tier.aarch64_sme2, client.select(full, .aarch64_sme2));
-    } else if (builtin.cpu.arch == .x86_64) {
+    } else if (builtin.target.cpu.arch == .x86_64) {
         try std.testing.expectEqual(client.Tier.x86_avx, client.select(full, .x86_avx));
         try std.testing.expectEqual(client.Tier.x86_avx2_fma, client.select(full, .x86_avx2_fma));
     }
@@ -339,14 +339,14 @@ test "ISA ceilings never grant features and baseline always stays baseline" {
 
 test "missing compiler prerequisites downgrade an otherwise capable host" {
     var cap = allCapabilities();
-    if (builtin.cpu.arch == .aarch64) {
+    if (builtin.target.cpu.arch == .aarch64) {
         cap.sme_f64f64 = false;
         try std.testing.expectEqual(client.Tier.aarch64_sme, client.select(cap, maximumTier()));
         cap.bf16 = false;
         try std.testing.expectEqual(client.Tier.aarch64_sve2, client.select(cap, maximumTier()));
         cap.fullfp16 = false;
         try std.testing.expectEqual(client.Tier.baseline, client.select(cap, maximumTier()));
-    } else if (builtin.cpu.arch == .x86_64) {
+    } else if (builtin.target.cpu.arch == .x86_64) {
         cap.f16c = false;
         try std.testing.expectEqual(client.Tier.x86_avx2_fma, client.select(cap, maximumTier()));
         cap.fma = false;
@@ -371,8 +371,8 @@ test "selected tier agrees with host evidence and fresh process baseline ceiling
 
 test "private packets keep arguments and results within aligned storage" {
     @setEvalBranchQuota(10_000);
-    inline for (@typeInfo(protocol.Operation).@"enum".fields) |field| {
-        const operation = comptime @field(protocol.Operation, field.name);
+    inline for (@typeInfo(protocol.Operation).@"enum".field_names) |field| {
+        const operation = comptime @field(protocol.Operation, field);
         inline for (.{ void, f32, f64, api.ComplexF32, api.ComplexF64 }) |T| {
             if (comptime protocol.validScalar(operation, T)) {
                 const layout = protocol.packetLayout(operation, T);
@@ -390,13 +390,47 @@ test "private packets keep arguments and results within aligned storage" {
     }
 }
 
+fn checkAxpyStreamingBoundaries() !void {
+    runtime.setMaxThreads(1);
+    defer runtime.setMaxThreads(0);
+    defer fortran.zynum_blas_shutdown();
+    inline for (scalars) |T| {
+        for ([_]usize{ 65535, 65536, 65537, 66047, 66049, 262145 }) |count| {
+            const x = try std.testing.allocator.alloc(T, count + 2);
+            defer std.testing.allocator.free(x);
+            const y = try std.testing.allocator.alloc(T, count + 2);
+            defer std.testing.allocator.free(y);
+            @memset(x, value(T, 777, -9));
+            @memset(y, value(T, 888, -8));
+            for (0..count) |i| {
+                x[i + 1] = value(T, @as(f64, @floatFromInt(i % 17)) - 8, 2);
+                y[i + 1] = value(T, @as(f64, @floatFromInt(i % 7)) - 3, -1);
+            }
+            const n: api.BlasInt = @intCast(count);
+            const stride: api.BlasInt = 1;
+            const alpha = value(T, 0.5, 0);
+            @field(fortran, prefix(T) ++ "axpy_")(&n, &alpha, x.ptr + 1, &stride, y.ptr + 1, &stride);
+            for (0..count) |i| {
+                const re = @as(f64, @floatFromInt(i % 17)) - 8;
+                try expectValue(T, re, 2, x[i + 1]);
+                try expectValue(T, (@as(f64, @floatFromInt(i % 7)) - 3) + 0.5 * re, 0, y[i + 1]);
+            }
+            try expectValue(T, 777, -9, x[0]);
+            try expectValue(T, 777, -9, x[count + 1]);
+            try expectValue(T, 888, -8, y[0]);
+            try expectValue(T, 888, -8, y[count + 1]);
+        }
+    }
+}
+
 test "ABI scaling and checked dot preserve vector tails for every scalar" {
+    try checkAxpyStreamingBoundaries();
     runtime.setMaxThreads(2);
     defer runtime.setMaxThreads(0);
     defer fortran.zynum_blas_shutdown();
     inline for (scalars) |T| {
         var x: [133]T = undefined;
-        const y = [_]T{value(T, 1, 0)} ** 131;
+        const y: [131]T = @splat(value(T, 1, 0));
         for (x[0..131], 0..) |*element, index| {
             element.* = value(T, @as(f64, @floatFromInt(index % 7)) - 3, 1);
         }
@@ -472,13 +506,13 @@ const ComplexGemvCalleeSavedProbe = struct {
     }
 
     fn check() !void {
-        if (comptime builtin.cpu.arch != .aarch64) return;
-        if (comptime !builtin.cpu.has(.aarch64, .complxnum)) return;
+        if (comptime builtin.target.cpu.arch != .aarch64) return;
+        if (comptime !builtin.target.cpu.has(.aarch64, .complxnum)) return;
         const kernels = @import("kernels/arch/aarch64/asm/matrix_vector.zig");
         const T = api.ComplexF64;
-        var a = [_]T{.{ .re = 1, .im = 2 }} ** (259 * 128);
-        var x = [_]T{.{ .re = 1, .im = -1 }} ** 128;
-        var y = [_]T{.{ .re = 0, .im = 0 }} ** 128;
+        var a: [259 * 128]T = @splat(.{ .re = 1, .im = 2 });
+        var x: [128]T = @splat(.{ .re = 1, .im = -1 });
+        var y: [128]T = @splat(.{ .re = 0, .im = 0 });
         const args = [8]usize{
             @bitCast(@as(f64, 1)), 0,                0,               0,
             @intFromPtr(&a),       259 * @sizeOf(T), @intFromPtr(&x), @intFromPtr(&y),
@@ -512,7 +546,7 @@ test "paired complex transposed GEMV preserves odd rows columns and unaligned gu
                 const beta = value(T, -0.25, 0.125);
                 for ([_]u8{ 'T', 'C' }) |trans| {
                     const flag = [_]u8{trans};
-                    var y = [_]T{value(T, 0.5, -0.25)} ** (shape[1] + 2);
+                    var y: [(shape[1] + 2)]T = @splat(value(T, 0.5, -0.25));
                     y[0] = value(T, 999, -999);
                     y[shape[1] + 1] = y[0];
                     @field(fortran, prefix(T) ++ "gemv_")(&flag, &m, &n, &alpha, a[1..].ptr, &lda, x[1..].ptr, &inc, &beta, y[1..].ptr, &inc);
@@ -542,7 +576,7 @@ test "ABI GEMV handles padded leading dimensions and complex coefficients" {
         var a: [21]T = undefined;
         for (&a, numbers) |*element, number| element.* = value(T, number, 0);
         const x = [_]T{ value(T, 2, 1), value(T, -1, 0), value(T, 3, -1) };
-        var y = [_]T{value(T, 1, 1)} ** 6;
+        var y: [6]T = @splat(value(T, 1, 1));
         const m: api.BlasInt = 5;
         const n: api.BlasInt = 3;
         const lda: api.BlasInt = 7;
@@ -555,14 +589,59 @@ test "ABI GEMV handles padded leading dimensions and complex coefficients" {
     }
 }
 
+fn checkGemmDoubleRowTails() !void {
+    const allocator = std.testing.allocator;
+    for ([_]usize{ 128, 129, 143, 144, 254, 255, 256 }) |rows| {
+        const m: api.BlasInt = @intCast(rows);
+        const n: api.BlasInt = 33;
+        const k: api.BlasInt = 129;
+        const lda: api.BlasInt = @intCast(rows + 3);
+        const ldb: api.BlasInt = 132;
+        const ldc: api.BlasInt = @intCast(rows + 5);
+        const a = try allocator.alloc(f64, (rows + 3) * 129 + 2);
+        defer allocator.free(a);
+        const b = try allocator.alloc(f64, 132 * 33 + 2);
+        defer allocator.free(b);
+        const c = try allocator.alloc(f64, (rows + 5) * 33 + 2);
+        defer allocator.free(c);
+        @memset(a, -999);
+        @memset(b, -999);
+        @memset(c, -999);
+        for (0..129) |p| {
+            for (0..rows) |row| a[1 + row + p * (rows + 3)] = @as(f64, @floatFromInt(@as(i32, @intCast((row + p) % 7)) - 3)) * 0.125;
+            for (0..33) |col| b[1 + p + col * 132] = @as(f64, @floatFromInt(@as(i32, @intCast((col + p) % 5)) - 2)) * 0.25;
+        }
+        const a_copy = try allocator.dupe(f64, a);
+        defer allocator.free(a_copy);
+        const b_copy = try allocator.dupe(f64, b);
+        defer allocator.free(b_copy);
+        const alpha: f64 = 1;
+        const beta: f64 = 0;
+        fortran.dgemm_("N", "N", &m, &n, &k, &alpha, a.ptr + 1, &lda, b.ptr + 1, &ldb, &beta, c.ptr + 1, &ldc);
+        for (0..33) |col| {
+            for (0..rows) |row| {
+                var sum: f64 = 0;
+                for (0..129) |p| sum = @mulAdd(f64, a[1 + row + p * (rows + 3)], b[1 + p + col * 132], sum);
+                try std.testing.expectEqual(sum, c[1 + row + col * (rows + 5)]);
+            }
+            for (rows..rows + 5) |row| try std.testing.expectEqual(@as(f64, -999), c[1 + row + col * (rows + 5)]);
+        }
+        try std.testing.expectEqual(@as(f64, -999), c[0]);
+        try std.testing.expectEqual(@as(f64, -999), c[c.len - 1]);
+        try std.testing.expectEqualSlices(f64, a_copy, a);
+        try std.testing.expectEqualSlices(f64, b_copy, b);
+    }
+}
+
 test "ABI GEMM matches explicit fringe products for all four scalar types" {
+    try checkGemmDoubleRowTails();
     runtime.setMaxThreads(2);
     defer runtime.setMaxThreads(0);
     defer fortran.zynum_blas_shutdown();
     inline for (scalars) |T| {
-        var a = [_]T{value(T, -999, -999)} ** 49;
-        var b = [_]T{value(T, -999, -999)} ** 24;
-        var c = [_]T{value(T, -999, -999)} ** 18;
+        var a: [49]T = @splat(value(T, -999, -999));
+        var b: [24]T = @splat(value(T, -999, -999));
+        var c: [18]T = @splat(value(T, -999, -999));
         for (0..7) |col| {
             for (0..5) |row| a[col * 7 + row] = value(T, @floatFromInt(row + 1), 1);
         }

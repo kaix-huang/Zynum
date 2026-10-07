@@ -304,7 +304,7 @@ inline fn finishC32x4(alpha: ComplexF32, beta: ComplexF32, c: [*]const ComplexF3
 
 fn kernelC32x4xN(comptime tile_n: usize, k: usize, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt, i: usize, j: usize) void {
     const zero_v: F32x4 = @splat(0);
-    var acc: [tile_n]C32x4 = [_]C32x4{.{ .re = zero_v, .im = zero_v }} ** tile_n;
+    var acc: [tile_n]C32x4 = @splat(.{ .re = zero_v, .im = zero_v });
 
     var p: usize = 0;
     while (p < k) : (p += 1) {
@@ -420,7 +420,7 @@ fn expandedComplexF32Feasible(policy: ComplexExecutionPolicy, transa: Order, tra
     // The padded 128x64 expanded-real leaf was tuned for AMX. On x86 a
     // 32x32 output would compute four times its useful real output area.
     // Let compact 3M handle these transposed fringe tiles instead.
-    if (builtin.cpu.arch == .x86_64 and (m < 64 or n < 64)) return false;
+    if (builtin.target.cpu.arch == .x86_64 and (m < 64 or n < 64)) return false;
 
     const work = m *| n *| k;
     return m <= 64 and n <= 64 and k >= 128 and k <= 256 and work >= 128 * 1024;
@@ -944,7 +944,7 @@ fn runThreePack64(raw: *const anyopaque, index: usize) void {
 }
 
 fn parallelThreePack(comptime T: type, ta: Order, tb: Order, m: usize, n: usize, k: usize, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, stride: usize, ar: anytype, ai: @TypeOf(ar), am: @TypeOf(ar), br: @TypeOf(ar), bi: @TypeOf(ar), bp: @TypeOf(ar)) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     if (m < 256 or n < 256 or k < 256 or runtime.maxThreads() <= 1) return false;
     const count = @min(runtime.maxThreads(), 16);
     const acount = count / 2;
@@ -1015,7 +1015,7 @@ fn runThreeMerge64(raw: *const anyopaque, index: usize) void {
     runThreeMerge(ComplexF64, raw, index);
 }
 fn parallelThreeMerge(comptime T: type, alpha: T, beta: T, m: usize, n: usize, stride: usize, c: [*]T, ldc: BlasInt, cr: anytype, ci: @TypeOf(cr), tmp: @TypeOf(cr)) bool {
-    if (comptime builtin.cpu.arch != .x86_64) return false;
+    if (comptime builtin.target.cpu.arch != .x86_64) return false;
     if (m < 256 or n < 256 or runtime.maxThreads() <= 1) return false;
     const count = @min(runtime.maxThreads(), 16);
     var tasks: [16]ThreeMergeTask(T) = undefined;
@@ -1042,7 +1042,7 @@ fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     const ldb_r: BlasInt = @intCast(k);
     const ldc_r: BlasInt = @intCast(m_compute);
     var parallel_real_products = false;
-    if (builtin.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192) {
+    if (builtin.target.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192) {
         const real_tasks = [_]ComplexF32RealGemmTask{
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
@@ -1142,7 +1142,7 @@ inline fn finishC64x2(alpha: ComplexF64, beta: ComplexF64, c: [*]const ComplexF6
 
 fn kernelC64x2xN(comptime tile_n: usize, k: usize, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt, i: usize, j: usize) void {
     const zero_v: F64x2 = @splat(0);
-    var acc: [tile_n]C64x2 = [_]C64x2{.{ .re = zero_v, .im = zero_v }} ** tile_n;
+    var acc: [tile_n]C64x2 = @splat(.{ .re = zero_v, .im = zero_v });
 
     var p: usize = 0;
     while (p < k) : (p += 1) {
@@ -1348,11 +1348,11 @@ fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     // reduction topology. This experimental range excludes square and skinny GEMM.
     const small_k_min_work: usize = 256 * 1024;
     const single_real_parallel_floor: usize = 96 * 96 * 96;
-    const mac_small_k_products = builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos and
+    const mac_small_k_products = builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and
         m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 24 and k <= 64 and
         m *| n *| k >= small_k_min_work and m_compute *| n *| k < single_real_parallel_floor and
         runtime.maxThreads() >= 3;
-    if (mac_small_k_products or (m == 127 and n == 129 and k == 32) or (builtin.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
+    if (mac_small_k_products or (m == 127 and n == 129 and k == 32) or (builtin.target.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
         const real_tasks = [_]ComplexF64RealGemmTask{
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
             .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
@@ -1408,7 +1408,7 @@ noinline fn gemmComplexF64PortableMode(comptime transa: Order, comptime transb: 
     if (transb != .no_trans and m == 1) {
         var j: usize = 0;
         while (n - j >= 4) : (j += 4) {
-            var sums = [_]T{zero(T)} ** 4;
+            var sums: [4]T = @splat(zero(T));
             for (0..k) |p| {
                 const av = matrixValue(T, transa, a, lda, 0, p);
                 inline for (0..4) |lane| {

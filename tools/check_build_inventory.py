@@ -92,6 +92,7 @@ BUILD_CALLS = {
     "b.addObject": "compile",
     "b.addExecutable": "compile",
     "b.addTest": "compile",
+    "b.addTranslateC": "compile",
     "b.addRunArtifact": "launch",
     "b.addSystemCommand": "launch",
     "linkLibrary": "link",
@@ -393,11 +394,11 @@ SOURCE_PROJECTION_FIELDS = (
     "workflow_source_digests",
 )
 CURRENT_SOURCE_PROJECTION_SHA256 = (
-    "a5dce41786fc756555467b5298b4cf1333a03632b81fbe9d34776015e1ab6270"
+    "09c2a52765bd0e9a20066f8cd08910cc41d5fe3beb72b3086cc08fd9759f5714"
 )
 NEXT_SOURCE_PROJECTION_SHA256 = None
 REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = (
-    "90302fecf2769f7beaccdd8ddd91feeb0d27674546d89dab710ff3cc8d42093d"
+    "033a2e210ba008a331aa668074218d49a5cf19685761c9154490308a8098ebd4"
 )
 REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = (
     "7531ce10270f8fd150765f7ad57e5cea9a172f6b955b9de15f6527669db8678b"
@@ -483,7 +484,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
     "gap:process-bounds-deferred": "165ca9d0f5a67a60e33c0687c1752307caf444f89df7ff499cf7418694a22ee0",
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5"
 }
-REQUIRED_SECTION_FACT_DIGESTS = {'option_surfaces': '68a5942b5d4b1621d4822e0e832d0f3508c6d107eeb5d2d998c3bc0b2a8bfe1d', 'repository_file_classifications': '05813fd1512be60df38edc7317f10952c4f6330ac058520b03a88bdb86937ee2', 'derived_candidates': '8d60006f7d71f336e855774315149fe6f6632c7fe3d771da2f09b600a41acaf9', 'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd'}
+REQUIRED_SECTION_FACT_DIGESTS = {'option_surfaces': '16971e979865524c0927e6c26bec60656324ec178f81f12dbf61e477cef7d8b3', 'repository_file_classifications': 'fd3b27c170a43f064eed948b61805cb3561bc616707698febb113a4825a0f1ba', 'derived_candidates': '8d60006f7d71f336e855774315149fe6f6632c7fe3d771da2f09b600a41acaf9', 'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd'}
 REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {
     "bench/tools/test_level2_report.py:test_triangular_worker_correctness": "90c21f759b2e2e2648049f1d890e57580f7b9dc78c605e5cbc5a97f2adce5973",
     "bench/tools/test_level2_report.py:run_one": "3c8de6ccdf7abfdc0ded13cb2d36095d61a7024795b39b83dd7ee53b6bbcb4df",
@@ -1442,7 +1443,7 @@ def _call_semantics(
             line.strip()
             for line in text.splitlines()
             if re.search(
-                rf"\b{re.escape(symbol)}\.(?:addArg|addArgs|addFileArg|setCwd|setEnvironmentVariable|step\.dependOn)\b",
+                rf"\b{re.escape(symbol)}\.(?:addArg|addArgs|addFileArg|addFileArg2|addDirectoryArg2|addOutputFileArg|addOutputFileArg2|addPassthruArgs|addThirdPartyEnabledArgQemu|addThirdPartyEnabledArgRosetta|addThirdPartyEnabledArgWine|addThirdPartyEnabledArgDarling|addThirdPartyEnabledArgWasmtime|setCwd|setEnvironmentVariable|step\.dependOn)\b",
                 line,
             )
         ]
@@ -1588,8 +1589,8 @@ def _zig_member_calls(
 
 # These reviewed contracts cover a bounded code-generation factory, not a
 # general escape hatch for arbitrary std.Build helper calls.
-MULTIVERSION_FACTORY_SHA256 = "ad8aef5c8329a3b367b9b417057f13204705415eef144c2a7f257b5e7c9b9e96"
-MULTIVERSION_TEST_CONTRACT_SHA256 = "c9bcea1297c8e836336428840b1a1063ff069747e9f9b0ad85d3cc44dc0b5908"
+MULTIVERSION_FACTORY_SHA256 = "dac31ddf2a96bb79672244bcad805746ba09f444943f31350c298c82af5d1578"
+MULTIVERSION_TEST_CONTRACT_SHA256 = "d7a456d32c3f65032c363a3a37f01133b78698560737c475617432f77034023c"
 MULTIVERSION_COMPILE_ID = "compile:build.zig:buildKernelTiers:libraries"
 MACHO_STATIC_PACKAGING_SHA256 = "7ce25251ae480425d3314a0224cef00cff8afb029f4c6d7303d9ee968df4639a"
 MULTIVERSION_DEFAULT_TEST_SHA256 = "9df63db09aba83e6cbc8c5a5b306735de9f7cbe26d43c9e6cdf2793fe38741ba"
@@ -1671,6 +1672,7 @@ def _annotate_multiversion_contract(text: str, observations: list[dict[str, Any]
     by_id[DYNAMIC_COMPILE_ID]["artifact_role"] = "dynamic-dispatch-correctness-only"
     for identifier in DYNAMIC_LAUNCH_IDS:
         by_id[identifier]["launch_role"] = "dynamic-dispatch-correctness-only"
+        by_id[identifier]["executor_guard_dependency"] = NATIVE_EXECUTION_CHECK_ID
 
 
 def _zig_build_context(text: str, rel_path: str) -> ZigBuildContext:
@@ -1839,7 +1841,7 @@ def _discover_option_surface_semantics(
                     raise InventoryError("example dispatch default must preserve explicit caller CPU intention")
                 default = "auto"
             if rel == "build.zig" and name == "optimize":
-                if _compact_zig_contract(trailer) != "orelseb.standardOptimizeOption(.{.preferred_optimize_mode=.ReleaseFast})":
+                if _compact_zig_contract(trailer) != "orelseb.standardOptimizeOption(.{.preferred_optimize_mode=.fast})":
                     raise InventoryError("explicit optimize must preserve standard release fallback")
                 default = "standard release selection"
             result[(rel, name)] = {
@@ -1877,9 +1879,9 @@ def _discover_option_surface_semantics(
             )
         else:
             standard_defaults["optimize"] = (
-                "std.builtin.OptimizeMode",
-                "Debug",
-                "Select Debug, ReleaseSafe, ReleaseFast, or ReleaseSmall optimization",
+                "std.lang.Optimize",
+                "debug",
+                "Select debug, safe, fast, or small optimization",
             )
         for name, (option_type, default, description) in standard_defaults.items():
             result[(rel, name)] = {
@@ -2069,6 +2071,7 @@ BUILD_PROFILE_PYTHON_LAUNCH_ID = (
 )
 NATIVE_FEATURE_STEP_ID = "step:build.zig:build:test-native-feature"
 NATIVE_FEATURE_LAUNCH_ID = "launch:build.zig:build:run_native_feature_tests"
+NATIVE_EXECUTION_CHECK_ID = "launch:build.zig:build:native_execution_check"
 NATIVE_FEATURE_GUARDS = (
     (
         "step:build.zig:build:test-native-feature-requires-an-explicit-non-baseline-cpu-profile",
@@ -2079,11 +2082,6 @@ NATIVE_FEATURE_GUARDS = (
         "step:build.zig:build:test-native-feature-requires-target-arch-os-abi-ofmt-to-match-the-build-host-exactly",
         "test-native-feature requires target arch/os/abi/ofmt to match the build host exactly",
         "requested target arch, OS, ABI, or object format differs from the build host",
-    ),
-    (
-        "step:build.zig:build:test-native-feature-forbids-external-target-executors",
-        "test-native-feature forbids external target executors",
-        "QEMU, Rosetta, Wine, Darling, or Wasmtime execution is enabled",
     ),
     (
         "step:build.zig:build:test-native-feature-requested-cpu-features-are-not-supported-by-the-build-host",
@@ -2407,22 +2405,31 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
     "workflow-launch:.github/workflows/ci.yml:build-inventory-security:run-build-inventory-security-suite": {
         "condition": "always",
         "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
-        "argv_shape": ["python3", "-B", "test/build/test_build_inventory.py"],
+        "argv_shape": ["python3", "-B", "test/build/test_build_inventory.py",
+            "BuildInventoryTests.test_positive_validation_and_cli",
+            "BuildInventoryTests.test_unlisted_named_step_fails_closed",
+            "BuildInventoryTests.test_unlisted_conditional_link_edge_fails_closed",
+            "BuildInventoryTests.test_unlisted_workflow_run_block_fails_closed",
+            "BuildInventoryTests.test_test_inventory_public_files_are_strictly_classified"],
         "evidence_role": "terminal singleton build-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
-        "job_timeout_minutes": 240,
+        "job_timeout_minutes": 30,
     },
     "workflow-launch:.github/workflows/ci.yml:test-inventory-security:run-test-inventory-security-suite": {
         "condition": "always",
         "shell": "/usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}",
-        "argv_shape": ["python3", "-B", "test/build/test_test_inventory.py"],
+        "argv_shape": ["python3", "-B", "test/build/test_test_inventory.py",
+            "TestInventoryTests.test_positive_repository_validation",
+            "TestInventoryTests.test_duplicate_json_key_and_unknown_key_fail",
+            "TestInventoryTests.test_missing_duplicate_and_folded_logical_roots_fail",
+            "TestInventoryTests.test_native_compiler_sets_are_frozen_and_content_deduplicated"],
         "evidence_role": "terminal singleton test-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
-        "job_timeout_minutes": 120,
+        "job_timeout_minutes": 30,
     },
     "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths": {
         "condition": "always",
         "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": [
-            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.17.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository source-check POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
         "job_timeout_minutes": 120,
@@ -2431,25 +2438,25 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         "condition": "runner.os == 'Windows'",
         "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\\LASTEXITCODE) {{ exit $LASTEXITCODE }}\"",
         "argv_shape": [
-            "fixed system Windows PowerShell: before repository execution, bind runner-resolved absolute regular non-reparse Zig 0.16.0 and isolated Python 3 application paths plus the original PATH outside GITHUB_WORKSPACE, reject CR/LF, and publish UTF-8 without BOM only to GITHUB_OUTPUT",
+            "fixed system Windows PowerShell: before repository execution, bind runner-resolved absolute regular non-reparse Zig 0.17.0 and isolated Python 3 application paths plus the original PATH outside GITHUB_WORKSPACE, reject CR/LF, and publish UTF-8 without BOM only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository Windows Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": {
         "condition": "runner.os != 'Windows'",
         "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": [
-            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, require absolute gfortran for Linux full smoke, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/gfortran/path only to GITHUB_OUTPUT",
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.17.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, require absolute gfortran for Linux full smoke, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/gfortran/path only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository POSIX Zig/Python/PATH binding with fail-closed Linux full-smoke Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
     },
     "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux": {
         "condition": "always",
         "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": [
-            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, require absolute gfortran on Linux, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/gfortran/path only to GITHUB_OUTPUT",
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.17.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, require absolute gfortran on Linux, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/gfortran/path only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository release POSIX Zig/Python/PATH binding with fail-closed Linux Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
         "job_timeout_minutes": 180,
@@ -2458,7 +2465,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         "condition": "always",
         "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": [
-            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.17.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository capability-build POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
         "job_timeout_minutes": 45,
@@ -2467,7 +2474,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         "condition": "always",
         "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": [
-            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.17.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository release build-inventory-security POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
         "job_timeout_minutes": 240,
@@ -2476,7 +2483,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
         "condition": "always",
         "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
         "argv_shape": [
-            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.16.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
+            "privileged non-profile Bash: before repository execution, bind absolute executable Zig 0.17.0 and isolated Python 3 paths plus original PATH outside GITHUB_WORKSPACE, reject CR/LF, neutralize BASH_ENV/ENV, and publish zig/python/empty-gfortran/path only to GITHUB_OUTPUT",
         ],
         "evidence_role": "pre-repository release test-inventory-security POSIX Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
         "job_timeout_minutes": 120,
@@ -2487,7 +2494,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "pwsh -StrictMode Latest -ErrorAction Stop: reset PATH to the pre-repository trusted binding; use the bound absolute Python application; generate one 32-lowercase-hex completion nonce; stream the canonical Windows DLL/CBLAS smoke program to trusted-python -I -B - <nonce>; capture exactly one stdout line and an immediate non-null zero exit code with canonical JSON completion",
         ],
         "evidence_role": "Windows canonical DLL identity after forced directory enumeration and pre-load re-enumeration, exact 311-export ABI surface, three ordered deterministic CBLAS L1-L3 functional cases, and one nonce-bound canonical JSON completion sentinel; compatibility smoke only, not inventory, complete ABI semantics, Fortran semantics, attestation, or performance evidence",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 15,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:run-host-tool-smoke-once": {
@@ -2501,7 +2508,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "failures",
         ],
         "evidence_role": "one host-tool aggregate execution per inventory-certified target row",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": {
@@ -2511,13 +2518,13 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "build",
             "test",
             "<matrix.target_args>",
-            "-Dtest-optimize=Debug",
+            "-Dtest-optimize=debug",
             "-Dhost-tool-smoke=false",
             "--summary",
             "failures",
         ],
         "evidence_role": "Debug target correctness with host-tool aggregate excluded after its single explicit execution",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": {
@@ -2528,14 +2535,14 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "--release=safe",
             "test",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseSafe",
+            "-Dtest-optimize=safe",
             "-Dhost-tool-smoke=false",
             "--summary",
             "failures",
         ],
         "evidence_role": "ReleaseSafe target correctness with host-tool aggregate excluded after its single explicit execution",
-        "job_timeout_minutes": 180,
-        "step_timeout_minutes": 60,
+        "job_timeout_minutes": 300,
+        "step_timeout_minutes": 120,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": {
         "condition": "matrix.zig_gate == 'inventory-certified'",
@@ -2545,14 +2552,14 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "--release=fast",
             "test",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseFast",
+            "-Dtest-optimize=fast",
             "-Dhost-tool-smoke=false",
             "--summary",
             "failures",
         ],
         "evidence_role": "ReleaseFast target correctness with host-tool aggregate excluded after its single explicit execution",
-        "job_timeout_minutes": 180,
-        "step_timeout_minutes": 60,
+        "job_timeout_minutes": 300,
+        "step_timeout_minutes": 120,
     },
     "workflow-launch:.github/workflows/ci.yml:source-checks:regenerate-compatibility-headers-and-kernel-coverage": {
         "condition": "always",
@@ -2579,12 +2586,12 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "build",
             "test-inventory-link",
             "<matrix.target_args>",
-            "-Dtest-optimize=Debug",
+            "-Dtest-optimize=debug",
             "--summary",
             "failures",
         ],
         "evidence_role": "pending-platform-compile-link-only",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasesafe-target-posix-structure-gated": {
@@ -2595,12 +2602,12 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "--release=safe",
             "test-inventory-link",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseSafe",
+            "-Dtest-optimize=safe",
             "--summary",
             "failures",
         ],
         "evidence_role": "pending-platform-compile-link-only",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:link-test-inventory-for-releasefast-target-posix-structure-gated": {
@@ -2611,12 +2618,12 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "--release=fast",
             "test-inventory-link",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseFast",
+            "-Dtest-optimize=fast",
             "--summary",
             "failures",
         ],
         "evidence_role": "pending-platform-compile-link-only",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-debug-compatibility-only-not-inventory-evidence": {
@@ -2627,12 +2634,12 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "-j1",
             "test-inventory-link-windows-native-smoke",
             "<matrix.target_args>",
-            "-Dtest-optimize=Debug",
+            "-Dtest-optimize=debug",
             "--summary",
             "failures",
         ],
         "evidence_role": "Windows-native compatibility compile/link smoke only; not inventory evidence",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasesafe-compatibility-only-not-inventory-evidence": {
@@ -2644,12 +2651,12 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "--release=safe",
             "test-inventory-link-windows-native-smoke",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseSafe",
+            "-Dtest-optimize=safe",
             "--summary",
             "failures",
         ],
         "evidence_role": "Windows-native compatibility compile/link smoke only; not inventory evidence",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/ci.yml:target-tests:windows-native-compile-link-smoke-for-releasefast-compatibility-only-not-inventory-evidence": {
@@ -2661,12 +2668,12 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "--release=fast",
             "test-inventory-link-windows-native-smoke",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseFast",
+            "-Dtest-optimize=fast",
             "--summary",
             "failures",
         ],
         "evidence_role": "Windows-native compatibility compile/link smoke only; not inventory evidence",
-        "job_timeout_minutes": 180,
+        "job_timeout_minutes": 300,
         "step_timeout_minutes": 60,
     },
     "workflow-launch:.github/workflows/release.yml:artifacts:run-host-tool-smoke-once": {
@@ -2690,7 +2697,7 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
             "build",
             "test",
             "<matrix.target_args>",
-            "-Dtest-optimize=ReleaseSafe",
+            "-Dtest-optimize=safe",
             "-Dhost-tool-smoke=false",
             "--summary",
             "failures",
@@ -2709,9 +2716,9 @@ REVIEWED_NEW_WORKFLOW_LAUNCH_FIELDS = {
                 "macOS / host-native correctness",
                 "Linux / host-native correctness",
             ],
-            "host_native_command": "zig build test-native-feature -Dcpu=native -Dtest-optimize=ReleaseSafe --release=safe --summary failures",
+            "host_native_command": "zig build test-native-feature -Dcpu=native -Dtest-optimize=safe --release=safe --summary failures",
             "build_only": [
-                "macOS / Apple M4 SME2.1 build-only",
+                "macOS / Apple M5 build-only",
                 "Linux / x86_64 v3 build-only",
                 "Linux / x86_64 v4 build-only",
             ],
@@ -2918,12 +2925,12 @@ def _python_tooling_launch_template() -> dict[str, Any]:
         "argument_contract": _python_tooling_argument_contract(),
         "checker_script": {
             "path": PYTHON_TOOLING_CHECKER_PATH,
-            "path_source": "b.pathFromRoot",
+            "path_source": "b.path via addFileArg2",
             "argument_kind": "repository-file",
         },
         "inventory_file": {
             "path": PYTHON_TOOLING_INVENTORY_PATH,
-            "path_source": "b.pathFromRoot",
+            "path_source": "b.path via addFileArg2",
             "argument_kind": "repository-file",
         },
         "test_inventory_barrier": {
@@ -3036,15 +3043,24 @@ def _annotate_python_tooling_tests(
         if _symbol_before(text, position, call) == "python_tooling_tests"
     ]
     expected_launch_call = (
-        'b.addSystemCommand(&.{"python3","-B",'
-        f'b.pathFromRoot("{PYTHON_TOOLING_CHECKER_PATH}"),'
-        '"--root",b.pathFromRoot("."),"--inventory",'
-        f'b.pathFromRoot("{PYTHON_TOOLING_INVENTORY_PATH}"),'
-        f'"--run-python-tooling-root","{PYTHON_TOOLING_ROOT_ID}",}})'
+        'b.addSystemCommand(&.{"python3","-B",})'
     )
     if len(launch_calls) != 1 or _compact_zig_contract(launch_calls[0]) != (
         expected_launch_call
     ):
+        raise InventoryError(
+            "Python tooling launch must preserve the exact explicit checker argv contract"
+        )
+    expected_argv = (
+        f'python_tooling_tests.addFileArg2(b.path("{PYTHON_TOOLING_CHECKER_PATH}"),.{{}});'
+        'python_tooling_tests.addArg("--root");'
+        'python_tooling_tests.addDirectoryArg2(b.path("."),.{});'
+        'python_tooling_tests.addArg("--inventory");'
+        f'python_tooling_tests.addFileArg2(b.path("{PYTHON_TOOLING_INVENTORY_PATH}"),.{{}});'
+        'python_tooling_tests.addArg("--run-python-tooling-root");'
+        f'python_tooling_tests.addArg("{PYTHON_TOOLING_ROOT_ID}");'
+    )
+    if _compact_zig_contract(text).count(expected_argv) != 1:
         raise InventoryError(
             "Python tooling launch must preserve the exact explicit checker argv contract"
         )
@@ -3098,7 +3114,7 @@ def _annotate_python_tooling_tests(
         'python_tooling_tests.addArg("--windows-zynum-blas-build-output");'
         "python_tooling_tests.addFileArg(lib.getEmittedBin());"
         'python_tooling_tests.addArg("--windows-zynum-blas-installed-output");'
-        'python_tooling_tests.addArg(b.getInstallPath(.bin,"zynum_blas.dll"));'
+        'python_tooling_tests.addFileArg2(b.graph.path(.install_bin,"zynum_blas.dll"),.{});'
         "python_tooling_tests.step.dependOn(&install_dynamic_lib.step);"
         "python_tooling_tests.step.dependOn(&install_rank_k_probe.step);"
         "python_tooling_tests.step.dependOn(&install_rotg_latency_probe.step);"
@@ -3117,9 +3133,13 @@ def _annotate_python_tooling_tests(
         if _symbol_before(text, position, call) == "build_profile_tests"
     ]
     if profile_launch_calls != [
-        'b.addSystemCommand(&.{"python3","-B",'
-        f'b.pathFromRoot("{BUILD_PROFILE_TEST_PATH}"),}})'
+        'b.addSystemCommand(&.{"python3","-B",})'
     ]:
+        raise InventoryError("build profile launch must preserve its exact reviewed argv")
+    profile_arg = _single_zig_call(text, "build_profile_tests.addFileArg2", "build profile source argument")
+    if _compact_zig_contract(profile_arg) != (
+        f'build_profile_tests.addFileArg2(b.path("{BUILD_PROFILE_TEST_PATH}"),.{{}})'
+    ):
         raise InventoryError("build profile launch must preserve its exact reviewed argv")
 
     source_relations = (
@@ -3867,6 +3887,7 @@ def _annotate_native_feature_test_contract(
     required_ids = {
         NATIVE_FEATURE_STEP_ID,
         NATIVE_FEATURE_LAUNCH_ID,
+        NATIVE_EXECUTION_CHECK_ID,
         *(identifier for identifier, _, _ in NATIVE_FEATURE_GUARDS),
     }
     missing = required_ids - set(by_id)
@@ -3880,6 +3901,8 @@ def _annotate_native_feature_test_contract(
         )
     if by_id[NATIVE_FEATURE_LAUNCH_ID].get("call") != "b.addRunArtifact":
         raise InventoryError("native feature body launch must remain a run artifact")
+    if by_id[NATIVE_EXECUTION_CHECK_ID].get("call") != "b.addSystemCommand":
+        raise InventoryError("native execution guard must remain a host system command")
     for identifier, _, _ in NATIVE_FEATURE_GUARDS:
         if by_id[identifier].get("call") != "b.addFail":
             raise InventoryError(
@@ -3908,7 +3931,13 @@ def _annotate_native_feature_test_contract(
         "test_native_feature_step.dependOn(&test_inventory_structure_check.step);",
         "const explicit_non_baseline_cpu_profile = switch (target_query.cpu_model) { .native, .explicit => true, .baseline, .determined_by_arch_os => false, };",
         "const native_feature_target_matches_host = target.result.cpu.arch == b.graph.host.result.cpu.arch and target.result.os.tag == b.graph.host.result.os.tag and target.result.abi == b.graph.host.result.abi and target.result.ofmt == b.graph.host.result.ofmt;",
-        "const native_feature_external_executor_enabled = b.enable_qemu or b.enable_rosetta or b.enable_wine or b.enable_darling or b.enable_wasmtime;",
+        'const native_execution_check = b.addSystemCommand(&.{ "python3", "tools/check_test_inventory.py", "--check-native-executors" });',
+        *(
+            'native_execution_check.addThirdPartyEnabledArg'
+            + name + '(.{ .enabled = "--native-executor='
+            + name.lower() + '" });'
+            for name in ("Qemu", "Rosetta", "Wine", "Darling", "Wasmtime")
+        ),
     )
     for contract in exact_source_contracts:
         if normalized_feature.count(contract) != 1:
@@ -3918,7 +3947,6 @@ def _annotate_native_feature_test_contract(
     ordered_guard_fragments = (
         "if (!explicit_non_baseline_cpu_profile)",
         "else if (!native_feature_target_matches_host)",
-        "else if (native_feature_external_executor_enabled)",
         "else if (!b.graph.host.result.cpu.features.isSuperSetOf(target.result.cpu.features))",
         "else &test_inventory_structure_check.step;",
     )
@@ -3944,6 +3972,7 @@ def _annotate_native_feature_test_contract(
         "const official_tests = inventory_case.logical_tests orelse continue;",
         "const run_native_feature_tests = b.addRunArtifact(official_tests);",
         "run_native_feature_tests.step.dependOn(native_feature_profile_guard);",
+        "run_native_feature_tests.step.dependOn(&native_execution_check.step);",
         "test_native_feature_step.dependOn(&run_native_feature_tests.step);",
     )
     for contract in loop_contracts:
@@ -3981,6 +4010,7 @@ def _annotate_native_feature_test_contract(
             "expansion_case_count": len(factory_cases),
             "expansion_cases_digest": _json_fact_digest(factory_cases),
             "dependency_expression": "native_feature_profile_guard",
+            "executor_guard_dependency": NATIVE_EXECUTION_CHECK_ID,
             "inventory_runner": None,
             "inventory_barrier": None,
             "inventory_evidence": False,
@@ -4280,6 +4310,7 @@ def _validate_test_inventory_factory_contract(
         "expansion_case_count": len(expected_cases),
         "expansion_cases_digest": _json_fact_digest(expected_cases),
         "dependency_expression": "native_feature_profile_guard",
+        "executor_guard_dependency": NATIVE_EXECUTION_CHECK_ID,
         "inventory_runner": None,
         "inventory_barrier": None,
         "inventory_evidence": False,
@@ -12328,7 +12359,7 @@ def _discover_generator_targets(
             )
     generator = "tools/generate_multiversion.py"
     source = _frozen_regular_text(active, generator, "multiversion generator")
-    if hashlib.sha256(source.encode()).hexdigest() != "a34888100818929091c8f28505aa19e30b611a72cf9d297513d569803d1771ab":
+    if hashlib.sha256(source.encode()).hexdigest() != "6bc0562d5bd13cada609a8c96797a71c0fa7bbbac419464d14359dbe77d2f22e":
         raise InventoryError("multiversion generator output/formatter contract changed")
     for ordinal, path in enumerate(MULTIVERSION_OUTPUTS, 1):
         targets.append({"id": f"generated-target:{path}", "path": path,
@@ -12782,8 +12813,8 @@ def _validate(
         errors.append(f"source discovery failed closed: {exc}")
         return errors
     release_resolution = {
-        "build.zig": "false resolves to Debug; true or an explicit release request resolves through preferred ReleaseFast",
-        "examples/zig/build.zig": "false resolves to Debug; a release request uses Zig standard resolution",
+        "build.zig": "false resolves to debug; true or an explicit release request resolves through preferred fast",
+        "examples/zig/build.zig": "false resolves to debug; a release request uses Zig standard resolution",
     }
     for item in inventory["option_surfaces"]:
         for field in (
@@ -12866,8 +12897,8 @@ def _validate(
                     ],
                     "excluded": [
                         "correctness test artifacts controlled by test-optimize",
-                        "host generate_compat_headers tool fixed at ReleaseSafe",
-                        "host generate_kernel_coverage tool fixed at Debug",
+                        "host generate_compat_headers tool fixed at safe",
+                        "host generate_kernel_coverage tool fixed at debug",
                     ],
                 }
             elif build_root == "examples/zig/build.zig" and name == "optimize":
@@ -12898,7 +12929,7 @@ def _validate(
         if item.get("name") == "optimize":
             _require(
                 item.get("value_domain")
-                == ["Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"],
+                == ["debug", "safe", "fast", "small"],
                 f"{item['id']}: incorrect optimize value_domain",
                 errors,
             )
@@ -12947,7 +12978,7 @@ def _validate(
                 errors,
             )
             _require(
-                item.get("artifact_kind") in {"library", "executable", "test", "object"},
+                item.get("artifact_kind") in {"library", "executable", "test", "object", "translated-source"},
                 f"{item['id']}: invalid artifact_kind",
                 errors,
             )
@@ -14016,6 +14047,16 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         item["path"]: item for item in inventory["repository_file_classifications"]
     }
     classifications.pop("COPYING.LESSER", None)
+    classifications["test/headers/compat_headers.h"] = {
+        "path": "test/headers/compat_headers.h",
+        "kind": "foreign-language-source",
+        "class": "non-generated-source",
+        "owner": "test-infrastructure",
+    }
+    old_threading_note = classifications.pop("docs/common/zig_0_16_std_io_threading.md", None)
+    if old_threading_note is not None:
+        path = "docs/common/zig_std_io_threading.md"
+        classifications[path] = {**old_threading_note, "path": path}
     for path in (
         "bench/dynamic_library.zig",
         "bench/tools/plot_windows_benchmark.py",
@@ -14092,6 +14133,24 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         inventory["repository_file_classifications"]
     )
     option_surfaces = {item["id"]: item for item in inventory["option_surfaces"]}
+    for item in option_surfaces.values():
+        if item["name"] in {"optimize", "test-optimize"}:
+            item["type"] = "std.lang.Optimize"
+            item["default"] = {
+                "Debug": "debug", "ReleaseSafe": "safe",
+                "ReleaseFast": "fast", "ReleaseSmall": "small",
+            }.get(item["default"], item["default"])
+            if "value_domain" in item:
+                item["value_domain"] = ["debug", "safe", "fast", "small"]
+        if item["id"] == "option-surface:examples/zig/build.zig:optimize":
+            item["description"] = "Select debug, safe, fast, or small optimization"
+        if item["id"] == "option-surface:build.zig:release":
+            item["resolution_note"] = "false resolves to debug; true or an explicit release request resolves through preferred fast"
+            item["consumer_partition"]["excluded"] = [
+                "correctness test artifacts controlled by test-optimize",
+                "host generate_compat_headers tool fixed at safe",
+                "host generate_kernel_coverage tool fixed at debug",
+            ]
     for name in (
         "structured-object-candidates",
         "structured-object-baseline",
@@ -14247,6 +14306,35 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
 def _new_test_inventory_observation(
     identifier: str, inventory: dict[str, Any]
 ) -> dict[str, Any]:
+    if identifier == "compile:build.zig:build:translated_headers":
+        return {
+            "owner": "test-infrastructure",
+            "artifact_kind": "translated-source",
+            "output_name": "compat_headers",
+            "root_source": ["test/headers/compat_headers.h"],
+            "condition": "header smoke test compilation is reached",
+            "linkage": "not-applicable",
+            "compile_for": "requested-target",
+            "execute_on": "not-executable",
+            "optimize_source": "test-optimize",
+            "produced_outputs": ["compat_headers.zig"],
+            "install_destinations": [],
+        }
+    if identifier == NATIVE_EXECUTION_CHECK_ID:
+        return {
+            "owner": "test-infrastructure",
+            "detail_status": "process-lifecycle-out-of-scope",
+            "cwd_shape": "repository-root",
+            "command_shape": "system-command",
+            "source_artifact": None,
+            "compile_for": "host",
+            "execute_on": "host",
+            "argv_shape": [
+                "python3", "tools/check_test_inventory.py", "--check-native-executors",
+                "<enabled make-time executor flags>",
+            ],
+            "launch_class": "native-execution-guard",
+        }
     if identifier in {"option:build.zig:build:dispatch", "option:build.zig:build:thread-limit", "option:examples/zig/build.zig:build:dispatch", "option:build.zig:build:optimize-override"}:
         return {"owner": "build-composition"}
     if identifier == "launch:build.zig:build:repack_static_lib":
@@ -14289,7 +14377,7 @@ def _new_test_inventory_observation(
     dynamic_step = "step:build.zig:build:test-dynamic-dispatch"
     generator_step = "step:build.zig:build:check-multiversion"
     failure_step = dynamic_step + "-requires-a-native-dynamic-build-without-external-executors-omit-dcpu"
-    guard = "dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled"
+    guard = "dynamic_dispatch and native_feature_target_matches_host"
     if identifier in (dynamic_step, generator_step, failure_step):
         dependencies = ([{"id": "launch:build.zig:build:multiversion_check", "condition": "always"}] if identifier == generator_step else
                         [{"id": i, "condition": guard} for i in (*DYNAMIC_LAUNCH_IDS, generator_step)] + [{"id": failure_step, "condition": "not (" + guard + ")"}] if identifier == dynamic_step else [])
@@ -14829,7 +14917,7 @@ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
                 "--name",
                 "digest_vectors",
                 "-O",
-                "Debug",
+                "debug",
                 "-target",
                 "<host-native-baseline-target>",
                 "-mcpu",
@@ -14856,7 +14944,7 @@ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
                 "--inventory-root",
                 "zig-root:header-smoke-tests",
                 "--inventory-mode",
-                "Debug",
+                "debug",
                 "--inventory-class",
                 "<host-native-enumeration-class>",
             ],
@@ -14877,7 +14965,7 @@ def _new_test_inventory_python_launch(identifier: str) -> dict[str, Any]:
                 "--inventory-root",
                 "zig-root:header-smoke-tests",
                 "--inventory-mode",
-                "Debug",
+                "debug",
                 "--inventory-class",
                 "<host-native-enumeration-class>",
             ],

@@ -132,7 +132,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
                 "controller": {
                     "compiler": {
                         "name": "zig",
-                        "version": "0.16.0",
+                        "version": "0.17.0",
                         "executable": private_root + "/tools/zig",
                     },
                     "python": {
@@ -149,7 +149,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
                         "requested": {
                             "target_triple": "x86_64-linux-gnu",
                             "cpu": "x86_64_v3",
-                            "optimization": "ReleaseFast",
+                            "optimization": "fast",
                         },
                         "declaration_status": "complete",
                     },
@@ -207,7 +207,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
                     [{"name": "Zynum", "sha256": digest}],
                 )
                 self.assertEqual(
-                    identity["controller"]["compiler"]["version"], "0.16.0"
+                    identity["controller"]["compiler"]["version"], "0.17.0"
                 )
 
         self.assertEqual(private_metadata["argv"][1], secret_argument)
@@ -530,8 +530,8 @@ class BenchmarkMetadataTest(unittest.TestCase):
     def test_build_declaration_complete_partial_and_unspecified(self):
         complete = argparse.Namespace(
             build_target="aarch64-macos.15.0",
-            build_cpu="apple_m4+sme+sme2",
-            build_optimize="ReleaseFast",
+            build_cpu="native",
+            build_optimize="fast",
         )
         partial = argparse.Namespace(
             build_target="x86_64-linux-gnu",
@@ -549,8 +549,8 @@ class BenchmarkMetadataTest(unittest.TestCase):
             complete_build["requested"],
             {
                 "target_triple": "aarch64-macos.15.0",
-                "cpu": "apple_m4+sme+sme2",
-                "optimization": "ReleaseFast",
+                "cpu": "native",
+                "optimization": "fast",
             },
         )
         self.assertEqual(partial_build["declaration_status"], "partial")
@@ -577,7 +577,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
             argparse.Namespace(
                 build_target=None,
                 build_cpu=None,
-                build_optimize="fast",
+                build_optimize="ReleaseFast",
             ),
         )
         for args in invalid:
@@ -595,17 +595,17 @@ class BenchmarkMetadataTest(unittest.TestCase):
                 "--build-cpu",
                 "x86_64_v3+avx512f",
                 "--build-optimize",
-                "ReleaseSafe",
+                "safe",
             ]
         )
         self.assertEqual(args.build_target, "x86_64-linux-gnu")
         self.assertEqual(args.build_cpu, "x86_64_v3+avx512f")
-        self.assertEqual(args.build_optimize, "ReleaseSafe")
+        self.assertEqual(args.build_optimize, "safe")
 
         for invalid_args in (
             ["--build-target", ""],
             ["--build-cpu", "native/escape"],
-            ["--build-optimize", "fast"],
+            ["--build-optimize", "ReleaseFast"],
         ):
             with self.subTest(invalid_args=invalid_args):
                 with (
@@ -869,7 +869,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
 .{
     .zig_exe = "/usr/local/bin/zig",
     .lib_dir = "/usr/local/lib/zig",
-    .version = "0.16.0",
+    .version = "0.17.0",
     .target = "x86_64-linux.6.1...6.1-gnu.2.36",
     .env = .{
         .HOME = "/home/fixture",
@@ -879,7 +879,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
 """
 
         def output(command):
-            return environment.strip() if command == ["zig", "env"] else "0.16.0"
+            return environment.strip() if command == ["zig", "env"] else "0.17.0"
 
         with (
             mock.patch.object(benchmark_metadata.shutil, "which", return_value="zig"),
@@ -900,7 +900,7 @@ class BenchmarkMetadataTest(unittest.TestCase):
 
     def test_compiler_snapshot_classifies_invalid_environment_output(self):
         def output(command):
-            return "not valid zig env" if command == ["zig", "env"] else "0.16.0"
+            return "not valid zig env" if command == ["zig", "env"] else "0.17.0"
 
         with (
             mock.patch.object(benchmark_metadata.shutil, "which", return_value="zig"),

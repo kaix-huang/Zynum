@@ -207,7 +207,7 @@ fn runCase(comptime T: type, uplo: Uplo, trans: Order, diag: Diag, n: usize, k: 
         x.ptr,
         1,
     );
-    if (builtin.cpu.arch == .x86_64) {
+    if (builtin.target.cpu.arch == .x86_64) {
         try std.testing.expect(production_hit);
         for (solution, x) |want, got| try expectApprox(T, want, got);
     } else {
@@ -269,7 +269,7 @@ fn checkGateMisses(comptime T: type) !void {
     try std.testing.expect(!triangular_band_solve.testing.gateAllowsForX86(T, 512, 33, 1));
     try std.testing.expect(!triangular_band_solve.testing.gateAllowsForX86(T, 512, 0, 2));
     try std.testing.expectEqual(
-        builtin.cpu.arch == .x86_64,
+        builtin.target.cpu.arch == .x86_64,
         triangular_band_solve.testing.productionGateAllows(T, 512, 8, 1),
     );
 
@@ -331,12 +331,12 @@ fn runFiniteCandidate(comptime T: type) !void {
     try std.testing.expect(descriptor.workspace.private_output);
     var profile = tuning.production_2026_07_17.triangular;
     profile.enable_finite_tbsv = true;
-    try std.testing.expectEqual(if (builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) id else .portable_scalar, profile.selectFiniteTbsv(T, 128, 32));
+    try std.testing.expectEqual(if (builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) id else .portable_scalar, profile.selectFiniteTbsv(T, 128, 32));
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTbsv(T, 127, 8));
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTbsv(T, 128, 33));
     profile.enable_finite_tbsv = false;
     try std.testing.expectEqual(catalog.Implementation.portable_scalar, profile.selectFiniteTbsv(T, 128, 8));
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     var a: [5000]T = undefined;
     var x: [260]T = undefined;
     for ([_]usize{ 128, 129 }) |n| {
@@ -530,7 +530,7 @@ fn runFiniteCandidate(comptime T: type) !void {
 }
 
 test "production TBSV staging copies preserve strides and late-failure fallback" {
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     inline for (.{ f32, f64 }) |T| {
         const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
         var a: [5000]T = undefined;
@@ -576,7 +576,7 @@ test "production TBSV staging copies preserve strides and late-failure fallback"
 }
 
 test "finite TBSV reconstructs early signs when the first zero accumulator is late" {
-    if (builtin.cpu.arch != .aarch64 or builtin.os.tag != .macos) return;
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
     const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
     inline for (.{ f32, f64 }) |T| {
         var a: [5000]T = undefined;

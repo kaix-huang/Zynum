@@ -428,7 +428,7 @@ test "SME epilogue rejection falls back without entering streaming state" {
 }
 
 test "Apple AMX success and rejection exits balance state before return" {
-    if (comptime builtin.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
+    if (comptime builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
 
     const a: [16]f32 = @splat(1);
     const b: [16]f32 = @splat(1);
@@ -580,9 +580,9 @@ test "forced complex GEMM stable IDs cover layouts epilogues vector edges and od
     for ([_]scalar.Order{ .trans, .conj_trans }) |ta| {
         for ([_]scalar.Order{ .trans, .conj_trans }) |tb| {
             for (0..3) |special_case| {
-                var a = [_]T{nan} ** 4;
-                var b = [_]T{nan} ** 14;
-                var c = [_]T{guard} ** 15;
+                var a: [4]T = @splat(nan);
+                var b: [14]T = @splat(nan);
+                var c: [15]T = @splat(guard);
                 a[0] = if (special_case == 0) complexValue(T, std.math.inf(f64), 0) else complexValue(T, 2, 0);
                 a[1] = complexValue(T, 3, 0);
                 for (0..2) |p_index| {
@@ -646,7 +646,7 @@ test "complex GEMM selection is deterministic across layouts and scalar classes"
         const compact: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .compact_c32 else .compact_c64;
         const vector_edge: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .vector_edge_c32 else .vector_edge_c64;
         const three_m: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32) .three_m_c32 else .three_m_c64;
-        const materialized_non_nn: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32 and builtin.cpu.arch != .x86_64) .expanded_real_c32 else three_m;
+        const materialized_non_nn: catalog.ComplexKernelId = if (T == complex_gemm.ComplexF32 and builtin.target.cpu.arch != .x86_64) .expanded_real_c32 else three_m;
         const arbitrary_alpha = complexValue(T, 0.75, -0.25);
         const arbitrary_beta = complexValue(T, -0.375, 0.125);
 

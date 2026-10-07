@@ -40,8 +40,8 @@ BUILD_INVENTORY_PATH = "tools/build_inventory.json"
 SELF_TEST_PATH = "test/build/test_test_inventory.py"
 AGGREGATE_STEP_ID = "step:build.zig:build:test"
 HOST_TOOL_SMOKE_STEP_ID = "step:build.zig:build:test-host-tool-smoke"
-MODES = ("Debug", "ReleaseSafe", "ReleaseFast")
-ZIG_ENUMERATION_SOURCE = "zig-0.16-builtin-test-functions"
+MODES = ("debug", "safe", "fast")
+ZIG_ENUMERATION_SOURCE = "zig-0.17-builtin-test-functions"
 PYTHON_ENUMERATION_SOURCE = "static"
 FACTORY_ROLE = "test-inventory-enumerator-factory"
 FACTORY_EXPANSION_RELATION = "one-per-applicable-logical-zig-root"
@@ -67,10 +67,10 @@ HOST_TOOL_SMOKE_DIRECT_DEPENDENCIES = (
     {"id": "step:build.zig:build:test-build-profiles", "condition": "always"},
 )
 LEGACY_WORKFLOW_MODE_COMMANDS = {
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=Debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
-    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=ReleaseFast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
-    "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-debug-target": "zig build test ${{ matrix.target_args }} -Dtest-optimize=debug -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasesafe-target": "zig build --release=safe test ${{ matrix.target_args }} -Dtest-optimize=safe -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
+    "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=fast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
+    "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=safe --summary failures",
 }
 _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     (
@@ -79,7 +79,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_benchmark_metadata.py",
-        "175c6e9a97ee195830355799d274ae85b904aa4edffd8d69defc97674ca6dbc8",
+        "e273afdd1f2f0bf5af640b148fff5f6bc0028fe2dc5f4392f379f67b9b8eb030",
     ),
     (
         "bench/tools/test_full_benchmark_report.py",
@@ -99,7 +99,7 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_rank_k_report.py",
-        "834ffd3fd3d1bb578d44fbca5f8d4b3d497c23b590a083edee9f81d70774f0af",
+        "ec91dc5e8f0a7927cc9d7afc7c19e2eb50aef4bad87c32f59a80088221e1c778",
     ),
     (
         "bench/tools/test_report_comparison.py",
@@ -119,15 +119,15 @@ _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_rotg_latency_report.py",
-        "db967016f6201a8bd93861566301f093ac46bd74fae8f59b5526715ac8f5119d",
+        "bbae21d0d23b5d839c857724405ae21fd8ddfcf9f9211880a020b5b5642ca558",
     ),
     (
         "bench/tools/test_symm_report.py",
-        "0f6a981a87909ed07e75e5feba88134702a0577f5c6afd054921650fb8587f14",
+        "6ed521a556b1b3d7b13e01fe597b0ddb7337f3f5adcd3cc1ca42b8b7decc6103",
     ),
     (
         "bench/tools/test_triangular_matrix_report.py",
-        "50f818b9aa7ccef69c8881459c720a7e0206b9f779364e76b316cad540fb7f87",
+        "bbb65fe3765ed95bec6f6059e0b5decd968cbfb3afd36eefa1f24cc61deb524d",
     ),
     (
         "bench/tools/test_windows_benchmark.py",
@@ -149,7 +149,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_benchmark_metadata.py",
-        "175c6e9a97ee195830355799d274ae85b904aa4edffd8d69defc97674ca6dbc8",
+        "e273afdd1f2f0bf5af640b148fff5f6bc0028fe2dc5f4392f379f67b9b8eb030",
     ),
     (
         "bench/tools/test_full_benchmark_report.py",
@@ -169,7 +169,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_rank_k_report.py",
-        "834ffd3fd3d1bb578d44fbca5f8d4b3d497c23b590a083edee9f81d70774f0af",
+        "ec91dc5e8f0a7927cc9d7afc7c19e2eb50aef4bad87c32f59a80088221e1c778",
     ),
     (
         "bench/tools/test_report_comparison.py",
@@ -189,15 +189,15 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/test_rotg_latency_report.py",
-        "db967016f6201a8bd93861566301f093ac46bd74fae8f59b5526715ac8f5119d",
+        "bbae21d0d23b5d839c857724405ae21fd8ddfcf9f9211880a020b5b5642ca558",
     ),
     (
         "bench/tools/test_symm_report.py",
-        "0f6a981a87909ed07e75e5feba88134702a0577f5c6afd054921650fb8587f14",
+        "6ed521a556b1b3d7b13e01fe597b0ddb7337f3f5adcd3cc1ca42b8b7decc6103",
     ),
     (
         "bench/tools/test_triangular_matrix_report.py",
-        "50f818b9aa7ccef69c8881459c720a7e0206b9f779364e76b316cad540fb7f87",
+        "bbb65fe3765ed95bec6f6059e0b5decd968cbfb3afd36eefa1f24cc61deb524d",
     ),
     (
         "bench/tools/test_windows_benchmark.py",
@@ -217,7 +217,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
     ),
     (
         "bench/tools/benchmark_metadata.py",
-        "28eeac857246f31554f766c4a8e1e492bbdefb95d3ab4c421f9c5a2ab6cf222f",
+        "d68efcaf8f1f7aa0a23e7e54f6f27fee3ac593c7c85a5060850350c68dc80dc9",
     ),
     (
         "bench/tools/check_gemm_sweep.py",
@@ -404,7 +404,7 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (
     ),
 )
 _PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
-    "87cd7d83dd4134cbc96337bed743614485978c5e81c965d7a24fadc2af5d4117"
+    "c98e1334264a7251f3a86a8c59ee46dbcfebfae30b69efafa8b00af57e03e4a9"
 )
 _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
     "a4b328fc2834a8120f988f28809f74130949a3f565cd0a5934b591d4663b0469"
@@ -1018,11 +1018,11 @@ MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
 CURRENT_TEST_INVENTORY_SHA256 = (
-    "0c8664aac749034b82c606bc63cb3c0446e99dd4e3751cb430830265ca28b7b6"
+    "10563ab5eb3df8440e3735f9e60f63e6951dd843b93e5f4a1f310a8f56b92a63"
 )
 NEXT_TEST_INVENTORY_SHA256: str | None = None
 CURRENT_NATIVE_PROJECTION_SHA256 = (
-    "0adfdac768bd6cf64ecb25e10786f31ec98814ec0d23b332abb076bde6bccd48"
+    "5c3a795584c102eb1d1cc0b3af32a26809e31f068b3b81594eb6c7b6a84d07f9"
 )
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 TOP_LEVEL_KEYS = {
@@ -2306,9 +2306,9 @@ def _workflow_commands(context: Any) -> dict[str, str]:
 
 def _command_for(environment: dict[str, Any], mode: str) -> str:
     release = {
-        "Debug": "",
-        "ReleaseSafe": " --release=safe",
-        "ReleaseFast": " --release=fast",
+        "debug": "",
+        "safe": " --release=safe",
+        "fast": " --release=fast",
     }[mode]
     smoke = str(environment["host_tool_smoke"]).lower()
     return (
@@ -2405,6 +2405,7 @@ def discover(
         or any(launch.get("call") != "b.addRunArtifact"
                or launch.get("source_artifact") != dynamic_compile_id
                or launch.get("launch_role") != "dynamic-dispatch-correctness-only"
+               or launch.get("executor_guard_dependency") != BUILD_CHECKER.NATIVE_EXECUTION_CHECK_ID
                for launch in dynamic_launches)):
         raise InventoryError("dynamic correctness-only root and two process launches must match the reviewed build contract")
     correctness_only_roots = [{
@@ -2414,7 +2415,8 @@ def discover(
         "compile_observation_id": dynamic_compile_id,
         "launch_observation_ids": dynamic_launch_ids,
         "selector_step_observation_id": "step:build.zig:build:test-dynamic-dispatch",
-        "guard": "dynamic_dispatch and native_feature_target_matches_host and !native_feature_external_executor_enabled",
+        "guard": "dynamic_dispatch and native_feature_target_matches_host",
+        "executor_guard_dependency": BUILD_CHECKER.NATIVE_EXECUTION_CHECK_ID,
         "process_environments": [{}, {"ZYNUM_MAX_ISA": "baseline"}],
         "enumeration_source": "static-source-reachability-only",
         "native_inventory_evidence": False,
@@ -2907,7 +2909,7 @@ def discover(
         "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target",
         "workflow-launch:.github/workflows/release.yml:artifacts:test",
     )
-    workflow_modes = ("Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSafe")
+    workflow_modes = ("debug", "safe", "fast", "safe")
     workflow_bindings = []
     for identifier, mode in zip(workflow_ids, workflow_modes, strict=True):
         if identifier not in by_id or identifier not in workflow_commands:
@@ -3033,6 +3035,7 @@ def discover(
         "count": len(row_ids),
         "digest": _fact_digest(row_ids),
     }
+    _refresh_native_gaps(result)
     result["strict_summary"] = _section_summary(result)
     return result
 
@@ -3454,8 +3457,8 @@ def _validate_runner_source(context: Any) -> list[str]:
         "resolved_cpu_model",
         "cpu_feature_policy",
         "canonical-baseline-resolved-features",
-        "std.Target.Cpu.baseline(builtin.cpu.arch, builtin.os)",
-        "builtin.cpu.features.eql(baseline_cpu.features)",
+        "std.Target.Cpu.baseline(builtin.target.cpu.arch, builtin.target.os)",
+        "builtin.target.cpu.features.eql(baseline_cpu.features)",
         "const frozen_size: usize = @intCast(before.size)",
         "file.readPositionalAll(runner_io, bytes, 0)",
         "file.readPositionalAll(runner_io, &growth_probe, before.size)",
@@ -3492,7 +3495,7 @@ def _validate_runner_source(context: Any) -> list[str]:
         errors.append(
             f"{path}: runner must bind environment/root/mode before CPU attestation"
         )
-    if "builtin.cpu.model.features" in text:
+    if "builtin.cpu.model.features" in text or "builtin.target.cpu.model.features" in text:
         errors.append(f"{path}: CPU attestation must use resolved baseline features")
     current_matches = re.findall(
         r'^const CURRENT_TEST_INVENTORY_SHA256: \[\]const u8 = "([0-9a-f]{64})";$',
@@ -13803,6 +13806,18 @@ def _run_python_tooling_root(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--check-native-executors",
+        action="store_true",
+        help="reject enabled third-party executors before native correctness tests",
+    )
+    parser.add_argument(
+        "--native-executor",
+        action="append",
+        choices=("qemu", "rosetta", "wine", "darling", "wasmtime"),
+        default=[],
+        help="enabled third-party executor, supplied by the Zig build runner",
+    )
+    parser.add_argument(
         "--root", type=Path, default=Path(__file__).resolve().parents[1]
     )
     parser.add_argument("--inventory", type=Path)
@@ -13850,6 +13865,38 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
+    if args.check_native_executors:
+        if (
+            args.inventory is not None
+            or args.structure_only
+            or args.require_current_only
+            or args.refresh_from_protocol
+            or args.protocol_log
+            or args.run_python_tooling_root is not None
+            or args.windows_zynum_blas_build_output is not None
+            or args.windows_zynum_blas_installed_output is not None
+        ):
+            print(
+                "test inventory error: --check-native-executors cannot be combined "
+                "with inventory validation, refresh, or Python tooling options",
+                file=sys.stderr,
+            )
+            return 2
+        if args.native_executor:
+            print(
+                "native correctness requires direct host execution; "
+                "disable third-party executors: "
+                + ", ".join(sorted(set(args.native_executor))),
+                file=sys.stderr,
+            )
+            return 1
+        return 0
+    if args.native_executor:
+        print(
+            "test inventory error: --native-executor requires --check-native-executors",
+            file=sys.stderr,
+        )
+        return 2
     root = Path(os.path.abspath(args.root))
     inventory = (
         Path(os.path.abspath(args.inventory))

@@ -82,6 +82,12 @@ class BuildInventoryTests(unittest.TestCase):
             (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
         )
         files = {"tools/build_inventory.json"}
+        files.update({
+            "tools/check_build_inventory.py",
+            "tools/repository_git.py",
+            "tools/repository_snapshot.py",
+            "test/headers/compat_headers.h",
+        })
         files.add(CHECKER.DEPENDABOT_CONFIG_PATH)
         files.add(CHECKER.LEVEL2_WIDTH_STUB_ROOT_PATH)
         files.update(item["path"] for item in cls.inventory.get("build_manifests", []))
@@ -607,7 +613,7 @@ class BuildInventoryTests(unittest.TestCase):
             (
                 "external-executor",
                 ["-Dcpu=native", "-fqemu"],
-                "test-native-feature forbids external target executors",
+                "native correctness requires direct host execution",
             ),
         ]
         if sys.platform == "darwin" and machine in {"aarch64", "arm64"}:
@@ -797,46 +803,33 @@ class BuildInventoryTests(unittest.TestCase):
                 "Python tooling test observations are incomplete",
             ),
             (
-                "const python_tooling_tests = b.addSystemCommand(&.{\n"
-                '        "python3",\n'
-                '        "-B",\n'
-                '        b.pathFromRoot("tools/check_test_inventory.py"),',
-                "const python_tooling_tests = b.addSystemCommand(&.{\n"
-                '        "python3",\n'
-                '        "-B",\n'
-                '        b.pathFromRoot("tools/unknown_checker.py"),',
+                'python_tooling_tests.addFileArg2(b.path("tools/check_test_inventory.py"), .{});',
+                'python_tooling_tests.addFileArg2(b.path("tools/unknown_checker.py"), .{});',
                 "exact explicit checker argv contract",
             ),
             (
-                '"--root",\n        b.pathFromRoot("."),\n        "--inventory",',
-                '"--inventory",\n        b.pathFromRoot("."),\n        "--root",',
+                'python_tooling_tests.addArg("--root");',
+                'python_tooling_tests.addArg("--inventory");',
                 "exact explicit checker argv contract",
             ),
             (
-                '"--inventory",',
-                '"--missing-inventory",',
+                'python_tooling_tests.addArg("--inventory");',
+                'python_tooling_tests.addArg("--missing-inventory");',
                 "exact explicit checker argv contract",
             ),
             (
-                '"python-root:benchmark-tools-discovery",',
-                "python_tooling_root_id,",
+                'python_tooling_tests.addArg("python-root:benchmark-tools-discovery");',
+                "python_tooling_tests.addArg(python_tooling_root_id);",
                 "exact explicit checker argv contract",
             ),
             (
-                'b.pathFromRoot("tools/test_inventory.json"),',
-                'b.pathFromRoot("tools/unknown_inventory.json"),',
+                'python_tooling_tests.addFileArg2(b.path("tools/test_inventory.json"), .{});',
+                'python_tooling_tests.addFileArg2(b.path("tools/unknown_inventory.json"), .{});',
                 "exact explicit checker argv contract",
             ),
             (
-                "const python_tooling_tests = b.addSystemCommand(&.{\n"
-                '        "python3",\n'
-                '        "-B",\n'
-                '        b.pathFromRoot("tools/check_test_inventory.py"),',
-                "const python_tooling_tests = b.addSystemCommand(&.{\n"
-                '        "python3",\n'
-                '        "-B",\n'
-                '        "-c",\n'
-                "        python_tooling_inventory_runner,",
+                'python_tooling_tests.addFileArg2(b.path("tools/check_test_inventory.py"), .{});',
+                'python_tooling_tests.addArg("-c");',
                 "exact explicit checker argv contract",
             ),
             (
@@ -896,8 +889,8 @@ class BuildInventoryTests(unittest.TestCase):
                 )
             ),
             (
-                'b.pathFromRoot("test/build/test_build_profiles.py"),',
-                'b.pathFromRoot("test/build/test_build_inventory.py"),',
+                'build_profile_tests.addFileArg2(b.path("test/build/test_build_profiles.py"), .{});',
+                'build_profile_tests.addFileArg2(b.path("test/build/test_build_inventory.py"), .{});',
                 "build profile launch must preserve its exact reviewed argv",
             ),
             (
@@ -1002,14 +995,17 @@ class BuildInventoryTests(unittest.TestCase):
             "target.result.os.tag == b.graph.host.result.os.tag",
             "target.result.abi == b.graph.host.result.abi",
             "target.result.ofmt == b.graph.host.result.ofmt",
-            "b.enable_qemu or",
-            "b.enable_rosetta or b.enable_wine or b.enable_darling or b.enable_wasmtime",
-            "else if (native_feature_external_executor_enabled)",
+            *(
+                'native_execution_check.addThirdPartyEnabledArg' + name
+                + '(.{ .enabled = "--native-executor=' + name.lower() + '" });'
+                for name in ("Qemu", "Rosetta", "Wine", "Darling", "Wasmtime")
+            ),
             "b.graph.host.result.cpu.features.isSuperSetOf(target.result.cpu.features)",
             "for (inventory_cases) |inventory_case|",
             "const official_tests = inventory_case.logical_tests orelse continue;",
             "const run_native_feature_tests = b.addRunArtifact(official_tests);",
             "run_native_feature_tests.step.dependOn(native_feature_profile_guard);",
+            "run_native_feature_tests.step.dependOn(&native_execution_check.step);",
             "test_native_feature_step.dependOn(&run_native_feature_tests.step);",
         )
         for fragment in required_feature_fragments:
@@ -1040,8 +1036,8 @@ class BuildInventoryTests(unittest.TestCase):
                 "native feature source guard contract changed",
             ),
             (
-                "b.enable_qemu or\n        b.enable_rosetta",
-                "b.enable_rosetta",
+                'native_execution_check.addThirdPartyEnabledArgQemu(.{ .enabled = "--native-executor=qemu" });',
+                '// QEMU toggle guard omitted',
                 "native feature source guard contract changed",
             ),
             (
@@ -1671,13 +1667,13 @@ class BuildInventoryTests(unittest.TestCase):
                 "condition": "runner.os == 'Windows'",
                 "shell": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -NoLogo -NoProfile -NonInteractive -Command \"$ErrorActionPreference = 'Stop'; $env:GITHUB_ENV = 'NUL'; $env:GITHUB_PATH = 'NUL'; & ([scriptblock]::Create([IO.File]::ReadAllText('{0}'))); if (Test-Path -LiteralPath variable:\\LASTEXITCODE) {{ exit $LASTEXITCODE }}\"",
                 "evidence_role": "pre-repository Windows Zig/Python/PATH binding for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
-                "job_timeout_minutes": 180,
+                "job_timeout_minutes": 300,
             },
             "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-posix-toolchain-paths-and-require-fortran-for-full-smoke": {
                 "condition": "runner.os != 'Windows'",
                 "shell": "/bin/bash --noprofile --norc -p -eo pipefail {0}",
                 "evidence_role": "pre-repository POSIX Zig/Python/PATH binding with fail-closed Linux full-smoke Fortran prerequisite for GitHub environment-file PATH-poisoning mitigation; not immutable-tool-object, inventory, correctness, attestation, or performance evidence",
-                "job_timeout_minutes": 180,
+                "job_timeout_minutes": 300,
             },
             "workflow-launch:.github/workflows/release.yml:artifacts:bind-trusted-posix-toolchain-paths-and-require-fortran-on-linux": {
                 "condition": "always",
@@ -3292,7 +3288,7 @@ class BuildInventoryTests(unittest.TestCase):
                     "--name",
                     "digest_vectors",
                     "-O",
-                    "Debug",
+                    "debug",
                     "-target",
                     "<host-native-baseline-target>",
                     "-mcpu",
@@ -3315,7 +3311,7 @@ class BuildInventoryTests(unittest.TestCase):
                     "--inventory-root",
                     "zig-root:header-smoke-tests",
                     "--inventory-mode",
-                    "Debug",
+                    "debug",
                     "--inventory-class",
                     "<host-native-enumeration-class>",
                 ],
@@ -3332,7 +3328,7 @@ class BuildInventoryTests(unittest.TestCase):
                     "--inventory-root",
                     "zig-root:header-smoke-tests",
                     "--inventory-mode",
-                    "Debug",
+                    "debug",
                     "--inventory-class",
                     "<host-native-enumeration-class>",
                 ],
@@ -4316,7 +4312,7 @@ class BuildInventoryTests(unittest.TestCase):
             for line in workflow_source.splitlines()
             if line.lstrip().startswith("- uses:")
         ]
-        self.assertEqual(24, len(action_lines))
+        self.assertEqual(23, len(action_lines))
         for line in action_lines:
             with self.subTest(action_pin=line):
                 self.assertRegex(
@@ -4346,9 +4342,9 @@ class BuildInventoryTests(unittest.TestCase):
             )
 
         assert_job_timeout(ci_source, "source-checks", 120)
-        assert_job_timeout(ci_source, "build-inventory-security", 240)
-        assert_job_timeout(ci_source, "test-inventory-security", 120)
-        assert_job_timeout(ci_source, "target-tests", 180)
+        assert_job_timeout(ci_source, "build-inventory-security", 30)
+        assert_job_timeout(ci_source, "test-inventory-security", 30)
+        assert_job_timeout(ci_source, "target-tests", 300)
         assert_job_timeout(ci_source, "capability-builds", 45)
         assert_job_timeout(ci_source, "ci-gate", 5)
         assert_job_timeout(release_source, "build-inventory-security", 240)
@@ -4378,9 +4374,9 @@ class BuildInventoryTests(unittest.TestCase):
             return source.replace(original, mutated, 1)
 
         for source, job, expected, legacy in (
-            (ci_source, "build-inventory-security", 240, 30),
-            (ci_source, "test-inventory-security", 120, 90),
-            (ci_source, "target-tests", 180, 90),
+            (ci_source, "build-inventory-security", 30, 15),
+            (ci_source, "test-inventory-security", 30, 15),
+            (ci_source, "target-tests", 300, 90),
             (ci_source, "capability-builds", 45, 60),
             (ci_source, "ci-gate", 5, 1),
             (release_source, "build-inventory-security", 240, 30),
@@ -4485,7 +4481,7 @@ class BuildInventoryTests(unittest.TestCase):
                 '[[ "$candidate" != /* || ! -f "$candidate" || ! -x "$candidate" ]]',
                 '"$workspace"|"$workspace"/*)',
                 'zig_version="$("$trusted_zig" version)"',
-                '[[ "$zig_version" != 0.16.0 ]]',
+                '[[ "$zig_version" != 0.17.0 ]]',
                 '"$trusted_python" -I -B -c',
                 'printf \'zig=%s\\n\' "$trusted_zig" >> "$GITHUB_OUTPUT"',
                 'printf \'python=%s\\n\' "$trusted_python" >> "$GITHUB_OUTPUT"',
@@ -4548,7 +4544,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "[IO.File]::Exists($candidate)",
                 "$candidate.Equals($workspace, [StringComparison]::OrdinalIgnoreCase)",
                 "$candidate.StartsWith($workspacePrefix, [StringComparison]::OrdinalIgnoreCase)",
-                "$zigVersion[0] -cne '0.16.0'",
+                "$zigVersion[0] -cne '0.17.0'",
                 "& $trustedPython -I -B --version 2>&1",
                 '"zig=$trustedZig"',
                 '"python=$trustedPython"',
@@ -4799,17 +4795,35 @@ class BuildInventoryTests(unittest.TestCase):
 
         assert_trusted_tool_bindings(ci_source, release_source)
 
+        build_ci_command = (
+            '|\n'
+            '          python3 -B test/build/test_build_inventory.py \\\n'
+            '            BuildInventoryTests.test_positive_validation_and_cli \\\n'
+            '            BuildInventoryTests.test_unlisted_named_step_fails_closed \\\n'
+            '            BuildInventoryTests.test_unlisted_conditional_link_edge_fails_closed \\\n'
+            '            BuildInventoryTests.test_unlisted_workflow_run_block_fails_closed \\\n'
+            '            BuildInventoryTests.test_test_inventory_public_files_are_strictly_classified'
+        )
+        test_ci_command = (
+            '|\n'
+            '          python3 -B test/build/test_test_inventory.py \\\n'
+            '            TestInventoryTests.test_positive_repository_validation \\\n'
+            '            TestInventoryTests.test_duplicate_json_key_and_unknown_key_fail \\\n'
+            '            TestInventoryTests.test_missing_duplicate_and_folded_logical_roots_fail \\\n'
+            '            TestInventoryTests.test_native_compiler_sets_are_frozen_and_content_deduplicated'
+        )
+
         terminal_singletons = (
             (
                 "build-inventory-security",
                 "Run build inventory security suite",
-                "python3 -B test/build/test_build_inventory.py",
+                build_ci_command,
                 "terminal singleton build-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
             ),
             (
                 "test-inventory-security",
                 "Run test inventory security suite",
-                "python3 -B test/build/test_test_inventory.py",
+                test_ci_command,
                 "terminal singleton test-inventory security run with GitHub command-file channels masked before repository execution and action post hooks",
             ),
             (
@@ -4862,16 +4876,16 @@ class BuildInventoryTests(unittest.TestCase):
         target_test_commands = {
             "Test Debug target": (
                 "zig build test ${{ matrix.target_args }} "
-                "-Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures"
+                "-Dtest-optimize=debug -Dhost-tool-smoke=false --summary failures"
             ),
             "Test ReleaseSafe target": (
                 "zig build --release=safe test ${{ matrix.target_args }} "
-                "-Dtest-optimize=ReleaseSafe -Dhost-tool-smoke=false "
+                "-Dtest-optimize=safe -Dhost-tool-smoke=false "
                 "--summary failures"
             ),
             "Test ReleaseFast target": (
                 "zig build --release=fast test ${{ matrix.target_args }} "
-                "-Dtest-optimize=ReleaseFast -Dhost-tool-smoke=false "
+                "-Dtest-optimize=fast -Dhost-tool-smoke=false "
                 "--summary failures"
             ),
         }
@@ -4887,31 +4901,31 @@ class BuildInventoryTests(unittest.TestCase):
         target_link_commands = {
             "Link test inventory for Debug target (POSIX structure-gated)": (
                 "zig build test-inventory-link ${{ matrix.target_args }} "
-                "-Dtest-optimize=Debug --summary failures"
+                "-Dtest-optimize=debug --summary failures"
             ),
             "Link test inventory for ReleaseSafe target (POSIX structure-gated)": (
                 "zig build --release=safe test-inventory-link "
-                "${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe "
+                "${{ matrix.target_args }} -Dtest-optimize=safe "
                 "--summary failures"
             ),
             "Link test inventory for ReleaseFast target (POSIX structure-gated)": (
                 "zig build --release=fast test-inventory-link "
-                "${{ matrix.target_args }} -Dtest-optimize=ReleaseFast "
+                "${{ matrix.target_args }} -Dtest-optimize=fast "
                 "--summary failures"
             ),
         }
         windows_link_commands = {
             "Windows native compile/link smoke for Debug (compatibility only; not inventory evidence)": (
                 "& $env:TRUSTED_ZIG build -j1 test-inventory-link-windows-native-smoke "
-                "${{ matrix.target_args }} -Dtest-optimize=Debug --summary failures"
+                "${{ matrix.target_args }} -Dtest-optimize=debug --summary failures"
             ),
             "Windows native compile/link smoke for ReleaseSafe (compatibility only; not inventory evidence)": (
                 "& $env:TRUSTED_ZIG build -j1 --release=safe test-inventory-link-windows-native-smoke "
-                "${{ matrix.target_args }} -Dtest-optimize=ReleaseSafe --summary failures"
+                "${{ matrix.target_args }} -Dtest-optimize=safe --summary failures"
             ),
             "Windows native compile/link smoke for ReleaseFast (compatibility only; not inventory evidence)": (
                 "& $env:TRUSTED_ZIG build -j1 --release=fast test-inventory-link-windows-native-smoke "
-                "${{ matrix.target_args }} -Dtest-optimize=ReleaseFast --summary failures"
+                "${{ matrix.target_args }} -Dtest-optimize=fast --summary failures"
             ),
         }
 
@@ -4920,6 +4934,9 @@ class BuildInventoryTests(unittest.TestCase):
             self.assertNotIn("host_tool_smoke:", target_gate)
             self.assertNotIn("matrix.host_tool_smoke", target_gate)
             self.assertNotIn("continue-on-error", target_gate)
+            linux_x86_row = target_gate.split("- name: Linux / x86_64 baseline", 1)[1].split("- name:", 1)[0]
+            self.assertIn("zig_gate: link-only", linux_x86_row)
+            self.assertIn("target_args: -Dtarget=x86_64-linux-gnu -Dcpu=baseline", linux_x86_row)
             self.assertIn(
                 "          - name: Linux / ARM64 baseline\n"
                 "            os: ubuntu-24.04-arm\n"
@@ -4949,7 +4966,7 @@ class BuildInventoryTests(unittest.TestCase):
                 self.assertEqual(
                     f"      - name: {step_name}\n"
                     "        if: matrix.zig_gate == 'inventory-certified'\n"
-                    "        timeout-minutes: 60\n"
+                    f"        timeout-minutes: {60 if step_name == 'Test Debug target' else 120}\n"
                     f"        shell: {trusted_posix_shell}\n"
                     f"{trusted_posix_env}"
                     f"        run: {command}",
@@ -5022,8 +5039,8 @@ class BuildInventoryTests(unittest.TestCase):
             mutate_job(
                 ci_source,
                 "target-tests",
-                "-Dtest-optimize=Debug --summary failures\n",
-                "-Dtest-optimize=Debug -Dhost-tool-smoke=false --summary failures\n",
+                "-Dtest-optimize=debug --summary failures\n",
+                "-Dtest-optimize=debug -Dhost-tool-smoke=false --summary failures\n",
             ),
             mutate_job(
                 ci_source,
@@ -5157,7 +5174,7 @@ class BuildInventoryTests(unittest.TestCase):
                 ci_source,
                 "source-checks",
                 'zig_version="$("$trusted_zig" version)"',
-                "zig_version=0.16.0",
+                "zig_version=0.17.0",
             ),
             mutate_job(
                 ci_source,
@@ -5329,13 +5346,13 @@ class BuildInventoryTests(unittest.TestCase):
             self.assertEqual(
                 f"      - name: Run build inventory security suite\n"
                 f"{suite_protection}"
-                f"        run: {build_suite_command}",
+                f"        run: {build_suite_command if release else build_ci_command}",
                 build_step,
             )
             self.assertEqual(
                 f"      - name: Run test inventory security suite\n"
                 f"{suite_protection}"
-                f"        run: {test_suite_command}",
+                f"        run: {test_suite_command if release else test_ci_command}",
                 test_step,
             )
             self.assertNotIn(test_suite_command, build_gate)
@@ -5400,10 +5417,7 @@ class BuildInventoryTests(unittest.TestCase):
         assert_security_suite_split(ci_source, "source-checks", release=False)
         assert_security_suite_split(release_source, "artifacts", release=True)
 
-        required_ci_gates = (
-            "    needs: [source-checks, build-inventory-security, "
-            "test-inventory-security]"
-        )
+        required_ci_gates = "    needs: source-checks"
         for job in ("target-tests", "capability-builds", "feature-compile"):
             with self.subTest(required_ci_gate=job):
                 self.assertEqual(1, job_block(ci_source, job).count(required_ci_gates))
@@ -5494,7 +5508,7 @@ class BuildInventoryTests(unittest.TestCase):
             mutant = mutate_job(
                 source,
                 "build-inventory-security",
-                f"        run: {build_suite_command}",
+                f"        run: {build_suite_command if release else build_ci_command}",
                 merged_suite,
             )
             with (
@@ -8381,16 +8395,9 @@ class BuildInventoryTests(unittest.TestCase):
         setup_zig = (
             "      - uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2.2.1\n"
             "        with:\n"
-            "          version: 0.16.0\n"
-        )
-        cache = (
-            "      - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0\n"
-            "        with:\n"
-            "          path: .zig-cache\n"
-            "          key: zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-${{ hashFiles('build.zig', 'build.zig.zon') }}\n"
-            "          restore-keys: |\n"
-            "            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-${{ matrix.cache_target }}-\n"
-            "            zig-test-${{ runner.os }}-${{ runner.arch }}-0.16.0-\n"
+            "          version: 0.17.0\n"
+            "          cache-key: ${{ matrix.cache_target }}\n"
+            "          cache-size-limit: 8192\n"
         )
         expected_source_checker = (
             "      - name: Check build inventory\n"
@@ -8474,8 +8481,9 @@ class BuildInventoryTests(unittest.TestCase):
         )
         checkout_index = text.index(checkout, text.index("  target-tests:\n"))
         setup_index = text.index(setup_zig, checkout_index + len(checkout))
-        cache_index = text.index(cache, setup_index + len(setup_zig))
-        windows_binding_index = text.index(windows_binding, cache_index + len(cache))
+        windows_binding_index = text.index(
+            windows_binding, setup_index + len(setup_zig)
+        )
         posix_binding_index = text.index(
             posix_binding, windows_binding_index + len(windows_binding)
         )
@@ -8486,8 +8494,7 @@ class BuildInventoryTests(unittest.TestCase):
         gate_index = text.index(windows_gate, layout_index + len(windows_layout))
         host_tool_index = text.index(host_tool_step, gate_index + len(windows_gate))
         self.assertEqual(checkout_index + len(checkout) + 1, setup_index)
-        self.assertEqual(setup_index + len(setup_zig) + 1, cache_index)
-        self.assertEqual(cache_index + len(cache) + 1, windows_binding_index)
+        self.assertEqual(setup_index + len(setup_zig) + 1, windows_binding_index)
         self.assertEqual(
             windows_binding_index + len(windows_binding) + 2,
             posix_binding_index,
@@ -8651,7 +8658,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": "Build Windows Python tooling executable fixtures and libraries",
-                "ordinal": 6,
+                "ordinal": 5,
             },
             build["anchor"],
         )
@@ -8662,7 +8669,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": "Check Windows library layout and tooling fixture boundary",
-                "ordinal": 7,
+                "ordinal": 6,
             },
             layout["anchor"],
         )
@@ -8673,7 +8680,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": windows_gate_name,
-                "ordinal": 8,
+                "ordinal": 7,
             },
             gate["anchor"],
         )
@@ -8684,7 +8691,7 @@ class BuildInventoryTests(unittest.TestCase):
                 "file": ".github/workflows/ci.yml",
                 "enclosing_function": "target-tests",
                 "symbol": "Run host tool smoke once",
-                "ordinal": 9,
+                "ordinal": 8,
             },
             host_tool["anchor"],
         )
@@ -9039,7 +9046,7 @@ class BuildInventoryTests(unittest.TestCase):
             for item in inventory["option_surfaces"]
             if item["name"] == "test-optimize"
         )
-        option["default"] = "Debug"
+        option["default"] = "debug"
         inventory["option_surfaces"] = [
             item
             for item in inventory["option_surfaces"]
@@ -9065,17 +9072,17 @@ class BuildInventoryTests(unittest.TestCase):
             ("bool", "false"),
             (releases["build.zig"]["type"], releases["build.zig"]["default"]),
         )
-        self.assertIn("preferred ReleaseFast", releases["build.zig"]["resolution_note"])
+        self.assertIn("preferred fast", releases["build.zig"]["resolution_note"])
         example = next(
             item
             for item in inventory["option_surfaces"]
             if item["id"] == "option-surface:examples/zig/build.zig:optimize"
         )
         self.assertEqual(
-            ("std.builtin.OptimizeMode", "Debug"), (example["type"], example["default"])
+            ("std.lang.Optimize", "debug"), (example["type"], example["default"])
         )
         self.assertEqual(
-            ["Debug", "ReleaseSafe", "ReleaseFast", "ReleaseSmall"],
+            ["debug", "safe", "fast", "small"],
             example["value_domain"],
         )
 

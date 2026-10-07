@@ -26,6 +26,20 @@ pub fn Real(comptime T: type) type {
     return if (T == ComplexF32) f32 else if (T == ComplexF64) f64 else T;
 }
 
+/// Reinterpret native-memory complex pairs while preserving real/imaginary
+/// order. Zig 0.17's logical @bitCast would reverse each pair on big-endian
+/// targets when changing the vector element width from u64 to f32.
+pub inline fn complexF32Lanes(comptime count: comptime_int, bits: @Vector(count, u64)) @Vector(2 * count, f32) {
+    const words: [count]u64 = bits;
+    return @as(*align(1) const [2 * count]f32, @ptrCast(&words)).*;
+}
+
+/// Encode interleaved real/imaginary lanes as native-memory complex pairs.
+pub inline fn complexF32Bits(comptime count: comptime_int, lanes: @Vector(2 * count, f32)) @Vector(count, u64) {
+    const components: [2 * count]f32 = lanes;
+    return @as(*align(1) const [count]u64, @ptrCast(&components)).*;
+}
+
 pub fn zero(comptime T: type) T {
     return if (T == ComplexF32)
         .{ .re = 0, .im = 0 }

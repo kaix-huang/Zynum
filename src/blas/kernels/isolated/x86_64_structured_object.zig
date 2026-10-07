@@ -49,15 +49,15 @@ fn outputPtr(comptime T: type, pointer: *anyopaque) [*]T {
 }
 
 fn coreSide(raw: u8) scalar.Side {
-    return if (@as(abi.Side, @enumFromInt(raw)) == .left) .left else .right;
+    return if (@as(abi.Side, @fromBackingInt(@intCast(raw))) == .left) .left else .right;
 }
 
 fn coreUplo(raw: u8) scalar.Uplo {
-    return if (@as(abi.Uplo, @enumFromInt(raw)) == .upper) .upper else .lower;
+    return if (@as(abi.Uplo, @fromBackingInt(@intCast(raw))) == .upper) .upper else .lower;
 }
 
 fn coreTranspose(raw: u8) scalar.Order {
-    return switch (@as(abi.Transpose, @enumFromInt(raw))) {
+    return switch (@as(abi.Transpose, @fromBackingInt(@intCast(raw)))) {
         .no_trans => .no_trans,
         .trans => .trans,
         .conj_trans => .conj_trans,
@@ -65,7 +65,7 @@ fn coreTranspose(raw: u8) scalar.Order {
 }
 
 fn coreDiagonal(raw: u8) scalar.Diag {
-    return if (@as(abi.Diagonal, @enumFromInt(raw)) == .unit) .unit else .non_unit;
+    return if (@as(abi.Diagonal, @fromBackingInt(@intCast(raw))) == .unit) .unit else .non_unit;
 }
 
 fn scalarTag(comptime T: type) abi.Scalar {
@@ -80,17 +80,17 @@ fn callHostGemm(comptime T: type, transa: scalar.Order, transb: scalar.Order, m:
     const alpha_parts = components(T, alpha);
     const beta_parts = components(T, beta);
     var request: abi.GemmRequest = .{
-        .transa = @intFromEnum(switch (transa) {
+        .transa = @backingInt(switch (transa) {
             .no_trans => abi.Transpose.no_trans,
             .trans => abi.Transpose.trans,
             .conj_trans => abi.Transpose.conj_trans,
         }),
-        .transb = @intFromEnum(switch (transb) {
+        .transb = @backingInt(switch (transb) {
             .no_trans => abi.Transpose.no_trans,
             .trans => abi.Transpose.trans,
             .conj_trans => abi.Transpose.conj_trans,
         }),
-        .scalar = @intFromEnum(scalarTag(T)),
+        .scalar = @backingInt(scalarTag(T)),
         .m = m,
         .n = n,
         .k = k,
@@ -327,7 +327,7 @@ fn rightDispatch(comptime T: type, request: *abi.Request) bool {
     for (tasks[0..task_count], 0..) |*task, task_index| {
         const rows = base_rows + @intFromBool(task_index < extra_rows);
         task.* = .{
-            .operation = @enumFromInt(request.operation),
+            .operation = @fromBackingInt(@intCast(request.operation)),
             .uplo = coreUplo(request.uplo),
             .transpose = coreTranspose(request.transpose),
             .diagonal = coreDiagonal(request.diagonal),
@@ -356,8 +356,8 @@ fn dispatchScalar(comptime T: type, operation: abi.Operation, request: *abi.Requ
 fn execute(request: *abi.Request) callconv(.c) u8 {
     if (zynum_internal_x86_64_structured_enabled == 0) return 0;
     if (request.m <= 0 or request.n <= 0) return 0;
-    const operation: abi.Operation = @enumFromInt(request.operation);
-    const scalar_tag: abi.Scalar = @enumFromInt(request.scalar);
+    const operation: abi.Operation = @fromBackingInt(@intCast(request.operation));
+    const scalar_tag: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     const handled = switch (scalar_tag) {
         .f32 => dispatchScalar(f32, operation, request),
         .f64 => dispatchScalar(f64, operation, request),

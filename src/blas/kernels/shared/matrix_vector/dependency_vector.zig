@@ -36,9 +36,9 @@ fn complexMul(comptime T: type, a: T, b: T) T {
 
 fn config(comptime T: type) fixed_simd.Config {
     const R = Real(T);
-    if (comptime builtin.cpu.arch == .x86_64) {
-        const has_avx512 = std.Target.x86.featureSetHas(builtin.cpu.features, .avx512f);
-        const has_avx = std.Target.x86.featureSetHas(builtin.cpu.features, .avx);
+    if (comptime builtin.target.cpu.arch == .x86_64) {
+        const has_avx512 = std.Target.x86.featureSetHas(builtin.target.cpu.features, .avx512f);
+        const has_avx = std.Target.x86.featureSetHas(builtin.target.cpu.features, .avx);
         return .{
             .lane_count = if (R == f32)
                 (if (has_avx512) 16 else if (has_avx) 8 else 4)

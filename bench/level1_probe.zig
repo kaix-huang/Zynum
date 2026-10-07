@@ -146,8 +146,8 @@ fn usage() void {
 }
 
 fn parseOp(name: []const u8) !Op {
-    inline for (@typeInfo(Op).@"enum".fields) |field| {
-        if (std.mem.eql(u8, name, field.name)) return @enumFromInt(field.value);
+    inline for (@typeInfo(Op).@"enum".field_names) |field| {
+        if (std.mem.eql(u8, name, field)) return @field(Op, field);
     }
     return error.InvalidOp;
 }

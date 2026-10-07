@@ -122,7 +122,7 @@ pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, 
     // Candidate: reuse bounded structured panels once both output dimensions
     // amortize a 64-wide GEMM update. The AArch64 blocked route never expands
     // the whole structured operand, and acquires its panel before any writes.
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_active_panel_candidate;
         if (m_ > 0 and n_ > 0 and profile.candidate(toUsize(m_), toUsize(n_))) {
             const capability = gemm_dispatch.activeCapability();
@@ -133,7 +133,7 @@ pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, 
     }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
             if (blocked.trySymm(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
         }
@@ -141,7 +141,7 @@ pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, 
     if (m_ <= 0 or n_ <= 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
-    if (comptime use_isolated_structured and builtin.cpu.arch == .x86_64) {
+    if (comptime use_isolated_structured and builtin.target.cpu.arch == .x86_64) {
         const profile = structured_tuning.x86_64_object_profile;
         const tuning_side: structured_tuning.Side = if (side == .left) .left else .right;
         if (profile.denseCandidate(structured_tuning.scalarKind(T), tuning_side, herm, m, n) and
@@ -340,7 +340,7 @@ pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasIn
     }
     // Candidate: compute one private output tile, then commit only its stored
     // triangle. All workspace is acquired before changing caller output.
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
         if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (runtime.maxThreads() == 1 or (profile.candidate(toUsize(n_), toUsize(k_), true) and (T != scalar.ComplexF64 or n_ >= 128 or k_ >= 64)))) {
             const capability = gemm_dispatch.activeCapability();
@@ -351,7 +351,7 @@ pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasIn
     }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n_ >= 128 and k_ >= 64 and (runtime.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
             if (blocked.trySyrk(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
         }
@@ -498,7 +498,7 @@ pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasI
     }
     // Candidate: combine both products in one private tile, then apply beta
     // once while committing only the stored triangle.
-    if (comptime builtin.cpu.arch == .aarch64 and builtin.os.tag == .macos) {
+    if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
         if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (runtime.maxThreads() == 1 or profile.candidate(toUsize(n_), toUsize(k_), true))) {
             const capability = gemm_dispatch.activeCapability();
@@ -509,7 +509,7 @@ pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasI
     }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
-    if (comptime builtin.cpu.arch == .x86_64) {
+    if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n_ >= 128 and k_ >= 64 and (runtime.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
             if (blocked.trySyr2k(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
         }

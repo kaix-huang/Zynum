@@ -5,7 +5,7 @@
     .name = .zynum,
     .version = "0.0.1-beta",
     .fingerprint = 0x407596199b6c23c2, // Changing this has security and trust implications.
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{},
     .paths = .{
         "build.zig",
