@@ -12,6 +12,12 @@ The `0.1.x` line is the BLAS-completion and performance line.
 
 ### Maintenance
 
+- Refresh the README benchmark figures and public evidence bundle from the
+  clean `4ef1065` source on 2026-10-10 with Zig 0.17.0, Apple M5, macOS 27.0.1,
+  Accelerate, and OpenBLAS 0.3.34. Retain six interleaved process samples per
+  case, correctness statuses, artifact identities, and median-based comparison
+  summaries for Level 1, Level 2, and GEMM.
+
 - Require Zig 0.17.x and pin CI to 0.17.0. Specialized builds on Apple M5
   now use `-Dcpu=native`; explicit cross-compilation uses `-Dcpu=apple_m5`.
 - Migrate build argument forwarding, lazy paths, optimization modes
@@ -27,12 +33,12 @@ The `0.1.x` line is the BLAS-completion and performance line.
   Windows native observations remain pending; Linux release artifacts retain
   their native inventory gate. Document the
   [platform evidence](docs/development_and_usage.md#test-inventory) and keep
-  published Zig 0.16 benchmark and ABI records labeled with their original
-  compiler version.
+  the retained ABI baseline records labeled with their original compiler
+  version.
 - Refine single-precision SME AXPY scheduling, double-precision SME GEMM row
   tails, and aligned single-precision GER panels, with boundary and padding
-  regression coverage. These kernel changes do not update the published
-  benchmark measurements.
+  regression coverage. The refreshed benchmark bundle measures the current
+  combined implementation; it does not isolate each kernel change.
 
 - Reject conflicting experimental build profile flags instead of silently
   selecting the first enabled profile. Default and single-profile builds keep

@@ -2,14 +2,14 @@
   "benchmark_identity": {
     "controller": {
       "compiler": {
-        "default_target": "aarch64-macos.27.0...27.0-none",
+        "default_target": "aarch64-macos.27.0.1...27.0.1-none",
         "default_target_diagnostic": {
           "classification": "zig_env_parsed",
           "format": "zig-object",
           "status": "ok"
         },
         "name": "zig",
-        "version": "0.16.0"
+        "version": "0.17.0"
       },
       "host": {
         "detected_capabilities": [
@@ -17,12 +17,12 @@
           "feat_sme2"
         ],
         "machine": "arm64",
-        "platform": "macOS-27.0-arm64-arm-64bit-Mach-O",
+        "platform": "macOS-27.0.1-arm64-arm-64bit-Mach-O",
         "processor": "arm",
         "system": "Darwin"
       },
       "python": {
-        "version": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.1.1.101)]"
+        "version": "3.14.8 (main, Sep 30 2026, 17:55:09) [Clang 21.0.0 (clang-2100.3.34.2)]"
       }
     },
     "payload": {
@@ -30,11 +30,11 @@
         "binaries": [
           {
             "name": "level1_probe",
-            "sha256": "8c7648430b1437769a28089b77754f1113c792d1a4ceab02b83d5ca3bc07eade"
+            "sha256": "a8fd3005caaf6d85b2e77553255d9d01da687d2926d9655f66bd297f55d47986"
           },
           {
             "name": "copy_probe",
-            "sha256": "fea7d9ce28f6b0e06c22e38f1db53db8e9da496aa19ade9c37e4c8039c2d33d9"
+            "sha256": "dca02d6f419f1cb1a23419d65c27e8c8bc86aab8fd303bc27a4d97d40290d79e"
           },
           {
             "name": "run_level1_report",
@@ -45,7 +45,7 @@
         "libraries": [
           {
             "name": "Zynum",
-            "sha256": "cc4c3842d1d138a303c803c0bff43644b7430f196ef41cb164759622bd35c737"
+            "sha256": "adc87a629630bbf8cc5ea0d8736d6c0f44fa944f41567067ce1947f8db349067"
           },
           {
             "name": "Accelerate",
@@ -62,7 +62,7 @@
         "missing_fields": [],
         "requested": {
           "cpu": "baseline",
-          "optimization": "ReleaseFast",
+          "optimization": "fast",
           "target_triple": "aarch64-macos"
         },
         "schema_version": 1,
@@ -100,10 +100,10 @@
     "source": {
       "branch": "main",
       "cleanliness_status": "known",
-      "dirty": true,
+      "dirty": false,
       "identity_diagnostic": "git_source_identity_loaded",
       "identity_status": "git",
-      "revision": "6a989d0ced00b6fc99d7920d845092e8ea2f72f7"
+      "revision": "4ef1065691d80439e9286f2f4d5ff758f0818e05"
     }
   },
   "command": {
@@ -195,8 +195,8 @@
     "VECLIB_MAXIMUM_THREADS": "10",
     "ZYNUM_MAXIMUM_THREADS": "unset"
   },
-  "generated_at_unix": 1790015671.1323001,
-  "git_revision": "6a989d0ced00b6fc99d7920d845092e8ea2f72f7",
+  "generated_at_unix": 1791565373.062838,
+  "git_revision": "4ef1065691d80439e9286f2f4d5ff758f0818e05",
   "groups": null,
   "isolation": "fresh process per library/op/size/repeat; best repeat kept as the primary metric with min/median/max and ordered samples retained",
   "level1_stride_pairs": [
@@ -228,7 +228,7 @@
       "sha256": "aeb5f40d3b5cc0fca84e05e90b8e7da6921cea2c33ca701062b0ccd7b4caf117"
     },
     "Zynum": {
-      "sha256": "cc4c3842d1d138a303c803c0bff43644b7430f196ef41cb164759622bd35c737"
+      "sha256": "adc87a629630bbf8cc5ea0d8736d6c0f44fa944f41567067ce1947f8db349067"
     }
   },
   "metadata_projection": {
@@ -283,8 +283,8 @@
     "dcopy"
   ],
   "probes": {
-    "copy_probe_sha256": "fea7d9ce28f6b0e06c22e38f1db53db8e9da496aa19ade9c37e4c8039c2d33d9",
-    "level1_probe_sha256": "8c7648430b1437769a28089b77754f1113c792d1a4ceab02b83d5ca3bc07eade"
+    "copy_probe_sha256": "dca02d6f419f1cb1a23419d65c27e8c8bc86aab8fd303bc27a4d97d40290d79e",
+    "level1_probe_sha256": "a8fd3005caaf6d85b2e77553255d9d01da687d2926d9655f66bd297f55d47986"
   },
   "process_repeats": 6,
   "seconds": 1,
@@ -316,6 +316,6 @@
     "zdrot",
     "zswap"
   ],
-  "zig_version": "0.16.0",
+  "zig_version": "0.17.0",
   "zynum_maximum_threads_detected": 10
 }

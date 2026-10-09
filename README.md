@@ -41,12 +41,12 @@ See the [build and API guide](docs/development_and_usage.md),
 
 ## Performance
 
-The published charts retain the earlier Zig 0.16.0 measurements on Apple M5,
-macOS 27.0, with a baseline-CPU dynamic-dispatch ReleaseFast build. They do not
-measure the Zig 0.17 migration. Charts compare **Zynum, Accelerate, and OpenBLAS**
-using six interleaved
-fresh-process measurements. **Higher is better.** Zynum uses its default
-thread policy; comparator thread caps are 10.
+Measured on **2026-10-10** at source [`4ef1065`](https://github.com/kaix-huang/Zynum/commit/4ef1065691d80439e9286f2f4d5ff758f0818e05),
+using **Zig 0.17.0**, Apple M5, and macOS 27.0.1. The baseline-CPU,
+dynamic-dispatch `fast` build is compared with **Accelerate and OpenBLAS 0.3.34**
+using six cyclically interleaved fresh-process measurements per case.
+**Higher is better.** Zynum uses its default thread policy; comparator thread
+caps are 10. The charts show the median statistic for each library.
 
 ![Level 1 performance](docs/assets/benchmarks/current/level1.svg)
 

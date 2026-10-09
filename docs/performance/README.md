@@ -1,21 +1,27 @@
 # Performance
 
-The README compares Zynum with Apple Accelerate and OpenBLAS on Apple M5
-(10 logical CPUs), macOS 27.0 (26A428), Zig 0.16.0, and OpenBLAS 0.3.34.
-Zynum is built with `-Dcpu=baseline -Ddispatch=dynamic -Doptimize=ReleaseFast`;
-the baseline compilation target still permits runtime selection of supported
-ISA kernels.
+The README compares Zynum with Apple Accelerate and OpenBLAS using measurements
+from **2026-10-10 (Asia/Shanghai)** at clean source
+[`4ef1065`](https://github.com/kaix-huang/Zynum/commit/4ef1065691d80439e9286f2f4d5ff758f0818e05).
+The host is Apple M5 (10 logical CPUs, 32 GiB memory), macOS 27.0.1 (26A434),
+with Zig 0.17.0 and OpenBLAS 0.3.34. Accelerate is the system framework supplied
+with that macOS build.
 
-These measurements predate the Zig 0.17 migration. Its correctness and build
-checks do not establish a performance improvement; fresh measurements are
-required before replacing this bundle or making a Zig 0.17 comparison.
+Zynum is built with `-Dcpu=baseline -Ddispatch=dynamic -Doptimize=fast`;
+baseline compilation still permits runtime selection of supported ISA kernels.
+The build inventory, test-inventory structure, inventory-gated baseline `fast`
+tests, host-tool smoke checks, and 132 dynamic-dispatch tests passed before
+measurement. Native evidence here covers this AArch64 macOS host; pending
+inventory rows for other targets remain pending.
 
 ## Scope and statistics
 
 Each case has six cyclically interleaved fresh-process measurements per library.
 Zynum uses its default thread policy. Comparator thread caps are 10, with
-dynamic threading disabled where supported. Compilation, tests and profiling
-are excluded from the timing interval.
+dynamic threading disabled where supported. Actual worker counts were not
+instrumented. Library order cycles through Zynum, Accelerate, and OpenBLAS by
+case and repeat, balancing execution positions. Compilation, tests and
+profiling are excluded from the timing interval.
 
 | Family | Cases | Measurement | Plotted statistic |
 | --- | ---: | --- | --- |
@@ -29,15 +35,59 @@ it is not a native batched-call benchmark. GEMM calibrates batches to at least
 100 microseconds and records their call counts. It does not represent all
 Level 3 routines.
 
-The bundle contains 822 aggregate rows and 4,932 process-case samples. Level
-1/2 use `sampled-ok` reference checks; GEMM uses `checked-ok` from its sampled
-reference checker. These checks do not independently verify every output
+The three chart datasets contain 822 aggregate rows and 4,932 process-case
+samples. Level 1/2 use `sampled-ok` reference checks; GEMM uses `checked-ok`
+from its sampled reference checker. These checks do not independently verify every output
 element. Selected cases on one host do not establish an all-function or
 cross-platform performance guarantee.
 
 The metadata reader recognizes kernel-coverage schema 1 while the generator
 emits schema 3. Its retained `kernel_coverage_invalid_document` diagnostic
 means the metadata does not validate per-call kernel selection.
+
+## Observed comparison
+
+Each case compares Zynum's plotted median rate with the higher median rate of
+Accelerate and OpenBLAS. Ratios above 1 favor Zynum. The geometric mean weights
+each measured case equally; it is not a weighted application speedup. Counts
+use a strict ratio of at least 1, with no noise tolerance or statistical
+significance claim.
+
+| Family | Cases at least as fast as the faster comparator | Geometric mean rate ratio |
+| --- | ---: | ---: |
+| Level 1 | 23 / 46 | 1.125x |
+| Level 2 | 46 / 60 | 1.207x |
+| GEMM | 97 / 168 | 0.942x |
+
+These results do not establish an all-case performance lead. The CSVs retain
+all six ordered samples and their dispersion, including slower cases. Small
+differences may be measurement noise. Cache-resident copy bandwidth is not
+DRAM bandwidth. This run also changes the OS and source relative to the older
+bundle, so it does not isolate a compiler-version effect.
+
+### Repeatability diagnostics
+
+Large sample ranges prompted focused repeats after the complete suite, using
+the same six-round interleaved policy. Level 1 repeats DDOT, DZASUM, and
+8 MiB DCOPY. Level 2 repeats the 20 legacy cases at n=128, including the
+variable SGEMV cases. GEMM repeats all four scalar types at M/N/K of
+1024/64/1024, 256/1536/256, and 128/128/4096 with kind and shape isolation.
+These diagnostics add 105 aggregate rows and 630 process-case samples; they
+do not replace the chart data.
+
+The table reports the largest within-row `(max - min) / median` sample-rate
+range among the rechecked library/case rows, and the largest absolute relative
+change in a row's plotted median rate between the full run and recheck.
+
+| Diagnostic | Full-run maximum range | Recheck maximum range | Maximum median shift | Evidence |
+| --- | ---: | ---: | ---: | --- |
+| Level 1 | 102.6% | 68.0% | 40.1% | [CSV](../assets/benchmarks/current/level1-recheck.csv), [metadata](../assets/benchmarks/current/level1-recheck.csv.meta.json) |
+| Level 2 | 68.6% | 65.1% | 8.2% | [CSV](../assets/benchmarks/current/level2-recheck.csv), [metadata](../assets/benchmarks/current/level2-recheck.csv.meta.json) |
+| GEMM | 64.4% | 81.1% | 44.5% | [CSV](../assets/benchmarks/current/gemm-recheck.csv), [metadata](../assets/benchmarks/current/gemm-recheck.csv.meta.json) |
+
+The cause of this variability was not isolated. The results describe the
+recorded runs; a dispatch change would need further controlled evidence rather
+than treating these medians as stable performance guarantees.
 
 ## Current data
 
@@ -51,21 +101,25 @@ All public benchmark assets use stable paths under
 | GEMM | [CSV](../assets/benchmarks/current/gemm.csv) | [JSON](../assets/benchmarks/current/gemm.csv.meta.json) | [SVG](../assets/benchmarks/current/gemm.svg) |
 
 The [source manifest](../assets/benchmarks/current/source.json) identifies the
-measured source contents, binaries, build settings, and host. Source hashes
-identify the working-tree code used for timing; the recorded base revision
-alone does not identify uncommitted source changes. Timing values are
+measured source contents, binaries, build settings, and host. This run used a
+clean source commit; source hashes also identify the measured
+source, test, build, header, and tooling contents. The manifest binds the
+curated CSVs, metadata, and figures by SHA-256. Timing values are
 observations and will vary when reproduced.
 
 ## Reproduce
 
-For the published measurements, use the source contents and Zig 0.16.0
-toolchain identified by the manifest. The commands below use the current Zig
-0.17 spelling (`fast`); historical checkouts use `ReleaseFast`. New runs collect
-their own Git identity and binary hashes. Run the three families sequentially
-on an otherwise idle machine; keep outputs local until the data and metadata
-have been reviewed for publication.
+Use the source commit and Zig 0.17.0 toolchain identified by the manifest.
+Run the correctness commands recorded in `source.json` first. The commands
+below reproduce the published measurement profile; each new run records its
+own Git identity and binary hashes. Use a fresh output directory and run the
+three families sequentially on an otherwise idle machine. Keep outputs local
+until their samples, correctness checks, and metadata have been reviewed.
+The sanitized environment leaves Zynum's thread and ISA caps unset.
 
 ```sh
+env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" sh <<'ZYNUM_BENCHMARK'
+set -eu
 zig build -Dcpu=baseline -Ddispatch=dynamic -Doptimize=fast
 unset ZYNUM_MAXIMUM_THREADS
 export OPENBLAS_NUM_THREADS=10 OPENBLAS_DYNAMIC=0 VECLIB_MAXIMUM_THREADS=10
@@ -103,6 +157,32 @@ python3 bench/tools/plot_level2_report.py zig-out/benchmarks/level2.csv \
   --bars-svg zig-out/benchmarks/level2.svg --stat median
 python3 bench/tools/plot_gemm_sweep.py zig-out/benchmarks/gemm.csv \
   zig-out/benchmarks/gemm.svg --stat median
+
+# Focused repeatability diagnostic after the full suite.
+python3 bench/tools/run_level1_report.py \
+  --level1-probe zig-out/bin/level1-probe --copy-probe zig-out/bin/dcopy-probe \
+  --n 1048576 --copy-byte-size 8KiB --copy-byte-size 8MiB --seconds 1 --copy-seconds 1 \
+  --op ddot --op dzasum --op dcopy \
+  --process-repeats 6 --process-schedule interleaved \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize fast \
+  --csv zig-out/benchmarks/level1-recheck.csv \
+  --zynum zig-out/lib/libzynum_blas.dylib
+python3 bench/tools/run_level2_report.py \
+  --n 128 --op legacy --reps-small 100 --reps-large 30 \
+  --process-repeats 6 --process-schedule interleaved \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize fast \
+  --csv zig-out/benchmarks/level2-recheck.csv \
+  --zynum zig-out/lib/libzynum_blas.dylib
+python3 bench/tools/run_gemm_sweep_isolated.py \
+  --gemm-sweep zig-out/bin/gemm-sweep --zynum-blas zig-out/lib/libzynum_blas.dylib \
+  --shape m1024_n64_k1024:1024:64:1024 \
+  --shape m256_n1536_k256:256:1536:256 \
+  --shape m128_n128_k4096:128:128:4096 \
+  --reps 30 --process-repeats 6 --process-schedule interleaved \
+  --isolate-kind --isolate-shape --check \
+  --build-target aarch64-macos --build-cpu baseline --build-optimize fast \
+  --csv zig-out/benchmarks/gemm-recheck.csv
+ZYNUM_BENCHMARK
 ```
 
 ## Kernel design

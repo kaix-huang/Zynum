@@ -478,13 +478,97 @@ REQUIRED_GAP_IDS = {
     "gap:cross-target-benchmark-payload-execution",
     "gap:process-bounds-deferred",
 }
-REQUIRED_DERIVED_CANDIDATE_IDS = frozenset(('derived:docs/assets/benchmarks/current/gemm.csv', 'derived:docs/assets/benchmarks/current/gemm.csv.meta.json', 'derived:docs/assets/benchmarks/current/gemm.svg', 'derived:docs/assets/benchmarks/current/level1.csv', 'derived:docs/assets/benchmarks/current/level1.csv.meta.json', 'derived:docs/assets/benchmarks/current/level1.svg', 'derived:docs/assets/benchmarks/current/level2.csv', 'derived:docs/assets/benchmarks/current/level2.csv.meta.json', 'derived:docs/assets/benchmarks/current/level2.svg', 'derived:docs/assets/benchmarks/current/source.json', 'derived:docs/kernel_coverage.json', 'derived:include/zynum/blas/abi_manifest.json', 'derived:include/zynum/blas/blas.f90', 'derived:include/zynum/blas/blas.h', 'derived:include/zynum/blas/cblas.h', 'derived:pkgconfig/zynum_blas.pc', 'derived:src/blas/kernels/dispatch/matrix_matrix.zig', 'derived:src/blas/kernels/dispatch/matrix_vector.zig', 'derived:src/blas/kernels/dispatch/vector_binary.zig', 'derived:src/blas/kernels/dispatch/vector_unary.zig', 'derived:src/blas/kernels/multiversion/object.zig', 'derived:src/blas/kernels/multiversion/protocol.zig', 'derived:tools/abi_baseline_observation.json'))
-REQUIRED_DERIVED_FACT_DIGESTS = {'derived:docs/assets/benchmarks/current/gemm.csv': '82415a2424f2e032af233e11cff6fa07deac3e4541bbcb33dd368dfaa7532c9f', 'derived:docs/assets/benchmarks/current/gemm.csv.meta.json': 'a17f4c233a2ecfa2ddf1f0e1066313bc21ef770e69786b6e98ffafbff4cdcd8b', 'derived:docs/assets/benchmarks/current/gemm.svg': '20bb77fc4e3c4b76be0c93aa598470b5a983789b6b844a1b55a647968faa42ae', 'derived:docs/assets/benchmarks/current/level1.csv': '505605ac3de712151027a29db708a7a99ca09bfb000f45d5004df796f00325db', 'derived:docs/assets/benchmarks/current/level1.csv.meta.json': '2ecd97efb79db9b03238bbeda0bab15b65bfef7252fa44240cea08e7e4836fef', 'derived:docs/assets/benchmarks/current/level1.svg': 'fffcf887ebacdd6b5888f92dab0c868678a6188b05122b9c8b815c5cc0debabc', 'derived:docs/assets/benchmarks/current/level2.csv': 'b7ed5691176251032ee39602c4007c7f958efa6c53febf40260f3ad4a4cb5f55', 'derived:docs/assets/benchmarks/current/level2.csv.meta.json': '873adbcc8c5012e2e711a834d34645612486c7a23b258379231162a3212081c9', 'derived:docs/assets/benchmarks/current/level2.svg': '1159637e1540cb125ec7efaa03d9cfc3b2a2f721b51dbbe8eed3cf97c149e6fd', 'derived:docs/assets/benchmarks/current/source.json': '8d2e5c942d49da18fb3ee30e383ad37ac697fb5aa57958c031587ddf95d95e48', 'derived:docs/kernel_coverage.json': '3585fdf4912ec58949ba689e2915c8620e6b8d3d941a54ce582137a2405b5fee', 'derived:include/zynum/blas/abi_manifest.json': '03432d387c814461bae90610bb13520bd15edc9bb440d138a780c1902bb3c557', 'derived:include/zynum/blas/blas.f90': 'c43410928301c3783ceac435bfab2b39a86289d2bd66737c6dc6c90c7199dce0', 'derived:include/zynum/blas/blas.h': '6e9da8d67ac8521c41524651a5acc906447bf24884aabdf4008bff3ca258f1c3', 'derived:include/zynum/blas/cblas.h': 'dac223578719947a5d5fa210ad1bda6a9aeb3d0b7e334206fb86fb4ed285a5fd', 'derived:pkgconfig/zynum_blas.pc': '252c8c9903eb2c676d02bed6c7db32f8e50e4632702cbec852ddf1131310dc6c', 'derived:src/blas/kernels/dispatch/matrix_matrix.zig': '227099547c77c5fa219f679e4643807da77355b2a9295c2882fde2197c19c5ce', 'derived:src/blas/kernels/dispatch/matrix_vector.zig': '74d392efe149eda5dc2ec65ba14942b993a0b468092ad8dcf709d5f1a6d6aab7', 'derived:src/blas/kernels/dispatch/vector_binary.zig': '57faef2bc9c5fc3a85fb94f7d8978ee2851eb52d7f0edd5f9a2b550995e7ef9b', 'derived:src/blas/kernels/dispatch/vector_unary.zig': 'fc5aeee3dad3080d50bb69473003854755decb246ec87510d2fd41ca09a3b4f8', 'derived:src/blas/kernels/multiversion/object.zig': '599af08444ba25827ee5f93ab5e55a57b30a085dfa7010791dea2d656beb1929', 'derived:src/blas/kernels/multiversion/protocol.zig': 'cc60aaf09c844e2b8341f1145686c5aa73efd7033401612eddd147080371ae3f', 'derived:tools/abi_baseline_observation.json': '2f78f017f1b8d531a4465f5ff54278464954a09169478e709ff6fff1e5c2a99a'}
+# Reviewed 2026-10-10 measurements at clean source 4ef1065; timings are observations.
+REVIEWED_CURRENT_BENCHMARK_ASSET_SHA256 = {
+    "gemm-recheck.csv": "b41676fa0cf42fc2851d4e411949024fba0e4cfb2ae5c68bb07f88b8f28df1f1",
+    "gemm-recheck.csv.meta.json": "9c3182f22373ea0b59a639ed8d37bf4aed2ee65b82bc44e5af928cf4e27201bb",
+    "gemm.csv": "bc123b91034a88959f29229d5226b6da53910408e279bf78a74b55667a2a8704",
+    "gemm.csv.meta.json": "9642a2b7d41f18b87687c14efefff0d3be337167be010acc388451454d30f02a",
+    "gemm.svg": "cc3b82652782d961da821ef8e90416b78cc7ecfb712f74ed716b896fa0436127",
+    "level1-recheck.csv": "d13a76aec74beedb02a95d9bba68f37348606b7e5db4fdc2cdedee5855d19878",
+    "level1-recheck.csv.meta.json": "2770d1faac9755ca45bc4d464d7d9eeeb23d001535c80513f282dd1f5e2089f1",
+    "level1.csv": "2cc0916704102ea5d01296c03c794d9e56b8977ec96ce663b1496fd4d60264b5",
+    "level1.csv.meta.json": "f57986cd713045a7a7836b5a007ff4981f5c443d745b6efe02f0abd9151d07c9",
+    "level1.svg": "0e9bc857ff582d96c736773721f234354de59fc1daf937874c79019e10612c2a",
+    "level2-recheck.csv": "e36e71f77bd73b3c6bbc453547898783dce491d117b94d411954d43a34bc6ce1",
+    "level2-recheck.csv.meta.json": "6b1c78e81692335e42ca66848cfdeb6b0deb31cbb037d005208de1a1a97ae39e",
+    "level2.csv": "585396dac0584c6d3c92d18f8a356b5828d34b8025036baa7501cef628cd1d87",
+    "level2.csv.meta.json": "369406cec5b1a4b66f0cc2b37cd173ec969848eedf3def33a109bfa039d94b33",
+    "level2.svg": "7eeb5fb4f69817fc1cb31f24871513e6534610ce2a45fd899198f994f04f5a2e",
+    "source.json": "97d4dc8a8fd1e13dccee40d2879c382b508c03d102af6bf4dc1e4c8332a0b958"
+}
+REQUIRED_DERIVED_CANDIDATE_IDS = frozenset([
+    "derived:docs/assets/benchmarks/current/gemm-recheck.csv",
+    "derived:docs/assets/benchmarks/current/gemm-recheck.csv.meta.json",
+    "derived:docs/assets/benchmarks/current/gemm.csv",
+    "derived:docs/assets/benchmarks/current/gemm.csv.meta.json",
+    "derived:docs/assets/benchmarks/current/gemm.svg",
+    "derived:docs/assets/benchmarks/current/level1-recheck.csv",
+    "derived:docs/assets/benchmarks/current/level1-recheck.csv.meta.json",
+    "derived:docs/assets/benchmarks/current/level1.csv",
+    "derived:docs/assets/benchmarks/current/level1.csv.meta.json",
+    "derived:docs/assets/benchmarks/current/level1.svg",
+    "derived:docs/assets/benchmarks/current/level2-recheck.csv",
+    "derived:docs/assets/benchmarks/current/level2-recheck.csv.meta.json",
+    "derived:docs/assets/benchmarks/current/level2.csv",
+    "derived:docs/assets/benchmarks/current/level2.csv.meta.json",
+    "derived:docs/assets/benchmarks/current/level2.svg",
+    "derived:docs/assets/benchmarks/current/source.json",
+    "derived:docs/kernel_coverage.json",
+    "derived:include/zynum/blas/abi_manifest.json",
+    "derived:include/zynum/blas/blas.f90",
+    "derived:include/zynum/blas/blas.h",
+    "derived:include/zynum/blas/cblas.h",
+    "derived:pkgconfig/zynum_blas.pc",
+    "derived:src/blas/kernels/dispatch/matrix_matrix.zig",
+    "derived:src/blas/kernels/dispatch/matrix_vector.zig",
+    "derived:src/blas/kernels/dispatch/vector_binary.zig",
+    "derived:src/blas/kernels/dispatch/vector_unary.zig",
+    "derived:src/blas/kernels/multiversion/object.zig",
+    "derived:src/blas/kernels/multiversion/protocol.zig",
+    "derived:tools/abi_baseline_observation.json"
+])
+REQUIRED_DERIVED_FACT_DIGESTS = {
+    "derived:docs/assets/benchmarks/current/gemm-recheck.csv": "7a6c664a285eb7b8bf6dbc425447ce6e7332af45011d882dbc9a4473b0988a66",
+    "derived:docs/assets/benchmarks/current/gemm-recheck.csv.meta.json": "32368b1fb325435cf2e4c33a0683056b63c0356654d3d7195d3539a09ae38f8d",
+    "derived:docs/assets/benchmarks/current/gemm.csv": "e540b7d6491881ca53674cbed70612a8bced099d810d29eca7db68651f67acc9",
+    "derived:docs/assets/benchmarks/current/gemm.csv.meta.json": "ff1c0e2f24866ddc8c66f4f322acb6b7ea6cd1854acfc3980b12036ac09f0d13",
+    "derived:docs/assets/benchmarks/current/gemm.svg": "19a9403aedaee43f3a6cd515020b176eddfeb5f9aad6424528be83bb4022a0a4",
+    "derived:docs/assets/benchmarks/current/level1-recheck.csv": "d37d2ff06f5cc602d07536c3a8d99a3b1828f656ba553e294c60fa90467d4130",
+    "derived:docs/assets/benchmarks/current/level1-recheck.csv.meta.json": "f10b3b966b78040fb512c95bf5071e2aee38e640e23e2e45d5d09ea2cdc7fe05",
+    "derived:docs/assets/benchmarks/current/level1.csv": "bef9fe1c32f48f530d1f2b835add81683c085401818df8b33bfdfe474a5eeb2c",
+    "derived:docs/assets/benchmarks/current/level1.csv.meta.json": "1cae10775d936501b95bdde1d92db3becd243e52ea685ec23824cde3b2cff047",
+    "derived:docs/assets/benchmarks/current/level1.svg": "c68afd052771ce11ebc79d2db02f849fcfdbf179da0954c1bae17e49759b6dc5",
+    "derived:docs/assets/benchmarks/current/level2-recheck.csv": "d7b206cdb33fe4fae9ce9c3fbc114a3afddb72116bef049a8d77b02bbed139a9",
+    "derived:docs/assets/benchmarks/current/level2-recheck.csv.meta.json": "60708df4d11cc820de8be2ab22c1efe42e8bee38ca34175f41cf8f661010d866",
+    "derived:docs/assets/benchmarks/current/level2.csv": "caf482c46ed6dcc2c9172604b3f9d16f14583e8ad04eb73184043c4d8e2a247e",
+    "derived:docs/assets/benchmarks/current/level2.csv.meta.json": "0f47d7f64e0b34685fef4fe18bf2a8bf3cb3d406958acfea9166efaeb758c7e7",
+    "derived:docs/assets/benchmarks/current/level2.svg": "917b947d49d4d326cba716937237859c91da111710e2771e4b8a1d9fb3d29aa9",
+    "derived:docs/assets/benchmarks/current/source.json": "66eb8f860552e45e0d833b8d94432ce6cbea789eb67024b595d46a18b3eb692e",
+    "derived:docs/kernel_coverage.json": "3585fdf4912ec58949ba689e2915c8620e6b8d3d941a54ce582137a2405b5fee",
+    "derived:include/zynum/blas/abi_manifest.json": "03432d387c814461bae90610bb13520bd15edc9bb440d138a780c1902bb3c557",
+    "derived:include/zynum/blas/blas.f90": "c43410928301c3783ceac435bfab2b39a86289d2bd66737c6dc6c90c7199dce0",
+    "derived:include/zynum/blas/blas.h": "6e9da8d67ac8521c41524651a5acc906447bf24884aabdf4008bff3ca258f1c3",
+    "derived:include/zynum/blas/cblas.h": "dac223578719947a5d5fa210ad1bda6a9aeb3d0b7e334206fb86fb4ed285a5fd",
+    "derived:pkgconfig/zynum_blas.pc": "252c8c9903eb2c676d02bed6c7db32f8e50e4632702cbec852ddf1131310dc6c",
+    "derived:src/blas/kernels/dispatch/matrix_matrix.zig": "227099547c77c5fa219f679e4643807da77355b2a9295c2882fde2197c19c5ce",
+    "derived:src/blas/kernels/dispatch/matrix_vector.zig": "74d392efe149eda5dc2ec65ba14942b993a0b468092ad8dcf709d5f1a6d6aab7",
+    "derived:src/blas/kernels/dispatch/vector_binary.zig": "57faef2bc9c5fc3a85fb94f7d8978ee2851eb52d7f0edd5f9a2b550995e7ef9b",
+    "derived:src/blas/kernels/dispatch/vector_unary.zig": "fc5aeee3dad3080d50bb69473003854755decb246ec87510d2fd41ca09a3b4f8",
+    "derived:src/blas/kernels/multiversion/object.zig": "599af08444ba25827ee5f93ab5e55a57b30a085dfa7010791dea2d656beb1929",
+    "derived:src/blas/kernels/multiversion/protocol.zig": "cc60aaf09c844e2b8341f1145686c5aa73efd7033401612eddd147080371ae3f",
+    "derived:tools/abi_baseline_observation.json": "2f78f017f1b8d531a4465f5ff54278464954a09169478e709ff6fff1e5c2a99a"
+}
 REQUIRED_GAP_FACT_DIGESTS = {
     "gap:process-bounds-deferred": "165ca9d0f5a67a60e33c0687c1752307caf444f89df7ff499cf7418694a22ee0",
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5"
 }
-REQUIRED_SECTION_FACT_DIGESTS = {'option_surfaces': '16971e979865524c0927e6c26bec60656324ec178f81f12dbf61e477cef7d8b3', 'repository_file_classifications': 'fd3b27c170a43f064eed948b61805cb3561bc616707698febb113a4825a0f1ba', 'derived_candidates': '8d60006f7d71f336e855774315149fe6f6632c7fe3d771da2f09b600a41acaf9', 'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd'}
+REQUIRED_SECTION_FACT_DIGESTS = {
+    "option_surfaces": "16971e979865524c0927e6c26bec60656324ec178f81f12dbf61e477cef7d8b3",
+    "repository_file_classifications": "25ea1bd01426330616dcfbe50b349271f9f55ada40d43b5c7ad78d1821ce7813",
+    "derived_candidates": "3e55302fd9a9c1bfd138ca5a2755a6b2c6b47022cf55976206b00299cdeb4b7b",
+    "current_gaps": "781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd"
+}
 REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {
     "bench/tools/test_level2_report.py:test_triangular_worker_correctness": "90c21f759b2e2e2648049f1d890e57580f7b9dc78c605e5cbc5a97f2adce5973",
     "bench/tools/test_level2_report.py:run_one": "3c8de6ccdf7abfdc0ded13cb2d36095d61a7024795b39b83dd7ee53b6bbcb4df",
@@ -14047,6 +14131,17 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         item["path"]: item for item in inventory["repository_file_classifications"]
     }
     classifications.pop("COPYING.LESSER", None)
+    for name in REVIEWED_CURRENT_BENCHMARK_ASSET_SHA256:
+        path = f"docs/assets/benchmarks/current/{name}"
+        classifications[path] = {
+            "path": path,
+            "kind": (
+                "json-data" if name.endswith(".json") else
+                "visual-asset" if name.endswith(".svg") else "other-public-file"
+            ),
+            "class": "curated-documentation-asset",
+            "owner": "documentation-maintainers",
+        }
     classifications["test/headers/compat_headers.h"] = {
         "path": "test/headers/compat_headers.h",
         "kind": "foreign-language-source",
@@ -14231,6 +14326,44 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         "workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date",
     ]
     derived_candidates = {item["id"]: item for item in inventory["derived_candidates"]}
+    for name, asset_sha256 in REVIEWED_CURRENT_BENCHMARK_ASSET_SHA256.items():
+        path = f"docs/assets/benchmarks/current/{name}"
+        derived_candidates[f"derived:{path}"] = {
+            "id": f"derived:{path}",
+            "path": path,
+            "class": "curated-documentation-asset",
+            "owner": "documentation-maintainers",
+            "tracking_status": "tracked",
+            "public_safe_provenance": (
+                "Current benchmark evidence identified by "
+                "docs/assets/benchmarks/current/source.json. "
+                f"Asset SHA-256: {asset_sha256}."
+            ),
+            "claim_scope": (
+                "Focused repeatability diagnostics for selected Level 1/2 and GEMM "
+                "cases on the recorded host; six fresh-process measurements. "
+                "These diagnostics do not replace the main chart data."
+                if "-recheck" in name else
+                "Selected Level 1/2 and GEMM cases on the recorded host; median of "
+                "six fresh-process measurements. No all-function or cross-platform "
+                "performance guarantee."
+            ),
+            "review_date": "2026-10-10",
+            "freshness_criteria": (
+                "Remeasure after material kernel, compiler, hardware, OS, or "
+                "benchmark protocol changes."
+            ),
+            "replacement_criteria": (
+                "Replace the current bundle as a unit after validating source "
+                "identity, numerical checks, sample completeness, and public metadata."
+            ),
+            "deterministic_regeneration_claim": False,
+            "raw_inputs_disposition": (
+                "Curated CSV samples and metadata accompany the figures in "
+                "docs/assets/benchmarks/current/. Process diagnostics and profiler "
+                "output remain local; timing values are not deterministic."
+            ),
+        }
     for path in (
         "include/zynum/blas/blas.h",
         "include/zynum/blas/cblas.h",
@@ -14275,7 +14408,7 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
         "install_disposition": "not installed",
     }
     inventory["derived_candidates"] = [
-        derived_candidates[item["id"]] for item in inventory["derived_candidates"]
+        derived_candidates[identifier] for identifier in sorted(derived_candidates)
     ]
     closed_gaps = {
         "gap:windows-library-install-collision",
