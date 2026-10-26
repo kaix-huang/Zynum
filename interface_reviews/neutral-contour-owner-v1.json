@@ -1,0 +1,69 @@
+{
+  "schema": "zynum.neutral-contour-owner-review/1",
+  "scope": "finite-callable-generation-only",
+  "reason": "Additive allocation-free validateRequest exposes the same existing canonical option checks; existing numerical bodies and literal-import paths are unchanged.",
+  "added_Core_declaration": "/// Frontends can validate the canonical request before reserving publication\n/// buffers. This performs no admission, allocation, action or communication.\npub fn validateRequest(comptime T: type, q: Request(T)) !void {\n    try options(T, q);\n}\n",
+  "records": [
+    {
+      "registry": "standard_abi_bindings.py",
+      "source_count": 201,
+      "changed_dependency": "src/numerics/contour_eigensolver.zig",
+      "old_sha256": "f788128ec351ca6606d9ecf11637f8783214da7643cc5de69cf9987504fa09f3",
+      "new_sha256": "109a603bc44b301ff0171ed17bf5b1fff353f1cb692f644cda17e60ce79a6871",
+      "source_envelope_sha256": "b9b39bcb3fc6e44a6c068e6b0d8d775cc0fc990facba985c6b654d734927e44b",
+      "literal_import_paths_changed": false
+    },
+    {
+      "registry": "standard_sparse_bindings.py",
+      "source_count": 173,
+      "changed_dependency": "src/numerics/contour_eigensolver.zig",
+      "old_sha256": "f788128ec351ca6606d9ecf11637f8783214da7643cc5de69cf9987504fa09f3",
+      "new_sha256": "109a603bc44b301ff0171ed17bf5b1fff353f1cb692f644cda17e60ce79a6871",
+      "source_envelope_sha256": "33e1a4da1e6d273bf15a80e11cee1b0688ff5cb92562386df469dd52873dcd26",
+      "literal_import_paths_changed": false
+    }
+  ],
+  "native_evidence": [
+    {
+      "path": "/Users/kxhuang/Project/zynum-work/contour-operator-interface-20261018/native-numerics-entry-v1-Debug-completion.json",
+      "sha256": "c1440a75de2b9ce0af770a45461690722e3c279f76b85b47a7403b00bbda91f0",
+      "mode": "Debug",
+      "test_bodies": 208
+    },
+    {
+      "path": "/Users/kxhuang/Project/zynum-work/contour-operator-interface-20261018/native-contour-binding-v2-Debug-attempt1-completion.json",
+      "sha256": "43e3fb5aa072471a218a5c9a0351528f2732c249907756cbcfc3df0aade6f7ca",
+      "mode": "Debug",
+      "test_bodies": 5
+    },
+    {
+      "path": "/Users/kxhuang/Project/zynum-work/contour-operator-interface-20261018/native-numerics-entry-v1-ReleaseSafe-completion.json",
+      "sha256": "7e198f3bc84f3bc7fe2c66b7aa2879df7960a8d7cc31deaa06586a944f4f9995",
+      "mode": "ReleaseSafe",
+      "test_bodies": 208
+    },
+    {
+      "path": "/Users/kxhuang/Project/zynum-work/contour-operator-interface-20261018/native-contour-binding-v2-ReleaseSafe-attempt1-completion.json",
+      "sha256": "ad8aec90349aa4ab3cec5da843bd0b18e28bf2c87c8d93bfb59d650613ef0c51",
+      "mode": "ReleaseSafe",
+      "test_bodies": 5
+    },
+    {
+      "path": "/Users/kxhuang/Project/zynum-work/contour-operator-interface-20261018/native-numerics-entry-v1-ReleaseFast-completion.json",
+      "sha256": "480ccc83d5cf4e3315aa1adbad344e9e564fc34ad49505798105a8ede9046505",
+      "mode": "ReleaseFast",
+      "test_bodies": 208
+    },
+    {
+      "path": "/Users/kxhuang/Project/zynum-work/contour-operator-interface-20261018/native-contour-binding-v2-ReleaseFast-attempt1-completion.json",
+      "sha256": "0a7c4caad2eb5675c805db33e53dbbcffb7615e46cf981b4ca3d04f28678b342",
+      "mode": "ReleaseFast",
+      "test_bodies": 5
+    }
+  ],
+  "existing_numerical_bodies_unchanged": true,
+  "existing_vendor_declarations_and_lowering_changed": false,
+  "unified_SDK_runtime_qualified": false,
+  "full_profile_ready": false,
+  "full_goal_complete": false
+}

@@ -1,0 +1,9 @@
+EXPORTS
+    LAPACKE_sgelss
+    LAPACKE_sgelss_work
+    LAPACKE_dgelss
+    LAPACKE_dgelss_work
+    LAPACKE_cgelss
+    LAPACKE_cgelss_work
+    LAPACKE_zgelss
+    LAPACKE_zgelss_work

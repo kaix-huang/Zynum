@@ -6,6 +6,7 @@
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const vector_ops = @import("../vector/operations.zig");
+const CallResources = @import("../execution/thread_pool.zig").CallResources;
 const access = @import("access.zig");
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
 const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
@@ -41,14 +42,14 @@ fn opIsUpper(uplo: Uplo, trans_: Order) bool {
     return (trans_ == .no_trans and uplo == .upper) or (trans_ != .no_trans and uplo == .lower);
 }
 
-fn denseAxpy(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
+fn denseAxpy(comptime T: type, resources: CallResources, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
     if (n == 0 or isZero(T, alpha)) return;
     if (tuning.enable_fixed_bodies and matrix_vector_kernels.triangularAxpyUnit(T, n, alpha, a, x)) return;
     if (tuning.preferDenseVector(n)) {
         if (comptime isComplex(T)) {
-            // Keep each triangular dependency step serial. The general complex
-            // helper is allowed only while the tuning profile keeps it serial.
-            if (tuning.keepComplexDependencySerial(n)) return vector_ops.axpy(T, @intCast(n), alpha, a, 1, x, 1);
+            // Preserve the existing helper-size gate. Any nested Level 1 work
+            // borrows the same enclosing call resources, including real AXPY.
+            if (tuning.keepComplexDependencySerial(n)) return vector_ops.axpyWithResources(T, resources, @intCast(n), alpha, a, 1, x, 1);
         } else {
             return vector_ops.axpyUnitReal(T, n, alpha, a, x);
         }
@@ -56,15 +57,15 @@ fn denseAxpy(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void 
     for (0..n) |i| x[i] = add(T, x[i], mul(T, alpha, a[i]));
 }
 
-fn denseDot(comptime T: type, n: usize, a: [*]const T, x: [*]const T, conjugate_a: bool) T {
+fn denseDot(comptime T: type, resources: CallResources, n: usize, a: [*]const T, x: [*]const T, conjugate_a: bool) T {
     if (tuning.enable_fixed_bodies) {
         var result = zero(T);
         if (matrix_vector_kernels.triangularDotUnit(T, n, a, x, conjugate_a, &result)) return result;
     }
     if (tuning.preferDenseVector(n)) {
         if (comptime isComplex(T)) {
-            // As above, do not let one solve step fan out into Level 1 tasks.
-            if (tuning.keepComplexDependencySerial(n)) return vector_ops.dot(T, @intCast(n), a, 1, x, 1, conjugate_a);
+            // Preserve the helper-size gate and the enclosing call resources.
+            if (tuning.keepComplexDependencySerial(n)) return vector_ops.dotWithResources(T, resources, @intCast(n), a, 1, x, 1, conjugate_a);
         } else {
             return vector_ops.dotUnitReal(T, n, a, x);
         }
@@ -77,14 +78,14 @@ fn denseDot(comptime T: type, n: usize, a: [*]const T, x: [*]const T, conjugate_
     return sum;
 }
 
-fn trmvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a: [*]const T, lda: BlasInt, x: [*]T) void {
+fn trmvUnit(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a: [*]const T, lda: BlasInt, x: [*]T) void {
     const lda_usize = toUsize(lda);
     if (trans_ == .no_trans) {
         if (uplo == .upper) {
             for (0..n) |j| {
                 const column = a + j * lda_usize;
                 const xj = x[j];
-                denseAxpy(T, j, xj, column, x);
+                denseAxpy(T, resources, j, xj, column, x);
                 if (diag == .non_unit) x[j] = mul(T, xj, column[j]);
             }
         } else {
@@ -94,7 +95,7 @@ fn trmvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
                 const column = a + j * lda_usize;
                 const xj = x[j];
                 if (diag == .non_unit) x[j] = mul(T, xj, column[j]);
-                denseAxpy(T, n - j - 1, xj, column + j + 1, x + j + 1);
+                denseAxpy(T, resources, n - j - 1, xj, column + j + 1, x + j + 1);
             }
         }
         return;
@@ -106,7 +107,7 @@ fn trmvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
         while (j > 0) {
             j -= 1;
             const column = a + j * lda_usize;
-            var sum = denseDot(T, j, column, x, conjugate_a);
+            var sum = denseDot(T, resources, j, column, x, conjugate_a);
             const diagonal = if (diag == .unit)
                 one(T)
             else if (conjugate_a)
@@ -126,7 +127,7 @@ fn trmvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
             else
                 column[j];
             var sum = mul(T, diagonal, x[j]);
-            sum = add(T, sum, denseDot(T, n - j - 1, column + j + 1, x + j + 1, conjugate_a));
+            sum = add(T, sum, denseDot(T, resources, n - j - 1, column + j + 1, x + j + 1, conjugate_a));
             x[j] = sum;
         }
     }
@@ -300,10 +301,19 @@ fn triPackedOpValue(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: 
 }
 
 pub fn trmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
+    return trmvWithResources(T, .legacy_default, uplo, trans_, diag, n_, a, lda, x, incx_);
+}
+
+/// Borrow one live operation through all synchronous nested Level 1 work.
+pub fn trmvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
+    return trmvWithResources(T, .{ .admitted = operation }, uplo, trans_, diag, n_, a, lda, x, incx_);
+}
+
+fn trmvWithResources(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
     if (n_ <= 0 or incx_ == 0) return;
     const n = toUsize(n_);
     const selected = level2_tuning.selectDefault(T, .trmv, .{ .m = n, .n = n, .incx = incx_ });
-    if (selected.kernel.implementation == .core_unit) return trmvUnit(T, uplo, trans_, diag, n, a, lda, x);
+    if (selected.kernel.implementation == .core_unit) return trmvUnit(T, resources, uplo, trans_, diag, n, a, lda, x);
     trmvFallback(T, uplo, trans_, diag, n_, a, lda, x, incx_);
 }
 
@@ -359,7 +369,7 @@ pub fn tpmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt
     }
 }
 
-fn trsvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a: [*]const T, lda: BlasInt, x: [*]T) void {
+fn trsvUnit(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a: [*]const T, lda: BlasInt, x: [*]T) void {
     const lda_usize = toUsize(lda);
     if (trans_ == .no_trans) {
         if (uplo == .upper) {
@@ -370,7 +380,7 @@ fn trsvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
                 var xj = x[j];
                 if (diag == .non_unit) xj = divv(T, xj, column[j]);
                 x[j] = xj;
-                denseAxpy(T, j, neg(T, xj), column, x);
+                denseAxpy(T, resources, j, neg(T, xj), column, x);
             }
         } else {
             for (0..n) |j| {
@@ -378,7 +388,7 @@ fn trsvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
                 var xj = x[j];
                 if (diag == .non_unit) xj = divv(T, xj, column[j]);
                 x[j] = xj;
-                denseAxpy(T, n - j - 1, neg(T, xj), column + j + 1, x + j + 1);
+                denseAxpy(T, resources, n - j - 1, neg(T, xj), column + j + 1, x + j + 1);
             }
         }
         return;
@@ -388,7 +398,7 @@ fn trsvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
     if (uplo == .upper) {
         for (0..n) |j| {
             const column = a + j * lda_usize;
-            var xj = sub(T, x[j], denseDot(T, j, column, x, conjugate_a));
+            var xj = sub(T, x[j], denseDot(T, resources, j, column, x, conjugate_a));
             if (diag == .non_unit) {
                 const diagonal = if (conjugate_a) conj(T, column[j]) else column[j];
                 xj = divv(T, xj, diagonal);
@@ -400,7 +410,7 @@ fn trsvUnit(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: usize, a
         while (j > 0) {
             j -= 1;
             const column = a + j * lda_usize;
-            var xj = sub(T, x[j], denseDot(T, n - j - 1, column + j + 1, x + j + 1, conjugate_a));
+            var xj = sub(T, x[j], denseDot(T, resources, n - j - 1, column + j + 1, x + j + 1, conjugate_a));
             if (diag == .non_unit) {
                 const diagonal = if (conjugate_a) conj(T, column[j]) else column[j];
                 xj = divv(T, xj, diagonal);
@@ -433,10 +443,19 @@ fn trsvFallback(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: Bla
 }
 
 pub fn trsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
+    return trsvWithResources(T, .legacy_default, uplo, trans_, diag, n_, a, lda, x, incx_);
+}
+
+/// Borrow one live operation through all synchronous nested Level 1 work.
+pub fn trsvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
+    return trsvWithResources(T, .{ .admitted = operation }, uplo, trans_, diag, n_, a, lda, x, incx_);
+}
+
+fn trsvWithResources(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx_: BlasInt) void {
     if (n_ <= 0 or incx_ == 0) return;
     const n = toUsize(n_);
     const selected = level2_tuning.selectDefault(T, .trsv, .{ .m = n, .n = n, .incx = incx_ });
-    if (selected.kernel.implementation == .core_unit) return trsvUnit(T, uplo, trans_, diag, n, a, lda, x);
+    if (selected.kernel.implementation == .core_unit) return trsvUnit(T, resources, uplo, trans_, diag, n, a, lda, x);
     trsvFallback(T, uplo, trans_, diag, n_, a, lda, x, incx_);
 }
 
@@ -490,10 +509,18 @@ pub fn tpsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt
 
 pub const testing = struct {
     pub fn axpyBody(comptime T: type, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
-        denseAxpy(T, n, alpha, a, x);
+        denseAxpy(T, .legacy_default, n, alpha, a, x);
     }
 
+    /// Exercise the actual nested-resource boundary without an O(n*n) matrix.
+    pub const admitted = if (@import("builtin").is_test) struct {
+        pub fn axpyBody(comptime T: type, operation: *const @import("zynum-execution").context.Operation, n: usize, alpha: T, a: [*]const T, x: [*]T) void {
+            _ = operation.borrowedContext();
+            denseAxpy(T, .{ .admitted = operation }, n, alpha, a, x);
+        }
+    } else struct {};
+
     pub fn dotBody(comptime T: type, n: usize, a: [*]const T, x: [*]const T, conjugate_a: bool) T {
-        return denseDot(T, n, a, x, conjugate_a);
+        return denseDot(T, .legacy_default, n, a, x, conjugate_a);
     }
 };

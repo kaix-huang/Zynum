@@ -1,0 +1,2221 @@
+{
+  "schema": "zynum.complex-gelsd-bidiagonal-owner/2",
+  "scope": "finite-generation-only",
+  "native_receipt": "/Users/kxhuang/Project/zynum-work/complex-gelsd-shared-core-20261020/residual-scale-native-v1/completion.json",
+  "native_receipt_sha256": "88f971f3958d9c8e657a3014c1d718591abcb52e62472d8ccecb08da1e921714",
+  "old_LAPACK_groups_each_mode": 752,
+  "new_registered_groups": 5,
+  "actual_GELSD_unfinished_edge_probe": 2,
+  "source_envelopes": {
+    "LAPACKE": {
+      "paths": 212,
+      "changed": [
+        "src/interop/lapacke_binding.zig",
+        "src/interop/lapacke_complex_gelsd_column.zig",
+        "src/interop/lapacke_complex_gelsd_policy.zig",
+        "src/interop/lapacke_complex_gelsd_workspace.zig",
+        "src/lapack/svd_least_squares.zig"
+      ],
+      "old_envelope": "bcdf071bd43db1f0ce799b16a01e1f25e3ace471f1262647c7c69c901fcc47c7",
+      "new_envelope": "d343582da7c9997e79237fec6923bc57a11ca699b0793a008907f0e8caf06941",
+      "added_or_removed_paths": []
+    },
+    "Sparse": {
+      "paths": 178,
+      "changed": [
+        "src/lapack/svd_least_squares.zig"
+      ],
+      "old_envelope": "c3a39b99093604eee0c68b236f83d64678c655e96f88787ee9da220a8f7b1bc4",
+      "new_envelope": "98f64324b1ec633308ea62cd524e28cd05fbaa8694f9edddaafdeb1a76da5f69",
+      "added_or_removed_paths": []
+    }
+  },
+  "plan_equivalence": [
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "bdbaa7427c2fabcc453568e314a60485eebeb72a186a08b5d4a200983f494a50",
+      "new_plan_sha256": "101d1edf0c8e06af3aa3ab3b5a4b798990526c3bb5fdf3a946b6c9ba9d6ee8c0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "64b0e26cae3140a2af0fcccb866543a9a1c85594b9450b445f5ea98ca67d7e46",
+      "new_plan_sha256": "89afa0e0f870fec4bca07ecb5016fa119bbe18a37cf164922302bc80b90855b0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-ordinary-ilp64-v1",
+      "old_plan_sha256": "53f8a8a51bf54482d88282c78682d190d270e6e2467b12452678b1db897bd7c5",
+      "new_plan_sha256": "3485a0e9498af8f3687001bf9e6648ef8a4785f199be055e198947187a4179f5",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "96cfac00769ef82ad3267641e671547acbb7d492e6528a8b9f06a2b4e603f1fe",
+      "new_plan_sha256": "c9aeaae4986be23c16d95b6ef424dc02944169c4a5e8909cb0ae72bd03a60a5c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-ilp64-v1",
+      "old_plan_sha256": "7282123d6e0ba2db46b5920c78f4340f3df041621ec7bf34298d38d7f093446c",
+      "new_plan_sha256": "3a20083502f38afa8eed2a2e214a4db441f8d7bf5172fe055bb09d209f116253",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "d701a15d8ebb5c4098f43508394127724c39984746839acb5e925c94c862f632",
+      "new_plan_sha256": "f2fef229168e9a0d1da8b238478810a5b344618e4b14ef1f6da5f9df68ec9b36",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-ordinary-ilp64-v1",
+      "old_plan_sha256": "84e536a85bb07a8418aa950138ee525094fa31a7d3e43eedf2f70841eb2b6df0",
+      "new_plan_sha256": "200d0a8c1b268099bf071db8128fea08172c094f6096af2b73c79e19cb47485d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "691b2236b9e36cf2814b665ec9318673d4098d9c8a24bd10ae231b39c352adf7",
+      "new_plan_sha256": "e26622e18f4e3a23122e6ff6ad2a3965c7fdfbc9d5045f910e11cc135701d1b9",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "6dc7f774246d3c0eed3610d08c2c905a228be1e80ce856a49d3c6624ce886739",
+      "new_plan_sha256": "762a0087bd7559747040c269de1e1409334cce12a5979acb0ec2c9aadab773f4",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "0377eac342d16715becee5dfbc5d4423c0e01d95b6741bf9c2dada36dc795a38",
+      "new_plan_sha256": "5848a9d3e80b94ae7aa4eb21d02953fc8864e7e57422fc644edb13937a4e7f4f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-ordinary-ilp64-v1",
+      "old_plan_sha256": "6931aa31f39190678596fef4a3f3e4b5efa991f4786bf06652484d605adddab2",
+      "new_plan_sha256": "d6a3dfe0bdc09131afee7efc0f8f7a6528db0a27241691c07d31935e9e92ffdf",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "d622372cfbdfe88761aaedd32cebace416e5740bba72ff63455d8f74efc5d0fa",
+      "new_plan_sha256": "e8c18851ce50855102a25ce6e41f72614f5991bf8a77ac0f69d14049f40af31a",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "f4e423b84f5fa4de60b4a26828ca18b47247260e880699680c60e236262e9402",
+      "new_plan_sha256": "12f062586910189d6d9668ffde610fac9eb40fc262d2a7694acde37a0b1fb695",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "f2c0d6e823d23da23ae5ed5c0238ea5d3dc4ba761bf2eaee50f20092ee52cf58",
+      "new_plan_sha256": "5aab608264df1f339168b369927d033340a494c7d6c136a016221c55f40c455c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "6d82c46eed664edfaa3a5438f6911f6959c96b1bf8109f4cea8d17930dd2a667",
+      "new_plan_sha256": "f53583714b79fbf07adf6afd3ee3b8955ad41b5f9a7cfd1d82283ae6a17b4c64",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "dcaabed5af4bdc8afa5087686b288b6b28b15a225a0c4cc3e86eaa9896efad21",
+      "new_plan_sha256": "78f9daf792210b09f9145b921cb26133876361d269a9f9302f6110d607ea84ac",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-ordinary-ilp64-v1",
+      "old_plan_sha256": "1e2e4d3990602ef1173ffd7a79d59e5163bdaad84f0c66a3f60711772c89eac6",
+      "new_plan_sha256": "f929c5037fdb5266744a7c7abef30b5c0b545e85184e6c5698042d36db45151b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "eb385b83665f9d272e8f7b161343bd85fc5815b3f3190034a512512fae73b5c2",
+      "new_plan_sha256": "26c83faec264d87796cb36e86004259e1fe2e4e85a6f246b093fe7ab4c80952b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "597d16e3d121b58362c4d58a6e5624b609149cdebff4519da68fe390806c4f72",
+      "new_plan_sha256": "a5f44940e05468f9f0989c2a7f9516c474f4845400fe5538ba2b4cfd9070e70c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "7e1e62f8989e2f71fa485792574f9e0744a98a733ef584225092163417292aae",
+      "new_plan_sha256": "e28f76817d8da39d53f7566dcd3e09e3a2ef43c0b2f70f0bbb8608631511e862",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-ordinary-ilp64-v1",
+      "old_plan_sha256": "c15dfcadee2b2ab2adcb423b4dcb2abeb16f63b5a324694fa832ff0987e567a4",
+      "new_plan_sha256": "53ff74351e151c5a317ce8c36acc45b9115e03d54313737efd07cf8b27131c16",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "9d2842121d2f42711833fc1e1741428f9e190cca6ee0a963e1307a730f3d0d56",
+      "new_plan_sha256": "7d0ffb818a6e39d354451d7f2e8d8c1212fa0599494649ec420fdf115c624d0f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "0a41363001ecbc46c7d37c86f1e936caf66e5981bf10154cbce8590fcc62e7de",
+      "new_plan_sha256": "ac8d4bfc58fe20f2fe286d2ef57a692da11e822eb62b06575b960742627e2521",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "19fb88a36c8cea1479fe8c3c2b781369ad1e31a3c4e6664e8b7302da58f3b644",
+      "new_plan_sha256": "0ac5accffe04e4406d9ce7adf179e105d88663ba155c434d8df0eff7369d70de",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "10a4ed2894052eb870ae92f914876baa818aa41f601dfd5865942fdc1968309f",
+      "new_plan_sha256": "543be0c8b8cf4f88379e49b4a4fb877165e8c603d42074c5926e021e5c1eca89",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "2d34bfaedd468cb50ae10264d2b08f583293e16ab4eb596b1473afa8ebbd6533",
+      "new_plan_sha256": "6448debad5a63ffa878f620d157735f0724f0bac3119c43fdb8d3914675a70d3",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-ordinary-ilp64-v1",
+      "old_plan_sha256": "e45bbdab9d456222f90de368ea97a9e2bc9b324626b5bbcbcedf4bd31dd86bdc",
+      "new_plan_sha256": "2e7fe0978cc4496ca8d3dee6540496b1053d9ed3e1e20a56bb9b8e7498080ffe",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "b3df88b9cf75a4055b3cb2ef85d3f17b8d0c6ac52a9dbe977b6e443825191bd6",
+      "new_plan_sha256": "27b962b42259082b412a10d6a77fce4a9d4b9d3a7bdb2743c1d1a6a134b98ddd",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "e45cd7cca285c4ea89bc89d97dff77b5c1765322dc79ae03dedaffeeda6dce82",
+      "new_plan_sha256": "cb3dde3248835196c0f5c24f4df4d8fe895ddcf4097f6c943643c19e07c5c855",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "287c0a5d1ef314deb77ee9aa8bc6c80ba5dc522ee66b4832ca4d6a8508288e6a",
+      "new_plan_sha256": "ce174af0120536c84a10bd415f2adf130b03a69ff223f2a217911664b80178e7",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-ordinary-ilp64-v1",
+      "old_plan_sha256": "0200ad55b1a2aba05710a3e30df8daa9e9d552f9c6be14d0421d30fd6c16ceb8",
+      "new_plan_sha256": "9be668e6484a38c269d07e88af2fa0610e1b65f4ffd7e6640c942fcf82f6b84d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "b9d3ab70171df43132177a304cac9788efef9527662a86696f5114c5142b65b0",
+      "new_plan_sha256": "e68bc77acae22002bbe00ea886d9e9d2932ef4e4753f5ea0093719003a4c26c3",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "b97a9c0548b102c2c020d46d5660684b3d99c7f1534924b8ffacc049aa6e0ca8",
+      "new_plan_sha256": "914123955d78f79839da8ee60a331b3490a56aff707c5a100b0e21ec3d4748b7",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "a50ce90218acf3b110a5d9ab79cbbf4451ffddbfa5838a31e728b84da1af7cc0",
+      "new_plan_sha256": "7a9a2d919b0fe35557615f453471fb1eb59a7af40f0c230dd2ce529f80bc2583",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-ordinary-ilp64-v1",
+      "old_plan_sha256": "2e5ba76b5a120707b47cb2bfab252878c355a3f7b66ea119610c46e68ef45c84",
+      "new_plan_sha256": "7015825cf1d8465c1851aa3d677195fdd53d2a182bd1650cd764e4e87eeba7a9",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "6669b51db2df043457375a3dd436d53d065af4eca683ae941efdd79eb05a293a",
+      "new_plan_sha256": "d3511df8a55c55c4c2bbb1293bbbc98d6889978bb2240f6a7763937186364d6e",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "0f92980dc2c5475affe02f28cbdc854970cb7197a72dd785a2b02d1b8bec47d2",
+      "new_plan_sha256": "ad7f12371f4349b8076d605d7322e588b17399e425c7863a5acdf0f817e7faf2",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "0fc306a242e75b18b48811947184f4914e69f89ee518f84270896619332aa1fe",
+      "new_plan_sha256": "5c50a66fc7c9e5b26d9e7e2c1392bbe65e8faf9db1a58cbb28d466a835ddd7ca",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-ordinary-ilp64-v1",
+      "old_plan_sha256": "0f57398115e971e9ecf4f5dfb7a1d34ed3b1e2791a8cbe6901214546fd90a272",
+      "new_plan_sha256": "1dbe170887d29ba9ba44c33c51b3b50956380102fb3b8472cde5d1720d02a92f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "f99774c6811b225fb78134e50c1eb20e0eb06ba2993e9f9ae7c7f8b0b6db1d06",
+      "new_plan_sha256": "604bb06d47aff218676a1e3e6a9880e3f2784d80a426f7b274fa7422511d66f0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "8c2023da6c0dfe6cdb6fd570b2e91f029608169793f7446740e1214145b1764b",
+      "new_plan_sha256": "07d5130493b116f8ac59f1aa81c4c858ad6f43c003234fa14f13be10f293400c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "4c100cc36f182c601d3f02ea08cba5264506957650fd21ef20426aa694969a24",
+      "new_plan_sha256": "e7b93d1b3387ab934465d206d438e02b26d45cab48ff0fe8090456d793cbb9f6",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "fb0b8ece991cf23f8b40ecb00259fd298db4e85321e5a0847cc3b77890897f00",
+      "new_plan_sha256": "9e8eff4f55046ac618124fa521c1925baada5a36762e9c1866518024eb3a3288",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "0b1918deffae91b54fa65c769e23b3058b1d17d4ac9a54603826baccf174e809",
+      "new_plan_sha256": "28c79a46ccbdeb93a2684261415184224e72d16065b6308193be53bf105c7307",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-ordinary-ilp64-v1",
+      "old_plan_sha256": "3fd9852c952a0a331e57f8bc585f685c507ec2e88e9e9059c4102ec1e91b91b2",
+      "new_plan_sha256": "eb69baa25c3b665998e72133cecb6f233a86aa71ae84968966ecb0bd9a5a3863",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-trtri-getri-ordinary-ilp64-v1",
+      "old_plan_sha256": "ad62af092584db84e135e9a67d3e7a0e3b7c657c07d4c6fe9c2608712712a306",
+      "new_plan_sha256": "92053edd7992614d39eac78f73211173074fef6d57cbf784b2eca9897d9fb137",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-trtri-ordinary-ilp64-v1",
+      "old_plan_sha256": "b5cbaf16d25599bf32d1907275ba237a67504182a2b9345e3e7316cd4866c8a4",
+      "new_plan_sha256": "9538202bee2255fe337b4b624b9834ff5a6092cf547e80d37c6a67c22b29442d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "bf52f358e2e3d460a897daf3d8921a0a38207625663addc0ad14ca0a660cf677",
+      "new_plan_sha256": "cf915743e6f5bc9174993c7702ad7126121608aa41f5dd1109de74202e4f526b",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-ordinary-lp64-v1",
+      "old_plan_sha256": "b6ce04928847d88d6de0e0aad427f35d143acd09bc64a27bd7d313ba31ba717d",
+      "new_plan_sha256": "670f60b8cd749075ead9dcf1ee7e303f07c348265848c102373cd7081ee0f33d",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "fb5dbf96e4ab752fe6470e5c128b6281a2ba71d5b9c84f6c627682bad9fe603c",
+      "new_plan_sha256": "9677d1e9ce0016dd528e5b0758cccba3a98007354a93aa70dc85d8381397ef1b",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "c1ac9dfafcfd24f2ba515bcc4195e27806ad956fee54d1c627dcc7fdd336793f",
+      "new_plan_sha256": "7fd73750a0e945668d5dba258ed6b55e69c84cafdd020bc77dbdfe81d467b8d1",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "b6d627e3832f465ab2d3ee66f812fc4507969b7e95205563c855298aa00085f0",
+      "new_plan_sha256": "70aa506da24b51f9da562043509cb6e14cda10decfd6ccfd189f501bc09fec68",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-ordinary-lp64-v1",
+      "old_plan_sha256": "87f19c790396cc44d4a87eb40007914e9256ff998aae4f973846833f1d1b3586",
+      "new_plan_sha256": "88e710af8b25cef5f4bc9e461c1d92fc0711722e531925cc0c2500650fc481ee",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "04cb8185d951b9f0deb295a842b183940916582928537fd8b069a1bcfe7d1dc6",
+      "new_plan_sha256": "e57303ff6bf03d3ddc672f95332fcc01c076cacd6691fe5dff3e4cff2096e97b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1",
+      "old_plan_sha256": "5dce1149bc9c28cc455d60155dbb7a9de2705f8f8efee9f58b0ca54c0cf2a1cb",
+      "new_plan_sha256": "5c207c638660dbe347df078ae6bc10cfcb0f6fd425ccb885c15a6bf2c13465e4",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "d8a1c9fbde952cb2c0da14a2f7ef3ed1a591a1b3a0e8dc7054d387ff0fb2c095",
+      "new_plan_sha256": "5a950b860a7b0264ebddeda0f4b9f36808e72e23be81f6adc4e5df86a0ec3324",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "e96b85edcaec184f37391984504ae5447665a71a375be26adc29a4eac195e815",
+      "new_plan_sha256": "7fee552c6dc68e2db45069515732f5ba8a1b79bc14870f975d7ba3043c59af1c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "78d5d44423a6d9e2342a68c885210cbeea3cba4d1a2bb2032b8c96bce7ace191",
+      "new_plan_sha256": "1a8a62a5f828ae979dd0b6d6ccab0d3b719af88364bb78022347d689af8cfc1d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "eb9d8ad6b5338862f85b3f7c8f53fecfee79fd0de343b227eda02e26205e44f1",
+      "new_plan_sha256": "0565390a26a3321a392ec7a7efe85bc3f292bd003b585a0077094fa938ae6531",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "465f160554798a4c225f3f5e9c02c787b9c2458a5c8a65bf20e293bc6b058b5e",
+      "new_plan_sha256": "a01219a28afe3d979238d38f2bace3501c5e7d45fc24d3e5b9e25f32d1c15670",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-ordinary-lp64-v1",
+      "old_plan_sha256": "a9c6d976109c6c595c9e9350801df5f039858338b89f41e725f4c59a2b432d26",
+      "new_plan_sha256": "c76516b02db60f30f26e5060d969ab213c280d230072bf045dac8a61d2c6d984",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "7201f5d6e39fc01e790148731526dce37f8f30d7ab3bef5fa902ddf7a5573a30",
+      "new_plan_sha256": "08951cfee34d114a9f209ae39d5de07cf5e67c49a2312b7240fba5c5395d3c1f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "1957366e59a07c1113b0ff62638b39a1b0db8372f62debfafedfba9d719e3ba8",
+      "new_plan_sha256": "d99c7fdc259e0766dda9d359ada971cd5cb3da960f44cdc17400b898514f2061",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "getri-ordinary-lp64-v1",
+      "old_plan_sha256": "b67b235d22643df2bfb5eaff99c6748df39c016b256984b896e3c11286afc2e4",
+      "new_plan_sha256": "3bcbd8fee4077f42d4e46eee2394a2f46157cfbac1e04558a0978fa496ddd6f7",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "d41eb13b5daf42c6a43a2c8c865351a896b9d82befb5345c04074c8fe338f58f",
+      "new_plan_sha256": "b7565f219aeae18226c50c8f44258cb03002e5455b820dfcabd9d98c55aca151",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-ordinary-lp64-v1",
+      "old_plan_sha256": "36a42f735df65cc6176aad94c47e8141afc7504f750fbe0952728ad07fa2dd3b",
+      "new_plan_sha256": "49a03e2928b43222209494a8313924cfdab4fc901864849008135d95ade1e337",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "16ecf17be3d39e8e8a69e06690ec06e42621db3b172ebd583e1ca00c44c38441",
+      "new_plan_sha256": "6859a020f8f60317a2fb544aa38e46720f6f469ff498dfeb3eac563e5154ab4e",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "27c04710c09718b8963d8bc4125d6c375c7b4f226442ad72f7c6543b1f298aac",
+      "new_plan_sha256": "f62b82301aad5e30b0d2e07e1d7ec972d6f2ff983596e0a281494cbb1f62bd90",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "ee3196137461e8d1e9de865c7010fbec8af6dea5653fd3fd8053b253d82652f5",
+      "new_plan_sha256": "4cbb8444aa7dc11bb2506498a48c4eceb0eae1682063f91da58f832de1127500",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-ordinary-lp64-v1",
+      "old_plan_sha256": "8aa7978ec41d6839d092f98983f2d8c2cb7936dddeb7cd595ddd2ce9b7aa042b",
+      "new_plan_sha256": "a8c8120739202ace1522d49791fe31131509a662502bbec0a18cdfecc8ab6413",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "96d982b5b6ba0c4f39c66def38517bd01736318b3535da8314b9982a47bd7a4f",
+      "new_plan_sha256": "1cd84a93cd396a9612a83603029280d1b07841257572fb3437f895fd369c9f66",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "dcaa9f2afa0b8625c622a83f71c7d87ba8baceafed31d0f6baed013a3ea5fe10",
+      "new_plan_sha256": "3c405efeee13f7522e87a883c91968599f06fdd5bfefc820ddf3c7edb423df51",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "0d1e4c99c22bb814c1263d415731fccab8542d471df40298806558fe857d8652",
+      "new_plan_sha256": "87e18361a8ce6bf68268cb97eab1fcec3ae4ac782043cabeccd2bc4a813b8b8f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-ordinary-lp64-v1",
+      "old_plan_sha256": "8458ac65be604cf16b2ce5dcccc333ae1696c4c5385c52229839f4a61050f5b4",
+      "new_plan_sha256": "9870acf723566dd48f5e376d5f65ab8d8691156a965494a12fcc02c542355832",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "aa0a81d892ce614d11af19d545a181a33fe87eee9335953210c3c5f64be391f0",
+      "new_plan_sha256": "9e6e7e07967d665316e306580b4e35205a18692af14832a96675cf89686b1e62",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c0c2a32f9e679506eacc5abb7f097656d2742a46736810bc83dc9e5cff6bc1e6",
+      "new_plan_sha256": "31dee217869efe8c1e0d7dd90f73863922d3be4b8e746eceb37f692988936255",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-ordinary-lp64-v1",
+      "old_plan_sha256": "443dec4ffc3cccd9940107a177ba4e3f1d24630d4fe3794ce4c71a21328061a6",
+      "new_plan_sha256": "4ed2285eb1b4a69fd9eec023f3650d80be8028bc7f976ff90f207a91d575479c",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2f1a901012bc5e70326353824a7a19566502c468fa4d6960b7fcaefda69c2ca7",
+      "new_plan_sha256": "80ad0c27d9a2ac46ddb66a98b01ef0741df6bac2c502687a2043af8979c2c7aa",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "becdc3f179774e4e73c4d1107cfa334c3fda861db0c9151d822ec9fc14456d2a",
+      "new_plan_sha256": "d7e7d3c43c6c0d10f19bf8e622212c01cd3f0b6432c1d5c8374a2e1e7edffe29",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "1319501efa41c91beff6e74d5fa6236eb5fa02363a4998796dca5198b70de0bc",
+      "new_plan_sha256": "81bb2f2f95871f0a27a85baaeb2504537c4360f388ec1b6713722023e14d707e",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "f1cb3561a1e8837f7d1b9efc8aec435a2d59b33ff6589f3b3b863aed1f852092",
+      "new_plan_sha256": "b80725520690327c8e42c0a3da6d49f0766a3a18479e79953aaf84f63f646a9e",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "9b9a4d551b887d03184cf2e8af8f43f52c38edd1fc307323ba80f850662e5267",
+      "new_plan_sha256": "f179d84a990e918bba98551916f433f3a92d1371d277a4b3d5b8fa2002bcc759",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "7b916657bd1d137b0ce28bc3b0da73a947396af0e1a77f166d026ade5f12bd06",
+      "new_plan_sha256": "6ae27d9f05506ecf9c649c80ccb0ffb04898dc1ff4ac70b372c22d0012c5a33a",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "894cface45e9aad3ba0c30e643a7038b6395fb7d9a91fdf2c2ae17d0f14f280c",
+      "new_plan_sha256": "440e73d08fd63744e780c3ae1f1dd6072c5be15923f82ade26d68f71adace56a",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "9ed721c91a1b547d89ed4f62d562e69cd65037a0a880ab8b5792d4bc3f4317c3",
+      "new_plan_sha256": "b317657ff161fda45ac58d87ee8962d4b91ee80467c66e0d4c020d1df050480a",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2b845284d928d7036e675794e1c64404e74cd3f14159265079d2bb24e39bdc3b",
+      "new_plan_sha256": "987f6b187efb1c80c279ce1ddbdfd268f98b8541704a938e22281c5ef996c75a",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "6c4144128117cd326c3995eadd35ddb0296df9654a5755b4a740d3b50dce0a1c",
+      "new_plan_sha256": "73fd1830f59bada60029a8d75b208941d83ddb1b67d00d45baa927284b498029",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c55ef32bfe285ade3821181cd86331221d330abffb0e95fb1a9b65e39d76cda7",
+      "new_plan_sha256": "0969a6526950a23af25f40ce6579e7cf75cb4094b0eaf48fd8e4de90415e73a1",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "23dd9262b6635b1ef329f88e59ffacd02ebf5399bc84abeb2401fe738885eaaf",
+      "new_plan_sha256": "ba6381bd6a2e171c8f8de358264723d38d509096de5daa23f7ce9b3b6f6f4aa0",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "bbc07a68201fc6ccdefd773160e2ff179861ca7976abe60ffd8836c9c733229d",
+      "new_plan_sha256": "526e11ccc2c6e97fe9771c17fa29cd8c9be947adb6777e7493e9ee10f036f8d9",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "acc274d0c0e790c986683c6fc182ad6c8fae1dc8ee964a169861a914a5a9e36c",
+      "new_plan_sha256": "5a98caf7ba2fb4162a4fee9615e41174f9c966c707ab06c04be36168b22b3465",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "22a497f96225f9f0d6efc95efed1b316a42681ac9aafbbb712741372eeeca672",
+      "new_plan_sha256": "7b2fd47315d56d9d8a2ed3c75bbdb4be107bd7c21ffeb429c7c8c33ade6725a1",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-ordinary-lp64-v1",
+      "old_plan_sha256": "afe2f06e4627d6b5d6697c213b8a270ef7711372952b1b8ed296930e861c32fb",
+      "new_plan_sha256": "33c7f913f34616aa8b3297c9b24b2bf38867998837c19e8c2a07eb01929322f6",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "e922699063217a8a5159b9603c2a068dcb845bff02e06c4c570c8c0d877bb351",
+      "new_plan_sha256": "4e4f45903f5eb66d517485f04b1a24f8403f6fd6d71df36a2afc58c3120e1a23",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "27064f76e37408cc52589567b1fd80f48d7a627db39446ba09871e6cde738be9",
+      "new_plan_sha256": "0689fd8f4d0f18062b83889d7d20883feaf070d4beaccc6c0da828cdf4b51d5d",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "8e79b449c4c1eb216e4dc157b9e0b398b8bcbf11a047090bc978da05b038845e",
+      "new_plan_sha256": "f6a34f241a94a862d3da205c8c3ccead75b92426c030a03ef1976a64914fc492",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "2ad5541c4de437da3e111597e9b7064bef11180214596de118895d0a4248c32a",
+      "new_plan_sha256": "79bdfcdda52040232fdd73a9d15e8fb109c23dcdca0e4668189849ebbf0593ab",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "409128a0f173dae68d813db3ce797917cb6751aab272901c17f5a1959c074adc",
+      "new_plan_sha256": "8a7604ef3ddecaf1688ae5b36bb99b3a0ec393d8bcc9fcef4cc0570d2dbd111a",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "5fd0ee0debaf2178019b1a756a832134d8bfbda3d142ad090e2cf9346524d82c",
+      "new_plan_sha256": "b94ab585745d1c4da397fb35a57988ede7a9ffab094c53146a035f6c66957246",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "b1627b4d0e3810af0009cd4106bbbb39b8e38e8c59ce13d4d62fe3912c291764",
+      "new_plan_sha256": "dd3dea063e14ed2ccd2a6c783f263c028ab6d90be974974ab926cd3cdbc59e40",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "475f653a8ec87026b7614779fa95eef5cb126e493e1e246f6de3e22b9d071a03",
+      "new_plan_sha256": "c4bf67745dc5a10cd162e25290b95c07ab87af39295c30c499dbfdb2f7095503",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c61bfc0926b8c99ae44d146b57811256298d1e8d34145d5a9f0d49a502e26a18",
+      "new_plan_sha256": "651fe3cee40cc24716b7d600993b54a39c699b4dfea2555a5044d324a1b68026",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "a71d73cd5a7e64a0df560bc62198bad0eb1df9d87dd9c02a74e83c25c3887ff2",
+      "new_plan_sha256": "2e28979b74db05fa5366d231d85ebc4fabac15e4d5ef0a44c4c64b9a1fc14e18",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "58b4c9c4ced0c1b87e5339b7189b466c9f31330247ee9d448e7c8ef84a6d24cd",
+      "new_plan_sha256": "ee018eb62f362715fb218e7e7ce470b01c5315fd73e38bc95240bd68f5e5c31f",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "d1426892bd875acf70360979d2d7d7152d23a8112bbdd4b9413d16b29638b825",
+      "new_plan_sha256": "65b9d324d7e1d7adcf8d4fca68fb534aca2a7f4ca8a696133a9a7ef93b2513f8",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "b71e5a70d6274b530cdfa11fb2a1ca2688534605e38326805579091a3f8e6626",
+      "new_plan_sha256": "06804bde7455ad1d88b0049c4fbe112ec7a8abf1544d4bdc66790afa5e7f9fd5",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "5c04f481c5a4fb729d3ebf5e7c102f6ba7fc2c73a9c37c965f6aa1b8dcd6151e",
+      "new_plan_sha256": "599a3d3371cd3f9f976da35f02890308cc6e030ced3ead3f2b7adf6b09a79998",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c9d0cddf20a2768a6c6e04e6eabe2d44171e57efcc5d33b7467fa62c3784757f",
+      "new_plan_sha256": "7f4f5f67523e1588aad9d58502071c9e1f789c6faaf75061cb5f25a331eeaaf0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-ordinary-lp64-v1",
+      "old_plan_sha256": "9ffb27edc4ff22ff0b7df7554c93f91fea5207725e8fb108172b91fd1f6974bf",
+      "new_plan_sha256": "113b3cbaea16a9c13816397134e814526f8ff5f2e8b178608106ffba602feff4",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "dfe023622b35ca4d7684b702c74d50b38bc7d7fb68a90ab9cc9ba1662a6013fd",
+      "new_plan_sha256": "4a0f00de5ba34ab0a85e0eddb9ebea5f6fb898f193ac597500971242b6911b63",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-ordinary-lp64-v1",
+      "old_plan_sha256": "2834bd607def3cd6cfae434602b4072827a66441ce1a37898ee9f93266db814b",
+      "new_plan_sha256": "56735e689748e04b98a48ae51fdb88e00b9d91ea1c3bd31488ce58d5b1472dfe",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "60668ef86430b42894a994af90fdcd25228694886a918956f0a2df2cd9202450",
+      "new_plan_sha256": "45dc1ec41bcbf9b1c7517e280928bad4a75e8c37e5420833a6c7223eea8c86e8",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "1e650c51e4e79d758e6e47064a188522e12bc7e782aa21927799a0cf9959b584",
+      "new_plan_sha256": "b87ded6587a7e657c5ba50e05d2eecc93d7e7da26c6416f5ca52299ea0db881e",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "02600b3abacc9dc7073657858528620b0c0293c0d4786b4316d5a0b57f8da908",
+      "new_plan_sha256": "fa02cf37f6417e9a9b6ba6f76956f0acf5f223b17d7918a9c51fb9930ff36e39",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "b33798fbfc5c02f8aadc25dec0ffccc2907d0514a37543f70b0b9ef6f4f4fa79",
+      "new_plan_sha256": "27a7aa0b1304c6c1bd9038ab8e85431796b2fa7bf87630fe2d3c48612a5902d4",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2ef11e9341f00e792c520dbef4a78d5303ad3127d7ece8142b6307c864647223",
+      "new_plan_sha256": "de1e38cde803f225e0579660541d53cfff90c9d89c243f220aa24d1d99781f5f",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "833070d3a9e9c9e3441c965da74075cf32edbcfbb4d7bb237c23018ec5c975cf",
+      "new_plan_sha256": "bc126c925eabe82d137eb62f2bc187a89672108ffa93af05a4021569c9fcb1fb",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "7e57ae4f6e0524f9ad15ae8422233c466d94b045f67ecd8cee59115b7494992f",
+      "new_plan_sha256": "ca79b3ce32489dabba493ef059bf79d125a9658be16ffbb62d5c164d5a23d091",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "16ab548fe27f37159ae95e401b1e8aaf702f0efacad131901d76a6b6626dc7c2",
+      "new_plan_sha256": "31ec121aa4f638c25c48c739ed256ea4ca9b0f9df349335a1ff145323ec32fb7",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "dfca686f6c388489e9c2da527d6ed97a448891987846c3660013143cd6bb1893",
+      "new_plan_sha256": "87e40c7247854fea4db58f15e48873bd07bde01f8c21c970f349b2f32875da17",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "95af8b9d8193f361c66f020cf9a0d305dfde10fc6b7c9ed9ef15926e4e6e9ec8",
+      "new_plan_sha256": "b0eeeb493d61fe3244e2c1a739cf7a7d24533a71fca779087947057e8808b868",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "f4731a812e41572fefd4df97a791be179a4f9c327b94ee89b29883e2631b4b80",
+      "new_plan_sha256": "099424b20feb069e0cb43849d5c8d8340b18dfe2b3a28264295a446d824086e9",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "f2ba49e9dfbcc29535033a948e30da1d35339551ef45d013020e1233f13b0b34",
+      "new_plan_sha256": "125babc228f59010f8bbd18850d5fe4eb0e7c127e79fd961108094bc57b23ff7",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "b2d1223625d30a7ee92047bc1a988a217239c46abef54456b41e5907f8a6ff2b",
+      "new_plan_sha256": "a767094595c93f8c2f53d003eb286eef89c65a1fb433496c6719883d41b09249",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "d35441b4b378cd9295f6232694cced540904c30df16bbfec0ac5aeea480d1da5",
+      "new_plan_sha256": "b9219013f8aa97251ea3aa34e7cecf5dfa5da7f4ecbdd9e8ed8d9b5b9e10f8ff",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "8b9e76f4eb3fcea9c9a69112d0ca2e58467247fc9492ac8cd0503bc5c536ccb4",
+      "new_plan_sha256": "f3e03e021e9e9ff76a9159b6cd655597e54bc28e0bd077a921b05e547527ea35",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-ordinary-lp64-v1",
+      "old_plan_sha256": "1c7a0bc59d02c9d63043e7ed3611e663d8d1124012bfdabcb398db106a58d8cc",
+      "new_plan_sha256": "289feb632f4b6e136b72d25b4147663dc627753e450c2573ff97d58977568043",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "6e6122e1ccc9e7497ca7b34c1336470d041e9898e74fe45798b213be8e6ffa59",
+      "new_plan_sha256": "efe432ed6ec37213d7b25cb11a274ef96a0f5f11009d9c9b8962bf8ff6441d81",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "ba80506849cf45dc4186347eb5128af576b9aff47f80740c2485c088fa94e967",
+      "new_plan_sha256": "238c5bc1f75ecf33fbbc362d4139b7e824dcd1ddb3c9e4da73a9f6956cda0345",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "386cdfec876386b336f9d1b70f1dacab16dabdba0a3ad46baf272236694d867c",
+      "new_plan_sha256": "500762922a99367e4ceb036b10d59ba0597ae03950ea42baf348d53fa5bb09d0",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "c3b97c520da358318c4d1ab6c3d2f84dfed294ee512a64c8f29885d5b9f5efb8",
+      "new_plan_sha256": "d0e71ebb5fad6bf73435812db5075bc353165f4a3585d341765e9bc843933fe3",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "fb1047e2edf8f9e17cca78ee74ecdeb0d8c2e44ee3b3749314a9ba2704fb3d1e",
+      "new_plan_sha256": "045414ae6306a976111e2a31f7a2aa3615ef9f4aa2524ab9cbcef0a57937dab9",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "c4e45329302f562767bbd6b3b905a5e84d2868b5b2b1f5623a56e940217fc303",
+      "new_plan_sha256": "72be14adda221c79eb002b69b3b6b6bdf58d6b8abcbdfac900dff7b92451e250",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "72d7a13ccb6e7d1d383f22e579c1425a2b0478a8140a3a5f064d66981d3a6045",
+      "new_plan_sha256": "8c46cfc8d85251e9ad77cb5e4dfb0da7b0b62a5639611bd171e748c5bc64caa7",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "f8a52cb90a815fca9fe52a3e63218d863791888dfeffdbb64d2ff50a22ca8721",
+      "new_plan_sha256": "020e88f16570ab4df3519c942fb2fd0b78a7162251ff9355577c08c4aa07d579",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "98bc8ae560c6230325ddc9765282fc5c02e4b9321c47185be54dc70863f6bbfe",
+      "new_plan_sha256": "1beef1c0633805ee2a38aea3b87815f17546d11650c44cdcdc20722938c6e1ad",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "94efc7d9d79f06ffafc4fadfb5525788cce1614544ece1d0f5355220973be4a4",
+      "new_plan_sha256": "556548f79dfd396aabbdb1bb913a34f1cef474aa85f87ebd733884a47e5042ef",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2e5df032e0bed292cd9d392695ae6a53fbfdbc115fe839dc6e417c135a4be8ad",
+      "new_plan_sha256": "8b12f3bdbf120944c7dfce478463420689854ac6b9e32f6a3f31a81680c59f59",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "9097b8aea976396129f776f3aeefb9580ce24accd76a2a9946e45b4e2ad87044",
+      "new_plan_sha256": "9db69888c5b0ecae5699a69e7603eda62a0456f625c2dcbd548351ff9600f3d1",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "47a3b99a94d699e3971b1a6b02c822cde179bb45b75bc620badd10eab7b6436d",
+      "new_plan_sha256": "68339707a011faa858835d52b1f85bcf7eb98be527b5aa7ce0195f9fcb63b6f5",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "f9e956750c0f731258bf0fc52b74b31ce82d60a502574f71c48d785c63bd11e7",
+      "new_plan_sha256": "23532b2b47521066d56da341a2887914dfb9cea90803f30086542cec7cc5f524",
+      "convergence_and_residual_units_contracts_changed": true,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "acb993db6aaea1ba39f53554dfb11effdf278f207e5479193fdf1e33b34805d4",
+      "new_plan_sha256": "81fe5abfad951ea24db1427563308922eeebaa30a1de6993b7ba668d2176a7b5",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-ordinary-lp64-v1",
+      "old_plan_sha256": "985d40233b228928b559f5f6a1a45ae51084594263b37300b92a62062acfd065",
+      "new_plan_sha256": "e2d430a009e661f4584add5c93c611b5ec2e7f0b4c6c770b08f56195f9648b79",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "93624f1668d4b64e9d99ce75617a3e7963dc577620ad2848271d092f19904057",
+      "new_plan_sha256": "98c679e6a58f8895751dbac8c0683a7cea3582d4d0e48356d949d606b7d4bc8c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "2491c936c77bdd8ad7b5fe3fb675145ad87d1949b284d456f386e453781b3c0b",
+      "new_plan_sha256": "2bd380ce34b204456c46cd3261b037e7b6400d7616df8d4b4f6fa750a82040ea",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "420cab7749aa79df151ac5daf8fbc8426895d0734440a4c56cdb2e8be726d30d",
+      "new_plan_sha256": "20119fba879218dd74a758f406c3fba3bac85647c4298601fd48ad0c83c7cf58",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "fc7a5b104cc8feaa5265e7625d2dc7bc20eb336970a62e07502607abec764b98",
+      "new_plan_sha256": "4ae97a28326dc68cf594c57f65dfa4aacb59deec2b2ffe598af61fc02ef7262f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "647ed3c5d0921bd0a686b271340c7478c886e7dcd6759754cbe415a5d20c56cf",
+      "new_plan_sha256": "085a15244b954e15cd852a689e26ef7d8396faf3f2cb28f80a698f4fef74401c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "575b7d87db8e0c09850bf08af1621e2af3dcb04cad9dba3e79870ca15aeb9d97",
+      "new_plan_sha256": "27a755b0d275af67822824a4359c0444948ae5c3221988b7b1cb884c36e1d751",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "18f42b7ad9190fbf3b04e8c9d87fc424205d9034d3939b5349319013cc601ce7",
+      "new_plan_sha256": "bb3b625097894289eb2c07db3a04066a377f88eefe65f3b52ebe8ab75515f6f0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "124a0097d5983ee20c89247c4b357ffcb5f96f7ed89ab9bc43c3f3441dd360e8",
+      "new_plan_sha256": "306f6f485c17d01869761e9deda1b7268f4bbca3a01166dc9d14b2d2da1cb600",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "ba18215edbe19982ea01858d8127823f912be9e9600ab9765317031b5280f7fd",
+      "new_plan_sha256": "42f127b8ee8e1f3fc33700626830c0b3f234eb934f41b0ec201c7609e7e941b6",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "a1a9669aad8ce2718e2ade9f9a102754002bdd6bcf9f543f236ac4b747672abd",
+      "new_plan_sha256": "79690eecae8ea8525a85da6d1148123d4678cea93045fbce1a51b8364be07452",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "745bb55b67eff959c3ca10cab10c8e8914408b10192b2607fffa733a6ee67710",
+      "new_plan_sha256": "ad84fc0e12b371f26c0b31b0c1f82cf63d47d5075f3db0951f9d9b9db67edd6a",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "f86e37abf4b26b7c2b2dc06e09ecaf457a71d41e4e6088176267fcb7ba9442cd",
+      "new_plan_sha256": "30a6c4f22a76f3c606c65b2428c68533a1fd7ab953e66d7c12337ce9ea4a2ec6",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "52dcca7498a9ba67b05db2555e1bd46565cb7a6d9a3578127434d3f39c525bc7",
+      "new_plan_sha256": "8a6031c1f1765b205841cee3b492b6fcaa4afd8f9e84da6394d0c4a43791f25c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "015bdfba79bc67207728779cfce96f714c93526daf0946fb9b81103c8235c676",
+      "new_plan_sha256": "a333192b6b99bb6251736d1ee8817c4054a1691ef1ee31f94634f4434b9d1d08",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "6429603c348884d72e7f04a3642e5a5317c561c794eb96df8eeaf9c5e1b975ed",
+      "new_plan_sha256": "deee01129c37cc0cdd7ae02cf12b935d5c5e2d83182270bf3c4471d7ff0c7e63",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1",
+      "old_plan_sha256": "63e9659120f491f4c22272532a7a462c41d51bc65579a2c56a3b1a434fef4197",
+      "new_plan_sha256": "229b35b3800ecb96ff721d7cd2fc5c40a8b7c6bcc2a9b39d42606f4ac0a16900",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "a91d89c5a86afba9c1015b1cdeda87d5637d48aabbf63d9e1812fa093e04f246",
+      "new_plan_sha256": "498e2ee2b5da2b113c13f84a4c535c0219ff9d12bc4022a6e58102642c92a847",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "7d0a056c1d04ff5c2957ccbe50410be059a25db9980c0d6c204ad7c78b89ead6",
+      "new_plan_sha256": "d88e510891a3991c61b29ebd3cd0a298b9dc73b59de578b2ff8a257e77f9a44f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "b6ea39380b7def2c7b51cfcc860f0462da0ef60c421c5e86cb45c7d251e05940",
+      "new_plan_sha256": "bd9350a2f035c9c00e336d29b1626369a53dc724e135f4cbd65fff25879a46f2",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "f6cbc9dda6a71489972cc7cffb525d14bc30cd0d383c3069dc7135f1ec0c660d",
+      "new_plan_sha256": "2440da0850948babaaaf1523fcb2093711dbe6a35de0224dc72bec36f098797c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "4f25e9bc16542ea0589acb4e79c738de8cf1e007bd62475b07b8421ebee455b4",
+      "new_plan_sha256": "3a6a725c1a64cb95b556c797ee0000089fa257b71bae6c90d5be6934e50f114e",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "b2f1c3f44d47d66f3cae2e03a7a4b0f472c889b49e3e2220434a4458ec559eb3",
+      "new_plan_sha256": "86764ee6542ebe1b7c5ccb07ee690dd3cf11f2ff6b130603a492f33f0d5a0538",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "0afe2fba34be892da6ce01413bbde55a3fcc82fcdedbd0efa39827a36020f9d1",
+      "new_plan_sha256": "66a26c2da9b13bf25f574e806aa1a69be88662e0730fcd911ab3481870da61eb",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "3c569e5637f9ec9c6944b2ef6e845a67e5ba2537f2b2d9eafee5f9b83b75fca2",
+      "new_plan_sha256": "48efb25567f4c2c5f3675674ebefc9f0af2ce094e844bf2ed6bb6acfcdc196b5",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "6ebac826a3ec4db176d43d4548499ddad34ac229721c26cb5e6ab8bed24434a8",
+      "new_plan_sha256": "34dae6e4abafedd2557dc289d778618822fbfc1c175121c01f5d83181a0e6baa",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "74ee4f5b5fc3b8573a2193020ebd93590693e8aac64ac743164a9fcb7ea5f62d",
+      "new_plan_sha256": "48cb7b2a37dc713eff34acc12fac12f14c8a45cf2625b03f6641b2cb807c7623",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "0e21ec37e85cab32d1c44b902f8fa2d45cd33be5af71b06c1d08468f0dc75a84",
+      "new_plan_sha256": "8a37d85b22c289fd736bfeafa5205588697cba59172f9e74a68e5250c18427e1",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "aef030e939b4267fa66727deeb59b744575a807a376163fcccd2ca8a64391769",
+      "new_plan_sha256": "9234a4a2c867a88515d2052099bda6b31de69a43e79efc2178cd01ca987647a9",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "ef6dfdba580bc6f3eef0b7e64adfa99842c689d0e5f1075d5129e9f3bc7ccaf7",
+      "new_plan_sha256": "efbcae419c63966eca4e1a7ade2b11fa29cffc2b22f9943b06c0924bf9a7a0fa",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "44fbd653cd323e3103f08eb5721b961059ea57684ed12758070f268ff47ee201",
+      "new_plan_sha256": "e6f7482bf0f36bb62547c038dce5129fcaf181f684c8b03c54eed06152766563",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "1232703b13794b320ccf962c786dcb776f1905ff055d6669b554cff1740231ba",
+      "new_plan_sha256": "692a3b5a838c8fc3de68bf921e5d8854b963164c7a84e8a71df48abb863520bc",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "ed0e144ff84415897a2c6210ace4bfc41dd0a995ad77d2b515b6fed54a5c38dc",
+      "new_plan_sha256": "6f7b63208dbee172b996e45f7d18c4b6d55f865be6e47cb2fb6e4fb98e2fe09c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "325106f750315df3ae777ed6e8bab15b8e7c9a0c43187edb4135b4f765978dcd",
+      "new_plan_sha256": "df265b259b193476af6c19d5fb50eef98f961e943853c4b246ea4df17c08d42e",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-ordinary-lp64-v1",
+      "old_plan_sha256": "bd2cb73a2011a0523694df224762d20d4dcb6f2f34a970bb1707735081e866a9",
+      "new_plan_sha256": "61a012fd62432ecdf1569471a27ee5df86ab546d240e9b48fde61dcd4719800f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "9d4dc428e23b1d703948f7769318d667a62d9105551d69958ce4014d19a9a1e7",
+      "new_plan_sha256": "367333f01f7003db4d435e2c5f156b5df4e6807936fa76391347d604e217dec0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "ca2cfb190816ce5e031fd23a531b73359fd50241dda68ee55273206e13a00530",
+      "new_plan_sha256": "a78ec9def701571e3d2d7c0911b635b9db9b97fa7c407a8736c22a8dfdfa7fb9",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "fd86f81914203dfda969a0eea2e334d32b2bc388508084e61ddbd76e71d22a8a",
+      "new_plan_sha256": "f8ea70a9285cc368f7debe3294c32399485ad679b5aa41442eceea9b24b7330a",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "1373caab06a1e89947ab3024fbebca1e2cb7247ed054cc7acaa3694a4f899323",
+      "new_plan_sha256": "a32ab37f9f57392c58c1fe7201d3d7926d6995e7bb7c0d7a0c744e7136a5a1c9",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "f95b25393f10c42f20061d147c287e01fba45ae59cfe9c47723ae99fc04efa08",
+      "new_plan_sha256": "3d39aa5ca1f26b4c41fbd793ba571ccb1116a62590c0e299076d0a88b13d2760",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "158212d37569c8370f32a99563b755dd94a701c46f6009eedd27d1fe96c5e5e1",
+      "new_plan_sha256": "6def85867d1988c97d34b28bfc6d94e1288020e877bec9c79e87b1927d5bc1d4",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "af1cb952a056de2690b6104cc8d7d95c517abad25594d82d89783fa229ba059e",
+      "new_plan_sha256": "03683fbdd520d81a48a9b8fbd6151b464254eb80b3e122088c185169397035ab",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "80461aa6b8e9d78e0ddb8dd00337dd619d5f035d675881e2316a62cf012e61a3",
+      "new_plan_sha256": "32f16176939e452aa2ea2e703f740a10d7e553d7c91ce29b11bf6637614adba8",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "7f9e3fa9a896f873feb3e6e202f1af2728fadf3268c735518f992d4ad03d89cf",
+      "new_plan_sha256": "1d4ebc4c3bd65894461537dff3d8e39a049f71e4547766802adcf51cb49bc796",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "22c4f0fa4f8a929fe27307eddebb0ea8a8bd8bac4342ba1b87c4e1d3bb0339ac",
+      "new_plan_sha256": "924c05fcda57627e4bd50b679467b9ff67774d30dd6fe7065cedd64d6644bd08",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "418a4ad7edea8eb5e8f499e23be20faa9c20e632c255c66ce683d75c15bd1e40",
+      "new_plan_sha256": "dddeb271578d2a9079606713dcda4b545b12b09a57c21508dfc32e1fb5ba654b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "8d783f8872d6566b73746ae39b1d47c5c12ca6e6e5bd696a2757ca6eb20d6dff",
+      "new_plan_sha256": "ac972eeb0f1d66a542b5b7e51e555d2487c77672f617eedb6191ca4d01150aee",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "de028ed120cac0f239b752c5d39bb476c3a75b95a2154e9e123e61b9b513b6e7",
+      "new_plan_sha256": "d57571f5b433df28b4fa0b5d7317295a818788438f4f9aa916b0ab72b8a12254",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "672b81169228dd0bef2aa94029b555068e63a69a899dac5671407395527fb555",
+      "new_plan_sha256": "5c8740f509d9955e6f250e4f00969c0121d16c00421f268d87db40d0fdad0be8",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "d63b4a8f879975bc07accd01f617e938ed40d9af4535a06780a7d7654a4d8d71",
+      "new_plan_sha256": "ba5e3de0fb6dd8fc90369198db8c99ca23aa9935ed8dc7a438ec1a17214aef7d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-ordinary-lp64-v1",
+      "old_plan_sha256": "c2c493db5382cffb0e5852ab9a10a8c0e02ad1431e79c4d38a3fd29b9cfb8f89",
+      "new_plan_sha256": "b988d65e4bcaf9f9a14ef9630d11eba4f0cab382edaf0c0781f3c341bcfaf350",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c33adc0a7ede8cb376081cc58e89db4892fd78e87e82bf4f89a170d5b91dd4d9",
+      "new_plan_sha256": "50c5a70b2e03836d4ce92e7346dd1609de0baf5dcffd114eeacd276274e3a756",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "8a58c49eb0bb61c917e9df916635b66cfbdb999ea4bb77a66165c260c7c104ea",
+      "new_plan_sha256": "401ef5e19c7d0b7ae210c0e9bee4f210b67a4a40ef945933fa73b4a06581ada4",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2098b22c3efe235077c2b89cf0f3d3858d1c6f400e70c831726dc59e0f9db84c",
+      "new_plan_sha256": "b1a2d15f4b0f58e5064f7341f6f581396426acadcde17dbb247481052a910273",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "d1318dfac485a9ea3e0f21f21303740a0c86a03d670dbb21ad55f55e941a207d",
+      "new_plan_sha256": "5584824f9b3477b4fec35f94716eec25c19d995045055de15faa7dc75bda6078",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "1eb3ee1d583b4cd3e4862939eecd3c75a3198e31eb235cb7e345f78fba81e719",
+      "new_plan_sha256": "dbef5779c1fc88a3ed486f635d4d76194272e0b6681c144771ae194e4f7a4458",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "30e5442d1c759c9eb10448636d3e2c17932b0d24baf9f20644bfae36ef918fe5",
+      "new_plan_sha256": "fe173bcdbbb88aab83aa5ee0e7052ef940e33221fbf075642f7276b7775dfd4a",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "997c1034f724b6d197873227e3d96cf037ac45447d7682a0a7cd47217824d8ba",
+      "new_plan_sha256": "9e10dbb21f322a4e1fa233ebdb116acbe7e6610bc1a9af59eb8048b1d041710c",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "b3336b2c524fc3d3d0dc442e28465c8186c6d4f1ec2a2e6e8a5e2506a33844ec",
+      "new_plan_sha256": "b5afa419976900fe007e1b4d3333f1d072a18efbb55fd5c11a24b56f7509c373",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "0bfc032ee42f076df2d559afda8aecc00c728665d22dafcdf3836247b06c8258",
+      "new_plan_sha256": "ba44aac7a1b056d14f99e258cad1148c610ca853e1601b8a4423939d5b4d6e10",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "308c9571ab4528b5b3fd105cec09cb8277fac6e998e21ed8ce9ed28e2ee0e451",
+      "new_plan_sha256": "362012ca9a55bee057f1aadb06f318a82715f5fe12756005efaba419d4c2aaa8",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "d58bfdc3209a520736d1c2c8a4022c37b653a2a096e871dd4b0ca5a162a64459",
+      "new_plan_sha256": "8aa2547bc74d6e8048500704707e26cddc8af39ee560c546a09d68092febc240",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "200895b12728da5f72735ccec4fe42c1f13940ca00cd5ca2f90a3bec2e7fcfab",
+      "new_plan_sha256": "00bf81a2f495da04be5cb75e230797d32c22c7a174c91bc730ff8fbb1ecce292",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "74cb0de170b8308e7ca038d5adc0b3f00d7341d161c4f9b68744bb336c89566c",
+      "new_plan_sha256": "216d37e4c8e4cb9dc603639fafa90e18b0f719a540aef898afbe78d7dbd9c620",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "699c3b74c52f9c52d55fa2e7b746cf1c3009143f30eec25f2492eaa96acb314f",
+      "new_plan_sha256": "618abb70f152e7aa1af7eee42685c348997003522405ca2f70dfaf1e8f6136ba",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-lp64-v1",
+      "old_plan_sha256": "77c70ea78e5bc3caf11660e16b2a53f59b2fe09e7e75363db0aabbeacbb1f1b8",
+      "new_plan_sha256": "1dcfbedc6c319ed3cbcee796488acd6f6c6cf569649702b32d86c7f6fd12ea70",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "7adc20ac70ea5a1d6cb2fea9fec1cf6fea686ea4d69a89b82499fb5cf5f4625a",
+      "new_plan_sha256": "df3765e8a802986cca485913c563a508f9f4d961080dc6825aa201dab9edbf4f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "61eae87f7f4881a9372fc054370ba7c516a3fdba2d427312e3e6ed54fc5423fd",
+      "new_plan_sha256": "fece440f254332f234bd4560f15b5d59216008f776049eff88b230bbb02e5fa1",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "a057b08c9e144b6920fa56abe9ccf42e96f3dbe4ae6e5afbeb8f4390c497996d",
+      "new_plan_sha256": "a39594f60b715b0dbf961445a0a41865575de19fbc0fc04b4fe83c3a0f456f01",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-ordinary-lp64-v1",
+      "old_plan_sha256": "4f2af8e4a5823f9bbe2f5e061a4750f64554769e81b497ff870d09b860215cae",
+      "new_plan_sha256": "69482453bc81e406de5a64f7ccb12ace28ac293f2deead7c92d6cdb45d2eceb5",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2cb56d580d703d7886d1d2212c64153bb9962d1c2539d5d6ed2a707f683292f6",
+      "new_plan_sha256": "3ce6b6427ca9e04e26c26df902a4987df6928133c1792bea809d5b878d95267a",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "8b546d6a503b9b9ba95df2899d94dce25c895cbcb04cda825ec64430c0423ad4",
+      "new_plan_sha256": "a46f55ea79d19c764bc75c2fa9adb06b661651c665361a0680aff9ef2bea27d3",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "feeb565ac9c80fb28b68ef668623689fce5bf0ec69fbb83c712541f665dd7b3c",
+      "new_plan_sha256": "def8aa7ff0df02411f0f46caa268e3e3bbfc0986d80695941506f233ed2f6d86",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "69e96f3c9b9371f028c8a724452251dfe12e130a4f0f5bdcea8e0e1a1c379ba6",
+      "new_plan_sha256": "b6126207c46d350877a543890eec4ca764c2c0185cdeb93fd140f9ab6e519193",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "56ef6db5256e8ce1e887ca077bb3e7bac63592612394928fd23ac75084d1b2e7",
+      "new_plan_sha256": "78752662a8e4b14608ebdc4091eb1b9d948ddb489298280b036830d8d3564333",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-ordinary-lp64-v1",
+      "old_plan_sha256": "46cb40b04288311caca4e16fea141317ba1137280f71f32963f218ba91e113a0",
+      "new_plan_sha256": "c8cd2fc0e756114efcb6ee96f5dbb1564ffd59a95a5cd5e718e6c5af56f2ace5",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c3c978cc0bcbe8216e5066701e9bc85b178f66d996643d9c9a06b0fa901efb3b",
+      "new_plan_sha256": "5d736ff238b7a569933e60ba8135927bfaad0521ad3256dcd3027bc5caf56ae8",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "5891d419cf8134f5cbe6d7e04e2b352e3e483a80086d26f81c4d0d82edd021fc",
+      "new_plan_sha256": "e6ff718f9b3423f728d1017c7b5ebd0783b762bc7f6da03f26a6266b3f54c3c8",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "9c3bdc78ca8c0a285488c2f3bcc7926619a9ff2627205277bccf2277ee966cc1",
+      "new_plan_sha256": "9b20151edde38686db5da24e81277bf32640316498f389c1baa09fe4dfdf81c7",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-ordinary-lp64-v1",
+      "old_plan_sha256": "96d1c60a5954125f9b6a66556f5c3a268904cb153505458444c4799a1d2ce3f9",
+      "new_plan_sha256": "337b302b26b446d287152f1f94e342e63b4e552fe6f648a05e0e936aea9f0bbb",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "76c375a3236b126c52af9c71669ae55b045c6e58afad0c2c97a3777172bdcfb5",
+      "new_plan_sha256": "9bbc612a614d5a6a84ba65fdea2c8903ab3569915893b3a12a76527f0da2adca",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "6c51dac469a714eb3f24164ec12ede9d746fcee85942c64698f0706fd1b8e51b",
+      "new_plan_sha256": "364cd14fd6b56151585d810d491cb686b7a98c1b72c259dd3bc4a535522985f0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "f4e2e378852c111c6921267a862e1e3eb2b390f1b56676197f6ccfcd41509b91",
+      "new_plan_sha256": "3a32d95d0ad89485bea71dbc051586085ee1fd0d819e8e4bf40dd7d7cf10781b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "d29d4746521bc9f97ce1b7a53e5730d5a1a46f6009e8919753716bcc13a38d0c",
+      "new_plan_sha256": "f9278eb1b92d95cdfed25bd9dd624f76361dce3ccd7e24c98666d18eaf3de2be",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "bc78a3c29297392410928e0e671972204f429a88517b85b749e73a236c0d83c4",
+      "new_plan_sha256": "04cc62dcd463da4ef27414d3dea2cda1473e212de77ead9067cf62163adb0794",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "d285c9449b635596bdc0f8a0b42c7dab0ee0803e8fe25042a476783dd5ed827d",
+      "new_plan_sha256": "80146cc8529d9692ce66e6e0872e611c8286cca3cf16be69045413f1eb3939b2",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "2fea262d0471d0379d4cbc6f58e29fd216e3f8a51e57d4d6e6b658b1fe34d724",
+      "new_plan_sha256": "18dacac02aadf902e235a5efd3cc266e1de01a351489d681138eb8a0c70612e4",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "7d365344331f0aae675cac2bb3598668224150749b322215b233871c2d5c38ec",
+      "new_plan_sha256": "d7646b43cd05157e43ff2fb992b6e84c3dda8cdac30402250b98560c14e1277f",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "c03e67951c34845a4d37186d39c3710c94af5987820d8dcd674aaaa6574adbef",
+      "new_plan_sha256": "2f696164a2d26a14ddb0f58892dc04754ff8aa4690bbeb4b2e9e6dbd0c90c27b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "e1514cdd41279c16c60252134aa05e4813b8b46a25ae790bb626d2e8d721d022",
+      "new_plan_sha256": "5b34bf6cb5243130cac0c7cefa4da6d19b0d92585393ef196d0b07a9410e35a5",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "a4cf2803e0e094f38cb64811415dcad4957b3178f081978ae37131bf69932a61",
+      "new_plan_sha256": "770b2073d4352bb4424a43184294d24a77caa4e247a92e6df54b8862afacd0a3",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "99805e2f08e7aebe70dd6e715149195f6c0e9bba173316397c61b41bbe3e509e",
+      "new_plan_sha256": "dac45fa21fb61e438280ace65c5d8a62d4f04590b300f0b63964a41e6e679665",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "d636513b29b0ad2d5eb38594761ff6efbf734bc331542e29ecb691ee772f3ac6",
+      "new_plan_sha256": "d611a46d5b7e258baa5f04fc467bc7e7640c05b481d74c288277382017fbbcf3",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-ordinary-lp64-v1",
+      "old_plan_sha256": "abc0d07c65513567f03ab783cd4cc0cfb42a29adf07e00b7eba69cc71ff60f9d",
+      "new_plan_sha256": "01de8aeff8c296bd8db69fb10de3c74b806b7a622e369ea5c12bee74e1d7f246",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-trtri-getri-ordinary-lp64-v1",
+      "old_plan_sha256": "9968ed7dfb76dfb49bab2549ce94d41071fb37cbd664c8ff718e56041876699f",
+      "new_plan_sha256": "b0d68bdfac7a623481d2f4d2e108ceb20d7b15e71755c448a355820278df2d8d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-trtri-ordinary-lp64-v1",
+      "old_plan_sha256": "a4ac6c5dd297cb7dfb8ece0ae25617c41a16b07f7593603d402d8dc22e21c8fc",
+      "new_plan_sha256": "3db897bcbb6b8d8d118759faabe47418b27050e91f62e85418613af20c03c8e1",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.ilp64",
+      "set": "sparse-csr-csc-mv-mm-ordinary-ilp64-v1",
+      "old_plan_sha256": "4c5ac25d9daa9b4eef8261bbd20a54d3c56a612f1d06da5327f9a7d369e738b1",
+      "new_plan_sha256": "18849f30d51d5f1454898e744c6a52ae60cacbe169873a77abd4d5783ef6601d",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.ilp64",
+      "set": "sparse-csr-csc-mv-mm-trsv-trsm-ordinary-ilp64-v1",
+      "old_plan_sha256": "7a60397d9ead55df343d6f56b39b100c27e36ca5793f0513a2cdff8ef993d92f",
+      "new_plan_sha256": "6743e8721f86414beeeb074fe75748f7081596426fc578a89f5252cdfcbfb7dd",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.lp64",
+      "set": "sparse-csr-csc-mv-mm-ordinary-lp64-v1",
+      "old_plan_sha256": "809422f4c8157d92cd7b80a24f6f5f5b32c6d8cc9cf8cc09a76bea8e9a5c07cc",
+      "new_plan_sha256": "c7b0b7ddfbed99d834da4ee3cd568c4decdc309f489b310cd96a780fd697374b",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.lp64",
+      "set": "sparse-csr-csc-mv-mm-trsv-trsm-ordinary-lp64-v1",
+      "old_plan_sha256": "213dde10de19e893e7ffe7a0f128f64ea7b7f07fc52569fe42e437096b735d32",
+      "new_plan_sha256": "3614b094a59d219ef9a84e3538cb051ceff3f34c18b90f7f66e60a1e771c2ad0",
+      "convergence_and_residual_units_contracts_changed": false,
+      "declarations_lowering_and_owner_identity_unchanged": true
+    }
+  ],
+  "internal_math_owned": true,
+  "new_context_allocator_executor_or_handle": 0,
+  "wire_signatures_unchanged": true,
+  "RWORK_IWORK_and_minimum_WORK_policy_unchanged": true,
+  "nonfinite_range_fault_token_still_separate": true,
+  "MKL_runtime_equivalence": false,
+  "installed_new_backend_qualified": false,
+  "full_profile_ready": false
+}

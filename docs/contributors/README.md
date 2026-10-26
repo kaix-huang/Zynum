@@ -27,6 +27,7 @@ zig fmt --check build.zig build.zig.zon src test bench examples tools
 PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py tools/*.py
 python3 -B tools/check_build_inventory.py --root .
 python3 -B tools/check_test_inventory.py --root . --structure-only
+python3 -B tools/generate_interfaces.py check --zig zig
 zig build test-build-inventory --summary failures
 zig build test-test-inventory --summary failures
 zig build test-host-tool-smoke -Dcpu=baseline --summary failures
@@ -52,7 +53,8 @@ ZYNUM_VALIDATION
 
 With explicit `-Dcpu=baseline`, the `test` step runs the test-inventory gate,
 all applicable Zig correctness tests, and the `test-host-tool-smoke` aggregate.
-Without `-Dcpu`, it runs dynamic-dispatch correctness and host-tool smoke. Set
+Without `-Dcpu`, it runs dynamic-dispatch correctness, the LAPACK and Sparse
+correctness suites, and host-tool smoke. Set
 `-Dhost-tool-smoke=false` when that aggregate has already run; invoking
 `zig build test-host-tool-smoke` explicitly always runs it. The aggregate
 includes the inventory-declared Python tooling tests, ABI manifest, C/C++ header
@@ -61,6 +63,21 @@ baseline observer tests. It does not
 include build-inventory security, test-inventory security, or ABI artifact parity.
 Run the independent `test-build-inventory` and `test-test-inventory` steps
 separately, as shown above.
+
+Changes to the [checked C/Fortran interface](../interop/README.md) also require
+its explicit supplemental checks:
+
+```sh
+zig build check-checked-abi -Dcpu=baseline --release=safe
+zig build test-checked-abi -Dcpu=baseline -Dtest-optimize=safe --release=safe
+zig build test-checked-fortran -Dcpu=baseline -Dtest-optimize=safe --release=safe
+```
+
+The Fortran check requires an installed GNU Fortran compiler. Modify the checked
+schema or generator, regenerate all six outputs, and review the resulting diff.
+These consumer checks do not create canonical Zig inventory observations. The
+[isolated module comparison tools](../../bench/modules/README.md) build and
+measure separately; do not run measurements alongside validation or compilation.
 
 CI runs the inventory validators and representative fail-closed security cases
 for each change. Native correctness runs on macOS and x86_64 Linux; the Linux

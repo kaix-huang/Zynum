@@ -22,6 +22,8 @@ useful for kernel work but are not part of the public API contract.
 | Goal | Read |
 | --- | --- |
 | Understand the project | [`../README.md`](../README.md) |
+| Review scientific capabilities and ownership | [`scientific.md`](scientific.md) |
+| Select generated LAPACKE, Sparse and FFTW interfaces | [`interop/README.md`](interop/README.md) |
 | Build and use Zynum | [`development_and_usage.md`](development_and_usage.md) |
 | Call BLAS from C, C++, or Fortran | [`fortran_compatibility.md`](fortran_compatibility.md) |
 | Run examples | [`../examples/README.md`](../examples/README.md) |

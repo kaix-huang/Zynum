@@ -1,0 +1,2224 @@
+{
+  "schema": "zynum.evd-owner-review/1",
+  "scope": "finite-callable-generation-only",
+  "reason": "Add GVD through the existing EVD boundary, one admitted operation, configuration and ContextScratch. The explicit reduced-basis failure-vector policy preserves all previous defaults; the complete 691-case LAPACK root passed. Sparse is reissued only for the changed shared Hermitian owner input.",
+  "source_envelopes": {
+    "LAPACKE": {
+      "old_count": 205,
+      "new_count": 205,
+      "changed_existing_source_paths": [
+        "src/interop/lapacke_binding.zig",
+        "src/interop/lapacke_common.zig",
+        "src/interop/lapacke_diagnostics.zig",
+        "src/interop/lapacke_evd.zig",
+        "src/lapack/core/hermitian_eigen.zig"
+      ],
+      "added_source_paths": [],
+      "old_envelope": "f2d068fa793aded9daa88fbfae6b42cf9b217724cf1a02b3c113ea6853d279a5",
+      "new_envelope": "ddd79c754f564ab5e4f22c1b195c46cafa5bdfa7d42f01460240eab922869240"
+    },
+    "Sparse": {
+      "old_count": 173,
+      "new_count": 173,
+      "changed_existing_source_paths": [
+        "src/lapack/core/hermitian_eigen.zig"
+      ],
+      "added_source_paths": [],
+      "old_envelope": "dc21dcc5f7cc1235a93f77e1d8e63bedb0c59979dae0bab9423002b4a0bfd58e",
+      "new_envelope": "1b79d779deab5a310b3328d5b50fa4d69d68e5e673b428875c164b1e08f01f20"
+    }
+  },
+  "existing_plan_equivalence": [
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4490d3851f8455a17ed4361d3846b5eec310cff204fc657e1540fee77a3078a5",
+      "new_plan_sha256": "b0ac3f9cf757edc36ecb8b1a1235f4d9998700f1176349c0ec215bf77c06e16f",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3caf810c090b42ffe54773401a0280f5136638a2515e475554b60b0f9681a864",
+      "new_plan_sha256": "bb3fd40ef17296c9059f3c34e9cc34a34ea208e472e6c6184dcde2a1f6472e21",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "fc4bda712a7fc858d928105c89d0bd92791094fb614bba8c1a220b0590bf4b18",
+      "new_plan_sha256": "b1b44c3885b90070e7be92d8fed9930f412459b7e67b179d61b8f11e6272e5a5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "6883e0b529993fd089d37c892897b68aa70f9e70c529174a8cd0b8e024b46cf0",
+      "new_plan_sha256": "751afbd779064298ed02c7fb767509775171ba1bc7d7b299e207b60398d4a8cd",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a8e9259f66d2b0db56fee33a42ca304caa24987f5d3fce016702aa735ac23b8d",
+      "new_plan_sha256": "0146dc810d5d42e2111c1568e73a8e1c75cc5ce9977874e1423267c217c645f4",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d07827499e0500c3a6fa409f99c830377c67594d9b49481908046fa182f5440c",
+      "new_plan_sha256": "3e5128e8079897dcd8ba04b709201b2233f64f093c23bdd1ccb12d28088a0206",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "6d29c86012b26aebdef7d4c54c70be1d4fcb3d145df16f3736b2b21d0e9cfd10",
+      "new_plan_sha256": "3658fb34de94d516f94a5a746725d6fb0d979cb6a7d5c98239819a9106cb854a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7c7caeddc405a1a8e0c03e34b414c2d56f64441eb3881f1a914e57b9146fc77d",
+      "new_plan_sha256": "eb67c8aea9e1fe29bac6330ab836d5a5703d0f581d008940a7360e6fcc36d559",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "70c364095f8fb712cc2f782c402fe9354dfc1a85e61295d017cf453a5c06dbcc",
+      "new_plan_sha256": "b518ae80fd473e82fbb26e5eb0357bf81da247824d97f49718b8407741f4c6a9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "72fd0d4cb569fb08fc6653b9975403cd167a7c597237a2cc6cfd3943d99d9f2b",
+      "new_plan_sha256": "8035f5933ece52ce529631d2d10d06940aaa356a9a7e69927954990ad6671397",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f479b0177ba501cd9b1aad3d2604534c15e23c6623d075764389f28571614a45",
+      "new_plan_sha256": "4c7647ba1fb2ebbeed007cf2b3647f9ae5d33c7f9d9a2bf41557b09542256482",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d3dcf33436207de011634d75120766d74c050c46c1e8fb437ee8ade5ba5017a4",
+      "new_plan_sha256": "26e2d50f97dc97afc3a2bc73ef2f8bb92aa258fd6588489e02a5509191b265f5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-trtrs-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f7c1e063783201acfe87de8b7b734f9feabaabe9e03692df3e226e58fdfa50e9",
+      "new_plan_sha256": "a730439499024b5cf95b42c82ee9c192f1605ea96ad14dd93092e9cf91f728ba",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ffc370dd29292da4924020fc528b576106f7c9a1fa2f9e67acbb094d34aaed59",
+      "new_plan_sha256": "534f79e3da1ac8b0211b14157fefa52797b8854d73b16b106b7557d1ab214ea6",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "114fa415d59e9c27557ac68e0300c2c0592e8c139c5e6b23e037c18f8f96d69e",
+      "new_plan_sha256": "5d5f7964a838b41573a349f9e28032baa8b7a70fc9a18af3bb6c300b514d1952",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f637629568266cba8c8f4e62f428f36053a21bf935bfe0a8a581ce886a7728a2",
+      "new_plan_sha256": "cc439b0419e3354fcd52f6278f764ad7a8eff784605975a847a677e1cd800b08",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "564a7e33e555cf87605abad757140bd8b4ad4dfe2939da2d0f1f90ccb5052236",
+      "new_plan_sha256": "b281a6a379d23b797d344fe903130b1458c680fc7de6be6efac07ee5c0097507",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d77e2b4f1302863ced2896a69633f513fbea7cc292a518da71cb77dc540c54b2",
+      "new_plan_sha256": "715151726fdc77a64b53781d516aa2e91095c78988ca990ad394bea8bdf2b16b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtrs-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "dceca0e0ae33b1581b5fa427a57a79e37007b9f61d6c48b8867727593f26dcd7",
+      "new_plan_sha256": "02efcde62578fc136f89b3e5e024db56d3204ae1b5c91e3d1f47791b158c3747",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "6a1dfa44a60509581ea639321f822d88b0f7b3667f51995f3263f49216f43038",
+      "new_plan_sha256": "f8204e0f69541d9c50c501f39cdaed0c4f4148ba1dfdcf47c1d41615dff7a3cd",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "530a09abfe1fb6111832b60dbd089ca44384846d160ec7346a89cab3efeb0408",
+      "new_plan_sha256": "eb569e0d8294897661f8da763818bc67a4f31b235cca7c558c1f50c807cf0665",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3e450584af90fe19b69d8947fa537b4da845dc1fd14c2f2a9678741f90720f40",
+      "new_plan_sha256": "02d796f07e7075cf1ccc3a0d25564e7749802bd95e83b82658b7318aec198bb1",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "222af2c1c5f2de8ccc8647fe502232776145184054908630d814e6599e06d2c1",
+      "new_plan_sha256": "9e20b3f8dac77a9eff1a65ef09befc4c8dfea34552968020897522bc287bad0d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "28cd0809f10a0c352365e8b90b56ca47abe4d4645c47924eb27478df48e6d347",
+      "new_plan_sha256": "eb4b97cbcd1bccc1cafc273c9ea58a5661ce9b4a24c0aac9f67eb7ca08235e91",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0e41174914f65c6301ed606c1b594909257cd54e271b810055852783bd0d790d",
+      "new_plan_sha256": "41a5cd5f9233809c2f36b059fa470177c1a7928ef003958dfc625461cffc199b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d0fda6b7f04164eeaca96c621e51a9812e2b73d03048c5b91182a3cbb55594fe",
+      "new_plan_sha256": "6bd55b61d6a5ebf37271e4235cccf3eda4109810d91ff3a321960f65cd286d82",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "42de4fdc27d21e247669b9235d56ae00ce541e8cb1f5ba3c594cec21f0d90409",
+      "new_plan_sha256": "55804043352de4c21275ffde8ad0877921dbcd148b11194069d63e3c58e0d531",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "06a48012db1fe199a37c16138fb2ebb5b9038c69aa88f42aec420827f73d9690",
+      "new_plan_sha256": "32f51ddd08e7b2afc449fce849e15fa56e5e804eaec5270af1db8a10937d3956",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f3452a61861584cb84302b1d6d8bae3b18f6efc9d47a5b7b5da50227cf0430e8",
+      "new_plan_sha256": "d4d3de591de77c58d937b156068a0c0cd819158839e5a85ab7d34822f61dd50f",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8e60a8a4daa6865449e670ea63637ad8cf85274f69e9ed51c63e5540a0a8d0bb",
+      "new_plan_sha256": "6ef080484091a3d3f24705c93e90bb9533e933c4d166cc952764b7d5b54abecd",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4d5f0673e8ab1de51ba3e62db782d370a5fe3a5dff3084ae626c406ea95006e0",
+      "new_plan_sha256": "37183ffd332e7a127df26694d477c500fec92e81a1f9fe85db69354f98236780",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "77dd0ba82a26f381a3d17fe57a76807298d1dacbf303a6de234d9eeb6d4bb892",
+      "new_plan_sha256": "e0d8822f7156d6a4f76badb242db119053eb83b396d71422ce18bd1f901e68b8",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "fd52eda5f2c4e9cde4ef519ed0bdd9aa1075d96013f342bbf135f2f8cce98542",
+      "new_plan_sha256": "aa4fbf9b9402eb71ec6828374737127471a3c240eb7439e593f91743f0e6b6c5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ddd66959d9b67e926d353db6ec08802ead4e316c2e8945a45ebb9a335de70fcc",
+      "new_plan_sha256": "c1771f311ec67e35f95a474f35f47d253efd5fe60e85d7c73700c0b33ec98e71",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "aa814d851850d422fd63362a2b678b080a0277daf63c2435a1e0507ef3110ad2",
+      "new_plan_sha256": "433963bc4a35f6744265b148d82271b0dead444533719c2f4e027461dff8fc71",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9f51c7b25fa261d9607b443ec8a90e92d24bf626767d04c712686d063d71f390",
+      "new_plan_sha256": "6b22d6e95098e8e85fd5f6041b81e4c712af69dfd4e3d586cc4f44e460b16c3d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5ef0fa1e0f18ee5a6085ed73b28570902edebcca81c6898ee26c75a4caead826",
+      "new_plan_sha256": "a8125b306690ce0bf17b7c182e0cfb6a7844f4e270fedc89f08ca0b7b6faad6c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "035c400d7df0a182ebcdc2db9a7cc056c3ce657073f6d75475aacea626e22f78",
+      "new_plan_sha256": "421fbea0fb206ff93ab69574ee9a8865d45e549128d2d45ce2bce6dfcdb35c09",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "13539ddb67e54b13cf235cb34d17880ce645cb7edd2b57072b48450e1753bb52",
+      "new_plan_sha256": "10d92a65de17e333ad494b57d5b52edfce0541ccd0f969a0f7db9647c3603a7d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "03de2d94bb0ba1e1e576f4c39a864d2b8d593dcecbb605d7b3f022d955884937",
+      "new_plan_sha256": "3798e7036af4e7bf67285e6b5a5700ca93a71c6c4577e5af1b5d50d12f8e8e38",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "potrf-potrs-trtrs-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c961ef9ef342744c46edda9dcad8809346d444c26750a09960bf11eb47d2173e",
+      "new_plan_sha256": "02c738b1f624218e58a7280e1393419174a2bd7333ebc9806eb004cf744d8058",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ba21b580ae3d21fd88dfe83345f65f8aa0569460fa05c823cdd12a67e4590e21",
+      "new_plan_sha256": "7e96085e9b29f64dba1187f082ea51d1422343ae3f4de3acd7841991c90e96bc",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "fa72d7c862555ea605e11fb2d052b13737c3af43bc0070c6cc7f0323e51dce0a",
+      "new_plan_sha256": "7aae1cbf570168df7d439d87467eb8f39792493a7503fae7f5ac6f6bef37e2aa",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "1bcb8f24ada5d11a1ddee928ba5d373bab02ed846c7424a44a8866bb5c35912e",
+      "new_plan_sha256": "34515853da7816829cecf61cb5f0d5c71ac1538cce00dba9ac100716e378ffad",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a4c3cfb5eeaccb01127ea86a7c829a1fc076dc1c09404cc32d3b15a08e6f9dca",
+      "new_plan_sha256": "0411e1c4ae56354d2f2da0719e38107f29fd83b40c767472774511893a07e828",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-trtri-getri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "62ff3ccf006a55d865a298b6c2d7fa288306facc36a5a738d747f48d50b3d6f9",
+      "new_plan_sha256": "5b42853b40690527e592a8eefd28298f75008c83c33320cb0d875f30665bd97e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.ilp64",
+      "set": "trtrs-trtri-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ccd56ebd161f3eda5b655f52935d87a269fd5fd9aaecad17e621d816fee0274e",
+      "new_plan_sha256": "770789b94a02f643f62828d5af933a4e583f78e83ae53fe1ad3ca8865c6fc466",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3c5258f7b586380829a31afcdc8f5e0ab2044535dd860f8a6cf5cd5dbbefa79d",
+      "new_plan_sha256": "b942ad14ae0446bc4186f034f22a805e33e99699c634b1d3f2681b465dbbb286",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ec49366602f0d8e6a56bf0ddd3176bbf1ec0b87c9b6386222395cc0efe91c8c5",
+      "new_plan_sha256": "d130c773f03a1cf7f0cd67dbedb1f93f87b07f8d099193364e470b215c010c46",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "be67c78e56a0c80aa1efdb598d5a8127013b2085244861926a6ea156721dd213",
+      "new_plan_sha256": "d2f8ee7939a9d19e06a664c62d016bc1ffd0773be8cfbc2c5ab92dfcadf5d648",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "complex-gelsd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e6c3903b8b656f250674fc82cda3012f2f3326b36bad65df84b81f06cb5c78c7",
+      "new_plan_sha256": "7044c2e4f6bbc18dbbdeba9e93370c75ef49221c7e1a29c7736d15c91238aab2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4ff13ff29f3ff486e93f1bf6ededc7c5f31bf18a6404f36194e113f9a7f03296",
+      "new_plan_sha256": "3e79178002bdc24a884ed8f8d4cd1c835c7c46c3b8f1d142d241d255cc90341c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "05cb087ee617f7f5106ebb70cbdcb39f8b5f6d2e53438b9a0a1e1a48abda458d",
+      "new_plan_sha256": "0cfa70e9d0a652fb7f3062d9f9101bd55019588d4ef535e213a11b60165821e2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c14b5d4034226434b582c70cf5eaba2de66018cf46da2fa52635e4b3fed773ce",
+      "new_plan_sha256": "d7240da90f731f73803fd9b8c1f3a1b88d04bf227554bec1bb2d6db654353932",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0b64f9d220ec99f0286b4d61911369798cfd65e03b6a04b913c462107bbec26d",
+      "new_plan_sha256": "1770c9e8d2c2cb55d4af86a50aa67b4a4d434a67a7b8a81a1576e7b06d70bbcf",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ac5077a32ab5832b306563dcb3eb279cdf8216e4e7f1e5b1dfedff75c4f1f963",
+      "new_plan_sha256": "18602df1a3cef81dc6eeb602a76c38a42705e38cec6c07cb362bf675164a3572",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-orgqr-ungqr-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2aad167a3a97d7ba55802dec26d644dd8a7c3ac2df837dfe1b93db902c57bcb4",
+      "new_plan_sha256": "597038fbc68bb78cdf3a13aeb168c57b868ca1830826fc840d6bac105d2f2ccb",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f37bd36ef9f19686b5d52810fbee25018218603d7819a8ca777985887e4bc73f",
+      "new_plan_sha256": "5c2a225593405518056b6b9bdcf662fae519cecda640e93c6f572fe3d5dc6943",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "geqrf-ormqr-unmqr-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "b6b2a9707bb3fa061b539c15edc834d96cbfb186f0fefc3c2740c554cd548bc4",
+      "new_plan_sha256": "4f924c4b5fddf9ccab7ba2d579065e7164aefab9d0a6bd51f4d4365a3724d80e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "03348d23014f05e78dfa1e839925b7f8b132be6a0de2c32e76fc13bb0e5cfd13",
+      "new_plan_sha256": "77ad8ea38fc448d16b9670c82d8235eeea7370cdca66722c43cee9536de846d6",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "bdfa0b0b70ad32fec9ed70e0a1538a244461eb26101285d8109bc1207a501a7d",
+      "new_plan_sha256": "8462dfec646dce84fbe21ba87f060bb8c5b4e2ce206d056b9bb15e777cd82fd3",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0fe3337f1fad8e4887a59671e34a336cabd468389f432bda7a6229b50cae31dd",
+      "new_plan_sha256": "f5cfc1ba8b1695cbcea91562052ea5b7fca4b4fe479965751f862765f5742d21",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "gesvd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "312cd163cc75f1af92f6f52ce0c957164025e2c654e09dc54b75334fe5aeb4ec",
+      "new_plan_sha256": "cff7f55e1c702f8447fb0f95b96dfa465b3c653a31330fb734bd8054a1815eba",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "63a1cae513963e1d665b52f38024c6bf114a545bb6a0d056c69dfee7f285a935",
+      "new_plan_sha256": "f64f91d5901729001ced84128e1c384223a34a174d692f76295bbb221c5682ad",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5cf5018b782aaaabeec8a9ccd36418e4e1c99dcf349568534c65d30c12b845fd",
+      "new_plan_sha256": "98defc22b35122a9d90810bda34b52564c4483528e26ba3bfd42ff57378782a4",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "6cedf03f0f4df84e24eb566c06f125f3d3fdd23e971341cbc49988f0e74a0a82",
+      "new_plan_sha256": "bec2e10b2839f34d4473836af2a117bfae6f9b99a20bb2c9a36134df975c4a0d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0f82ff8b326d0019243409292b33ea92dc8c5b2b78f69382c8339a77baa61f31",
+      "new_plan_sha256": "a94bb690fabe9a1230649ed5d561acb8c119e71960bd5b1b7bc38df57f00f3af",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "hermitian-eigen-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "591a65928da162f330596295954896f4d296a213fefa00c402ce5d0c737e888b",
+      "new_plan_sha256": "6981392adcc6d458039ada096354451b7774f7457b5a804dd081a338fb475f59",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "673883cc93cb055dd83c2ff1850b65b2376093efadda13e9aa0d937cd05551d4",
+      "new_plan_sha256": "17c1c22ff8e26af479839c88488df6cdbc129774e189f81e63f2056b54bb6782",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "dcc99973f082a0dd71c6891aa2c9266d453e3793fe35a51e3cc9296a7da7f0b3",
+      "new_plan_sha256": "09d3fa19d36298efa15711db39123620e1d6d9fe1345ec21aaca146b96c8be1b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "79e325efec865f22b1b513f030706ce4a3d64f0f79c6a92085c5ab7b11521f02",
+      "new_plan_sha256": "bf6f3500882d83f875aac583f7308cf4069eed34f1f4b2a81a1abefc272b845c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "orgqr-ungqr-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8100a8f5e797a975c8fc9df3b71d10b4506bbe93babb052f581f1623c34d23c5",
+      "new_plan_sha256": "54a432e30bedb39aa5c74e1332c5f719cb0b4b0a561c2f845ba545a8a47e5ff1",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2390037b3d09a1a71541ccd61ce55ebcd6dbe056d6fecf8aeb71f3cbb554c09b",
+      "new_plan_sha256": "292cf400d9ca29847008eec06fe544a00100a999f9402bc538520246147944a3",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "1150c6abb488026ec11439b601ada56bc0d7637c575d770754ead718d9dcc09d",
+      "new_plan_sha256": "8bce25af2f780d5854675cc620d0e0cc051ba57f31da41457a704d9a28750b48",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "214b404451ebceaaa2330950bc314eea31e2a54593be14cd9de6320d11d3909c",
+      "new_plan_sha256": "67d5b8772b402f81ca153009ec53c5a5ff1826bbe6cd6a1434db63424b5ce70f",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "efacff4a647ceede406a2604257eed7dec57be40de9dfa13ed24e5f3a9ba1296",
+      "new_plan_sha256": "35ca515c51e701612783df5a3fd5e7ad174ddd5e88f43a1ef7ea48459bf00738",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4a96ab04e015d60de8098c53abeb2795a855a573fe46805b91e1e0d22d53348f",
+      "new_plan_sha256": "9a2c499e676332cc7f2a1e72b0a1e3cf1f2e11895ea85b1edced2c1f5bfbd8bf",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "561c9cefdedd994a12ffa2f09d3ce016078b7f4b8022e3ca6863a8aff8ad0772",
+      "new_plan_sha256": "a38bf326c793e1cf2e93e736e8998875f8b6118d0c91501f14c1df33730c4eac",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "25a3890636ba21d3d2b0b0416acc354b12fde293529e96aa0e150d25c9189910",
+      "new_plan_sha256": "31dd45983d42bb7be9d9c444a8fb14b6624ae3e0a437e0db3d43cbff4d00cef0",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "442f35870e8304e2ac00325198555d713d6fe4c3a1e909dd7c88481d35c3b0ac",
+      "new_plan_sha256": "77042360b9afa223070bf1a1008c84ee40f485674fcb4b4c20758e01b02ccb2d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "6b5479efe3569ad16c236e5c2bf034a90a79c4a0aa6d9d14ef64981ef9502e05",
+      "new_plan_sha256": "3e81bd5823c8e914b38632f86cbcec0c0493a42b7d3b7afb98645906eeb245d1",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "76c25fb822128ab5ebd5bdc574f76b161e473a4f0b8426341c666cb98b7561ec",
+      "new_plan_sha256": "b7032895772faf546c4c647e98f9c667d04c251a292e989db92df298a7dd53c6",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8df7e65d46a03b702ca3bf4d3e3a79caf185f326195436a26a060bf83be4c236",
+      "new_plan_sha256": "6c9bc84bd00efe9d640e1e3af13d0dab266e43214578b9ba41d6c97c03ff3b96",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "be366eb0ebfb69c7b78ea5e81ec3e53fa32724fd44dfb1396e832a4e8d378041",
+      "new_plan_sha256": "7c292b55eae7bae9431f15dc00a552e2d3e3a4699ff4f93a3dd89cb99dce3d3c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0e5c235cd359ce5b9062dd1e29640774e3eb661e625b5253c5d090aa96e0a7cb",
+      "new_plan_sha256": "a718f7e9cf2dbf3eb4aad75aa2754ea8a1ad00f9a7a7e5cd02b6425f37c519ec",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "fa9747bd062e78268622d4ee71450db8c8b417c00afbc8b6bcc464d747bbff10",
+      "new_plan_sha256": "c93762dc0c3f990ae25c72f2b72ba797c484810d4b8241aa12613c7b5cfac38e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a7699052f25af6779f44181e07880bd12616c4598a89901c95a85b5a4a2efa4f",
+      "new_plan_sha256": "bafc9591328d4b45b94f0cddcf61c7613cca189fd40d1ef46c0593c6ddc13bfc",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5ac202d7452fd25f386e283e5b0f93f38f249c0422a87bb0a4e974f750c7e193",
+      "new_plan_sha256": "f77a05ffd5f8f2ca47104391d461078fea7f7f493f9c078a2eb92890a22cbc7b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "13482266ae7492babee9c1ab09dc4cec34e48e7ae0b3d93542af54a796ee2c99",
+      "new_plan_sha256": "3cd236bf4f1493f97015db1d9c74d4682a9115d85aaef21ed60e016b39275914",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "bbb114593627bca9e16ee61bcade131edd3233178f0c0c747e391090fe302298",
+      "new_plan_sha256": "daf949e78fad89455c746cf1692fa729217c8d20af9e5111336d1ef7f3f7b752",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "cfcdc1c87559670d3f6c4a100393bb272a9b6c4564d3e50021ff3f84d4ea5cad",
+      "new_plan_sha256": "1ddbded64066ae4542f36474ce828995d6d0059c123a528cf24044bd357e91ac",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e7cda5264116b8f953483e2ea761683dd99d0d1c394dcc5adfbbd93bebd054e2",
+      "new_plan_sha256": "210f8ca4559a0a6489cd0e6ab803d5ca93e2ec31c2ec20f7a5dfc6600aa0e107",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f5376453e0e31346eb0a9b82d7f5c6ebd32e1fc739692109608e316e44fe36e1",
+      "new_plan_sha256": "02298bbf94f4c64b34766bf07612bdbd50bacb831bbd2fe82d32ce4742e682d6",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "bda2c91d7be06134170db8e9447673f383c47ccb7bb0eabc4ea63dd837673f83",
+      "new_plan_sha256": "430b5f73df5925659c12afecbf78ce522a0f9edbec6087c31ee32518df3c2b8d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4f234db7ea3f377ba91ee59db11775a73a9b57cf3789fe33ca3d247aff0b3160",
+      "new_plan_sha256": "b6e98801201601708230b9d3d0616b29582922eec95712f49302b037c7bf4337",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "6cac8a710e6cf3a105f7d542a81f168f619d1c0ad160e50d469b3e1260c2769e",
+      "new_plan_sha256": "ba1fb8209cd43e8d5db63898c0ce2cbf71224e1e00d173beded4d3617340aea5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e01804b996761cfea0d31e8ba5e867f80aedc136b901c5e3f7646afc5e8a9c16",
+      "new_plan_sha256": "a4343cf178ec6b2184f989ccda328c69917be60ef7cdea11afec39f8411ff657",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "39ddfe7857c07ff5ff657788671fb0bf1f4a4097d98e1883ab2bc3c4625680c6",
+      "new_plan_sha256": "4c1ca6e4db2e4e94e118ca22b35717af4d47e2d76adaac0105644646cb3662fd",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d1db178d02ec92b1ee8b406225f3e3a969622ec8a870b7282b47dcf82d96220a",
+      "new_plan_sha256": "e88351f4224243f091c979c642e32e80bc853d0e02cb934e78a6e6bfd6d6c55c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7262d5bfcbe631ad08bf09797e82e2bfa9a6f274f74708c56661f6af7880bfef",
+      "new_plan_sha256": "91c18887c616bca1222c5689d9eb6ab4f16d5bf95bc20a718536e852f35b324b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "02aa0104661b77dbda5dd1cfad001b2821acbc3a638f994ab09b1852830b0e03",
+      "new_plan_sha256": "5f6d1e56e3b0c3ebe49c08d460fa9e192e19d16f45eed823ce45705a2b17e054",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e2cbb8340eee27b26283efc9897dd7fec21f529eff1a9e0e9bfcdcdaba5fbc65",
+      "new_plan_sha256": "0d53105e7ef3c17e05b7e8c172547a4f4415fa01b617c8744fde62e1afc9d46c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5987d3f17af1279c550182349ddd12a9299a2b0c624355f635ba4c899483f3e1",
+      "new_plan_sha256": "6cc5481562698f869b9f16de17c6d56558916a353716e0415f9b8670cac5b291",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d837478d0a7ef92eebe832f9bdf783eef777f429bd179ae7e6c8dedbecfb224e",
+      "new_plan_sha256": "6eb1ca81f0d5f94bc6e506434681a80e095c4af3bc55eda86422f94a4fe580f2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f47a374e4d6c82d04baea956993791dc6cdeb0afb40f71e303a44d758ef982aa",
+      "new_plan_sha256": "1345f0e016ca1d5463af8eb8232b8aaee86d4d0435180707bc9734e985ffc34a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "19dd8bd8d479b8fbefb06617e63244702b33bb6c17323f9ff939274c514c82be",
+      "new_plan_sha256": "ef26cd51f726e569c493c97e59ca6030fe02e6b7878fc3fb99ab590771623b90",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "daa3298cc84bc9847a5a3d6f4ca85577fe90838df0d206171fdef973ad2613d9",
+      "new_plan_sha256": "ae40ceda93784caac78292f4e173d8d0ad13943ea41ab40c61495e757bc61c70",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "1c9e2c11de827487fe04226e954006a7746b0fcc8779d8b96af8452cb30f2868",
+      "new_plan_sha256": "8085947b790702891b67e309c5fc76657463b23b8e75e412f272ce48192f15c2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "96c8bf3451144dac38871d48c2ebb203197e4d49682bc41b3514b2ef8f781da6",
+      "new_plan_sha256": "efd3ab58556d92ee3e6d93fd33e469cf6a2185d6b463484dec9747dbfa3b56df",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c7aa4b798d42d1cfbdc88d1fcfe6082666540029994a3f8d576f3beaf788b0a7",
+      "new_plan_sha256": "dfead0c7707a00de16114ad0fbbc055ac519c038f256e3d09ad6d41bb8039035",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3a84f56fdcbf01e14ffcbfa267b56eaaa8090433a88e69d11f8ee43248367edd",
+      "new_plan_sha256": "0e4fc6e6a01144ef9e9038e59e8a35198685a1dbf7847511c87449849b9eeea9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0b7ccaec97e9e7c59f0cc6bbd7e3caebe8425e2da646f7c709b98bf41b24b06b",
+      "new_plan_sha256": "f08f89907f975362afc8b6d758676ad9f80219fbc6fe40587b970ce9bbafb290",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a4b2dfe78b57472ab7d39a59c6628615fa94a9d06914bbdebdd86cc68f189fb5",
+      "new_plan_sha256": "8bafee8893c3ac7ba0faedd05df9b49715f871d5acc254165c80c640c7253b14",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "98a1b1935fd8379c8f6dd61f34fa0bb615d8d2cfa4f4b4ecf1bbc8bdbc76d773",
+      "new_plan_sha256": "a005a22a4beee9ca404e56b6e43769fd2d338f4e43a548bd04b8f0b260d98628",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2d68aeb0c92d4b09eb3766108f3e721eaeecc7dc9c2c98d2052af6cb31cf1442",
+      "new_plan_sha256": "109704aaddf799244193baf1d761f0ae4ec663e2119a0576199e4e7d376ba2aa",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "01e0ff875b56377d83386afc6baf4d73661a27fbedf5fae5663cf80b4f0bf4be",
+      "new_plan_sha256": "4ef66fa47a2ca1c2e3867ff313338f719bebd8454bb665ef80c3dfd1f96476e5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c855b85340139b782b09ec6cfd647ef72bde7903282fa87c368f17056d75e501",
+      "new_plan_sha256": "0f26ad577d072f5713f2e8840cceb081e003f5b6e94c4e43846251f5425b60ee",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8b4be6a52dbc88217a498191adde20879f7f6fa4dd1ff47af2ade7f55ed8b130",
+      "new_plan_sha256": "30c4e728f2514b353cdfebfe0f6882437aa535284c21fe0df54d3c527f46d7e2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "92e457a0b0eede5a994bc9a3186e08bdea2e399bac80f240e54d1a4ae77063db",
+      "new_plan_sha256": "f50964ddc07d5dbca02c1880725d318550dbfb6d8613a415fbc7f5b906f9cdf1",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "478e43b74774f4890574e4f8ed622fff5313172b029b9346a875a30630ecbb8d",
+      "new_plan_sha256": "962c153e12025e15caf44419a459c5bb9150924088edfac8f431142b860bcc28",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7de32deecf9896869cb94c9e6fc441966198363458fd76f629988361f92e2cf3",
+      "new_plan_sha256": "84579ffe11b3ff2231d0a02a2f3c6fa53c48f2234b68a4e6ad4749dec6113878",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9e8d29459fc83d04d73d1bf21712ce9450c6d7e73200aa37eee053b37c76a92f",
+      "new_plan_sha256": "2ca5be64478b7735a7d31d192342f7cf6896c097c20767e25b3b186f92c0685b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7d0cce70e99a0ce3e79a5fc2cbb64c814e5aa562004a1975fb2dc1ed29e26cca",
+      "new_plan_sha256": "855eb990313bb95e071d979c12781d3af74aeec850223413c7f8f6c839f13c4b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3dc341488c4e230615adb89e5ed6d627931c0c556729723de7b98331f1850857",
+      "new_plan_sha256": "ae2ba34b7c38b72724809d3ce06ac0ab09f0486141f770013ff9f99da738d5e2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "016a05f9464a922f034db9ab761c28b83d553944ce1fbb0221777cc45a63d8a0",
+      "new_plan_sha256": "f9c5294b2d096b3f3dbca97e607c58257d5e5ddab284b857c3f111639ccdd188",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "808c43762121c5fa10e4345ca163d3d779056f200a36ce88b9407a0422308a70",
+      "new_plan_sha256": "8ab7f482931a0ae3d4cf38f6010b586e5625b4c11ef60945c3253dd831dd6773",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8d00826464e43d1c14658be0d5d3e12cd1b275792479c18bf42fa9d0f5548af7",
+      "new_plan_sha256": "ed0f9b0291324e15eb9e8ba7bf4e2a135f7c70bc2c46501e50c2413ecfd08d50",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "cbcae5bb7ecb59e8eec8c7b86224ecc830f27cb0aac894811bde5046e24824d1",
+      "new_plan_sha256": "0d37c35dffdaefcae3b27a46bea50c4f0d14adbcf5228769729843ee3c855ed7",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "81c0ca3e4720616579ce16b26cd31601da0c08b6a0ca2dfebed7ad1249f5969c",
+      "new_plan_sha256": "825992371afa417c720e837112f6ec4ba6da0a146683e035d5d32a5c2c7bcd4d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8c52c0fefe155ddaeda5d2345f88f009a1af9e62c07c1eb176022023a92fa1c3",
+      "new_plan_sha256": "a8f9f4321e32e796fd5f29e2aeba97d3f5028647957750df02bca093a028da8e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a2eee2abcef0d5e1773d5bbbe7d26462d6f7f1e64198d6d7804519f394bdb3ac",
+      "new_plan_sha256": "f8cbd75d9c42219cfc98660459e3ac158dca08f927f500055ab507199f6d46df",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a22191d4be84ae9f323a072788c44f3c5c72056525cbaf312990f1fe57cf5f6b",
+      "new_plan_sha256": "d888e11a28f57928e3b355a36093db65d41480830472050c9588a473e494f953",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "fa2ddece58ca461bf828970d8293ba3de07473eba190feaa12bbaf4ca6e1d4c8",
+      "new_plan_sha256": "b5958cf7a367e63ac1059746afce6173b9e3a7c2c4efab2059421dedd2d8d92c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2fe075043e002043d9ed47cfb049077f0e97879809da733ef190759af93143f3",
+      "new_plan_sha256": "206c67d099c94dd7c7a2cef1cd86bf122ec74ac10e9a9e6dd6d837fe3b9f6ee3",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "abff8928fbe8539daa59b4e84be1671eef125671d3b1b61bcc74062d9c3fa898",
+      "new_plan_sha256": "d6a6c7b922ed5a1717512411b0d3ef15ddaa980edad956a10a69ace72a14c36a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c85ce6dc7a6d45f1c211d991d3ccddee20fa9eedfc940f168f0456d1b3a9aeab",
+      "new_plan_sha256": "87e2b71e7505721c834f52927ad2f2e174f3c7c024a0759ff0cce58cd232bd26",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ecf8ade68a87edcf53f87dc109a88ed0333e148f2ebf2140f965e5776e15153f",
+      "new_plan_sha256": "f7a3889c845b6a8ff32feb1c9e3289497561a6fd91da0294ee0221c8c9a879e9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "bdb0670d16aec963f2aa2aa2fbad0b184c743771bc1753ae68c3f3d90f420b8d",
+      "new_plan_sha256": "9d1e3e2de7d26670a8dc31960e078a61791a1a7c7f79ae89b693d1b27dfbeab7",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d63ded638d42c981401e18a9e8c1b2c38f9b34c1e745d6b56e30574485ea77f3",
+      "new_plan_sha256": "fc87a795d7262f30f46526a3c0569d3dc1802bda973cb8b5681684f175b0348a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "fc089279aec1209ccc419bf587f519cbdcec9e711e6600fe8da99f6e1037747b",
+      "new_plan_sha256": "bc8da6ae873ad8c3146620fa18e7e5278f6bd5453c785b02f338021ff3ab03b5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "eedab75361d2a1e4508b64cc502dc69e18ed3ec24fce4f0699dae65aa9f95975",
+      "new_plan_sha256": "4e9fcad4c4af2f8d8b29407dbc3899b340994fb24259609d372f7c77fb5e3730",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "22091c15e74824008928872b983fc9c78fd27ad32cee4400b975a39bdc771960",
+      "new_plan_sha256": "6b49a9855c28db3c3b712f86b093e8d3f1a4da8818f71f7766de575fadd64c87",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2af7fae65c7c87f5b0f36757a995897b9a1b46627b8e17caa8c476fba3f08e13",
+      "new_plan_sha256": "89031342602cc90dd26b0e3fb0708d1fb5ca136030901dda9cf350290d07b192",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ef3b1352e45be9ab9cbf91a64c9b8504dc840f62271d1907e69795b372979f40",
+      "new_plan_sha256": "cad6a77096f37bbe79cb157df58d014523de614b6c369eb10ac1454ac498b207",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2bba1241584381ffb7daff37d269604a388938cbe6e554ccfbe64f744cbbbdd8",
+      "new_plan_sha256": "b92c017bb0afb69ed4f240361be195764b0643a0b96b2267b9f33aa9ac37eb15",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "aa1472c32bece09529d10eac1366aaf4477754f85880baf5edc12720f1be0e1f",
+      "new_plan_sha256": "e36c4535c5418347bbd4897fc94b71356163e3bbc3dbf22ad1713c74b6a8625b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "cf4d0216aa5cf32d0dd471e44e169c22432226f33892b64f70077cf30fdd7a7b",
+      "new_plan_sha256": "0f16150bb96cf616de0ebbf04d3c6d4be9a322341d676acb421a3d77f33286f6",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5fb4567b76d6941f6e7c8c6eeb372b31831d9911265b1f4b20a4007c63377b30",
+      "new_plan_sha256": "b6d8e059a89949f3fe9706e3784e6d2ec4388786bd0494bb14038fcf7538bda9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d9c7ccb1d5ec1f9919ec093d8a443be44925a087a5b65ecfd28aac939e2e4d5b",
+      "new_plan_sha256": "48e886af7aecb4b02a8b2a4a5b81c30e31844722a4dda581789479e57359cc7d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "87f44ddf04de805671b9088d3a54365934cdc42f19e28437be0fe15b9ebe0a52",
+      "new_plan_sha256": "0210147fa29cea153d340d7c3364238615d3f54cdd9bfc54f67a1f01c36fc2bd",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "34d92381fc6d6cf99adecc3dc6ab59091cc7321af64ab32cc7f300c83ad11b82",
+      "new_plan_sha256": "c5fd5cdf91856458062533d89dadc9e66fd0e932699064305cafa61dd8397f8a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9b2aea6da70984c2d30719ad85eb6496c842c25a24d0d04725fc963fe477f7a4",
+      "new_plan_sha256": "a5ec02a6126f9f5007790fa071e0b11b9a212fd5f4c47db9f2ff98420acebee9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "489a2899c14cde65809098993c6d3008b837edfb304e193fb9f483a250e58e81",
+      "new_plan_sha256": "ffe4ff20c4096fb09e875209ec2be650673b2287def66831b45d797821db7a09",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7280f5e6aff6aee81c1996dd25c214356e67db49c290056f9c8d8f9fcb18bfb8",
+      "new_plan_sha256": "727cdbcb4cb7b599b3337ff4767a82cfde5129c11c4bf3e44019c3dafb4eb263",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0f9014733d5b884d9cbc5735ae7011727c4cd79b54cea8b56defd1dda3a75636",
+      "new_plan_sha256": "6925c5cab5388991fac51c52924d36e7ca47169273773fc3994269e51e2c510c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "1ca99f1999d34c5c6f27139904b353836fc75ce0854fafb765b8a9adcd4e3329",
+      "new_plan_sha256": "9cc593bb1363281bf2cafb7dc7f2427fcdf207a37e96a363db57f2bfff55e2c5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c01970a27299d24e377754b317f26f4094a87b3ae087b5bf9f3b2e5393f34cfe",
+      "new_plan_sha256": "dfc96f0d4c57cfa4354f6faeb3151a7ef704d250cfc06b05fdcfd572c859c444",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "11104f7e6d125f81afad2f3c8d0d0ff1afe581e173cd720028cbf08c6eb309b9",
+      "new_plan_sha256": "e4aded9bcf0f3f10b14c45456f6de0e770c58017adf0c66a11d0de76a048634f",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "118f30e75ba6f430d193edfa77e28ff0af9196aaba1f1ee2f6e436fd8e7c6887",
+      "new_plan_sha256": "2652cd502ec21a15bdef438b0cf4d1148f38a524b95221cb1eff628409249090",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5e5778397907d361415bdecb2f12255ca6a7ca43ca12fb73bfa4fc826c7cc98c",
+      "new_plan_sha256": "b1e9e576645d639631a50e11f67eebe1db6bc3f1a0aa8a45f2ad50a2ae01ba29",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c5aa4f085423ba7580c541c7ae8d16cb6ef5eca4752bbeb2bdcfec48a7f8c370",
+      "new_plan_sha256": "587d6346d98dd825cf238cd753a52d987baac16dc2d21b59e7da28fda52c400d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5691ed5d1df832e8334a93e0dbf5d31675f53e5394dc195df3e9b01fddbce8e5",
+      "new_plan_sha256": "90dfab793887de633ef82625b387ac9c7f8dda6f5878afc4fd82a99a96bec967",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "07c8e62876c4f61e91c60be393ee0b21a09b200ed9b4dce59fa9074341cdec5b",
+      "new_plan_sha256": "83cb5e409e4e1c97fe4848c229885864dbcac79ea8c9a1e188c39266704dddad",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e8fe94e3ece0f332f9a21381d4a7f754221048fc3dbc9ddb22ddccf0fce5001d",
+      "new_plan_sha256": "25cba4687757e990a0165021f3b0a614a9f8be265f4338801d06a3914bb06626",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "467fdf1e08aa5f456cb4f36fb550a3c5c5a5be055753c564b6b37948aeb94e0c",
+      "new_plan_sha256": "3ae07d7779c5c8b60cca3b276854707b709a4b60411d667ad9f2040c17739ae8",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "476a2f27450d8b571f2f2685a63451909da7d21a9f24db35172c02658c80f84f",
+      "new_plan_sha256": "10d4bc31abef072dfac9814acfbc7171d06b088091958e9582b9b51f9a951c61",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "42a0a1ab070b200a879632bc6402a0bc5ad2d88619fa9cc906fb219d922d2b12",
+      "new_plan_sha256": "d518e19e99244ac4b81fd9e41f22fe4933ad1a6e3bfa7e3e1c1fbf81744a9b72",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d2d2be3b8a955253553497f2d14cad68305e2bac701fb39eb65b691d17a6f453",
+      "new_plan_sha256": "4cd077cde5f56805798451e6cb933f14f7832a74c6b2f7d0fc59f20fc21052f9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c16b1d3c46ebf8d92cea1d383456949b7649fe8a47fb6dc1c7563f73be1f3d73",
+      "new_plan_sha256": "575b624f6d2adbb1d309b8e2dc0c8adf4512e840ec194d7b3a9cca386325fdc0",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0a65f10676f285a69839ba73610c0c5f0200e85781b7088708fcb4267b9e75d7",
+      "new_plan_sha256": "6456e1e3ec859b79fd9dbf651206c0d894eaf852a65971d0bd2d103d516de854",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "894469a1d367875c5a6a3630fabcfa6ad51056ce46b5ab05a8ff6e685a94fe08",
+      "new_plan_sha256": "78db9951b9b2bc2b6760c74f3c39b2cf5ba50308b950648a629a9c05aa668424",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "50e1a5ab0c864b6a0f0233febd3186f7336179fccf40e986cd5612b976821895",
+      "new_plan_sha256": "670a1ecc0fb1f6003608bfd939102b8a4b7ed83a5b4c1c0b1638c4e1f1b57b22",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3124083bc875b125e52fde53249ae3e671b626583ecb31eeecfff20031e18753",
+      "new_plan_sha256": "bd9c68803996bcfaf87186d17fe11cd3072255dd7aa31db88aae0cdabef58c36",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "10c1aa00f47c6978d7d5250223516a700f4be675d03a7f259c307347407bacf2",
+      "new_plan_sha256": "f96fc9d17f93a3073f24b939806463484d28df40c0a7a59ce34ca0c98ea53f1d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "cdee279670958ada1e1afa11ae366b276d95a2d105519311bf102603115dea4c",
+      "new_plan_sha256": "c7a578e73a5840caacf9c6cfcfe46866d9a518057b0222dd076163e441a24ca6",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "071df79eac2862d7752aed97eb53dfd14613b8d9375fae6427984d86e63a41ec",
+      "new_plan_sha256": "821c4aa57c542d3c62fd4db9808f7bc889d4fdca2ad8d8974ed089e9a44cb65b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3f414fc4d22f50d453bdfd67e4e9e3b7aa139ec6ff5dee2425d986ff319800fd",
+      "new_plan_sha256": "37ddc8bae1d16b01e503c7b4b05164ecb78cc81c18047694d7b569ac4ba5767a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "42535ca1d8134ebc9175b78a34d014b537d1c2c1a529ad343a4e761ec9d45e89",
+      "new_plan_sha256": "0d8ca5b2def80f85f31506f60a3d206de6a6c059d9df5dd998d7579e705045ce",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9afc9af41c2ead9f2545e7ff4bfe88c7f5a724b06442c83712ba73597440da79",
+      "new_plan_sha256": "6dcd09be351d15d3be8f16abc9a4d2f92c980f94f0ec4c9ff5e2afe77c034891",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "df39735e321b1d85a83b17cf95760babce731f7559029821e3d52ac8e3921ab0",
+      "new_plan_sha256": "5bcf640e08070ace0059ce39739f8c7de209337f612245c5f90bea30be780636",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "45f281ccd44eca4d10e49d022fcd1c06dfdeef86069a4e540a88d8a8b8cd4e06",
+      "new_plan_sha256": "f51fb47c39e17a1890a4046e11c6c5a3aae91543b788fb429c52f81b266d28b9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7bfa838cd00fe8f438489ce1fde43759ecc62b58ecdcdc5321e3449bf47a2cc5",
+      "new_plan_sha256": "83d1d61a5cbb8dcedb87fdea12c62f7d008f600dace78692122a9c8de1a9dc0e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ff554f8d547326612de4f4784a4ef3c5178b167c4f5ce18006702baf794a7113",
+      "new_plan_sha256": "9468e6f924097633dec30a6410d106b07123ee91196e3bae577fdd41819eeacc",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0edf0b4757a58bace7fbdbf933536a22aced760c649a429c3f0f1bc74800e885",
+      "new_plan_sha256": "6cb73e979427799e3377ffe44cae31d2e4406cdf4bb84303e904dc7760826111",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9dfd57cb718c190ab3df7437e327cbf847be4c1c58918df1d658b13929e4cc04",
+      "new_plan_sha256": "8a8bc05657c38ba27dd523c6fd2a4d6d75a2dfa72251e2fe7eb76c4b62c5ffed",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "b08459aabb9f9475ea56c93d5c5df1e5f2d6663bf3e2f08bb1d099a869454986",
+      "new_plan_sha256": "2f66e4a8268817119b11ee7a63c0d2d14f037c136acd4000eae12a74cf4b2f07",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "5956edf0a7abbd9cbfe0a9cf12672caa99f4be552121068c1685fbaad57e7ebe",
+      "new_plan_sha256": "28a5b17b2d7d0c2b6c8c8d171f2f42365f18737d184c3466d996eda10fac0886",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d5786dce55757ef679e747c4aa7e698da1565f54a5bbc21ea738e445c2333a4d",
+      "new_plan_sha256": "c0ab119a120e78a8c573d40361bd7f9ca90cd88ec21f9db312ea17a8f26a9af9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2186866b070740f1a5b43a64e50382327a18b822a9b5238291a09fb1431f3930",
+      "new_plan_sha256": "7df4de4f69f886ac7b85430b6263f971e9bdcf42836a6fde543f6cdaa03719fb",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ffe54a961bd9735d8da8145edf6b34836a68b1521a2d16cafff6e052a2166159",
+      "new_plan_sha256": "a8c91827abff9f65f7621e586eee2e07179ae6e59fba10ea2debd3d5f6e7190e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "f6b4fd89e9637ce7e79af173d75168dee82978dbed0c87bca9e808d1b8731c2f",
+      "new_plan_sha256": "79a022e3595dbe573a89ebf2a59fbf70ccc47de1842241ec942917bcaac39b29",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7316ccefd5701751599060b23aa49660308aa4f00fa1ba8f4b4950c441ef8730",
+      "new_plan_sha256": "356545f187993ead05402b96d272ca3c9eb7cddb0628cc37a1b0c75688e939f3",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "560e5c4199ff9e65d02027d82c39adb7d0e91942dff71846c60598b80561ec20",
+      "new_plan_sha256": "3d32b9a7b4cebd607800571b6939084a5c80983276b144ca0c78401ecf6d36ea",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "91c8bde29c76a297a000bbf32ea74ee7c1d1e0079bd25807d221432d9cf191f7",
+      "new_plan_sha256": "62ae12d6619d269dc1c613239fd4fc7a7b0fa4dacf496adab9a07370568f2b4b",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "1b5597c7a8666be4018de10180491adf4a5749b40b120bd4a05952494d57e542",
+      "new_plan_sha256": "fb100fbfdc36d6dddc9e7390bb379e0e305c3b3470535f0349e522751106267e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "906d3ff0043561dfb56576c728d193407cba0c0a84b5c3ddd4bdf882a3c64dfe",
+      "new_plan_sha256": "dde6b11df041a6b0490130300cd2c366ba03673475259135e05b21f1db765c59",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c7cc64720c24cf82982c671ab9a0aa4492dd5000741dd433917cd804c4ade210",
+      "new_plan_sha256": "22c7bc7438b059b97defd6af76eee4606a539ddc92fb3fc39819efc2823213f2",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "152b07b6c18c574a5c140050be77e3b0508db6a3aba22b0ba7ccb3f641afad6c",
+      "new_plan_sha256": "489e2e45ec26e647d68b508bc364035efb439fa32128d9c7c8730680617f73e5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "93cf542ddb6363a3eeef6f7598426d884c053cd05bf74a31003d424c9ed3de63",
+      "new_plan_sha256": "b5a1fe934d2f044ed7a920d09d6288c85d08330a3bb7a4aeea358b014599dd69",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "020591e4489936c15f16e44a8ba880a62930c3c2b7a02323508e7e3d01c5e0f2",
+      "new_plan_sha256": "4a57f36107b02968106cbd20535f48c0a19d99d4ddc6616a4fc5eda56e434ec5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "24efb578244f9c8a475cc2bb5723cd900cf0670c9bbe67094a2b421af69fd6f6",
+      "new_plan_sha256": "296ff9ac605c3a62229b065d36cab13c28859827f53fbe55b87ff53cba11ccd0",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2c0f66b9b24095c2b033a758e81ae785039e7ad0e89abc83aee3cf033ea2a368",
+      "new_plan_sha256": "bfcea315df2a358f2d12499e73da0d4c8477653073b4551eeaf9ea95a42b8de7",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "919a79a4f9034897f95c513854183d726f40d4a96740c86c4869a9d075c4fcbb",
+      "new_plan_sha256": "b024ba7c98c32c786a27ad1a4121fa9560a9fbbb910da5eec6988deacb132c60",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c3a46cd19ff5c658acdae2478652faeb8c1975c426dd716c0d9c72e0c38163b8",
+      "new_plan_sha256": "ad00a264ad0e66871da813342cb222466768207104dda6ce04a8835cef90ba98",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "623818b0adf25205aadc691b6949fb7c08b1106ecadfa25353c345e7241e49d1",
+      "new_plan_sha256": "ae8178ee176da3057e5a02c4d8d73f518c4fecfeb91f223a6c95e72db30290b8",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "91e38f18d4c7536be91ec1f02e8220088424bb7d4986b4c18ee0b63a0a02cfd7",
+      "new_plan_sha256": "2a005d2e8315ce423d15bc58de76a3a72384451e46ad827d2ceaa9da5b280c00",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "86b47e9ff04be20fa85aaf77d238d6c3b3a3c12f0d5dcc4c3f505bab59d5cbbf",
+      "new_plan_sha256": "0abf98efa17660a11a6117f4d22b2817c39aecfe76779bb4df2fe8302797844d",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "643950bbcda6f1f00c428ff81b05b226db7f7ecd17c0c33d8ccca8f6d7594736",
+      "new_plan_sha256": "bd01f5fb482acea6ba075818eb6a6f39e90370a89c5e813242b94886b3244468",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "a27d6fbb20f8cd3088a3cfa09de58e2869ae5efa6b5c2732c2f3fc2447e23815",
+      "new_plan_sha256": "3dfd1b5de0b6512e7d9edc8f9c0987da5aa836cc3528d1e77ba43afcbfaa7ff8",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-gelsd-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "09aed7901656e2baf1763c87ef7182dde0aa194d7d10c155f248e0062cfaa948",
+      "new_plan_sha256": "09c99cbbfbc659e4d114665206e0dfa087a4540b544720d47c2ed76624588a08",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9775a2ec3f496112bdcdea7038488ed448dbdc01eabac85b3b02e1898829bfc2",
+      "new_plan_sha256": "3d8a3074db15ae839ee5f5218f7beb252b4d90c40a91a6d4599e21488219fa24",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "3d4fa211a067af26a7e2691070edaa62280231447da362aff34e46835131298e",
+      "new_plan_sha256": "c7585a1da33c8b185ddd6a091504d91d68495b655abd302ac9d1007c6cd65465",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "68816c3222a2841de277e678905bb3088fd4638525c19db839ecfd9ffe879281",
+      "new_plan_sha256": "15feca11cd91e22a7e0be9224b9ec3e6d4a7cf095d86145d662161438974f61c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-stev-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e619407a404070e660115d905723b428089d3634b37625626b49bf977e2b46ed",
+      "new_plan_sha256": "4019767ade3c33bfba06ed63afc3a11a3eedb40866215fa3c487b9a25a43f5c0",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "86a488b6e7fe6e78253b0b37cc4451f110057a923aa678851bfb46867d54dd24",
+      "new_plan_sha256": "1fe7176cc97f3e6ca1f5a95494c6e2c1a28d408849256b344dd52122dca471be",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-gesv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "2c4cbe4828b86d35bca0841bdcc205167c1c2485ef0d6845d5d5b33d8aa1f3da",
+      "new_plan_sha256": "5383ee383cfa46238c06e9aefdaa83faa01719cc74b0d2c8b003eba7e97c541e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "8af2ea450c5f0c90342de245c62eb9a4cd9a4a65494999ca03655aaf906e965b",
+      "new_plan_sha256": "5c37d3cd4173ddb28a989b16499279b2607085ff2a2a5ec9a16761f22a7a741a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "00a7fcfe3341dcef93a25c7df02f4f16e2974656602deeed03a8865e1b1b26b2",
+      "new_plan_sha256": "85f18ccfa968ceb43896928eb2f783eb9dad1357c3d1416a24516f07a70d9637",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "72bd51a7498296e8117d439d830ea303ecf075cc6af506b696a94d10f19b9e45",
+      "new_plan_sha256": "8e9fec26633729789f2c3434f80c273e5d6bea20b5a235a0e974104eb9fda768",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "c9bcf464bf41460a207b5d6ebdd9f7a39aa04b4571d0b29e0e27c7bc499193c3",
+      "new_plan_sha256": "111abc59769704b10e3cb5573df54caccaf079df3c9d5cd6ca406c0faa304fc4",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d5689bd9fc6a8d9aad269ece8c2b7d7bb21d9d7836283dc651c59aeaa6a1165f",
+      "new_plan_sha256": "7ac6ca3000177e4a2d57608b6def312132a762cdd9a0cbd749d0e9d5bd123e01",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "58537bed1e6c6c0778f03440632dca44c6d7d1fa865012ef5bb83e5b851ac94d",
+      "new_plan_sha256": "f6dd763a91422faba65614f9a422eb92118ea3870e2bbf814e3ce8d609627a1c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ad76e2f39c75be1739f4ab0bb4495bcc34789368f02688c5a82c35025ff44dbc",
+      "new_plan_sha256": "6c02ea6ec7a86cbf8eac511ed06f84f4b0d57c53497333c0ff5667d441f7f0c3",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "7147d44561753daa594ea297057f94761c02e63c1d278aa2876a013ee2b8a242",
+      "new_plan_sha256": "07001bdd158bd403cd160f8ea57b1a00fd059c2f38b612a8f4dc38f678b679f1",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "d4bb6dcb99b457ff657e5faefa6784079395f0e0912b3af3fcfc8afe1596675b",
+      "new_plan_sha256": "818981a6781f7f9e412706e2c4879cf59c7ac01da472cc1553f95560619e8c92",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "751b1b01a22a257227530c7e7b8c559caadc75214af91929655a24bafcfc99df",
+      "new_plan_sha256": "131a4d57d6fee1a9eda37f353f1bf3088b99dd0246c65b147c2361f012b09bc9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4afdb3e0b61f4b543344bc494186d92d5e5a0ae23ce39d08fa0439fea0b55d1a",
+      "new_plan_sha256": "20398b9ec049ec7485ab476cc4df4f961c21a22873085fd6a1684e7d2d9ea99c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-posv-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "23cb78579f6c83c620b1b36f3e1f33040ba8d6aa144ae39839981f8d14761e98",
+      "new_plan_sha256": "3bb835211aa476092ac4864e8e17b6d90f34267d331958dcbf0a15212289de29",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "0872af6ac6171e985f391ea4749020dd85f0791118587bcc7e839961bc2b8518",
+      "new_plan_sha256": "aa4a8fa8e8eade919c034eb48dfe5fd34e854964c128267a26cbe48b22f56d8c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "09738f1062a7a547f7de9c19a4193afb3f5018be7466ed3d7072ed4ee521ad78",
+      "new_plan_sha256": "555860d8d6ab4008e79721f05638baef32e080aabace4f6fef8da2cac9b9642f",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "e75453da26764fd3db04b4e650ae990a9165c2b38c7e1dc5e1b3603e023d2c44",
+      "new_plan_sha256": "1b5eb55ba022f00eecf03aa3ecf503c6d090327c29419287273e5db34200673f",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "ae34a24a94c52c537b6b0bf1f39f799f7f53b424643219b04bad108a57d786f1",
+      "new_plan_sha256": "3bd315ef04b4a9679bdb3b3413aa6acf01c2781725028ff97d5d63006f386b1e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "609646811d14e27128041a81dd72f55648fd6a3b1cd0e681b5e89ed251e38a20",
+      "new_plan_sha256": "93e03176209a7fa1d761979e6d1ca3c06c478832b4f9fea4e8c94c688afc1a2c",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "9ea8602974d949ec651e64b434e09bff7103f4508ffaf042b1452f77edaf8d8c",
+      "new_plan_sha256": "eb0292aca4544450cf695ee381c363642e77621b5130c80c30c8cad31afb77e5",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "4c1ee064be03f6e570b19c0e714669444558ebb15315cbb0066d92791a8bd660",
+      "new_plan_sha256": "b39e1bb6c4d06357e4b715c32ab293ca5603a8fd5a74770f5a1f5d278c610edb",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "39f39c39574c908e7f67233fdf9ac82818f1a70c5f4625b2001e51daf5f19caa",
+      "new_plan_sha256": "b76009018ef1d43969eef84ac7806fea2bcb75e166a0f1f483f20578f7a15342",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-trtri-getri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "469ee27842de0964f04eed6a6def5553be6e0cb65fada769533e1be04601d2c2",
+      "new_plan_sha256": "9a7a0f0df98c72ec9924c72ae33ebc6ab3a89d0dd39c5cf76401f00680724ca9",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "LAPACKE",
+      "profile": "mkl2026.lp64",
+      "set": "trtrs-trtri-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "37f85f6cbc6ec84be8aec31d7d171b4b70d51f6da1e1713b934b5d516bdf4a21",
+      "new_plan_sha256": "9b8b3ef8cec99c8ca4ad97eb820bd4aacc92a4910141b771181217daea3f7dbe",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.ilp64",
+      "set": "sparse-csr-csc-mv-mm-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "72ab837539ef8913ff219e2a0c3cc67f0b67a96c76deba557b5a385425d9e823",
+      "new_plan_sha256": "143d925503310afa2574226acaa4f9a67eee95477a511e436c01e34945c33370",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.ilp64",
+      "set": "sparse-csr-csc-mv-mm-trsv-trsm-ordinary-ilp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "b271cf33ad3d9aefdbbf2203c0710f0da4b125fdb009dd65015f013bce981a97",
+      "new_plan_sha256": "b387b207a3d414d8c349535b9ba2676ed52227085b4ac4d4197cde70ef023a0e",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.lp64",
+      "set": "sparse-csr-csc-mv-mm-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "dc9a517acd666c8e817823dfbc4dd0d17841890b15dc1553bbcab4b5f63dbeed",
+      "new_plan_sha256": "8d8727bf2d235fe4725d79f7483523997ae8e4e41577b3f057c9361f9178055a",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    },
+    {
+      "family": "Sparse",
+      "profile": "mkl2026.lp64",
+      "set": "sparse-csr-csc-mv-mm-trsv-trsm-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "old_plan_sha256": "57733e93bf3ac0187536f5f28b66b58876628f342c936a6e73db6215c41cba65",
+      "new_plan_sha256": "fe2ee70a8a847e89a4e02c2a27ee1ff163c004c9610cd5423f63a731f298c0e7",
+      "declarations_parameters_lowering_and_resource_owners_unchanged": true
+    }
+  ],
+  "native_frontend_receipt": {
+    "path": "/Users/kxhuang/Project/zynum-work/lapacke-gvd-20261020/native-v2/completion.json",
+    "sha256": "7549ecdca0cefdc4c0e591df3bb4ce048dcae170f6c6372db9118a8561054821"
+  },
+  "vendor_declaration_audit": {
+    "path": "/Users/kxhuang/Project/zynum-work/lapacke-gvd-contract-20261020/vendor-signatures-v1/completion.json",
+    "sha256": "32e357c19fe8fdd3e3d83b663d102a41ed208fc841cf41c42226b02bfa516775"
+  },
+  "new_context_allocator_executor_handle_or_configuration_state": 0,
+  "optional_new_GVD_LP64_symbols": 8,
+  "installed_GVD_qualified": false,
+  "full_profile_ready": false,
+  "full_goal_complete": false
+}

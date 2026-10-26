@@ -1,0 +1,3 @@
+EXPORTS
+    LAPACKE_set_nancheck
+    LAPACKE_get_nancheck

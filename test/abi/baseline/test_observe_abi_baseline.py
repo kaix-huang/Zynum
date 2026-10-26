@@ -280,7 +280,7 @@ class PolicyTests(unittest.TestCase):
 class SourceTests(unittest.TestCase):
     def test_real_repository_counts_and_cross_map(self) -> None:
         declarations = observer.scan_zig_exports(ROOT / "src", ROOT)
-        self.assertEqual(335, len(declarations))
+        self.assertEqual(475, len(declarations))
         self.assertEqual(
             161,
             sum(
@@ -303,8 +303,14 @@ class SourceTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            16, sum(item["visibility"] == "hidden" for item in declarations)
+            15, sum(item["visibility"] == "hidden" for item in declarations)
         )
+        self.assertEqual(140, sum(item["category"] == "separate_checked_interface" for item in declarations))
+        self.assertEqual(1, sum(item["category"] == "test_probe" for item in declarations))
+        public, hidden = observer.artifact_source_symbol_sets(declarations)
+        self.assertNotIn("main", public)
+        self.assertFalse(any(name.startswith("zynum_checked_") for name in public | hidden))
+        self.assertIn("dgemm_", public)
         dynamic_export = next(
             item for item in declarations
             if item["source_path"] == "src/blas/kernels/multiversion/object.zig"
@@ -387,6 +393,15 @@ class SourceTests(unittest.TestCase):
             self.assertEqual("c", dynamic[0]["callconv"])
             self.assertEqual("unclassified", dynamic[1]["category"])
             self.assertEqual("unclassified", dynamic[2]["category"])
+            checked = "zynum_checked_csr_spmm_complex_f64_i64_i32"
+            self.assertEqual("separate_checked_interface", observer.classify_symbol(checked, "src/checked/sparse_exports.zig", "default"))
+            self.assertEqual("unclassified", observer.classify_symbol(checked, "src/unreviewed.zig", "default"))
+            self.assertEqual("unclassified", observer.classify_symbol(checked + "_extra", "src/checked/sparse_exports.zig", "default"))
+            self.assertEqual("test_probe", observer.classify_symbol("main", "src/blas/runtime_lifecycle_probe.zig", "default"))
+            self.assertEqual("unclassified", observer.classify_symbol("main", "src/unreviewed.zig", "default"))
+            unknown["category"] = "unclassified"
+            public, _ = observer.artifact_source_symbol_sets([unknown])
+            self.assertEqual({"mystery"}, public)
 
     def test_projection_preserves_type_and_fortran_details(self) -> None:
         projection, _, _ = observer.observe_projections(ROOT)
@@ -1696,6 +1711,24 @@ class GitObservationTests(unittest.TestCase):
 
 
 class DeterminismTests(unittest.TestCase):
+    """Source determinism with a coherent test-only Git identity.
+
+    Live repository observation and incomplete Git states are tested separately;
+    these tests also run from source archives without inventing production Git.
+    """
+
+    def setUp(self) -> None:
+        repository = mock.Mock()
+        repository.observe_identity.return_value = observer.repository_git.RepositoryGitIdentity(
+            revision="1" * 40, branch="determinism-fixture", detached=False,
+            status_bytes=b"", status_lines=(),
+            status_sha256=observer.sha256_bytes(b""),
+            index_sha256=observer.sha256_bytes(b"determinism-fixture-index"),
+        )
+        patcher = mock.patch.object(observer.repository_git, "open_repository", return_value=repository)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_source_only_observation_is_byte_deterministic(self) -> None:
         first = observer.build_observation(arguments())
         second = observer.build_observation(arguments())

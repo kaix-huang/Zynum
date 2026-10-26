@@ -9,8 +9,8 @@
 //! tests and module consumers should prefer the testable facades in
 //! `compat_fortran.zig` and `compat_cblas.zig`.
 
-const fortran = @import("abi/fortran.zig");
-const cblas = @import("abi/cblas.zig");
+const fortran = @import("zynum-blas-abi").fortran;
+const cblas = @import("zynum-blas-abi").cblas;
 
 comptime {
     _ = fortran;

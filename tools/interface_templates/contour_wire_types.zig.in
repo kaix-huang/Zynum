@@ -1,0 +1,38 @@
+// Copyright (C) 2026 Zynum contributors
+// SPDX-License-Identifier: LGPL-3.0-or-later
+// Generated external wire types. Numerical requests and resource owners remain in Core.
+pub const abi_version: u32 = @ABI_VERSION@;
+pub const rank_relative_present: u32 = 1;
+pub const ritz_relative_present: u32 = 2;
+pub const allow_inexact_iteration_limit: u32 = 4;
+pub const publish_finite_stops: u32 = 8;
+pub const known_flags: u32 = 15;
+fn realType(comptime R: type) void {
+    if (R != f32 and R != f64) @compileError("unsupported contour wire real type");
+}
+pub fn Options(comptime R: type) type {
+    realType(R);
+    return extern struct {
+@OPTIONS_FIELDS@
+    };
+}
+pub const Ritz = extern struct {
+@RITZ_FIELDS@
+};
+// The caller supplies the existing operator-v1 RationalResult type.
+// This extension does not establish a second definition or owner for it.
+pub fn Summary(comptime R: type, comptime Rational: type) type {
+    realType(R);
+    return extern struct {
+@SUMMARY_FIELDS@
+    };
+}
+/// Validate the wire encoding only. Native Core validates numerical controls.
+/// Floating values are deliberately untouched here, including optional absent fields.
+pub fn validateDescriptor(comptime R: type, o: Options(R)) !void {
+    if (o.version != abi_version or o.reserved != 0 or o.flags & ~known_flags != 0)
+        return error.InvalidOptions;
+    if (o.quadrature_rule > 1 or o.linear_accuracy > 1 or o.convergence > 1 or
+        o.method > 1 or o.output_selection > 1) return error.InvalidOptions;
+@COUNT_CHECKS@
+}

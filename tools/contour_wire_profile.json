@@ -1,0 +1,39 @@
+{
+  "schema": "zynum-contour-wire-candidate/1",
+  "profile": "zynum-contour-v1",
+  "abi_version": 1,
+  "target": "apple-arm64-default-c-v1",
+  "enums": {
+    "QUADRATURE": {"MIDPOINT_TRAPEZOIDAL": 0, "GAUSS_LEGENDRE": 1},
+    "LINEAR_ACCURACY": {"FIXED": 0, "RESIDUAL_SCALED": 1},
+    "CONVERGENCE": {"RESIDUAL": 0, "TRACE": 1},
+    "METHOD": {"FILTERED_SUBSPACE": 0, "RESIDUAL_INVERSE": 1},
+    "OUTPUT": {"SELECTED": 0, "ALL_RITZ": 1},
+    "STATUS": {"CONVERGED": 0, "ITERATION_LIMIT": 1, "CAPACITY_LIMIT": 2, "EMPTY_SUBSPACE": 3, "LINEAR_STOP": 4, "RITZ_STOP": 5},
+    "RITZ_STATUS": {"CONVERGED": 0, "GRAM_ITERATION_LIMIT": 1, "REDUCED_ITERATION_LIMIT": 2, "INDEFINITE_METRIC": 3, "RANGE_LIMIT": 4}
+  },
+  "options": [
+    ["version", "u32"], ["flags", "u32"], ["quadrature_rule", "u32"],
+    ["linear_accuracy", "u32"], ["convergence", "u32"], ["method", "u32"],
+    ["output_selection", "u32"], ["reserved", "u32"],
+    ["global_dimension", "i64"], ["half_nodes", "i64"], ["gauss_max_iterations", "i64"],
+    ["max_iterations", "i64"], ["linear_max_iterations", "i64"], ["ritz_max_sweeps", "i64"],
+    ["lower", "real"], ["upper", "real"], ["vertical_ratio", "real"],
+    ["relative_tolerance", "real"], ["absolute_tolerance", "real"],
+    ["linear_relative_tolerance", "real"], ["linear_absolute_tolerance", "real"],
+    ["rank_relative_tolerance", "real"], ["rank_absolute_tolerance", "real"], ["trace_tolerance", "real"],
+    ["ritz_relative_tolerance", "f64"]
+  ],
+  "ritz": [["status", "i32"], ["reserved", "u32"], ["rank", "i64"], ["gram_sweeps", "i64"], ["reduced_sweeps", "i64"]],
+  "summary": [
+    ["status", "i32"], ["has_linear", "u32"], ["has_ritz", "u32"], ["reserved", "u32"],
+    ["iterations", "i64"], ["rank", "i64"], ["found", "i64"], ["converged_pairs", "i64"],
+    ["published", "i64"], ["completed_systems", "i64"], ["linear_iterations", "i64"],
+    ["inexact_systems", "i64"], ["action_count", "i64"],
+    ["max_residual_norm", "real"], ["trace_change", "real"], ["linear", "rational"], ["ritz", "ritz"]
+  ],
+  "layouts": {
+    "f32": {"options_bytes": 128, "summary_bytes": 200, "real_offset": 80, "ritz_relative_offset": 120, "linear_offset": 96, "ritz_offset": 168},
+    "f64": {"options_bytes": 168, "summary_bytes": 208, "real_offset": 80, "ritz_relative_offset": 160, "linear_offset": 104, "ritz_offset": 176}
+  }
+}

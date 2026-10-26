@@ -1,0 +1,13 @@
+; Copyright (C) 2026 Zynum contributors
+; SPDX-License-Identifier: LGPL-3.0-or-later
+
+LIBRARY zynum_checked
+EXPORTS
+    zynum_checked_cholesky_factor_f32
+    zynum_checked_cholesky_solve_f32
+    zynum_checked_csr_spmv_f32_u32
+    zynum_checked_csr_spmv_f32_u64
+    zynum_checked_cholesky_factor_f64
+    zynum_checked_cholesky_solve_f64
+    zynum_checked_csr_spmv_f64_u32
+    zynum_checked_csr_spmv_f64_u64

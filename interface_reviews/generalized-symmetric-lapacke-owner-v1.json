@@ -1,0 +1,81 @@
+{
+  "schema": "zynum.generalized-symmetric-owner-review/1",
+  "scope": "finite-callable-generation-only",
+  "source_records": [
+    {
+      "registry": "standard_abi_bindings.py",
+      "old_count": 202,
+      "new_count": 203,
+      "added_paths": [
+        "src/interop/lapacke_symmetric_generalized.zig"
+      ],
+      "changed_existing_sources": [
+        "src/interop/lapacke_binding.zig",
+        "src/interop/lapacke_common.zig",
+        "src/interop/lapacke_diagnostics.zig"
+      ],
+      "source_envelope_sha256": "81c87f8576076e1fa0bb2cc69429256a57e98df0ba7fe9e38937a02b1adcd5f7"
+    },
+    {
+      "registry": "standard_sparse_bindings.py",
+      "old_count": 173,
+      "new_count": 173,
+      "added_paths": [],
+      "changed_existing_sources": [],
+      "source_envelope_sha256": "f35c9debf472cb57ae7ed8ac7dd6f6b0867341e5350f390fa89a5dc0f31e0b55"
+    }
+  ],
+  "native_evidence": [
+    {
+      "mode": "Debug",
+      "actual_root_tests": 661,
+      "receipt": "/Users/kxhuang/Project/zynum-work/generalized-symmetric-lapacke-20261019/native-sygv-root-v1-Debug-attempt3-completion.json"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "actual_root_tests": 661,
+      "receipt": "/Users/kxhuang/Project/zynum-work/generalized-symmetric-lapacke-20261019/native-sygv-root-v1-ReleaseSafe-attempt1-completion.json"
+    },
+    {
+      "mode": "ReleaseFast",
+      "actual_root_tests": 661,
+      "receipt": "/Users/kxhuang/Project/zynum-work/generalized-symmetric-lapacke-20261019/native-sygv-root-v1-ReleaseFast-attempt1-completion.json"
+    }
+  ],
+  "pinned_MKL_declarations": {
+    "header": "/Users/kxhuang/Project/zynum-work/symmetric-lapacke-20261019/vendor-header/mkl_lapacke.h",
+    "header_sha256": "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+    "entries": [
+      {
+        "symbol": "LAPACKE_ssygv",
+        "header_line": 10630,
+        "normalized_declaration": "lapack_int LAPACKE_ssygv( int matrix_layout, lapack_int itype, char jobz, char uplo, lapack_int n, float* a, lapack_int lda, float* b, lapack_int ldb, float* w );",
+        "sha256": "a0153ab29bf39b144827cedd63c97ecc93c72a2bb057a139c382ae2ca5b3c744"
+      },
+      {
+        "symbol": "LAPACKE_ssygv_work",
+        "header_line": 10635,
+        "normalized_declaration": "lapack_int LAPACKE_ssygv_work( int matrix_layout, lapack_int itype, char jobz, char uplo, lapack_int n, float* a, lapack_int lda, float* b, lapack_int ldb, float* w, float* work, lapack_int lwork );",
+        "sha256": "cf9a5911e7cb455fbdc4a030adb78699fdc169a0e8b3a159122f8f89704823e4"
+      },
+      {
+        "symbol": "LAPACKE_dsygv",
+        "header_line": 7181,
+        "normalized_declaration": "lapack_int LAPACKE_dsygv( int matrix_layout, lapack_int itype, char jobz, char uplo, lapack_int n, double* a, lapack_int lda, double* b, lapack_int ldb, double* w );",
+        "sha256": "e749cc9ad199abebcd14a83fcdaf6dffa9ee5143292c109fe98f82dab84f96e1"
+      },
+      {
+        "symbol": "LAPACKE_dsygv_work",
+        "header_line": 7186,
+        "normalized_declaration": "lapack_int LAPACKE_dsygv_work( int matrix_layout, lapack_int itype, char jobz, char uplo, lapack_int n, double* a, lapack_int lda, double* b, lapack_int ldb, double* w, double* work, lapack_int lwork );",
+        "sha256": "2c54d5d3fdf44d4567ae7e23670f73280a5bbc8ca8b5506a4e3a32acccd0d00b"
+      }
+    ]
+  },
+  "all_old_binding_entry_bodies_unchanged": true,
+  "old_diagnostic_enum_ordinals_preserved": true,
+  "existing_numerical_kernel_sources_unchanged": true,
+  "generator_instantiates_owner_or_allocator": false,
+  "installed_or_runtime_C_ABI_qualified": false,
+  "full_profile_ready": false
+}

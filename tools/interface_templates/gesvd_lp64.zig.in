@@ -1,0 +1,33 @@
+// Generated representation only. One injected binding owns Core and resources.
+// QR exhaustion returns upper bidiagonal factors and edge counts; separate numeric faults retain their token.
+fn SingularValueDecomposition(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("GESVD generation acceptance is LP64 only");
+    const R = binding.Provider.Scalar.Real(T);
+    return struct {
+        fn invoke(layout: c_int, jobu: i8, jobvt: i8, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, singular: ?[*]align(1) R, u: ?[*]align(1) T, ldu: WireInt, vt: ?[*]align(1) T, ldvt: WireInt, superb: ?[*]align(1) R, work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) R) WireInt {
+            const result = binding.Shared.gesvdRawManagedWithDefaults(true, T, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout, .jobu = @bitCast(jobu), .jobvt = @bitCast(jobvt),
+                .m = @intCast(m), .n = @intCast(n), .a = a, .lda = @intCast(lda),
+                .singular = singular, .u = u, .ldu = @intCast(ldu),
+                .vt = vt, .ldvt = @intCast(ldvt), .superb = superb,
+                .work = work, .lwork = @intCast(lwork), .rwork = rwork,
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            // The borrowed scratch leases and sole operation have ended here.
+            return switch (result) {
+                .lapacke_info => |info| @intCast(info),
+                .admission_fault => |err| terminal(@errorName(err)),
+                .numerical_fault => |err| if (binding.gesvd_policy.numericalInfo(err)) |info| @intCast(info) else terminal(@errorName(err)),
+            };
+        }
+        fn high(layout: c_int, jobu: i8, jobvt: i8, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, singular: ?[*]align(1) R, u: ?[*]align(1) T, ldu: WireInt, vt: ?[*]align(1) T, ldvt: WireInt, superb: ?[*]align(1) R) callconv(.c) WireInt {
+            return invoke(layout, jobu, jobvt, m, n, a, lda, singular, u, ldu, vt, ldvt, superb, null, 0, null);
+        }
+        fn realWork(layout: c_int, jobu: i8, jobvt: i8, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, singular: ?[*]align(1) R, u: ?[*]align(1) T, ldu: WireInt, vt: ?[*]align(1) T, ldvt: WireInt, work: ?[*]align(1) T, lwork: WireInt) callconv(.c) WireInt {
+            return invoke(layout, jobu, jobvt, m, n, a, lda, singular, u, ldu, vt, ldvt, null, work, lwork, null);
+        }
+        fn complexWork(layout: c_int, jobu: i8, jobvt: i8, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, singular: ?[*]align(1) R, u: ?[*]align(1) T, ldu: WireInt, vt: ?[*]align(1) T, ldvt: WireInt, work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) R) callconv(.c) WireInt {
+            return invoke(layout, jobu, jobvt, m, n, a, lda, singular, u, ldu, vt, ldvt, null, work, lwork, rwork);
+        }
+        pub const call = if (level == .high) high else if (binding.Provider.Scalar.isComplex(T)) complexWork else realWork;
+    };
+}

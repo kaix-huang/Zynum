@@ -96,14 +96,20 @@ pub const rotmg = vector.rotmg;
 
 pub const matrixValue = matrix_vector.matrixValue;
 pub const symValue = matrix_vector.symValue;
+pub const HermitianStorage = matrix_vector.HermitianStorage;
+pub const hermitianMvViewAdmitted = matrix_vector.hermitianMvViewAdmitted;
 pub const symPackedValue = matrix_vector.symPackedValue;
 pub const triValue = matrix_vector.triValue;
 pub const triPackedValue = matrix_vector.triPackedValue;
 pub const gemv = matrix_vector.gemv;
+pub const gemvAdmitted = matrix_vector.gemvAdmitted;
 pub const gbmv = matrix_vector.gbmv;
 pub const symv = matrix_vector.symv;
+pub const symvAdmitted = matrix_vector.symvAdmitted;
 pub const sbmv = matrix_vector.sbmv;
+pub const sbmvAdmitted = matrix_vector.sbmvAdmitted;
 pub const spmv = matrix_vector.spmv;
+pub const spmvAdmitted = matrix_vector.spmvAdmitted;
 pub const trmv = matrix_vector.trmv;
 pub const tbmv = matrix_vector.tbmv;
 pub const tpmv = matrix_vector.tpmv;
@@ -122,11 +128,18 @@ pub const hpr2 = matrix_vector.hpr2;
 
 pub const gemmNoTransReal = matrix_matrix.gemmNoTransReal;
 pub const gemm = matrix_matrix.gemm;
+pub const gemmRealAdmitted = matrix_matrix.gemmRealAdmitted;
+pub const gemmComplexAdmitted = matrix_matrix.gemmComplexAdmitted;
 pub const symm = matrix_matrix.symm;
+pub const symmAdmitted = matrix_matrix.symmAdmitted;
 pub const syrk = matrix_matrix.syrk;
+pub const syrkAdmitted = matrix_matrix.syrkAdmitted;
 pub const syr2k = matrix_matrix.syr2k;
+pub const syr2kAdmitted = matrix_matrix.syr2kAdmitted;
 pub const trmm = matrix_matrix.trmm;
+pub const trmmAdmitted = matrix_matrix.trmmAdmitted;
 pub const trsm = matrix_matrix.trsm;
+pub const trsmAdmitted = matrix_matrix.trsmAdmitted;
 
 pub fn shutdown() void {
     matrix_vector.freeCurrentThreadCaches();

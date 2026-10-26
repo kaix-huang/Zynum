@@ -11,6 +11,7 @@ const indexing = @import("../shared/indexing.zig");
 const access = @import("access.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
 const level2_catalog = @import("../../kernels/shared/matrix_vector/catalog.zig");
 const fixed_matrix_vector = @import("../../kernels/shared/matrix_vector/fixed_simd.zig");
@@ -84,6 +85,30 @@ fn symvWorkspace(comptime T: type, len: usize) ?[]T {
         return symv_workspace_c64_ptr.?[0..len];
     }
     return null;
+}
+
+fn SymvCallWorkspace(comptime T: type) type {
+    return struct {
+        values: []T,
+        allocator: ?std.mem.Allocator,
+
+        fn release(self: @This()) void {
+            if (self.allocator) |allocator| allocator.free(self.values);
+        }
+    };
+}
+
+fn symvWorkspaceWithResources(comptime T: type, resources: CallResources, len: usize) ?SymvCallWorkspace(T) {
+    return switch (resources) {
+        .admitted => blk: {
+            // An admitted call owns its scratch until all tasks and merges finish.
+            // Allocation failure must not retry through the legacy TLS allocator.
+            const allocator = resources.scratchAllocator().?;
+            const values = allocator.alloc(T, len) catch return null;
+            break :blk .{ .values = values, .allocator = allocator };
+        },
+        .legacy_default => .{ .values = symvWorkspace(T, len) orelse return null, .allocator = null },
+    };
 }
 
 pub fn freeCurrentThreadCaches() void {
@@ -432,15 +457,17 @@ fn runSymvTaskF64(raw_tasks: *const anyopaque, index: usize) void {
     runSymvTask(f64, raw_tasks, index);
 }
 
-fn parallelSymvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) bool {
+fn parallelSymvUnitReal(comptime T: type, resources: CallResources, uplo: Uplo, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) bool {
     if (!tuning.preferRealParallel(n)) return false;
-    var task_count = core_pool.taskCount(n, tuning.realMinColumns(T, n));
+    var task_count = resources.taskCount(n, tuning.realMinColumns(T, n));
     task_count = tuning.capRealTasks(T, n, task_count);
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * n;
     if (!tuning.workspaceAllowed(workspace_len, @sizeOf(T))) return false;
-    const workspace = symvWorkspace(T, workspace_len) orelse return false;
+    const call_workspace = symvWorkspaceWithResources(T, resources, workspace_len) orelse return false;
+    defer call_workspace.release();
+    const workspace = call_workspace.values;
     const use_upper_ranged_workspace = tuning.useUpperRangedRealWorkspace(T, uplo == .upper, n);
     if (!use_upper_ranged_workspace) @memset(workspace, 0);
 
@@ -468,9 +495,9 @@ fn parallelSymvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]
 
     const runner = if (T == f32) runSymvTaskF32 else runSymvTaskF64;
     const ran = if (builtin.target.cpu.arch == .x86_64 or tuning.useRealLowLatency(T, n))
-        core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)
+        resources.runLowLatency(runner, @ptrCast(&tasks), task_count)
     else
-        core_pool.run(runner, @ptrCast(&tasks), task_count);
+        resources.run(runner, @ptrCast(&tasks), task_count);
     if (!ran) return false;
 
     if (use_upper_ranged_workspace) {
@@ -486,8 +513,8 @@ fn symvTaskBoundary(uplo: Uplo, n: usize, task_count: usize, task_index: usize) 
     return lowerTriangularTaskBoundary(n, task_count, task_index);
 }
 
-fn symvUnitReal(comptime T: type, uplo: Uplo, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
-    if (alpha != 0 and parallelSymvUnitReal(T, uplo, n, alpha, a, lda, x, beta, y)) return;
+fn symvUnitReal(comptime T: type, resources: CallResources, uplo: Uplo, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
+    if (alpha != 0 and parallelSymvUnitReal(T, resources, uplo, n, alpha, a, lda, x, beta, y)) return;
     scaleUnitReal(T, n, beta, y);
     if (alpha == 0) return;
     symvColumnsUnitReal(T, uplo, n, 0, n, alpha, a, lda, x, y);
@@ -690,7 +717,7 @@ fn hermvUpperPair(comptime T: type, j: usize, alpha: T, a0: [*]const T, a1: [*]c
     y[j + 1] = add(T, y[j + 1], add(T, mul(T, alpha, sum1), mul(T, c1, hermDiag(T, a1[j + 1]))));
 }
 
-fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y_delta: [*]T) void {
+fn hermvColumnsUnitComplex(comptime T: type, resources: CallResources, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y_delta: [*]T) void {
     if (tuning.enable_fixed_columns and matrix_vector_kernels.symmetricColumnsUnit(
         T,
         uplo == .upper,
@@ -723,8 +750,8 @@ fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1
             }
             const xj = mul(T, alpha, x[j]);
             if (j > 0) {
-                if (!isZero(T, xj)) vector_ops.axpy(T, @intCast(j), xj, col, 1, y_delta, 1);
-                const sum = vector_ops.dot(T, @intCast(j), col, 1, x, 1, true);
+                if (!isZero(T, xj)) vector_ops.axpyWithResources(T, resources, @intCast(j), xj, col, 1, y_delta, 1);
+                const sum = vector_ops.dotWithResources(T, resources, @intCast(j), col, 1, x, 1, true);
                 y_delta[j] = add(T, y_delta[j], mul(T, alpha, sum));
             }
             y_delta[j] = add(T, y_delta[j], mul(T, xj, hermDiag(T, col[j])));
@@ -738,8 +765,8 @@ fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1
                 const tail_len = n - j - 1;
                 const tail_col = col + j + 1;
                 const tail_x = x + j + 1;
-                if (!isZero(T, xj)) vector_ops.axpy(T, @intCast(tail_len), xj, tail_col, 1, y_delta + j + 1, 1);
-                const sum = vector_ops.dot(T, @intCast(tail_len), tail_col, 1, tail_x, 1, true);
+                if (!isZero(T, xj)) vector_ops.axpyWithResources(T, resources, @intCast(tail_len), xj, tail_col, 1, y_delta + j + 1, 1);
+                const sum = vector_ops.dotWithResources(T, resources, @intCast(tail_len), tail_col, 1, tail_x, 1, true);
                 y_delta[j] = add(T, y_delta[j], mul(T, alpha, sum));
             }
         }
@@ -748,6 +775,7 @@ fn hermvColumnsUnitComplex(comptime T: type, uplo: Uplo, n: usize, j0: usize, j1
 
 fn HermvTask(comptime T: type) type {
     return struct {
+        resources: CallResources,
         uplo: Uplo,
         n: usize,
         j0: usize,
@@ -763,7 +791,7 @@ fn HermvTask(comptime T: type) type {
 fn runHermvTask(comptime T: type, raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const HermvTask(T) = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    hermvColumnsUnitComplex(T, task.uplo, task.n, task.j0, task.j1, task.alpha, task.a, task.lda, task.x, task.y_delta);
+    hermvColumnsUnitComplex(T, task.resources, task.uplo, task.n, task.j0, task.j1, task.alpha, task.a, task.lda, task.x, task.y_delta);
 }
 
 fn runHermvTaskC32(raw_tasks: *const anyopaque, index: usize) void {
@@ -774,12 +802,12 @@ fn runHermvTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runHermvTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn mergeHermvUpperWorkspacesUnitComplex(comptime T: type, n: usize, task_count: usize, workspace: [*]const T, ends: []const usize, y: [*]T) void {
+fn mergeHermvUpperWorkspacesUnitComplex(comptime T: type, resources: CallResources, n: usize, task_count: usize, workspace: [*]const T, ends: []const usize, y: [*]T) void {
     const add_alpha = one(T);
     for (0..task_count) |task_index| {
         const end = ends[task_index];
         if (end == 0) continue;
-        vector_ops.axpy(T, @intCast(end), add_alpha, workspace + task_index * n, 1, y, 1);
+        vector_ops.axpyWithResources(T, resources, @intCast(end), add_alpha, workspace + task_index * n, 1, y, 1);
     }
 }
 
@@ -799,16 +827,18 @@ fn lowerTriangularTaskBoundary(n: usize, task_count: usize, task_index: usize) u
     return @min(n, @as(usize, @intFromFloat(boundary)));
 }
 
-fn parallelHermvUnitComplex(comptime T: type, uplo: Uplo, n: usize, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelHermvUnitComplex(comptime T: type, resources: CallResources, uplo: Uplo, n: usize, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferHermitianParallel(n)) return false;
-    var task_count = core_pool.taskCount(n, tuning.hermitianMinColumns());
+    var task_count = resources.taskCount(n, tuning.hermitianMinColumns());
     task_count = tuning.capHermitianTasks(T, n, task_count);
     const balance_upper = tuning.balanceUpperHermitian(uplo == .upper, n);
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * n;
     if (!tuning.workspaceAllowed(workspace_len, @sizeOf(T))) return false;
-    const workspace = symvWorkspace(T, workspace_len) orelse return false;
+    const call_workspace = symvWorkspaceWithResources(T, resources, workspace_len) orelse return false;
+    defer call_workspace.release();
+    const workspace = call_workspace.values;
     const use_upper_ranged_workspace = uplo == .upper;
     if (!use_upper_ranged_workspace) @memset(workspace, zero(T));
 
@@ -822,6 +852,7 @@ fn parallelHermvUnitComplex(comptime T: type, uplo: Uplo, n: usize, n_: BlasInt,
             @memset((workspace.ptr + task_index * n)[0..j1], zero(T));
         }
         tasks[task_index] = .{
+            .resources = resources,
             .uplo = uplo,
             .n = n,
             .j0 = j0,
@@ -835,38 +866,58 @@ fn parallelHermvUnitComplex(comptime T: type, uplo: Uplo, n: usize, n_: BlasInt,
     }
 
     const runner = if (T == scalar.ComplexF32) runHermvTaskC32 else runHermvTaskC64;
-    if (!core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
+    if (!resources.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
 
     if (use_upper_ranged_workspace) {
-        mergeHermvUpperWorkspacesUnitComplex(T, n, task_count, workspace.ptr, upper_ends[0..task_count], y);
+        mergeHermvUpperWorkspacesUnitComplex(T, resources, n, task_count, workspace.ptr, upper_ends[0..task_count], y);
     } else {
         const add_alpha = one(T);
         for (0..task_count) |task_index| {
-            vector_ops.axpy(T, n_, add_alpha, workspace.ptr + task_index * n, 1, y, 1);
+            vector_ops.axpyWithResources(T, resources, n_, add_alpha, workspace.ptr + task_index * n, 1, y, 1);
         }
     }
     return true;
 }
 
-fn hermvUnitComplex(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
+// BLAS matrix-vector beta=0 discards old Y even when it contains NaNs.
+// SCAL intentionally has a different contract and may multiply old values by 0.
+fn scaleHermitianUnit(comptime T: type, resources: CallResources, n: BlasInt, beta: T, y: [*]T) void {
+    if (isZero(T, beta)) {
+        @memset(y[0..toUsize(n)], zero(T));
+        return;
+    }
+    vector_ops.scalWithResources(T, resources, n, beta, y, 1);
+}
+
+fn hermvUnitComplex(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
     const n = toUsize(n_);
-    vector_ops.scal(T, n_, beta, y, 1);
+    scaleHermitianUnit(T, resources, n_, beta, y);
     if (isZero(T, alpha)) return;
-    if (parallelHermvUnitComplex(T, uplo, n, n_, alpha, a, lda, x, y)) return;
-    hermvColumnsUnitComplex(T, uplo, n, 0, n, alpha, a, lda, x, y);
+    if (parallelHermvUnitComplex(T, resources, uplo, n, n_, alpha, a, lda, x, y)) return;
+    hermvColumnsUnitComplex(T, resources, uplo, n, 0, n, alpha, a, lda, x, y);
+}
+
+/// Borrow one live operation until all synchronous tasks and scratch releases finish.
+pub fn symvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    return symvWithResources(T, .{ .admitted = operation }, uplo, n_, alpha, a, lda, x, incx_, beta, y, incy_, herm);
 }
 
 pub fn symv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    return symvWithResources(T, .legacy_default, uplo, n_, alpha, a, lda, x, incx_, beta, y, incy_, herm);
+}
+
+/// Use the enclosing call's resources without acquiring another operation.
+pub fn symvWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         const selected = level2_tuning.selectDefault(T, .symv, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ });
         if (!herm and selected.kernel.implementation == .core_unit)
-            return symvUnitReal(T, uplo, n, alpha, a, lda, x, beta, y);
+            return symvUnitReal(T, resources, uplo, n, alpha, a, lda, x, beta, y);
     } else if (comptime isComplex(T)) {
         const selected = level2_tuning.selectDefault(T, .hemv, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ });
         if (herm and selected.kernel.implementation == .core_unit)
-            return hermvUnitComplex(T, uplo, n_, alpha, a, lda, x, beta, y);
+            return hermvUnitComplex(T, resources, uplo, n_, alpha, a, lda, x, beta, y);
     }
     const sx = startIndex(n_, incx_);
     const sy = startIndex(n_, incy_);
@@ -883,11 +934,21 @@ pub fn symv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, a: [*]const T, 
     }
 }
 
-pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
-    sbmvImpl(T, uplo, n_, k_, alpha, a, lda, x, incx_, beta, y, incy_, herm, null);
+/// Borrow one live operation until all synchronous tasks and scratch releases finish.
+pub fn sbmvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    return sbmvWithResources(T, .{ .admitted = operation }, uplo, n_, k_, alpha, a, lda, x, incx_, beta, y, incy_, herm);
 }
 
-fn sbmvImpl(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool, forced: ?level2_catalog.Implementation) void {
+pub fn sbmv(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    return sbmvWithResources(T, .legacy_default, uplo, n_, k_, alpha, a, lda, x, incx_, beta, y, incy_, herm);
+}
+
+/// Use the enclosing call's resources without acquiring another operation.
+pub fn sbmvWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    sbmvImpl(T, resources, uplo, n_, k_, alpha, a, lda, x, incx_, beta, y, incy_, herm, null);
+}
+
+fn sbmvImpl(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool, forced: ?level2_catalog.Implementation) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -896,7 +957,7 @@ fn sbmvImpl(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
         if (comptime isReal(T)) {
             scaleUnitReal(T, n, beta, y);
         } else {
-            vector_ops.scal(T, n_, beta, y, 1);
+            scaleHermitianUnit(T, resources, n_, beta, y);
         }
         if (isZero(T, alpha)) return;
 
@@ -925,13 +986,13 @@ fn sbmvImpl(comptime T: type, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a:
                         if (comptime isReal(T)) {
                             vector_ops.axpyUnitReal(T, len, xj, col, y + row0);
                         } else {
-                            vector_ops.axpy(T, @intCast(len), xj, col, 1, y + row0, 1);
+                            vector_ops.axpyWithResources(T, resources, @intCast(len), xj, col, 1, y + row0, 1);
                         }
                     }
                     break :fused if (comptime isReal(T))
                         vector_ops.dotUnitReal(T, len, col, x + row0)
                     else
-                        vector_ops.dot(T, @intCast(len), col, 1, x + row0, 1, herm);
+                        vector_ops.dotWithResources(T, resources, @intCast(len), col, 1, x + row0, 1, herm);
                 };
                 y[j] = add(T, y[j], mul(T, alpha, sum));
             }
@@ -1076,7 +1137,7 @@ fn mergePackedMvWorkspacesUnit(comptime T: type, n: usize, task_count: usize, be
     }
 }
 
-fn singlePackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T) bool {
+fn singlePackedMvUnit(comptime T: type, resources: CallResources, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T) bool {
     if (comptime !isReal(T)) return false;
     if (!tuning.preferPackedParallel(n)) return false;
     // The alpha-zero semantic shortcut must not inspect either input matrix or X.
@@ -1097,22 +1158,26 @@ fn singlePackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]c
         if (output - matrix < packed_bytes) return false;
     } else if (matrix - output < vector_bytes) return false;
     if (!tuning.workspaceAllowed(n, @sizeOf(T))) return false;
-    const workspace = symvWorkspace(T, n) orelse return false;
+    const call_workspace = symvWorkspaceWithResources(T, resources, n) orelse return false;
+    defer call_workspace.release();
+    const workspace = call_workspace.values;
     @memset(workspace, zero(T));
     packedMvColumnsUnitImpl(T, uplo, n, 0, n, alpha, ap, x, workspace.ptr, false, .compact_symmetric_packed_fused);
     mergePackedMvWorkspacesUnit(T, n, 1, beta, workspace.ptr, y);
     return true;
 }
 
-noinline fn parallelPackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T, herm: bool) bool {
-    const task_count = core_pool.taskCount(n, tuning.packedMinColumns());
+noinline fn parallelPackedMvUnit(comptime T: type, resources: CallResources, uplo: Uplo, n: usize, alpha: T, ap: [*]const T, x: [*]const T, beta: T, y: [*]T, herm: bool) bool {
+    const task_count = resources.taskCount(n, tuning.packedMinColumns());
     if (task_count == 1 and tuning.selectRealPackedSingleImplementation(T) == .compact_symmetric_packed_fused) {
-        return singlePackedMvUnit(T, uplo, n, alpha, ap, x, beta, y);
+        return singlePackedMvUnit(T, resources, uplo, n, alpha, ap, x, beta, y);
     }
     if (task_count <= 1) return false;
     if (!tuning.workspaceAllowed(task_count *| n, @sizeOf(T))) return false;
     const workspace_len = task_count * n;
-    const workspace = symvWorkspace(T, workspace_len) orelse return false;
+    const call_workspace = symvWorkspaceWithResources(T, resources, workspace_len) orelse return false;
+    defer call_workspace.release();
+    const workspace = call_workspace.values;
     @memset(workspace, zero(T));
 
     var tasks: [core_pool.max_tasks]PackedMvTask(T) = undefined;
@@ -1149,7 +1214,7 @@ noinline fn parallelPackedMvUnit(comptime T: type, uplo: Uplo, n: usize, alpha: 
     else
         return false;
     // A false result means core_pool ran no task, so the caller can use the unchanged serial body.
-    if (!core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
+    if (!resources.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
 
     mergePackedMvWorkspacesUnit(T, n, task_count, beta, workspace.ptr, y);
     return true;
@@ -1172,20 +1237,88 @@ fn spmvSerial(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const 
     }
 }
 
+/// Borrow one live operation until all synchronous tasks and scratch releases finish.
+pub fn spmvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    return spmvWithResources(T, .{ .admitted = operation }, uplo, n_, alpha, ap, x, incx_, beta, y, incy_, herm);
+}
+
 pub fn spmv(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
+    return spmvWithResources(T, .legacy_default, uplo, n_, alpha, ap, x, incx_, beta, y, incy_, herm);
+}
+
+/// Use the enclosing call's resources without acquiring another operation.
+pub fn spmvWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt, herm: bool) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const n = toUsize(n_);
     if (tuning.preferPackedParallel(n) and incx_ == 1 and incy_ == 1 and !isZero(T, alpha)) {
-        if (parallelPackedMvUnit(T, uplo, n, alpha, ap, x, beta, y, herm)) return;
+        if (parallelPackedMvUnit(T, resources, uplo, n, alpha, ap, x, beta, y, herm)) return;
     }
     spmvSerial(T, uplo, n_, alpha, ap, x, incx_, beta, y, incy_, herm);
 }
 
+/// Borrow the caller's operation for a normalized Hermitian storage view.
+/// No new admission, scratch, or retained state is introduced. Ordinary views
+/// keep the selected column-oriented kernels; conjugated views use the shared
+/// allocation-free scalar traversal until an optimized view kernel is provided.
+pub fn hermitianMvViewAdmitted(comptime T: type, comptime storage: access.HermitianStorage, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n: BlasInt, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx: BlasInt, beta: T, y: [*]T, incy: BlasInt, conjugate_matrix: bool) void {
+    _ = operation.borrowedContext();
+    hermitianMvViewWithResources(T, storage, .{ .admitted = operation }, uplo, n, k, alpha, a, lda, x, incx, beta, y, incy, conjugate_matrix);
+}
+
+fn hermitianMvViewWithResources(comptime T: type, comptime storage: access.HermitianStorage, resources: CallResources, uplo: Uplo, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx: BlasInt, beta: T, y: [*]T, incy: BlasInt, conjugate_matrix: bool) void {
+    if (comptime !isComplex(T)) @compileError("Hermitian product requires a BLAS complex scalar");
+    if (!conjugate_matrix) {
+        return switch (storage) {
+            .dense => symvWithResources(T, resources, uplo, n_, alpha, a, lda, x, incx, beta, y, incy, true),
+            .band => sbmvWithResources(T, resources, uplo, n_, k_, alpha, a, lda, x, incx, beta, y, incy, true),
+            .packed_storage => spmvWithResources(T, resources, uplo, n_, alpha, a, x, incx, beta, y, incy, true),
+        };
+    }
+    if (n_ <= 0 or incx == 0 or incy == 0) return;
+    if (isZero(T, alpha) and scalar.isOne(T, beta)) return;
+    const n = toUsize(n_);
+    const k = if (storage == .band) toUsize(k_) else 0;
+    const sx = startIndex(n_, incx);
+    const sy = startIndex(n_, incy);
+    if (!scalar.isOne(T, beta)) for (0..n) |i| {
+        const target = ix(sy, i, incy);
+        y[target] = if (isZero(T, beta)) zero(T) else mul(T, beta, y[target]);
+    };
+    if (isZero(T, alpha)) return;
+    const matrix: access.HermitianView(T, storage) = .{
+        .triangle = uplo,
+        .order = n,
+        .bandwidth = k,
+        .data = a,
+        .leading_dimension = lda,
+        .conjugate_matrix = true,
+    };
+    for (0..n) |row| {
+        var sum = zero(T);
+        const first = if (storage == .band and row > k) row - k else 0;
+        const last = if (storage == .band) @min(n, row + k + 1) else n;
+        for (first..last) |col| {
+            sum = add(T, sum, mul(T, matrix.value(row, col), vectorGet(T, x, sx, col, incx)));
+        }
+        const target = ix(sy, row, incy);
+        y[target] = add(T, y[target], mul(T, alpha, sum));
+    }
+}
+
 pub const testing = struct {
+    /// Test-only access to one real lower Hermitian column; no n-by-n backing
+    /// matrix is required because the original traversal uses exactly j=0.
+    pub const admitted = if (builtin.is_test) struct {
+        pub fn lowerFirstHermitianColumn(comptime T: type, operation: *const @import("zynum-execution").context.Operation, n: usize, alpha: T, column: [*]const T, x: [*]const T, y_delta: [*]T) void {
+            _ = operation.borrowedContext();
+            hermvColumnsUnitComplex(T, .{ .admitted = operation }, .lower, n, 0, 1, alpha, column, @intCast(n), x, y_delta);
+        }
+    } else struct {};
+
     /// Force the same one-workspace executor used by the selected cap-one route.
     pub fn singlePackedSymmetricImplementation(comptime T: type, uplo: Uplo, n: BlasInt, alpha: T, ap: [*]const T, x: [*]const T, incx: BlasInt, beta: T, y: [*]T, incy: BlasInt) bool {
         if (n <= 0 or incx != 1 or incy != 1) return false;
-        return singlePackedMvUnit(T, uplo, @intCast(n), alpha, ap, x, beta, y);
+        return singlePackedMvUnit(T, .legacy_default, uplo, @intCast(n), alpha, ap, x, beta, y);
     }
 
     pub fn packedSymmetricColumnsImplementation(comptime T: type, implementation: level2_catalog.Implementation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, ap: [*]const T, x: [*]const T, y_delta: [*]T) bool {
@@ -1202,7 +1335,7 @@ pub const testing = struct {
         if (comptime !isReal(T)) return false;
         if (implementation != .compact_symmetric_band and implementation != .compact_symmetric_band_fused) return false;
         if (n <= 0 or k < 0 or lda <= k or incx != 1 or incy != 1) return false;
-        sbmvImpl(T, uplo, n, k, alpha, a, lda, x, incx, beta, y, incy, false, implementation);
+        sbmvImpl(T, .legacy_default, uplo, n, k, alpha, a, lda, x, incx, beta, y, incy, false, implementation);
         return true;
     }
 
@@ -1219,6 +1352,6 @@ pub const testing = struct {
         y_delta: [*]T,
     ) void {
         if (comptime isReal(T)) return symvColumnsUnitReal(T, uplo, n, j0, j1, alpha, a, lda, x, y_delta);
-        return hermvColumnsUnitComplex(T, uplo, n, j0, j1, alpha, a, lda, x, y_delta);
+        return hermvColumnsUnitComplex(T, .legacy_default, uplo, n, j0, j1, alpha, a, lda, x, y_delta);
     }
 };

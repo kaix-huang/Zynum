@@ -1,0 +1,29 @@
+; Copyright (C) 2026 Zynum contributors
+; SPDX-License-Identifier: LGPL-3.0-or-later
+LIBRARY zynum_sparse_ilp64
+EXPORTS
+    mkl_sparse_s_create_csr
+    mkl_sparse_s_create_csc
+    mkl_sparse_s_export_csr
+    mkl_sparse_s_export_csc
+    mkl_sparse_s_mv
+    mkl_sparse_s_mm
+    mkl_sparse_d_create_csr
+    mkl_sparse_d_create_csc
+    mkl_sparse_d_export_csr
+    mkl_sparse_d_export_csc
+    mkl_sparse_d_mv
+    mkl_sparse_d_mm
+    mkl_sparse_c_create_csr
+    mkl_sparse_c_create_csc
+    mkl_sparse_c_export_csr
+    mkl_sparse_c_export_csc
+    mkl_sparse_c_mv
+    mkl_sparse_c_mm
+    mkl_sparse_z_create_csr
+    mkl_sparse_z_create_csc
+    mkl_sparse_z_export_csr
+    mkl_sparse_z_export_csc
+    mkl_sparse_z_mv
+    mkl_sparse_z_mm
+    mkl_sparse_destroy

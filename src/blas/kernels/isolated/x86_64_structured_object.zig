@@ -6,15 +6,16 @@
 const std = @import("std");
 
 const abi = @import("x86_64_structured_abi.zig");
-const task_runtime = @import("task_runtime_client.zig");
 const scalar = @import("../../core/shared/scalar.zig");
 const indexing = @import("../../core/shared/indexing.zig");
 const structured_tuning = @import("../tuning/structured.zig");
 
 extern var zynum_internal_x86_64_structured_enabled: u8;
-extern fn zynum_internal_structured_gemm_execute(request: *abi.GemmRequest) callconv(.c) void;
 
 const max_tasks = 32;
+// Preserve the previous task_runtime_client stack capacity independently of
+// the unchanged max32 partition; the structured object no longer imports it.
+const task_capacity = 64;
 const dense_max_workspace_bytes = 64 * 1024 * 1024;
 
 fn realValue(comptime T: type, raw: u64) T {
@@ -76,7 +77,7 @@ fn scalarTag(comptime T: type) abi.Scalar {
     unreachable;
 }
 
-fn callHostGemm(comptime T: type, transa: scalar.Order, transb: scalar.Order, m: i32, n: i32, k: i32, alpha: T, a: [*]const T, lda: i32, b: [*]const T, ldb: i32, beta: T, c: [*]T, ldc: i32) void {
+fn callHostGemm(comptime T: type, services: *const abi.ServicesV1, transa: scalar.Order, transb: scalar.Order, m: i32, n: i32, k: i32, alpha: T, a: [*]const T, lda: i32, b: [*]const T, ldb: i32, beta: T, c: [*]T, ldc: i32) void {
     const alpha_parts = components(T, alpha);
     const beta_parts = components(T, beta);
     var request: abi.GemmRequest = .{
@@ -105,7 +106,7 @@ fn callHostGemm(comptime T: type, transa: scalar.Order, transb: scalar.Order, m:
         .b = @ptrCast(b),
         .c = @ptrCast(c),
     };
-    zynum_internal_structured_gemm_execute(&request);
+    services.gemm(services.borrow, &request);
 }
 
 fn symmetricValue(comptime T: type, uplo: scalar.Uplo, a: [*]const T, lda: i32, row: usize, col: usize, hermitian: bool) T {
@@ -127,7 +128,7 @@ fn scaleOutput(comptime T: type, m: usize, n: usize, beta: T, c: [*]T, ldc: i32)
     }
 }
 
-fn denseSymm(comptime T: type, request: *abi.Request) bool {
+fn denseSymm(comptime T: type, services: *const abi.ServicesV1, request: *abi.Request) bool {
     const m: usize = @intCast(request.m);
     const n: usize = @intCast(request.n);
     const side = coreSide(request.side);
@@ -154,8 +155,11 @@ fn denseSymm(comptime T: type, request: *abi.Request) bool {
     const workspace_len = std.math.add(usize, dense_len, saved_len) catch return false;
     const workspace_bytes = std.math.mul(usize, workspace_len, @sizeOf(T)) catch return false;
     if (workspace_bytes > dense_max_workspace_bytes) return false;
-    const workspace = std.heap.c_allocator.alloc(T, workspace_len) catch return false;
-    defer std.heap.c_allocator.free(workspace);
+    const alignment_log2: u8 = @intCast(@backingInt(std.mem.Alignment.of(T)));
+    const allocation = services.alloc(services.borrow, workspace_bytes, alignment_log2) orelse return false;
+    defer services.free(services.borrow, allocation, workspace_bytes, alignment_log2);
+    const workspace_ptr: [*]T = @ptrCast(@alignCast(allocation));
+    const workspace = workspace_ptr[0..workspace_len];
     const dense_a = workspace[0..dense_len];
     const saved_c = workspace[dense_len..];
 
@@ -169,9 +173,9 @@ fn denseSymm(comptime T: type, request: *abi.Request) bool {
             };
         }
         if (side == .left) {
-            callHostGemm(T, .no_trans, .no_trans, request.m, request.n, request.m, scalar.one(T), dense_a.ptr, request.m, b, request.ldb, scalar.zero(T), c, request.ldc);
+            callHostGemm(T, services, .no_trans, .no_trans, request.m, request.n, request.m, scalar.one(T), dense_a.ptr, request.m, b, request.ldb, scalar.zero(T), c, request.ldc);
         } else {
-            callHostGemm(T, .no_trans, .no_trans, request.m, request.n, request.n, scalar.one(T), b, request.ldb, dense_a.ptr, request.n, scalar.zero(T), c, request.ldc);
+            callHostGemm(T, services, .no_trans, .no_trans, request.m, request.n, request.n, scalar.one(T), b, request.ldb, dense_a.ptr, request.n, scalar.zero(T), c, request.ldc);
         }
         for (0..n) |j| for (0..m) |i| {
             const index = indexing.matIndex(request.ldc, i, j);
@@ -179,9 +183,9 @@ fn denseSymm(comptime T: type, request: *abi.Request) bool {
             c[index] = if (saved_c.len == 0) product else scalar.add(T, product, scalar.mul(T, beta, saved_c[i + j * m]));
         };
     } else if (side == .left) {
-        callHostGemm(T, .no_trans, .no_trans, request.m, request.n, request.m, alpha, dense_a.ptr, request.m, b, request.ldb, beta, c, request.ldc);
+        callHostGemm(T, services, .no_trans, .no_trans, request.m, request.n, request.m, alpha, dense_a.ptr, request.m, b, request.ldb, beta, c, request.ldc);
     } else {
-        callHostGemm(T, .no_trans, .no_trans, request.m, request.n, request.n, alpha, b, request.ldb, dense_a.ptr, request.n, beta, c, request.ldc);
+        callHostGemm(T, services, .no_trans, .no_trans, request.m, request.n, request.n, alpha, b, request.ldb, dense_a.ptr, request.n, beta, c, request.ldc);
     }
     return true;
 }
@@ -314,13 +318,13 @@ fn runTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn rightDispatch(comptime T: type, request: *abi.Request) bool {
+fn rightDispatch(comptime T: type, services: *const abi.ServicesV1, request: *abi.Request) bool {
     const m: usize = @intCast(request.m);
     const n: usize = @intCast(request.n);
     if (!structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n)) return false;
-    const task_count = @min(task_runtime.taskCount(m, 4), max_tasks);
+    const task_count = @min(services.task_count(services.borrow, m, 4), max_tasks);
     if (task_count <= 1) return false;
-    var tasks: [task_runtime.max_tasks]RightTask(T) = undefined;
+    var tasks: [task_capacity]RightTask(T) = undefined;
     const base_rows = m / task_count;
     const extra_rows = m % task_count;
     var first_row: usize = 0;
@@ -343,30 +347,32 @@ fn rightDispatch(comptime T: type, request: *abi.Request) bool {
         first_row += rows;
     }
     const runner = if (T == f32) runTaskF32 else if (T == f64) runTaskF64 else if (T == scalar.ComplexF32) runTaskC32 else runTaskC64;
-    return task_runtime.runLowLatency(runner, @ptrCast(tasks[0..task_count].ptr), task_count);
+    const task_fn: *const fn (*const anyopaque, usize) void = runner;
+    return services.run_low_latency(services.borrow, @intFromPtr(task_fn), @ptrCast(tasks[0..task_count].ptr), task_count) != 0;
 }
 
-fn dispatchScalar(comptime T: type, operation: abi.Operation, request: *abi.Request) bool {
+fn dispatchScalar(comptime T: type, services: *const abi.ServicesV1, operation: abi.Operation, request: *abi.Request) bool {
     return switch (operation) {
-        .symm_dense => denseSymm(T, request),
-        .trmm_right, .trsm_right => rightDispatch(T, request),
+        .symm_dense => denseSymm(T, services, request),
+        .trmm_right, .trsm_right => rightDispatch(T, services, request),
     };
 }
 
-fn execute(request: *abi.Request) callconv(.c) u8 {
+fn execute(request: *abi.Request, services: *const abi.ServicesV1) callconv(.c) u8 {
     if (zynum_internal_x86_64_structured_enabled == 0) return 0;
+    if (!abi.servicesSupported(services)) return 0;
     if (request.m <= 0 or request.n <= 0) return 0;
     const operation: abi.Operation = @fromBackingInt(@intCast(request.operation));
     const scalar_tag: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     const handled = switch (scalar_tag) {
-        .f32 => dispatchScalar(f32, operation, request),
-        .f64 => dispatchScalar(f64, operation, request),
-        .complex_f32 => dispatchScalar(scalar.ComplexF32, operation, request),
-        .complex_f64 => dispatchScalar(scalar.ComplexF64, operation, request),
+        .f32 => dispatchScalar(f32, services, operation, request),
+        .f64 => dispatchScalar(f64, services, operation, request),
+        .complex_f32 => dispatchScalar(scalar.ComplexF32, services, operation, request),
+        .complex_f64 => dispatchScalar(scalar.ComplexF64, services, operation, request),
     };
     return @intFromBool(handled);
 }
 
 comptime {
-    @export(&execute, .{ .name = "zynum_internal_x86_64_structured_execute", .visibility = .hidden });
+    @export(&execute, .{ .name = "zynum_internal_x86_64_structured_execute_v2", .visibility = .hidden });
 }

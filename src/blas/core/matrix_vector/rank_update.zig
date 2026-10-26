@@ -10,6 +10,7 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
 const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 const runtime = @import("../../runtime.zig");
@@ -106,6 +107,7 @@ fn gerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]const T, y:
 
 fn GerTask(comptime T: type) type {
     return struct {
+        resources: CallResources,
         m0: usize,
         m1: usize,
         n0: usize,
@@ -141,9 +143,9 @@ fn runGerTaskF64(raw_tasks: *const anyopaque, index: usize) void {
     runGerTask(f64, raw_tasks, index);
 }
 
-fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
+fn parallelGerUnitReal(comptime T: type, resources: CallResources, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
     if (!tuning.preferRealGerParallel(m, n)) return false;
-    const task_count = tuning.capRealGerTasks(n, core_pool.taskCount(n, tuning.realGerMinColumns(n)));
+    const task_count = tuning.capRealGerTasks(n, resources.taskCount(n, tuning.realGerMinColumns(n)));
     if (task_count <= 1) return false;
 
     const block_cols: usize = 4;
@@ -158,6 +160,7 @@ fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]con
             (task_index + 1) * n / task_count,
         };
         tasks[task_index] = .{
+            .resources = resources,
             .m0 = 0,
             .m1 = m,
             .n0 = n0,
@@ -171,9 +174,9 @@ fn parallelGerUnitReal(comptime T: type, m: usize, n: usize, alpha: T, x: [*]con
     }
 
     const runner = if (T == f32) runGerTaskF32 else runGerTaskF64;
-    if (tuning.useRealGerLowLatency(T, n)) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    return core_pool.run(runner, @ptrCast(&tasks), task_count);
+    if (tuning.useRealGerLowLatency(T, n)) return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    return resources.run(runner, @ptrCast(&tasks), task_count);
 }
 
 inline fn c64GerTerm(xv: @Vector(4, f64), coeff: scalar.ComplexF64) @Vector(4, f64) {
@@ -231,7 +234,7 @@ fn c32Ger4(m: usize, c0: scalar.ComplexF32, c1: scalar.ComplexF32, c2: scalar.Co
     }
 }
 
-fn gerUnitComplexC32(m: usize, n: usize, alpha: scalar.ComplexF32, x: [*]const scalar.ComplexF32, y: [*]const scalar.ComplexF32, a: [*]scalar.ComplexF32, lda: BlasInt, conj_y: bool) void {
+fn gerUnitComplexC32(resources: CallResources, m: usize, n: usize, alpha: scalar.ComplexF32, x: [*]const scalar.ComplexF32, y: [*]const scalar.ComplexF32, a: [*]scalar.ComplexF32, lda: BlasInt, conj_y: bool) void {
     var j: usize = 0;
     while (j + 4 <= n) : (j += 4) {
         c32Ger4(
@@ -249,7 +252,7 @@ fn gerUnitComplexC32(m: usize, n: usize, alpha: scalar.ComplexF32, x: [*]const s
     }
     while (j < n) : (j += 1) {
         const temp = mul(scalar.ComplexF32, alpha, maybeConj(scalar.ComplexF32, y[j], conj_y));
-        if (!isZero(scalar.ComplexF32, temp)) vector_ops.axpy(scalar.ComplexF32, @intCast(m), temp, x, 1, a + matIndex(lda, 0, j), 1);
+        if (!isZero(scalar.ComplexF32, temp)) vector_ops.axpyWithResources(scalar.ComplexF32, resources, @intCast(m), temp, x, 1, a + matIndex(lda, 0, j), 1);
     }
 }
 
@@ -294,7 +297,7 @@ fn c64Ger4(m: usize, c0: scalar.ComplexF64, c1: scalar.ComplexF64, c2: scalar.Co
     }
 }
 
-fn gerUnitComplexC64(m: usize, n: usize, alpha: scalar.ComplexF64, x: [*]const scalar.ComplexF64, y: [*]const scalar.ComplexF64, a: [*]scalar.ComplexF64, lda: BlasInt, conj_y: bool) void {
+fn gerUnitComplexC64(resources: CallResources, m: usize, n: usize, alpha: scalar.ComplexF64, x: [*]const scalar.ComplexF64, y: [*]const scalar.ComplexF64, a: [*]scalar.ComplexF64, lda: BlasInt, conj_y: bool) void {
     var j: usize = 0;
     while (j + 4 <= n) : (j += 4) {
         c64Ger4(
@@ -312,31 +315,32 @@ fn gerUnitComplexC64(m: usize, n: usize, alpha: scalar.ComplexF64, x: [*]const s
     }
     while (j < n) : (j += 1) {
         const temp = mul(scalar.ComplexF64, alpha, maybeConj(scalar.ComplexF64, y[j], conj_y));
-        if (!isZero(scalar.ComplexF64, temp)) vector_ops.axpy(scalar.ComplexF64, @intCast(m), temp, x, 1, a + matIndex(lda, 0, j), 1);
+        if (!isZero(scalar.ComplexF64, temp)) vector_ops.axpyWithResources(scalar.ComplexF64, resources, @intCast(m), temp, x, 1, a + matIndex(lda, 0, j), 1);
     }
 }
 
-fn gerUnitComplex(comptime T: type, m_: BlasInt, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt, conj_y: bool) void {
+fn gerUnitComplex(comptime T: type, resources: CallResources, m_: BlasInt, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt, conj_y: bool) void {
     if (tuning.enable_fixed_complex_ger and
         matrix_vector_kernels.gerUnitComplex(T, toUsize(m_), n, alpha, x, y, a, lda, conj_y))
     {
         return;
     }
     if (T == scalar.ComplexF32 and tuning.preferComplexGerSpecialized(T, toUsize(m_))) {
-        return gerUnitComplexC32(toUsize(m_), n, alpha, x, y, a, lda, conj_y);
+        return gerUnitComplexC32(resources, toUsize(m_), n, alpha, x, y, a, lda, conj_y);
     }
     if (T == scalar.ComplexF64 and tuning.preferComplexGerSpecialized(T, toUsize(m_))) {
-        return gerUnitComplexC64(toUsize(m_), n, alpha, x, y, a, lda, conj_y);
+        return gerUnitComplexC64(resources, toUsize(m_), n, alpha, x, y, a, lda, conj_y);
     }
     for (0..n) |j| {
         const yj = maybeConj(T, y[j], conj_y);
         const temp = mul(T, alpha, yj);
-        if (!isZero(T, temp)) vector_ops.axpy(T, m_, temp, x, 1, a + matIndex(lda, 0, j), 1);
+        if (!isZero(T, temp)) vector_ops.axpyWithResources(T, resources, m_, temp, x, 1, a + matIndex(lda, 0, j), 1);
     }
 }
 
 fn ComplexGerTask(comptime T: type) type {
     return struct {
+        resources: CallResources,
         m: BlasInt,
         n0: usize,
         n1: usize,
@@ -354,6 +358,7 @@ fn runComplexGerTask(comptime T: type, raw_tasks: *const anyopaque, index: usize
     const task = tasks[index];
     gerUnitComplex(
         T,
+        task.resources,
         task.m,
         task.n1 - task.n0,
         task.alpha,
@@ -373,10 +378,10 @@ fn runComplexGerTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runComplexGerTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn parallelGerUnitComplex(comptime T: type, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt, conj_y: bool) bool {
+fn parallelGerUnitComplex(comptime T: type, resources: CallResources, m: usize, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt, conj_y: bool) bool {
     const exact_c64_ger128 = T == scalar.ComplexF64 and m == 128 and n == 128;
     if (!tuning.preferComplexGerParallel(exact_c64_ger128, m, n)) return false;
-    var task_count = core_pool.taskCount(n, tuning.complexGerMinColumns(T, exact_c64_ger128));
+    var task_count = resources.taskCount(n, tuning.complexGerMinColumns(T, exact_c64_ger128));
     task_count = tuning.capComplexGerTasks(T, exact_c64_ger128, n, task_count);
     if (task_count <= 1) return false;
 
@@ -392,6 +397,7 @@ fn parallelGerUnitComplex(comptime T: type, m: usize, n: usize, alpha: T, x: [*]
             (task_index + 1) * n / task_count,
         };
         tasks[task_index] = .{
+            .resources = resources,
             .m = @intCast(m),
             .n0 = n0,
             .n1 = n1,
@@ -405,16 +411,25 @@ fn parallelGerUnitComplex(comptime T: type, m: usize, n: usize, alpha: T, x: [*]
     }
 
     const runner = if (T == scalar.ComplexF32) runComplexGerTaskC32 else runComplexGerTaskC64;
-    return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
 }
 
 pub fn ger(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt, conj_y: bool) void {
+    return gerWithResources(T, .legacy_default, m_, n_, alpha, x, incx_, y, incy_, a, lda, conj_y);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn gerAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt, conj_y: bool) void {
+    return gerWithResources(T, .{ .admitted = operation }, m_, n_, alpha, x, incx_, y, incy_, a, lda, conj_y);
+}
+
+fn gerWithResources(comptime T: type, resources: CallResources, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt, conj_y: bool) void {
     if (m_ <= 0 or n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (!conj_y and level2_tuning.coreUnitSelected(T, .ger, .{ .m = m, .n = n, .incx = incx_, .incy = incy_ })) {
-            if (parallelGerUnitReal(T, m, n, alpha, x, y, a, lda)) return;
+            if (parallelGerUnitReal(T, resources, m, n, alpha, x, y, a, lda)) return;
             return gerUnitReal(T, m, n, alpha, x, y, a, lda);
         }
     } else if (comptime isComplex(T)) {
@@ -423,8 +438,8 @@ pub fn ger(comptime T: type, m_: BlasInt, n_: BlasInt, alpha: T, x: [*]const T, 
         else
             level2_tuning.coreUnitSelected(T, .geru, .{ .m = m, .n = n, .incx = incx_, .incy = incy_ });
         if (unit_selected) {
-            if (parallelGerUnitComplex(T, m, n, alpha, x, y, a, lda, conj_y)) return;
-            return gerUnitComplex(T, m_, n, alpha, x, y, a, lda, conj_y);
+            if (parallelGerUnitComplex(T, resources, m, n, alpha, x, y, a, lda, conj_y)) return;
+            return gerUnitComplex(T, resources, m_, n, alpha, x, y, a, lda, conj_y);
         }
     }
     const sx = startIndex(m_, incx_);
@@ -466,14 +481,14 @@ fn rankUpdateTaskLimit(comptime T: type, comptime operation: DenseRankOperation,
 
 // Rank-two updates share one read/modify/write of the destination column.
 // In particular, avoid a second pass over a column larger than L1.
-fn rankTwoColumn(comptime T: type, n: usize, cx: T, x: [*]const T, cy: T, y: [*]const T, dest: [*]T) void {
+fn rankTwoColumn(comptime T: type, resources: CallResources, n: usize, cx: T, x: [*]const T, cy: T, y: [*]const T, dest: [*]T) void {
     if (comptime builtin.target.cpu.arch != .x86_64) {
-        if (!isZero(T, cx)) vector_ops.axpy(T, @intCast(n), cx, x, 1, dest, 1);
-        if (!isZero(T, cy)) vector_ops.axpy(T, @intCast(n), cy, y, 1, dest, 1);
+        if (!isZero(T, cx)) vector_ops.axpyWithResources(T, resources, @intCast(n), cx, x, 1, dest, 1);
+        if (!isZero(T, cy)) vector_ops.axpyWithResources(T, resources, @intCast(n), cy, y, 1, dest, 1);
         return;
     }
-    if (isZero(T, cx)) return vector_ops.axpy(T, @intCast(n), cy, y, 1, dest, 1);
-    if (isZero(T, cy)) return vector_ops.axpy(T, @intCast(n), cx, x, 1, dest, 1);
+    if (isZero(T, cx)) return vector_ops.axpyWithResources(T, resources, @intCast(n), cy, y, 1, dest, 1);
+    if (isZero(T, cy)) return vector_ops.axpyWithResources(T, resources, @intCast(n), cx, x, 1, dest, 1);
     const R = if (T == f32 or T == scalar.ComplexF32) f32 else f64;
     const width = 32 / @sizeOf(R);
     const V = @Vector(width, R);
@@ -602,14 +617,14 @@ inline fn rankTwoPanel(comptime T: type, comptime columns: usize, comptime is_pa
     }
 }
 
-fn tiledRankTwoColumns(comptime T: type, comptime is_packed: bool, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) usize {
+fn tiledRankTwoColumns(comptime T: type, resources: CallResources, comptime is_packed: bool, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) usize {
     if (comptime isReal(T) and (!is_packed or T == f32)) {
-        if (n <= 256) return tiledRankTwoColumnsImpl(T, is_packed, 2, uplo, n, j0, j1, alpha, x, y, a, lda);
+        if (n <= 256) return tiledRankTwoColumnsImpl(T, resources, is_packed, 2, uplo, n, j0, j1, alpha, x, y, a, lda);
     }
-    return tiledRankTwoColumnsImpl(T, is_packed, if (isReal(T)) 4 else 2, uplo, n, j0, j1, alpha, x, y, a, lda);
+    return tiledRankTwoColumnsImpl(T, resources, is_packed, if (isReal(T)) 4 else 2, uplo, n, j0, j1, alpha, x, y, a, lda);
 }
 
-fn tiledRankTwoColumnsImpl(comptime T: type, comptime is_packed: bool, comptime columns: usize, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) usize {
+fn tiledRankTwoColumnsImpl(comptime T: type, resources: CallResources, comptime is_packed: bool, comptime columns: usize, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) usize {
     var j = j0;
     while (j + columns <= j1) : (j += columns) {
         const row0 = if (uplo == .upper) 0 else j + columns - 1;
@@ -630,7 +645,7 @@ fn tiledRankTwoColumnsImpl(comptime T: type, comptime is_packed: bool, comptime 
             const fringe_count = if (uplo == .upper) col else columns - 1 - col;
             if (fringe_count > 0) {
                 const fringe = a + if (is_packed) packedIndex(uplo, n, fringe_row, jj) else matIndex(lda, fringe_row, jj);
-                rankTwoColumn(T, fringe_count, cx[col], x + fringe_row, cy[col], y + fringe_row, fringe);
+                rankTwoColumn(T, resources, fringe_count, cx[col], x + fringe_row, cy[col], y + fringe_row, fringe);
             }
             if (comptime !isReal(T)) {
                 const diag = if (is_packed) packedIndex(uplo, n, jj, jj) else matIndex(lda, jj, jj);
@@ -641,9 +656,9 @@ fn tiledRankTwoColumnsImpl(comptime T: type, comptime is_packed: bool, comptime 
     return j;
 }
 
-fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) void {
+fn denseRankColumns(comptime T: type, resources: CallResources, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) void {
     const first = if (comptime builtin.target.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
-        tiledRankTwoColumns(T, false, uplo, n, j0, j1, alpha, x, y, a, lda)
+        tiledRankTwoColumns(T, resources, false, uplo, n, j0, j1, alpha, x, y, a, lda)
     else
         j0;
     for (first..j1) |j| {
@@ -659,18 +674,18 @@ fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, up
             },
             .her => {
                 const temp = mul(T, alpha, conj(T, x[j]));
-                if (!isZero(T, temp)) vector_ops.axpy(T, @intCast(count), temp, x + row0, 1, column, 1);
+                if (!isZero(T, temp)) vector_ops.axpyWithResources(T, resources, @intCast(count), temp, x + row0, 1, column, 1);
                 a[matIndex(lda, j, j)].im = 0;
             },
             .syr2 => {
                 const temp1 = alpha * y[j];
                 const temp2 = alpha * x[j];
-                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, column);
+                rankTwoColumn(T, resources, count, temp1, x + row0, temp2, y + row0, column);
             },
             .her2 => {
                 const temp1 = mul(T, alpha, conj(T, y[j]));
                 const temp2 = mul(T, conj(T, alpha), conj(T, x[j]));
-                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, column);
+                rankTwoColumn(T, resources, count, temp1, x + row0, temp2, y + row0, column);
                 a[matIndex(lda, j, j)].im = 0;
             },
         }
@@ -679,6 +694,7 @@ fn denseRankColumns(comptime T: type, comptime operation: DenseRankOperation, up
 
 fn DenseRankTask(comptime T: type) type {
     return struct {
+        resources: CallResources,
         uplo: Uplo,
         n: usize,
         j0: usize,
@@ -694,7 +710,7 @@ fn DenseRankTask(comptime T: type) type {
 fn runDenseRankTask(comptime T: type, comptime operation: DenseRankOperation, raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const DenseRankTask(T) = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    denseRankColumns(T, operation, task.uplo, task.n, task.j0, task.j1, task.alpha, task.x, task.y, task.a, task.lda);
+    denseRankColumns(T, task.resources, operation, task.uplo, task.n, task.j0, task.j1, task.alpha, task.x, task.y, task.a, task.lda);
 }
 
 fn runSyrTaskF32(raw_tasks: *const anyopaque, index: usize) void {
@@ -740,10 +756,10 @@ fn denseRankTaskBoundary(uplo: Uplo, n: usize, task_count: usize, task_index: us
     return @min(n, @as(usize, @intFromFloat(boundary)));
 }
 
-fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
+fn parallelDenseRankUpdate(comptime T: type, resources: CallResources, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, a: [*]T, lda: BlasInt) bool {
     if (!tuning.preferDenseStructuredParallel(n)) return false;
 
-    var task_count = core_pool.taskCount(n, tuning.structuredMinColumns());
+    var task_count = resources.taskCount(n, tuning.structuredMinColumns());
     if (comptime builtin.target.cpu.arch == .x86_64) {
         task_count = level2_tuning.capTaskCountByWork(task_count, n *| n, 64 * 1024);
     }
@@ -753,6 +769,7 @@ fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperat
     var tasks: [core_pool.max_tasks]DenseRankTask(T) = undefined;
     for (0..task_count) |task_index| {
         tasks[task_index] = .{
+            .resources = resources,
             .uplo = uplo,
             .n = n,
             .j0 = denseRankTaskBoundary(uplo, n, task_count, task_index),
@@ -771,13 +788,13 @@ fn parallelDenseRankUpdate(comptime T: type, comptime operation: DenseRankOperat
         .syr2 => if (T == f32) runSyr2TaskF32 else runSyr2TaskF64,
         .her2 => if (T == scalar.ComplexF32) runHer2TaskC32 else runHer2TaskC64,
     };
-    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    return core_pool.run(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    return resources.run(runner, @ptrCast(&tasks), task_count);
 }
 
-fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) void {
+fn packedRankColumns(comptime T: type, resources: CallResources, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, j0: usize, j1: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) void {
     const first = if (comptime builtin.target.cpu.arch == .x86_64 and (operation == .syr2 or operation == .her2))
-        tiledRankTwoColumns(T, true, uplo, n, j0, j1, alpha, x, y, ap, 0)
+        tiledRankTwoColumns(T, resources, true, uplo, n, j0, j1, alpha, x, y, ap, 0)
     else
         j0;
     for (first..j1) |j| {
@@ -792,18 +809,18 @@ fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, u
             },
             .her => {
                 const temp = mul(T, alpha, conj(T, x[j]));
-                if (!isZero(T, temp)) vector_ops.axpy(T, @intCast(count), temp, x + row0, 1, segment, 1);
+                if (!isZero(T, temp)) vector_ops.axpyWithResources(T, resources, @intCast(count), temp, x + row0, 1, segment, 1);
                 ap[packedIndex(uplo, n, j, j)].im = 0;
             },
             .syr2 => {
                 const temp1 = alpha * y[j];
                 const temp2 = alpha * x[j];
-                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, segment);
+                rankTwoColumn(T, resources, count, temp1, x + row0, temp2, y + row0, segment);
             },
             .her2 => {
                 const temp1 = mul(T, alpha, conj(T, y[j]));
                 const temp2 = mul(T, conj(T, alpha), conj(T, x[j]));
-                rankTwoColumn(T, count, temp1, x + row0, temp2, y + row0, segment);
+                rankTwoColumn(T, resources, count, temp1, x + row0, temp2, y + row0, segment);
                 ap[packedIndex(uplo, n, j, j)].im = 0;
             },
         }
@@ -812,6 +829,7 @@ fn packedRankColumns(comptime T: type, comptime operation: DenseRankOperation, u
 
 fn PackedRankTask(comptime T: type) type {
     return struct {
+        resources: CallResources,
         uplo: Uplo,
         n: usize,
         j0: usize,
@@ -826,7 +844,7 @@ fn PackedRankTask(comptime T: type) type {
 fn runPackedRankTask(comptime T: type, comptime operation: DenseRankOperation, raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const PackedRankTask(T) = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    packedRankColumns(T, operation, task.uplo, task.n, task.j0, task.j1, task.alpha, task.x, task.y, task.ap);
+    packedRankColumns(T, task.resources, operation, task.uplo, task.n, task.j0, task.j1, task.alpha, task.x, task.y, task.ap);
 }
 
 fn runPackedSyrTaskF32(raw_tasks: *const anyopaque, index: usize) void {
@@ -866,10 +884,10 @@ fn packedRankElementCount(n: usize) usize {
     return if (n % 2 == 0) (n / 2) *| next else n *| (next / 2);
 }
 
-noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) bool {
+noinline fn parallelPackedRankUpdate(comptime T: type, resources: CallResources, comptime operation: DenseRankOperation, uplo: Uplo, n: usize, alpha: T, x: [*]const T, y: [*]const T, ap: [*]T) bool {
     if (!tuning.preferPackedTaskComposition(n)) return false;
 
-    var task_count = core_pool.taskCount(n, tuning.structuredMinColumns());
+    var task_count = resources.taskCount(n, tuning.structuredMinColumns());
     if (comptime builtin.target.cpu.arch == .x86_64) {
         task_count = level2_tuning.capTaskCountByWork(task_count, packedRankElementCount(n), 64 * 1024);
     }
@@ -879,6 +897,7 @@ noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: Dense
     var tasks: [core_pool.max_tasks]PackedRankTask(T) = undefined;
     for (0..task_count) |task_index| {
         tasks[task_index] = .{
+            .resources = resources,
             .uplo = uplo,
             .n = n,
             .j0 = denseRankTaskBoundary(uplo, n, task_count, task_index),
@@ -896,17 +915,26 @@ noinline fn parallelPackedRankUpdate(comptime T: type, comptime operation: Dense
         .syr2 => if (T == f32) runPackedSyr2TaskF32 else runPackedSyr2TaskF64,
         .her2 => if (T == scalar.ComplexF32) runPackedHer2TaskC32 else runPackedHer2TaskC64,
     };
-    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    return core_pool.run(runner, @ptrCast(&tasks), task_count);
+    if (comptime builtin.target.cpu.arch == .x86_64) return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    return resources.run(runner, @ptrCast(&tasks), task_count);
 }
 
 pub fn syr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return syrWithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, a, lda);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn syrAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return syrWithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, a, lda);
+}
+
+fn syrWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (level2_tuning.coreUnitSelected(T, .syr, .{ .m = n, .n = n, .incx = incx_ })) {
-            if (parallelDenseRankUpdate(T, .syr, uplo, n, alpha, x, x, a, lda)) return;
-            return denseRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, a, lda);
+            if (parallelDenseRankUpdate(T, resources, .syr, uplo, n, alpha, x, x, a, lda)) return;
+            return denseRankColumns(T, resources, .syr, uplo, n, 0, n, alpha, x, x, a, lda);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -923,14 +951,23 @@ pub fn syr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
 }
 
 pub fn spr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, ap: [*]T) void {
+    return sprWithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, ap);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn sprAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, ap: [*]T) void {
+    return sprWithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, ap);
+}
+
+fn sprWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (level2_tuning.coreUnitSelected(T, .spr, .{ .m = n, .n = n, .incx = incx_ }) and
             preferPackedColumns(n))
         {
-            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .syr, uplo, n, alpha, x, x, ap)) return;
-            return packedRankColumns(T, .syr, uplo, n, 0, n, alpha, x, x, ap);
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, resources, .syr, uplo, n, alpha, x, x, ap)) return;
+            return packedRankColumns(T, resources, .syr, uplo, n, 0, n, alpha, x, x, ap);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -947,12 +984,21 @@ pub fn spr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, i
 }
 
 pub fn syr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return syr2WithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, y, incy_, a, lda);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn syr2Admitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return syr2WithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, y, incy_, a, lda);
+}
+
+fn syr2WithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (level2_tuning.coreUnitSelected(T, .syr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ })) {
-            if (parallelDenseRankUpdate(T, .syr2, uplo, n, alpha, x, y, a, lda)) return;
-            return denseRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, a, lda);
+            if (parallelDenseRankUpdate(T, resources, .syr2, uplo, n, alpha, x, y, a, lda)) return;
+            return denseRankColumns(T, resources, .syr2, uplo, n, 0, n, alpha, x, y, a, lda);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -971,14 +1017,23 @@ pub fn syr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
 }
 
 pub fn spr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
+    return spr2WithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, y, incy_, ap);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn spr2Admitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
+    return spr2WithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, y, incy_, ap);
+}
+
+fn spr2WithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isReal(T)) {
         if (level2_tuning.coreUnitSelected(T, .spr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ }) and
             preferPackedColumns(n))
         {
-            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .syr2, uplo, n, alpha, x, y, ap)) return;
-            return packedRankColumns(T, .syr2, uplo, n, 0, n, alpha, x, y, ap);
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, resources, .syr2, uplo, n, alpha, x, y, ap)) return;
+            return packedRankColumns(T, resources, .syr2, uplo, n, 0, n, alpha, x, y, ap);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -997,13 +1052,22 @@ pub fn spr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
 }
 
 pub fn her(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return herWithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, a, lda);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn herAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return herWithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, a, lda);
+}
+
+fn herWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or alpha == 0) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
         if (level2_tuning.coreUnitSelected(T, .her, .{ .m = n, .n = n, .incx = incx_ })) {
             const complex_alpha = realScalar(T, alpha);
-            if (parallelDenseRankUpdate(T, .her, uplo, n, complex_alpha, x, x, a, lda)) return;
-            return denseRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, a, lda);
+            if (parallelDenseRankUpdate(T, resources, .her, uplo, n, complex_alpha, x, x, a, lda)) return;
+            return denseRankColumns(T, resources, .her, uplo, n, 0, n, complex_alpha, x, x, a, lda);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -1020,6 +1084,15 @@ pub fn her(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
 }
 
 pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, ap: [*]T) void {
+    return hprWithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, ap);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn hprAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, ap: [*]T) void {
+    return hprWithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, ap);
+}
+
+fn hprWithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]const T, incx_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or alpha == 0) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
@@ -1027,8 +1100,8 @@ pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
             preferPackedColumns(n))
         {
             const complex_alpha = realScalar(T, alpha);
-            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .her, uplo, n, complex_alpha, x, x, ap)) return;
-            return packedRankColumns(T, .her, uplo, n, 0, n, complex_alpha, x, x, ap);
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, resources, .her, uplo, n, complex_alpha, x, x, ap)) return;
+            return packedRankColumns(T, resources, .her, uplo, n, 0, n, complex_alpha, x, x, ap);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -1045,12 +1118,21 @@ pub fn hpr(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: Real(T), x: [*]cons
 }
 
 pub fn her2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return her2WithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, y, incy_, a, lda);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn her2Admitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
+    return her2WithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, y, incy_, a, lda);
+}
+
+fn her2WithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, a: [*]T, lda: BlasInt) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
         if (level2_tuning.coreUnitSelected(T, .her2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ })) {
-            if (parallelDenseRankUpdate(T, .her2, uplo, n, alpha, x, y, a, lda)) return;
-            return denseRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, a, lda);
+            if (parallelDenseRankUpdate(T, resources, .her2, uplo, n, alpha, x, y, a, lda)) return;
+            return denseRankColumns(T, resources, .her2, uplo, n, 0, n, alpha, x, y, a, lda);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -1070,14 +1152,23 @@ pub fn her2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, 
 }
 
 pub fn hpr2(comptime T: type, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
+    return hpr2WithResources(T, .legacy_default, uplo, n_, alpha, x, incx_, y, incy_, ap);
+}
+
+/// Synchronous borrow; the enclosing caller owns admission and completion.
+pub fn hpr2Admitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
+    return hpr2WithResources(T, .{ .admitted = operation }, uplo, n_, alpha, x, incx_, y, incy_, ap);
+}
+
+fn hpr2WithResources(comptime T: type, resources: CallResources, uplo: Uplo, n_: BlasInt, alpha: T, x: [*]const T, incx_: BlasInt, y: [*]const T, incy_: BlasInt, ap: [*]T) void {
     if (n_ <= 0 or incx_ == 0 or incy_ == 0 or isZero(T, alpha)) return;
     const n = toUsize(n_);
     if (comptime isComplex(T)) {
         if (level2_tuning.coreUnitSelected(T, .hpr2, .{ .m = n, .n = n, .incx = incx_, .incy = incy_ }) and
             preferPackedColumns(n))
         {
-            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, .her2, uplo, n, alpha, x, y, ap)) return;
-            return packedRankColumns(T, .her2, uplo, n, 0, n, alpha, x, y, ap);
+            if (tuning.preferPackedStructuredParallel(n) and parallelPackedRankUpdate(T, resources, .her2, uplo, n, alpha, x, y, ap)) return;
+            return packedRankColumns(T, resources, .her2, uplo, n, 0, n, alpha, x, y, ap);
         }
     }
     const sx = startIndex(n_, incx_);
@@ -1109,7 +1200,7 @@ pub const testing = struct {
         conjugate_y: bool,
     ) void {
         if (comptime isReal(T)) return gerUnitReal(T, m, n, alpha, x, y, a, lda);
-        return gerUnitComplex(T, @intCast(m), n, alpha, x, y, a, lda, conjugate_y);
+        return gerUnitComplex(T, .legacy_default, @intCast(m), n, alpha, x, y, a, lda, conjugate_y);
     }
 };
 
@@ -1160,8 +1251,8 @@ fn expectParallelPackedRankMatchesSingle(comptime T: type, comptime operation: D
         const value = packedRankTestValue(T, 5, 4);
         break :blk realScalar(T, value.re);
     } else packedRankTestValue(T, 5, 4);
-    packedRankColumns(T, operation, uplo, n, 0, n, alpha, x.ptr, y.ptr, expected.ptr);
-    try std.testing.expect(parallelPackedRankUpdate(T, operation, uplo, n, alpha, x.ptr, y.ptr, actual.ptr));
+    packedRankColumns(T, .legacy_default, operation, uplo, n, 0, n, alpha, x.ptr, y.ptr, expected.ptr);
+    try std.testing.expect(parallelPackedRankUpdate(T, .legacy_default, operation, uplo, n, alpha, x.ptr, y.ptr, actual.ptr));
     try expectPackedRankApprox(T, expected, actual);
 
     for (actual, 0..) |*value, i| value.* = packedRankTestValue(T, i, 3);
@@ -1212,7 +1303,7 @@ test "fused rank-two columns preserve tails guards and zero coefficients" {
                 for (&expected, 0..) |*v, i| v.* = packedRankTestValue(T, i, 3);
                 var actual = expected;
                 for (0..n) |i| expected[i] = add(T, add(T, expected[i], mul(T, cx, x[i])), mul(T, cy, y[i]));
-                rankTwoColumn(T, n, cx, &x, cy, &y, &actual);
+                rankTwoColumn(T, .legacy_default, n, cx, &x, cy, &y, &actual);
                 try expectPackedRankApprox(T, &expected, &actual);
             }
         }

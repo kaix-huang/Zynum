@@ -69,8 +69,23 @@ fn AmxGemvBuffers(comptime T: type) type {
     };
 }
 
-fn amxGemvBuffer(comptime T: type, which: AmxGemvBufferKind, len: usize) ?[]T {
-    return AmxGemvBuffers(T).get(which, len);
+fn AmxGemvWorkspace(comptime T: type) type {
+    return struct {
+        data: []T,
+        allocator: ?std.mem.Allocator = null,
+
+        fn deinit(self: @This()) void {
+            if (self.allocator) |allocator| allocator.free(self.data);
+        }
+    };
+}
+
+fn amxGemvBuffer(comptime T: type, which: AmxGemvBufferKind, len: usize, scratch_allocator: ?std.mem.Allocator) ?AmxGemvWorkspace(T) {
+    if (scratch_allocator) |allocator| {
+        const data = allocator.alloc(T, len) catch return null;
+        return .{ .data = data, .allocator = allocator };
+    }
+    return .{ .data = AmxGemvBuffers(T).get(which, len) orelse return null };
 }
 
 fn axpbyUnitF32(n: usize, alpha: f32, x: [*]const f32, beta: f32, y: [*]f32) void {
@@ -161,11 +176,16 @@ fn gemvNoTransAmxF32(
     x: [*]const f32,
     beta: f32,
     y: [*]f32,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (!canUseAmxGemvNoTransF32(m, n, lda)) return false;
     const pack_len = n * 16;
-    const b = amxGemvBuffer(f32, .b, pack_len) orelse return false;
-    const c = amxGemvBuffer(f32, .c, m) orelse return false;
+    const b_workspace = amxGemvBuffer(f32, .b, pack_len, scratch_allocator) orelse return false;
+    defer b_workspace.deinit();
+    const b = b_workspace.data;
+    const c_workspace = amxGemvBuffer(f32, .c, m, scratch_allocator) orelse return false;
+    defer c_workspace.deinit();
+    const c = c_workspace.data;
     for (0..n) |i| {
         const value = alpha * x[i];
         @memset(b[i * 16 .. i * 16 + 16], value);
@@ -278,10 +298,15 @@ fn gemvNoTransAmxF64(
     lda: BlasInt,
     x: [*]const f64,
     y: [*]f64,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     const pack_len = gemvNoTransPackLenF64(m, n, lda) orelse return false;
-    const b = amxGemvBuffer(f64, .b, pack_len) orelse return false;
-    const c = amxGemvBuffer(f64, .c, m) orelse return false;
+    const b_workspace = amxGemvBuffer(f64, .b, pack_len, scratch_allocator) orelse return false;
+    defer b_workspace.deinit();
+    const b = b_workspace.data;
+    const c_workspace = amxGemvBuffer(f64, .c, m, scratch_allocator) orelse return false;
+    defer c_workspace.deinit();
+    const c = c_workspace.data;
 
     if (!gemvNoTransPackF64(n, alpha, x, b)) return false;
     return gemvNoTransPackedRowsF64(m, n, a, lda, b.ptr, c.ptr, y);
@@ -296,10 +321,15 @@ fn gemvNoTransAmxF64Full(
     x: [*]const f64,
     beta: f64,
     y: [*]f64,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     const pack_len = gemvNoTransPackLenF64(m, n, lda) orelse return false;
-    const b = amxGemvBuffer(f64, .b, pack_len) orelse return false;
-    const c = amxGemvBuffer(f64, .c, m) orelse return false;
+    const b_workspace = amxGemvBuffer(f64, .b, pack_len, scratch_allocator) orelse return false;
+    defer b_workspace.deinit();
+    const b = b_workspace.data;
+    const c_workspace = amxGemvBuffer(f64, .c, m, scratch_allocator) orelse return false;
+    defer c_workspace.deinit();
+    const c = c_workspace.data;
 
     if (!gemvNoTransPackF64(n, alpha, x, b)) return false;
     if (amx.dgemvN8PackedB(@intCast(m), @intCast(n), a, @intCast(lda), b.ptr, c.ptr) == 0) return false;
@@ -965,10 +995,11 @@ fn gemvNoTransF64(
     lda: BlasInt,
     x: [*]const f64,
     y: [*]f64,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (comptime !features.has_asimd) return false;
     if (m == 0 or n == 0 or lda <= 0) return false;
-    if (gemvNoTransAmxF64(m, n, alpha, a, lda, x, y)) return true;
+    if (gemvNoTransAmxF64(m, n, alpha, a, lda, x, y, scratch_allocator)) return true;
 
     return false;
 }
@@ -1116,6 +1147,7 @@ pub fn gemvNoTransFullUnitReal(
     x: [*]const T,
     beta: T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (T == f32) {
         // Reuse the retained 512-row SME2 body for tall matrices.  Keeping the
@@ -1131,7 +1163,7 @@ pub fn gemvNoTransFullUnitReal(
         }
         if (gemvNoTransSme2F32(m, n, alpha, a, lda, x, beta, y)) return true;
         if (gemvNoTransAsimdF32M128(m, n, alpha, a, lda, x, beta, y)) return true;
-        if (gemvNoTransAmxF32(m, n, alpha, a, lda, x, beta, y)) return true;
+        if (gemvNoTransAmxF32(m, n, alpha, a, lda, x, beta, y, scratch_allocator)) return true;
         if (comptime features.has_asimd) return fixed_simd.gemvNoTransFullUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, beta, y);
         return false;
     }
@@ -1149,7 +1181,7 @@ pub fn gemvNoTransFullUnitReal(
         if (gemvNoTransSmF64(m, n, alpha, a, lda, x, beta, y)) return true;
         if (gemvNoTransSme2F64(m, n, alpha, a, lda, x, beta, y)) return true;
         if (comptime features.has_asimd)
-            if (gemvNoTransAmxF64Full(m, n, alpha, a, lda, x, beta, y)) return true;
+            if (gemvNoTransAmxF64Full(m, n, alpha, a, lda, x, beta, y, scratch_allocator)) return true;
         if (comptime features.has_asimd) return fixed_simd.gemvNoTransFullUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, beta, y);
         return false;
     }
@@ -1164,10 +1196,11 @@ fn gemvTransF64(
     lda: BlasInt,
     x: [*]const f64,
     y: [*]f64,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (comptime amx.enabled and builtin.target.os.tag == .macos and features.has_asimd) {
         if (m == 1024 and n == 1024) {
-            if (amx.dgemvTransN8(@intCast(m), @intCast(n), alpha, a, @intCast(lda), x, y) != 0) return true;
+            if (amx.dgemvTransN8WithScratch(@intCast(m), @intCast(n), alpha, a, @intCast(lda), x, y, scratch_allocator) != 0) return true;
         }
     }
     if (m == 0 or n == 0 or lda <= 0) return false;
@@ -1295,6 +1328,7 @@ pub fn gemvTransFullUnitReal(
     x: [*]const T,
     beta: T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (T == f32) {
         // Long unit-stride outputs are independent column panels.  The 2048
@@ -1334,7 +1368,19 @@ pub fn gemvTransFullUnitReal(
         if (m == 512 and n == 512) return false;
         if (canUseGemvTransF64(m, n, lda)) {
             scaleUnitF64(n, beta, y);
-            if (gemvTransF64(m, n, alpha, a, lda, x, y)) return true;
+            if (gemvTransF64(m, n, alpha, a, lda, x, y, scratch_allocator)) return true;
+            // Beta was already applied. Finish this call even if the AMX
+            // workspace allocation or the fixed SIMD eligibility check fails.
+            if (comptime features.has_asimd) {
+                if (fixed_simd.gemvTransUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, y)) return true;
+            }
+            for (0..n) |j| {
+                const column = a + j * @as(usize, @intCast(lda));
+                var sum: f64 = 0;
+                for (0..m) |i| sum += column[i] * x[i];
+                y[j] += alpha * sum;
+            }
+            return true;
         }
         if (comptime features.has_asimd) return fixed_simd.gemvTransFullUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, beta, y);
         return false;
@@ -1351,13 +1397,14 @@ pub fn gemvTransAmxUnitReal(
     lda: BlasInt,
     x: [*]const T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (comptime !amx.enabled) return false;
     if (T != f64) return false;
     if (m == 0 or n == 0 or lda <= 0) return false;
     if (comptime builtin.target.os.tag != .macos or !features.has_asimd) return false;
     if (m != 1024 or n != 1024) return false;
-    return amx.dgemvTransN8(@intCast(m), @intCast(n), alpha, a, @intCast(lda), x, y) != 0;
+    return amx.dgemvTransN8WithScratch(@intCast(m), @intCast(n), alpha, a, @intCast(lda), x, y, scratch_allocator) != 0;
 }
 
 pub fn gemvTransUnitReal(
@@ -1369,6 +1416,7 @@ pub fn gemvTransUnitReal(
     lda: BlasInt,
     x: [*]const T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (T == f32) {
         if (gemvTransSme2F32(m, n, alpha, a, lda, x, 1, y)) return true;
@@ -1377,7 +1425,7 @@ pub fn gemvTransUnitReal(
     }
     if (T == f64) {
         if (gemvTransSme2F64(m, n, alpha, a, lda, x, 1, y)) return true;
-        if (gemvTransF64(m, n, alpha, a, lda, x, y)) return true;
+        if (gemvTransF64(m, n, alpha, a, lda, x, y, scratch_allocator)) return true;
         if (comptime features.has_asimd) return fixed_simd.gemvTransUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, y);
         return false;
     }
@@ -1393,8 +1441,9 @@ pub fn gemvNoTransUnitReal(
     lda: BlasInt,
     x: [*]const T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
-    if (T == f64 and gemvNoTransF64(m, n, alpha, a, lda, x, y)) return true;
+    if (T == f64 and gemvNoTransF64(m, n, alpha, a, lda, x, y, scratch_allocator)) return true;
     if ((T == f32 or T == f64) and comptime features.has_asimd) return fixed_simd.gemvNoTransUnitReal(T, simd_config.matrixConfig(T), m, n, alpha, a, lda, x, y);
     return false;
 }

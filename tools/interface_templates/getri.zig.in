@@ -1,0 +1,24 @@
+// Generated forwarding only. Mathematics, Context and every lease belong to the owner.
+fn invokeLuInverse(comptime T: type, comptime level: Level, layout: c_int, n: WireInt, a: ?[*]align(1) T, lda: WireInt, ipiv: ?[*]align(1) const WireInt, work: ?[*]align(1) T, lwork: WireInt) WireInt {
+    const result = binding.Shared.getriRawManagedWithDefaults(true, T, InternalInt, level, binding.Provider.Execution.getContext(), .{
+        .layout = layout,
+        .n = @intCast(n),
+        .a = a,
+        .lda = @intCast(lda),
+        .pivots = if (ipiv) |pointer| @as([*]align(1) const InternalInt, @ptrCast(pointer)) else null,
+        .work = work,
+        .lwork = @intCast(lwork),
+    }, profileDefaults()) catch |err| terminal(@errorName(err));
+    return finish(result);
+}
+fn LuInverse(comptime T: type, comptime level: Level) type {
+    return if (level == .high) struct {
+        pub fn call(layout: c_int, n: WireInt, a: ?[*]align(1) T, lda: WireInt, ipiv: ?[*]align(1) const WireInt) callconv(.c) WireInt {
+            return invokeLuInverse(T, level, layout, n, a, lda, ipiv, null, 0);
+        }
+    } else struct {
+        pub fn call(layout: c_int, n: WireInt, a: ?[*]align(1) T, lda: WireInt, ipiv: ?[*]align(1) const WireInt, work: ?[*]align(1) T, lwork: WireInt) callconv(.c) WireInt {
+            return invokeLuInverse(T, level, layout, n, a, lda, ipiv, work, lwork);
+        }
+    };
+}

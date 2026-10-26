@@ -1,0 +1,345 @@
+{
+  "schema": "zynum-external-interface-profile-v1",
+  "profile": "fftw3.f32.abplas-v1",
+  "target": "apple-arm64-default-c-v1",
+  "full_fftw_compatibility": false,
+  "implementation_status": "shared-scalar-binding-qualified-external-installation-and-runtime-pending",
+  "requires_profiles": [
+    "fftw3.f64.abplas-v1"
+  ],
+  "functions": [
+    {
+      "symbol": "fftwf_plan_dft_1d",
+      "returns": "fftwf_plan",
+      "parameters": "int n, fftwf_complex *in, fftwf_complex *out, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_r2c_1d",
+      "returns": "fftwf_plan",
+      "parameters": "int n, float *in, fftwf_complex *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_r2c_3d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, int n2, float *in, fftwf_complex *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_c2r_3d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, int n2, fftwf_complex *in, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_r2r_1d",
+      "returns": "fftwf_plan",
+      "parameters": "int n, float *in, float *out, fftwf_r2r_kind kind, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_execute",
+      "returns": "void",
+      "parameters": "const fftwf_plan p"
+    },
+    {
+      "symbol": "fftwf_destroy_plan",
+      "returns": "void",
+      "parameters": "fftwf_plan p"
+    },
+    {
+      "symbol": "fftwf_alloc_complex",
+      "returns": "fftwf_complex *",
+      "parameters": "size_t n"
+    },
+    {
+      "symbol": "fftwf_free",
+      "returns": "void",
+      "parameters": "void *p"
+    },
+    {
+      "symbol": "fftwf_alignment_of",
+      "returns": "int",
+      "parameters": "float *p"
+    },
+    {
+      "symbol": "fftwf_execute_dft",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, fftwf_complex *in, fftwf_complex *out"
+    },
+    {
+      "symbol": "fftwf_execute_dft_r2c",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, float *in, fftwf_complex *out"
+    },
+    {
+      "symbol": "fftwf_execute_dft_c2r",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, fftwf_complex *in, float *out"
+    },
+    {
+      "symbol": "fftwf_execute_r2r",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, float *in, float *out"
+    },
+    {
+      "symbol": "fftwf_plan_dft_2d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, fftwf_complex *in, fftwf_complex *out, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_3d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, int n2, fftwf_complex *in, fftwf_complex *out, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, fftwf_complex *in, fftwf_complex *out, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_r2c_2d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, float *in, fftwf_complex *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_r2c",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, float *in, fftwf_complex *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_c2r_1d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, fftwf_complex *in, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_c2r_2d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, fftwf_complex *in, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_dft_c2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, fftwf_complex *in, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_r2r_2d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, float *in, float *out, fftwf_r2r_kind kind0, fftwf_r2r_kind kind1, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_r2r_3d",
+      "returns": "fftwf_plan",
+      "parameters": "int n0, int n1, int n2, float *in, float *out, fftwf_r2r_kind kind0, fftwf_r2r_kind kind1, fftwf_r2r_kind kind2, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_r2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, float *in, float *out, const fftwf_r2r_kind *kind, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_many_dft",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, int howmany, fftwf_complex *in, const int *inembed, int istride, int idist, fftwf_complex *out, const int *onembed, int ostride, int odist, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_dft",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, fftwf_complex *in, fftwf_complex *out, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_dft",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, fftwf_complex *in, fftwf_complex *out, int sign, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_many_dft_r2c",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, int howmany, float *in, const int *inembed, int istride, int idist, fftwf_complex *out, const int *onembed, int ostride, int odist, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_many_dft_c2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, int howmany, fftwf_complex *in, const int *inembed, int istride, int idist, float *out, const int *onembed, int ostride, int odist, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_many_r2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const int *n, int howmany, float *in, const int *inembed, int istride, int idist, float *out, const int *onembed, int ostride, int odist, const fftwf_r2r_kind *kind, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_dft_r2c",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, float *in, fftwf_complex *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_dft_c2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, fftwf_complex *in, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_r2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, float *in, float *out, const fftwf_r2r_kind *kind, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_dft_r2c",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, float *in, fftwf_complex *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_dft_c2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, fftwf_complex *in, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_r2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, float *in, float *out, const fftwf_r2r_kind *kind, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_split_dft",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, float *ri, float *ii, float *ro, float *io, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_split_dft_r2c",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, float *in, float *ro, float *io, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru_split_dft_c2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim *dims, int howmany_rank, const fftwf_iodim *howmany_dims, float *ri, float *ii, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_split_dft",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, float *ri, float *ii, float *ro, float *io, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_split_dft_r2c",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, float *in, float *ro, float *io, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_plan_guru64_split_dft_c2r",
+      "returns": "fftwf_plan",
+      "parameters": "int rank, const fftwf_iodim64 *dims, int howmany_rank, const fftwf_iodim64 *howmany_dims, float *ri, float *ii, float *out, unsigned flags"
+    },
+    {
+      "symbol": "fftwf_execute_split_dft",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, float *ri, float *ii, float *ro, float *io"
+    },
+    {
+      "symbol": "fftwf_execute_split_dft_r2c",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, float *in, float *ro, float *io"
+    },
+    {
+      "symbol": "fftwf_execute_split_dft_c2r",
+      "returns": "void",
+      "parameters": "const fftwf_plan p, float *ri, float *ii, float *out"
+    },
+    {
+      "symbol": "fftwf_malloc",
+      "returns": "void *",
+      "parameters": "size_t n"
+    },
+    {
+      "symbol": "fftwf_alloc_real",
+      "returns": "float *",
+      "parameters": "size_t n"
+    }
+  ],
+  "r2r_kinds": {
+    "R2HC": 0,
+    "HC2R": 1,
+    "DHT": 2,
+    "REDFT00": 3,
+    "REDFT01": 4,
+    "REDFT10": 5,
+    "REDFT11": 6,
+    "RODFT00": 7,
+    "RODFT01": 8,
+    "RODFT10": 9,
+    "RODFT11": 10
+  },
+  "constants": {
+    "FFTW_FORWARD": -1,
+    "FFTW_BACKWARD": 1,
+    "FFTW_MEASURE": 0,
+    "FFTW_DESTROY_INPUT": 1,
+    "FFTW_UNALIGNED": 2,
+    "FFTW_CONSERVE_MEMORY": 4,
+    "FFTW_EXHAUSTIVE": 8,
+    "FFTW_PRESERVE_INPUT": 16,
+    "FFTW_PATIENT": 32,
+    "FFTW_ESTIMATE": 64,
+    "FFTW_WISDOM_ONLY": 2097152
+  },
+  "constant_types": {
+    "FFTW_FORWARD": "int",
+    "FFTW_BACKWARD": "int",
+    "FFTW_MEASURE": "unsigned int",
+    "FFTW_DESTROY_INPUT": "unsigned int",
+    "FFTW_UNALIGNED": "unsigned int",
+    "FFTW_CONSERVE_MEMORY": "unsigned int",
+    "FFTW_EXHAUSTIVE": "unsigned int",
+    "FFTW_PRESERVE_INPUT": "unsigned int",
+    "FFTW_PATIENT": "unsigned int",
+    "FFTW_ESTIMATE": "unsigned int",
+    "FFTW_WISDOM_ONLY": "unsigned int"
+  },
+  "abi": {
+    "int_bytes": 4,
+    "unsigned_bytes": 4,
+    "pointer_bytes": 8,
+    "size_t_bytes": 8,
+    "float_bytes": 4,
+    "complex_bytes": 8,
+    "complex_alignment": 4,
+    "plan_tag": "fftwf_plan_s",
+    "kind_tag": "fftw_r2r_kind_do_not_use_me",
+    "iodim_tag": "fftw_iodim_do_not_use_me",
+    "iodim64_tag": "fftw_iodim64_do_not_use_me"
+  },
+  "scope": {
+    "precision": "f32",
+    "functions": 48,
+    "current_direct_ABPLaS_f32_calls": 0,
+    "composition": "optional single-precision companion to the existing f64 FFTW profile",
+    "pending": [
+      "generated ABI and external installed calls",
+      "captured callback-close and concurrent f32 execution",
+      "full FFTW APIs, wisdom, planner thread state and other precisions"
+    ]
+  },
+  "separation": {
+    "generated": "external declarations, export list, argument/status conversion selected at build time",
+    "internal": "Zynum-owned numerical types and algorithms; one existing Core with shared context, allocator, admission, resource pins, thread and workspace policy",
+    "profile_selection": "FFTW first; DFTI retained as an optional candidate; profiles must not instantiate separate internal owners"
+  },
+  "semantic_acceptance": [
+    "Unnormalized transforms, sign -1/+1, row-major last axis contiguous, real half-spectrum packing and DCT-I endpoint weights.",
+    "Plan binds caller-owned arrays; repeated execute uses those arrays. Planning failure returns NULL; execute and destroy retain FFTW void signatures.",
+    "FFTW_ESTIMATE planning preserves input and output. WISDOM_ONLY requires matching wisdom; do not silently treat it as ESTIMATE.",
+    "Accept legal in-place layouts using FFTW physical padding; unsupported initial cases must remain explicitly pending, rather than pretending full compatibility.",
+    "Honor preserve/destroy input restrictions, including NULL for multidimensional c2r plus PRESERVE_INPUT as documented.",
+    "Immutable plan metadata and invocation-owned work must permit concurrent execution on distinct arrays; a shared mutable per-plan workspace is insufficient.",
+    "FFTW has no finite-input validation status channel. Preserve IEEE exceptional-value behavior instead of silently retaining output on a checked numerical failure.",
+    "Use captured shared allocator and resource pins for plan/buffer lifetime; release allocation before pin, including teardown after close; no second context/cache/handle registry.",
+    "Buffer allocation alignment, overflow/OOM handling, external C/C++ calls and physical ABPLaS regressions are separate mandatory acceptance gates."
+  ],
+  "sources": {
+    "local_header": "/opt/homebrew/opt/fftw/include/fftw3.h",
+    "local_header_sha256": "c82bf45065551f8659748f9c77d8c9dee6783ea524d579e951757ac78a926d05",
+    "reference_pages": [
+      "https://www.fftw.org/fftw3_doc/Using-Plans.html",
+      "https://www.fftw.org/fftw3_doc/Planner-Flags.html",
+      "https://www.fftw.org/fftw3_doc/Memory-Allocation.html",
+      "https://www.fftw.org/fftw3_doc/New_002darray-Execute-Functions.html",
+      "https://www.fftw.org/fftw3_doc/Complex-Multi_002dDimensional-DFTs.html",
+      "https://www.fftw.org/fftw3_doc/Real_002ddata-DFTs.html",
+      "https://www.fftw.org/fftw3_doc/Real_002dto_002dReal-Transforms.html",
+      "https://fftw.org/fftw3_doc/Precision.html"
+    ]
+  }
+}

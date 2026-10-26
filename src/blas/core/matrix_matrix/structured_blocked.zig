@@ -13,6 +13,8 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const gemm_impl = @import("gemm.zig");
+const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
 const structured_catalog = @import("../../kernels/shared/matrix_matrix/structured_catalog.zig");
 const kernel_contract = @import("../../kernels/contract.zig");
 const packing = @import("../../kernels/shared/matrix_matrix/structured_packing.zig");
@@ -67,11 +69,11 @@ fn workspaceElements(options: Options, buffer_count: usize) ?usize {
     return std.math.mul(usize, block_elements, buffer_count) catch null;
 }
 
-fn acquireWorkspace(comptime T: type, options: Options, buffer_count: usize) ?[]T {
+fn acquireWorkspace(comptime T: type, allocator: std.mem.Allocator, options: Options, buffer_count: usize) ?[]T {
     const len = workspaceElements(options, buffer_count) orelse return null;
     const bytes = std.math.mul(usize, len, @sizeOf(T)) catch return null;
     if (bytes > options.workspace_byte_limit) return null;
-    return std.heap.c_allocator.alloc(T, len) catch null;
+    return allocator.alloc(T, len) catch null;
 }
 
 fn scaleGeneral(comptime T: type, m: usize, n: usize, beta: T, c: [*]T, ldc: BlasInt) void {
@@ -120,12 +122,13 @@ fn blockExtent(size: usize, block_size: usize, block_index: usize) struct { star
     return .{ .start = start, .len = @min(block_size, size - start) };
 }
 
-fn tryFullSymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+fn tryFullSymm(comptime T: type, resources: CallResources, options: Options, side: Side, uplo: Uplo, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     const order = if (side == .left) m else n;
-    if (builtin.target.cpu.arch != .x86_64 or @import("../../runtime.zig").maxThreads() <= 1 or order < 256 or order > 1024) return false;
+    if (builtin.target.cpu.arch != .x86_64 or resources.maxThreads() <= 1 or order < 256 or order > 1024) return false;
     if (!validOptions(options) or !options.workspace_available) return false;
-    const workspace = std.heap.c_allocator.alloc(T, order * order) catch return false;
-    defer std.heap.c_allocator.free(workspace);
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = allocator.alloc(T, order * order) catch return false;
+    defer allocator.free(workspace);
     const Context = struct {
         order: usize,
         uplo: Uplo,
@@ -142,10 +145,11 @@ fn tryFullSymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m: us
     };
     const context = Context{ .order = order, .uplo = uplo, .hermitian = hermitian, .a = a, .lda = lda, .output = workspace };
     const jobs = blockCount(order, 32);
-    if (!@import("../execution/thread_pool.zig").runQueued(Context.execute, &context, jobs, 16)) {
+    if (!resources.runQueued(Context.execute, &context, jobs, 16)) {
         for (0..jobs) |index| Context.execute(&context, index);
     }
     const Product = struct {
+        resources: CallResources,
         m: usize,
         n: usize,
         order: usize,
@@ -165,18 +169,23 @@ fn tryFullSymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m: us
             const rows = @min(@as(usize, 64), x.m - row);
             const cols = @min(@as(usize, 64), x.n - col);
             const ld: BlasInt = @intCast(x.order);
-            gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(rows), @intCast(cols), ld, x.alpha, if (x.side == .left) x.structured + row else x.b + row, if (x.side == .left) ld else x.ldb, if (x.side == .left) x.b + matIndex(x.ldb, 0, col) else x.structured + col * x.order, if (x.side == .left) x.ldb else ld, x.beta, x.c + matIndex(x.ldc, row, col), x.ldc);
+            gemm_impl.gemmWithResources(T, x.resources, .no_trans, .no_trans, @intCast(rows), @intCast(cols), ld, x.alpha, if (x.side == .left) x.structured + row else x.b + row, if (x.side == .left) ld else x.ldb, if (x.side == .left) x.b + matIndex(x.ldb, 0, col) else x.structured + col * x.order, if (x.side == .left) x.ldb else ld, x.beta, x.c + matIndex(x.ldc, row, col), x.ldc);
         }
     };
-    const product = Product{ .m = m, .n = n, .order = order, .side = side, .alpha = alpha, .beta = beta, .structured = workspace.ptr, .b = b, .ldb = ldb, .c = c, .ldc = ldc };
-    if (@import("../execution/thread_pool.zig").runQueued(Product.execute, &product, blockCount(m, 64) * blockCount(n, 64), 16)) return true;
-    gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(m), @intCast(n), @intCast(order), alpha, if (side == .left) workspace.ptr else b, if (side == .left) @intCast(order) else ldb, if (side == .left) b else workspace.ptr, if (side == .left) ldb else @intCast(order), beta, c, ldc);
+    const product = Product{ .resources = resources, .m = m, .n = n, .order = order, .side = side, .alpha = alpha, .beta = beta, .structured = workspace.ptr, .b = b, .ldb = ldb, .c = c, .ldc = ldc };
+    if (resources.runQueued(Product.execute, &product, blockCount(m, 64) * blockCount(n, 64), 16)) return true;
+    gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(m), @intCast(n), @intCast(order), alpha, if (side == .left) workspace.ptr else b, if (side == .left) @intCast(order) else ldb, if (side == .left) b else workspace.ptr, if (side == .left) ldb else @intCast(order), beta, c, ldc);
     return true;
 }
 
 /// Computes SYMM/HEMM by packing one logical block of the structured operand
 /// and immediately consuming it through the stable GEMM path.
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn trySymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+    return trySymmWithResources(T, .legacy_default, options, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, hermitian);
+}
+
+pub fn trySymmWithResources(comptime T: type, resources: CallResources, options: Options, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     if (m_ <= 0 or n_ <= 0) return true;
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -184,9 +193,10 @@ pub fn trySymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m_: B
         scaleGeneral(T, m, n, beta, c, ldc);
         return true;
     }
-    if (tryFullSymm(T, options, side, uplo, m, n, alpha, a, lda, b, ldb, beta, c, ldc, hermitian)) return true;
-    const workspace = acquireWorkspace(T, options, 1) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
+    if (tryFullSymm(T, resources, options, side, uplo, m, n, alpha, a, lda, b, ldb, beta, c, ldc, hermitian)) return true;
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 1) orelse return false;
+    defer allocator.free(workspace);
     const bs = options.block_size;
     const order = if (side == .left) m else n;
 
@@ -199,7 +209,7 @@ pub fn trySymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m_: B
                 const pb = @min(bs, order - p0);
                 const panel = workspace[0 .. ib * pb];
                 packing.packSymmetricBlock(T, packTriangle(uplo), hermitian, a, lda, i_base, p0, ib, pb, panel);
-                gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(ib), n_, @intCast(pb), alpha, panel.ptr, @intCast(ib), b + p0, ldb, if (p0 == 0) beta else scalar.one(T), c + i_base, ldc);
+                gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(ib), n_, @intCast(pb), alpha, panel.ptr, @intCast(ib), b + p0, ldb, if (p0 == 0) beta else scalar.one(T), c + i_base, ldc);
             }
         }
     } else {
@@ -211,7 +221,7 @@ pub fn trySymm(comptime T: type, options: Options, side: Side, uplo: Uplo, m_: B
                 const pb = @min(bs, order - p0);
                 const panel = workspace[0 .. pb * jb];
                 packing.packSymmetricBlock(T, packTriangle(uplo), hermitian, a, lda, p0, j0, pb, jb, panel);
-                gemm_impl.gemm(T, .no_trans, .no_trans, m_, @intCast(jb), @intCast(pb), alpha, b + matIndex(ldb, 0, p0), ldb, panel.ptr, @intCast(pb), if (p0 == 0) beta else scalar.one(T), c + matIndex(ldc, 0, j0), ldc);
+                gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, m_, @intCast(jb), @intCast(pb), alpha, b + matIndex(ldb, 0, p0), ldb, panel.ptr, @intCast(pb), if (p0 == 0) beta else scalar.one(T), c + matIndex(ldc, 0, j0), ldc);
             }
         }
     }
@@ -241,13 +251,18 @@ pub fn parallelPackedRankKernel(comptime T: type, operation: structured_catalog.
     unreachable;
 }
 
-fn selectedPackedRankKernel(comptime T: type, options: Options, operation: structured_catalog.StructuredOperation) structured_catalog.StructuredKernelId {
-    return if (options.parallel_packed_rank_panels and @import("../../runtime.zig").maxThreads() > 1) parallelPackedRankKernel(T, operation) else packedRankKernel(T, operation);
+fn selectedPackedRankKernel(comptime T: type, resources: CallResources, options: Options, operation: structured_catalog.StructuredOperation) structured_catalog.StructuredKernelId {
+    return if (options.parallel_packed_rank_panels and resources.maxThreads() > 1) parallelPackedRankKernel(T, operation) else packedRankKernel(T, operation);
 }
 
 /// Shared execution mapping for default selection and forced-ID tests. No
 /// preference threshold is checked here; all descriptor semantics are checked.
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn executePackedRank(comptime T: type, kernel: structured_catalog.StructuredKernelId, options: Options, uplo: Uplo, trans: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+    return executePackedRankWithResources(T, .legacy_default, kernel, options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+pub fn executePackedRankWithResources(comptime T: type, resources: CallResources, kernel: structured_catalog.StructuredKernelId, options: Options, uplo: Uplo, trans: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
     const descriptor = structured_catalog.descriptorForKernel(kernel) orelse return false;
     const parallel = descriptor.implementation == .parallel_packed_nn_rank_update;
     if ((!parallel and descriptor.implementation != .packed_nn_rank_update) or descriptor.scalar != kernel_contract.scalarKind(T)) return false;
@@ -270,22 +285,22 @@ pub fn executePackedRank(comptime T: type, kernel: structured_catalog.Structured
     }
     if (parallel) {
         const completed = switch (descriptor.operation) {
-            .syrk, .herk => tryParallelPackedRank(T, false, options, uplo, trans, n, toUsize(k_), alpha, a, lda, a, lda, beta, c, ldc, hermitian),
-            .syr2k, .her2k => tryParallelPackedRank(T, true, options, uplo, trans, n, toUsize(k_), alpha, a, lda, b, ldb, beta, c, ldc, hermitian),
+            .syrk, .herk => tryParallelPackedRankWithResources(T, resources, false, options, uplo, trans, n, toUsize(k_), alpha, a, lda, a, lda, beta, c, ldc, hermitian),
+            .syr2k, .her2k => tryParallelPackedRankWithResources(T, resources, true, options, uplo, trans, n, toUsize(k_), alpha, a, lda, b, ldb, beta, c, ldc, hermitian),
             else => return false,
         };
         if (completed) return true;
         // No task ran: the exact serial identity owns all subsequent writes.
-        return executePackedRank(T, descriptor.fallback.?, options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        return executePackedRankWithResources(T, resources, descriptor.fallback.?, options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
     }
     return switch (descriptor.operation) {
-        .syrk, .herk => tryPackedRank(T, false, options, uplo, trans, n, toUsize(k_), alpha, a, lda, a, lda, beta, c, ldc, hermitian),
-        .syr2k, .her2k => tryPackedRank(T, true, options, uplo, trans, n, toUsize(k_), alpha, a, lda, b, ldb, beta, c, ldc, hermitian),
+        .syrk, .herk => tryPackedRank(T, resources, false, options, uplo, trans, n, toUsize(k_), alpha, a, lda, a, lda, beta, c, ldc, hermitian),
+        .syr2k, .her2k => tryPackedRank(T, resources, true, options, uplo, trans, n, toUsize(k_), alpha, a, lda, b, ldb, beta, c, ldc, hermitian),
         else => false,
     };
 }
 
-fn packedRankProduct(comptime T: type, trans: Order, hermitian: bool, row0: usize, col0: usize, rows: usize, cols: usize, k: usize, alpha: T, left: [*]const T, ld_left: BlasInt, right: [*]const T, ld_right: BlasInt, accumulate: bool, output: []T, a_panel: []T, b_panel: []T) void {
+fn packedRankProduct(comptime T: type, resources: CallResources, trans: Order, hermitian: bool, row0: usize, col0: usize, rows: usize, cols: usize, k: usize, alpha: T, left: [*]const T, ld_left: BlasInt, right: [*]const T, ld_right: BlasInt, accumulate: bool, output: []T, a_panel: []T, b_panel: []T) void {
     const bs: usize = 64;
     var p0: usize = 0;
     while (p0 < k) : (p0 += bs) {
@@ -296,24 +311,30 @@ fn packedRankProduct(comptime T: type, trans: Order, hermitian: bool, row0: usiz
         const right_trans: packing.Transpose = if (trans == .no_trans) (if (hermitian) .conj_trans else .trans) else .no_trans;
         packing.packGeneralOpBlock(T, left_trans, left, ld_left, row0, p0, rows, depth, a_panel);
         packing.packGeneralOpBlock(T, right_trans, right, ld_right, p0, col0, depth, cols, b_panel);
-        gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(rows), @intCast(cols), @intCast(depth), alpha, a_panel.ptr, @intCast(rows), b_panel.ptr, @intCast(depth), if (accumulate or p0 != 0) scalar.one(T) else scalar.zero(T), output.ptr, @intCast(rows));
+        gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(rows), @intCast(cols), @intCast(depth), alpha, a_panel.ptr, @intCast(rows), b_panel.ptr, @intCast(depth), if (accumulate or p0 != 0) scalar.one(T) else scalar.zero(T), output.ptr, @intCast(rows));
     }
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn tryParallelPackedRank(comptime T: type, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+    return tryParallelPackedRankWithResources(T, .legacy_default, rank_two, options, uplo, trans, n, k, alpha, a, lda, b, ldb, beta, c, ldc, hermitian);
+}
+
+pub fn tryParallelPackedRankWithResources(comptime T: type, resources: CallResources, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     if (!options.packed_rank_panels or !options.parallel_packed_rank_panels or options.direct_rank_panels or options.block_size != 64 or !options.packed_rank_pool_available) return false;
     // Scaling-only calls belong to executePackedRank; no product tile exists.
     if (n == 0 or k == 0 or scalar.isZero(T, alpha)) return false;
-    const pool = @import("../execution/thread_pool.zig");
     // Tiny edge panels do not justify additional helpers. Count a partial
     // block only when it covers at least half a panel; every tile is still run.
     const substantial_blocks = n / 64 + @as(usize, @intFromBool(n % 64 >= 32));
     const parallel_tiles = (std.math.mul(usize, substantial_blocks, substantial_blocks + 1) catch return false) / 2;
-    const workers: usize = @min(@min(options.packed_rank_worker_limit, structured_catalog.parallel_rank_max_workers), pool.taskCount(parallel_tiles, 1));
+    const workers: usize = @min(@min(options.packed_rank_worker_limit, structured_catalog.parallel_rank_max_workers), resources.taskCount(parallel_tiles, 1));
     if (workers <= 1) return false;
-    const workspace = acquireWorkspace(T, options, 3 * workers) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 3 * workers) orelse return false;
+    defer allocator.free(workspace);
     const Context = struct {
+        resources: CallResources,
         n: usize,
         k: usize,
         alpha: T,
@@ -355,23 +376,24 @@ pub fn tryParallelPackedRank(comptime T: type, comptime rank_two: bool, options:
                     const owned = ordinal % x.workers == worker;
                     if (!owned) continue;
                     const rows = @min(bs, x.n - row_start);
-                    packedRankProduct(T, x.trans, x.hermitian, row_start, j0, rows, cols, x.k, x.alpha, x.a, x.lda, if (rank_two) x.b else x.a, if (rank_two) x.ldb else x.lda, false, tile, a_panel, b_panel);
-                    if (rank_two) packedRankProduct(T, x.trans, x.hermitian, row_start, j0, rows, cols, x.k, if (x.hermitian) scalar.conj(T, x.alpha) else x.alpha, x.b, x.ldb, x.a, x.lda, true, tile, a_panel, b_panel);
+                    packedRankProduct(T, x.resources, x.trans, x.hermitian, row_start, j0, rows, cols, x.k, x.alpha, x.a, x.lda, if (rank_two) x.b else x.a, if (rank_two) x.ldb else x.lda, false, tile, a_panel, b_panel);
+                    if (rank_two) packedRankProduct(T, x.resources, x.trans, x.hermitian, row_start, j0, rows, cols, x.k, if (x.hermitian) scalar.conj(T, x.alpha) else x.alpha, x.b, x.ldb, x.a, x.lda, true, tile, a_panel, b_panel);
                     commitRankTile(T, x.uplo, x.hermitian, row_start, j0, rows, cols, x.beta, tile, x.c, x.ldc);
                 }
             }
         }
     };
-    const context = Context{ .n = n, .k = k, .alpha = alpha, .a = a, .lda = lda, .b = b, .ldb = ldb, .beta = beta, .c = c, .ldc = ldc, .hermitian = hermitian, .uplo = uplo, .trans = trans, .workspace = workspace, .workers = workers, .major_blocks = substantial_blocks, .major_tiles = parallel_tiles };
+    const context = Context{ .resources = resources, .n = n, .k = k, .alpha = alpha, .a = a, .lda = lda, .b = b, .ldb = ldb, .beta = beta, .c = c, .ldc = ldc, .hermitian = hermitian, .uplo = uplo, .trans = trans, .workspace = workspace, .workers = workers, .major_blocks = substantial_blocks, .major_tiles = parallel_tiles };
     // False is guaranteed before any task executes; never retry partial output.
-    return pool.runLowLatency(Context.execute, &context, workers);
+    return resources.runLowLatency(Context.execute, &context, workers);
 }
 
-fn tryPackedRank(comptime T: type, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+fn tryPackedRank(comptime T: type, resources: CallResources, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     // Direct panels can have rows > bs; this plan accepts private tiles only.
     if (options.direct_rank_panels or options.block_size != 64) return false;
-    const workspace = acquireWorkspace(T, options, 3) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 3) orelse return false;
+    defer allocator.free(workspace);
     const bs: usize = 64;
     const elements: usize = bs * bs;
     const tile = workspace[0..elements];
@@ -384,19 +406,19 @@ fn tryPackedRank(comptime T: type, comptime rank_two: bool, options: Options, up
         const i_end = if (uplo == .upper) j0 + cols else n;
         while (row_start < i_end) : (row_start += bs) {
             const rows = @min(bs, n - row_start);
-            packedRankProduct(T, trans, hermitian, row_start, j0, rows, cols, k, alpha, a, lda, if (rank_two) b else a, if (rank_two) ldb else lda, false, tile, a_panel, b_panel);
-            if (rank_two) packedRankProduct(T, trans, hermitian, row_start, j0, rows, cols, k, if (hermitian) scalar.conj(T, alpha) else alpha, b, ldb, a, lda, true, tile, a_panel, b_panel);
+            packedRankProduct(T, resources, trans, hermitian, row_start, j0, rows, cols, k, alpha, a, lda, if (rank_two) b else a, if (rank_two) ldb else lda, false, tile, a_panel, b_panel);
+            if (rank_two) packedRankProduct(T, resources, trans, hermitian, row_start, j0, rows, cols, k, if (hermitian) scalar.conj(T, alpha) else alpha, b, ldb, a, lda, true, tile, a_panel, b_panel);
             commitRankTile(T, uplo, hermitian, row_start, j0, rows, cols, beta, tile, c, ldc);
         }
     }
     return true;
 }
 
-fn rankProduct(comptime T: type, trans: Order, hermitian: bool, rows: usize, cols: usize, k_: BlasInt, alpha: T, left: [*]const T, ld_left: BlasInt, right: [*]const T, ld_right: BlasInt, beta: T, tile: [*]T, ld_tile: BlasInt) void {
+fn rankProduct(comptime T: type, resources: CallResources, trans: Order, hermitian: bool, rows: usize, cols: usize, k_: BlasInt, alpha: T, left: [*]const T, ld_left: BlasInt, right: [*]const T, ld_right: BlasInt, beta: T, tile: [*]T, ld_tile: BlasInt) void {
     if (trans == .no_trans) {
-        gemm_impl.gemm(T, .no_trans, if (hermitian) .conj_trans else .trans, @intCast(rows), @intCast(cols), k_, alpha, left, ld_left, right, ld_right, beta, tile, ld_tile);
+        gemm_impl.gemmWithResources(T, resources, .no_trans, if (hermitian) .conj_trans else .trans, @intCast(rows), @intCast(cols), k_, alpha, left, ld_left, right, ld_right, beta, tile, ld_tile);
     } else {
-        gemm_impl.gemm(T, if (hermitian) .conj_trans else .trans, .no_trans, @intCast(rows), @intCast(cols), k_, alpha, left, ld_left, right, ld_right, beta, tile, ld_tile);
+        gemm_impl.gemmWithResources(T, resources, if (hermitian) .conj_trans else .trans, .no_trans, @intCast(rows), @intCast(cols), k_, alpha, left, ld_left, right, ld_right, beta, tile, ld_tile);
     }
 }
 
@@ -416,19 +438,19 @@ fn commitRankTile(comptime T: type, uplo: Uplo, hermitian: bool, row0: usize, co
     }
 }
 
-fn rankDiagonal(comptime T: type, comptime rank_two: bool, uplo: Uplo, trans: Order, hermitian: bool, start: usize, size: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, workspace: []T) void {
+fn rankDiagonal(comptime T: type, resources: CallResources, comptime rank_two: bool, uplo: Uplo, trans: Order, hermitian: bool, start: usize, size: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, workspace: []T) void {
     // Both tile widths are at most 256. Widen before multiplying: @min may
     // infer a narrow integer for a bounded width, which cannot hold its square.
     const second_alpha = if (hermitian) scalar.conj(T, alpha) else alpha;
     // Complex 3M needs larger tiles to amortize conversion. Only real,
     // single-thread diagonal updates benefited from smaller subtiles.
-    if (scalar.isComplex(T) or @import("../../runtime.zig").maxThreads() > 1) {
+    if (scalar.isComplex(T) or resources.maxThreads() > 1) {
         const da = rankOperandBase(T, trans, a, lda, start);
         const db = rankOperandBase(T, trans, b, ldb, start);
         const tile_elements: u32 = @as(u32, @intCast(size)) * @as(u32, @intCast(size));
         const tile = workspace[0..tile_elements];
-        rankProduct(T, trans, hermitian, size, size, k, alpha, da, lda, db, ldb, scalar.zero(T), tile.ptr, @intCast(size));
-        if (rank_two) rankProduct(T, trans, hermitian, size, size, k, second_alpha, db, ldb, da, lda, scalar.one(T), tile.ptr, @intCast(size));
+        rankProduct(T, resources, trans, hermitian, size, size, k, alpha, da, lda, db, ldb, scalar.zero(T), tile.ptr, @intCast(size));
+        if (rank_two) rankProduct(T, resources, trans, hermitian, size, size, k, second_alpha, db, ldb, da, lda, scalar.one(T), tile.ptr, @intCast(size));
         commitRankTile(T, uplo, hermitian, start, start, size, size, beta, tile, c, ldc);
         return;
     }
@@ -442,26 +464,28 @@ fn rankDiagonal(comptime T: type, comptime rank_two: bool, uplo: Uplo, trans: Or
         const db = rankOperandBase(T, trans, b, ldb, d);
         if (rows > 0) {
             const output = c + matIndex(ldc, first, d);
-            rankProduct(T, trans, hermitian, rows, width, k, alpha, rankOperandBase(T, trans, a, lda, first), lda, db, ldb, beta, output, ldc);
-            if (rank_two) rankProduct(T, trans, hermitian, rows, width, k, second_alpha, rankOperandBase(T, trans, b, ldb, first), ldb, da, lda, scalar.one(T), output, ldc);
+            rankProduct(T, resources, trans, hermitian, rows, width, k, alpha, rankOperandBase(T, trans, a, lda, first), lda, db, ldb, beta, output, ldc);
+            if (rank_two) rankProduct(T, resources, trans, hermitian, rows, width, k, second_alpha, rankOperandBase(T, trans, b, ldb, first), ldb, da, lda, scalar.one(T), output, ldc);
         }
         const tile_elements: u32 = @as(u32, @intCast(width)) * @as(u32, @intCast(width));
         const tile = workspace[0..tile_elements];
-        rankProduct(T, trans, hermitian, width, width, k, alpha, da, lda, db, ldb, scalar.zero(T), tile.ptr, @intCast(width));
-        if (rank_two) rankProduct(T, trans, hermitian, width, width, k, second_alpha, db, ldb, da, lda, scalar.one(T), tile.ptr, @intCast(width));
+        rankProduct(T, resources, trans, hermitian, width, width, k, alpha, da, lda, db, ldb, scalar.zero(T), tile.ptr, @intCast(width));
+        if (rank_two) rankProduct(T, resources, trans, hermitian, width, width, k, second_alpha, db, ldb, da, lda, scalar.one(T), tile.ptr, @intCast(width));
         commitRankTile(T, uplo, hermitian, d, d, width, width, beta, tile, c, ldc);
     }
 }
 
-fn tryQueuedRank(comptime T: type, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
-    if (builtin.target.cpu.arch != .x86_64 or n < 256 or k < 64 or @import("../../runtime.zig").maxThreads() <= 1) return false;
+fn tryQueuedRank(comptime T: type, resources: CallResources, comptime rank_two: bool, options: Options, uplo: Uplo, trans: Order, n: usize, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+    if (builtin.target.cpu.arch != .x86_64 or n < 256 or k < 64 or resources.maxThreads() <= 1) return false;
     if (!validOptions(options) or !options.workspace_available) return false;
     const bs: usize = if (n < 384) 32 else 64;
     const nb = blockCount(n, bs);
     const length = std.math.mul(usize, nb, bs * bs) catch return false;
-    const workspace = std.heap.c_allocator.alloc(T, length) catch return false;
-    defer std.heap.c_allocator.free(workspace);
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = allocator.alloc(T, length) catch return false;
+    defer allocator.free(workspace);
     const Context = struct {
+        resources: CallResources,
         n: usize,
         nb: usize,
         bs: usize,
@@ -490,41 +514,48 @@ fn tryQueuedRank(comptime T: type, comptime rank_two: bool, options: Options, up
             const diagonal = bi == bj;
             const output = if (diagonal) x.workspace.ptr + bi * x.bs * x.bs else x.c + matIndex(x.ldc, row, col);
             const ld: BlasInt = if (diagonal) @intCast(rows) else x.ldc;
-            rankProduct(T, x.trans, x.hermitian, rows, cols, x.k, x.alpha, rankOperandBase(T, x.trans, x.a, x.lda, row), x.lda, rankOperandBase(T, x.trans, x.b, x.ldb, col), x.ldb, if (diagonal) scalar.zero(T) else x.beta, output, ld);
-            if (rank_two) rankProduct(T, x.trans, x.hermitian, rows, cols, x.k, if (x.hermitian) scalar.conj(T, x.alpha) else x.alpha, rankOperandBase(T, x.trans, x.b, x.ldb, row), x.ldb, rankOperandBase(T, x.trans, x.a, x.lda, col), x.lda, scalar.one(T), output, ld);
+            rankProduct(T, x.resources, x.trans, x.hermitian, rows, cols, x.k, x.alpha, rankOperandBase(T, x.trans, x.a, x.lda, row), x.lda, rankOperandBase(T, x.trans, x.b, x.ldb, col), x.ldb, if (diagonal) scalar.zero(T) else x.beta, output, ld);
+            if (rank_two) rankProduct(T, x.resources, x.trans, x.hermitian, rows, cols, x.k, if (x.hermitian) scalar.conj(T, x.alpha) else x.alpha, rankOperandBase(T, x.trans, x.b, x.ldb, row), x.ldb, rankOperandBase(T, x.trans, x.a, x.lda, col), x.lda, scalar.one(T), output, ld);
             if (diagonal) commitRankTile(T, x.uplo, x.hermitian, row, col, rows, cols, x.beta, output[0 .. rows * cols], x.c, x.ldc);
         }
     };
-    const context = Context{ .n = n, .nb = nb, .bs = bs, .k = k, .uplo = uplo, .trans = trans, .hermitian = hermitian, .alpha = alpha, .beta = beta, .a = a, .lda = lda, .b = b, .ldb = ldb, .c = c, .ldc = ldc, .workspace = workspace };
+    const context = Context{ .resources = resources, .n = n, .nb = nb, .bs = bs, .k = k, .uplo = uplo, .trans = trans, .hermitian = hermitian, .alpha = alpha, .beta = beta, .a = a, .lda = lda, .b = b, .ldb = ldb, .c = c, .ldc = ldc, .workspace = workspace };
     const jobs = std.math.mul(usize, nb, nb) catch return false;
-    return @import("../execution/thread_pool.zig").runQueued(Context.execute, &context, jobs, @min(@as(usize, 16), nb * (nb + 1) / 2));
+    return resources.runQueued(Context.execute, &context, jobs, @min(@as(usize, 16), nb * (nb + 1) / 2));
 }
 
 /// Computes SYRK/HERK into private block tiles and commits only the requested
 /// triangle, preserving the unstored half bitwise.
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn trySyrk(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+    return trySyrkWithResources(T, .legacy_default, options, uplo, trans, n_, k_, alpha, a, lda, beta, c, ldc, hermitian);
+}
+
+pub fn trySyrkWithResources(comptime T: type, resources: CallResources, options: Options, uplo: Uplo, trans: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     if (n_ <= 0) return true;
     const n = toUsize(n_);
     if (k_ <= 0 or scalar.isZero(T, alpha)) {
         scaleStoredTriangle(T, uplo, n, beta, c, ldc, hermitian);
         return true;
     }
-    if (options.packed_rank_panels) return executePackedRank(T, selectedPackedRankKernel(T, options, if (hermitian) .herk else .syrk), options, uplo, trans, n_, k_, alpha, a, lda, a, lda, beta, c, ldc);
+    if (options.packed_rank_panels) return executePackedRankWithResources(T, resources, selectedPackedRankKernel(T, resources, options, if (hermitian) .herk else .syrk), options, uplo, trans, n_, k_, alpha, a, lda, a, lda, beta, c, ldc);
     if (comptime builtin.target.cpu.arch == .x86_64 and (T == f32 or T == f64)) {
-        if (trans != .no_trans and n >= 128 and k_ >= 64 and (@import("../../runtime.zig").maxThreads() == 1 or n < 384) and options.workspace_available and validOptions(options)) {
+        if (trans != .no_trans and n >= 128 and k_ >= 64 and (resources.maxThreads() == 1 or n < 384) and options.workspace_available and validOptions(options)) {
             const count = std.math.mul(usize, n, toUsize(k_)) catch return false;
-            const converted = std.heap.c_allocator.alloc(T, count) catch return false;
-            defer std.heap.c_allocator.free(converted);
+            const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+            const converted = allocator.alloc(T, count) catch return false;
+            defer allocator.free(converted);
             // Convert once for all rank panels instead of repacking transposed
             // A inside every small GEMM. The recursive no-trans path cannot
             // re-enter this conversion and preserves the unstored triangle.
             @import("../../kernels/shared/matrix_matrix/packing.zig").packTransposedA(T, n, toUsize(k_), a, lda, converted);
-            return trySyrk(T, options, uplo, .no_trans, n_, k_, alpha, converted.ptr, n_, beta, c, ldc, hermitian);
+            return trySyrkWithResources(T, resources, options, uplo, .no_trans, n_, k_, alpha, converted.ptr, n_, beta, c, ldc, hermitian);
         }
     }
-    if (tryQueuedRank(T, false, options, uplo, trans, n, k_, alpha, a, lda, a, lda, beta, c, ldc, hermitian)) return true;
-    const workspace = acquireWorkspace(T, options, 1) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
+    if (tryQueuedRank(T, resources, false, options, uplo, trans, n, k_, alpha, a, lda, a, lda, beta, c, ldc, hermitian)) return true;
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 1) orelse return false;
+    defer allocator.free(workspace);
     const bs = options.block_size;
 
     var j0: usize = 0;
@@ -535,8 +566,8 @@ pub fn trySyrk(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_:
             // triangle. Update it directly, reusing packing across rows.
             const first = if (uplo == .upper) 0 else j0 + jb;
             const rows = if (uplo == .upper) j0 else n - first;
-            if (rows > 0) rankProduct(T, trans, hermitian, rows, jb, k_, alpha, rankOperandBase(T, trans, a, lda, first), lda, rankOperandBase(T, trans, a, lda, j0), lda, beta, c + matIndex(ldc, first, j0), ldc);
-            rankDiagonal(T, false, uplo, trans, hermitian, j0, jb, k_, alpha, a, lda, a, lda, beta, c, ldc, workspace);
+            if (rows > 0) rankProduct(T, resources, trans, hermitian, rows, jb, k_, alpha, rankOperandBase(T, trans, a, lda, first), lda, rankOperandBase(T, trans, a, lda, j0), lda, beta, c + matIndex(ldc, first, j0), ldc);
+            rankDiagonal(T, resources, false, uplo, trans, hermitian, j0, jb, k_, alpha, a, lda, a, lda, beta, c, ldc, workspace);
             continue;
         }
         var i_base: usize = if (uplo == .upper) 0 else j0;
@@ -544,7 +575,7 @@ pub fn trySyrk(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_:
         while (i_base < i_end) : (i_base += bs) {
             const ib = @min(bs, n - i_base);
             const tile = workspace[0 .. ib * jb];
-            rankProduct(T, trans, hermitian, ib, jb, k_, alpha, rankOperandBase(T, trans, a, lda, i_base), lda, rankOperandBase(T, trans, a, lda, j0), lda, scalar.zero(T), tile.ptr, @intCast(ib));
+            rankProduct(T, resources, trans, hermitian, ib, jb, k_, alpha, rankOperandBase(T, trans, a, lda, i_base), lda, rankOperandBase(T, trans, a, lda, j0), lda, scalar.zero(T), tile.ptr, @intCast(ib));
             commitRankTile(T, uplo, hermitian, i_base, j0, ib, jb, beta, tile, c, ldc);
         }
     }
@@ -552,29 +583,36 @@ pub fn trySyrk(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_:
 }
 
 /// Computes SYR2K/HER2K with two GEMM updates per private output tile.
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn trySyr2k(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
+    return trySyr2kWithResources(T, .legacy_default, options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, hermitian);
+}
+
+pub fn trySyr2kWithResources(comptime T: type, resources: CallResources, options: Options, uplo: Uplo, trans: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, hermitian: bool) bool {
     if (n_ <= 0) return true;
     const n = toUsize(n_);
     if (k_ <= 0 or scalar.isZero(T, alpha)) {
         scaleStoredTriangle(T, uplo, n, beta, c, ldc, hermitian);
         return true;
     }
-    if (options.packed_rank_panels) return executePackedRank(T, selectedPackedRankKernel(T, options, if (hermitian) .her2k else .syr2k), options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+    if (options.packed_rank_panels) return executePackedRankWithResources(T, resources, selectedPackedRankKernel(T, resources, options, if (hermitian) .her2k else .syr2k), options, uplo, trans, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
     if (comptime builtin.target.cpu.arch == .x86_64 and (T == f32 or T == f64)) {
-        if (trans != .no_trans and n >= 128 and k_ >= 64 and (@import("../../runtime.zig").maxThreads() == 1 or n < 384) and options.workspace_available and validOptions(options)) {
+        if (trans != .no_trans and n >= 128 and k_ >= 64 and (resources.maxThreads() == 1 or n < 384) and options.workspace_available and validOptions(options)) {
             const count = std.math.mul(usize, n, toUsize(k_)) catch return false;
             const total = std.math.mul(usize, count, 2) catch return false;
-            const converted = std.heap.c_allocator.alloc(T, total) catch return false;
-            defer std.heap.c_allocator.free(converted);
+            const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+            const converted = allocator.alloc(T, total) catch return false;
+            defer allocator.free(converted);
             const general_packing = @import("../../kernels/shared/matrix_matrix/packing.zig");
             general_packing.packTransposedA(T, n, toUsize(k_), a, lda, converted[0..count]);
             general_packing.packTransposedA(T, n, toUsize(k_), b, ldb, converted[count..]);
-            return trySyr2k(T, options, uplo, .no_trans, n_, k_, alpha, converted.ptr, n_, converted.ptr + count, n_, beta, c, ldc, hermitian);
+            return trySyr2kWithResources(T, resources, options, uplo, .no_trans, n_, k_, alpha, converted.ptr, n_, converted.ptr + count, n_, beta, c, ldc, hermitian);
         }
     }
-    if (tryQueuedRank(T, true, options, uplo, trans, n, k_, alpha, a, lda, b, ldb, beta, c, ldc, hermitian)) return true;
-    const workspace = acquireWorkspace(T, options, 1) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
+    if (tryQueuedRank(T, resources, true, options, uplo, trans, n, k_, alpha, a, lda, b, ldb, beta, c, ldc, hermitian)) return true;
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 1) orelse return false;
+    defer allocator.free(workspace);
     const bs = options.block_size;
     const second_alpha = if (hermitian) scalar.conj(T, alpha) else alpha;
 
@@ -586,10 +624,10 @@ pub fn trySyr2k(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_
             const rows = if (uplo == .upper) j0 else n - first;
             if (rows > 0) {
                 const output = c + matIndex(ldc, first, j0);
-                rankProduct(T, trans, hermitian, rows, jb, k_, alpha, rankOperandBase(T, trans, a, lda, first), lda, rankOperandBase(T, trans, b, ldb, j0), ldb, beta, output, ldc);
-                rankProduct(T, trans, hermitian, rows, jb, k_, second_alpha, rankOperandBase(T, trans, b, ldb, first), ldb, rankOperandBase(T, trans, a, lda, j0), lda, scalar.one(T), output, ldc);
+                rankProduct(T, resources, trans, hermitian, rows, jb, k_, alpha, rankOperandBase(T, trans, a, lda, first), lda, rankOperandBase(T, trans, b, ldb, j0), ldb, beta, output, ldc);
+                rankProduct(T, resources, trans, hermitian, rows, jb, k_, second_alpha, rankOperandBase(T, trans, b, ldb, first), ldb, rankOperandBase(T, trans, a, lda, j0), lda, scalar.one(T), output, ldc);
             }
-            rankDiagonal(T, true, uplo, trans, hermitian, j0, jb, k_, alpha, a, lda, b, ldb, beta, c, ldc, workspace);
+            rankDiagonal(T, resources, true, uplo, trans, hermitian, j0, jb, k_, alpha, a, lda, b, ldb, beta, c, ldc, workspace);
             continue;
         }
         var i_base: usize = if (uplo == .upper) 0 else j0;
@@ -597,8 +635,8 @@ pub fn trySyr2k(comptime T: type, options: Options, uplo: Uplo, trans: Order, n_
         while (i_base < i_end) : (i_base += bs) {
             const ib = @min(bs, n - i_base);
             const tile = workspace[0 .. ib * jb];
-            rankProduct(T, trans, hermitian, ib, jb, k_, alpha, rankOperandBase(T, trans, a, lda, i_base), lda, rankOperandBase(T, trans, b, ldb, j0), ldb, scalar.zero(T), tile.ptr, @intCast(ib));
-            rankProduct(T, trans, hermitian, ib, jb, k_, second_alpha, rankOperandBase(T, trans, b, ldb, i_base), ldb, rankOperandBase(T, trans, a, lda, j0), lda, scalar.one(T), tile.ptr, @intCast(ib));
+            rankProduct(T, resources, trans, hermitian, ib, jb, k_, alpha, rankOperandBase(T, trans, a, lda, i_base), lda, rankOperandBase(T, trans, b, ldb, j0), ldb, scalar.zero(T), tile.ptr, @intCast(ib));
+            rankProduct(T, resources, trans, hermitian, ib, jb, k_, second_alpha, rankOperandBase(T, trans, b, ldb, i_base), ldb, rankOperandBase(T, trans, a, lda, j0), lda, scalar.one(T), tile.ptr, @intCast(ib));
             commitRankTile(T, uplo, hermitian, i_base, j0, ib, jb, beta, tile, c, ldc);
         }
     }
@@ -624,17 +662,19 @@ fn storeScaledTile(comptime T: type, rows: usize, cols: usize, alpha: T, tile: [
 
 /// Blocked TRMM. Effective triangular panels are packed, multiplied into a
 /// private output tile, then committed in dependency-preserving block order.
-fn tryQueuedTriangular(comptime T: type, comptime solve: bool, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
-    if (builtin.target.cpu.arch != .x86_64 or m < 256 or n < 256 or @import("../../runtime.zig").maxThreads() <= 1) return false;
+fn tryQueuedTriangular(comptime T: type, resources: CallResources, comptime solve: bool, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+    if (builtin.target.cpu.arch != .x86_64 or m < 256 or n < 256 or resources.maxThreads() <= 1) return false;
     if (!validOptions(options) or !options.workspace_available) return false;
     const bs = 64;
     const rhs_width = 32;
     const jobs = blockCount(if (side == .left) n else m, rhs_width);
     const per_job = bs * bs * (if (solve) @as(usize, 1) else 2);
     const length = std.math.mul(usize, jobs, per_job) catch return false;
-    const workspace = std.heap.c_allocator.alloc(T, length) catch return false;
-    defer std.heap.c_allocator.free(workspace);
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = allocator.alloc(T, length) catch return false;
+    defer allocator.free(workspace);
     const Context = struct {
+        resources: CallResources,
         m: usize,
         n: usize,
         side: Side,
@@ -655,14 +695,19 @@ fn tryQueuedTriangular(comptime T: type, comptime solve: bool, options: Options,
             const output = x.b + if (x.side == .left) matIndex(x.ldb, 0, first) else first;
             const scratch = x.workspace[index * per_job .. (index + 1) * per_job];
             const operation = if (solve) trsmWorkspace else trmmWorkspace;
-            _ = operation(T, bs, x.side, x.uplo, x.trans, x.diag, @intCast(rows), @intCast(cols), x.alpha, x.a, x.lda, output, x.ldb, scratch);
+            _ = operation(T, x.resources, bs, x.side, x.uplo, x.trans, x.diag, @intCast(rows), @intCast(cols), x.alpha, x.a, x.lda, output, x.ldb, scratch);
         }
     };
-    const context = Context{ .m = m, .n = n, .side = side, .uplo = uplo, .trans = trans, .diag = diag, .alpha = alpha, .a = a, .lda = lda, .b = b, .ldb = ldb, .workspace = workspace };
-    return @import("../execution/thread_pool.zig").runQueued(Context.execute, &context, jobs, 16);
+    const context = Context{ .resources = resources, .m = m, .n = n, .side = side, .uplo = uplo, .trans = trans, .diag = diag, .alpha = alpha, .a = a, .lda = lda, .b = b, .ldb = ldb, .workspace = workspace };
+    return resources.runQueued(Context.execute, &context, jobs, 16);
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn tryTrmm(comptime T: type, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+    return tryTrmmWithResources(T, .legacy_default, options, side, uplo, trans, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+pub fn tryTrmmWithResources(comptime T: type, resources: CallResources, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
     if (m_ <= 0 or n_ <= 0) return true;
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -670,10 +715,11 @@ pub fn tryTrmm(comptime T: type, options: Options, side: Side, uplo: Uplo, trans
         zeroGeneral(T, m, n, b, ldb);
         return true;
     }
-    if (tryQueuedTriangular(T, false, options, side, uplo, trans, diag, m, n, alpha, a, lda, b, ldb)) return true;
-    const workspace = acquireWorkspace(T, options, 2) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
-    return trmmWorkspace(T, options.block_size, side, uplo, trans, diag, m_, n_, alpha, a, lda, b, ldb, workspace);
+    if (tryQueuedTriangular(T, resources, false, options, side, uplo, trans, diag, m, n, alpha, a, lda, b, ldb)) return true;
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 2) orelse return false;
+    defer allocator.free(workspace);
+    return trmmWorkspace(T, resources, options.block_size, side, uplo, trans, diag, m_, n_, alpha, a, lda, b, ldb, workspace);
 }
 
 fn allFinite(comptime T: type, values: []const T) bool {
@@ -727,7 +773,7 @@ fn trmmDiagonalNonfinite(comptime T: type, side: Side, triangle: packing.Triangl
     return true;
 }
 
-fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt, workspace: []T) bool {
+fn trmmWorkspace(comptime T: type, resources: CallResources, bs: usize, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt, workspace: []T) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const block_elements = bs * bs;
@@ -735,7 +781,7 @@ fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
     const output = workspace[block_elements .. 2 * block_elements];
     const effective = packing.effectiveTriangle(packTriangle(uplo), packTranspose(trans));
 
-    if (builtin.target.cpu.arch == .x86_64 and @import("../../runtime.zig").maxThreads() > 1) {
+    if (builtin.target.cpu.arch == .x86_64 and resources.maxThreads() > 1) {
         const dimension = if (side == .left) m else n;
         const rhs = if (side == .left) n else m;
         const blocks = blockCount(dimension, bs);
@@ -753,10 +799,10 @@ fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
                 if (count > 0) {
                     if (side == .left) {
                         const panel = a + if (trans == .no_trans) matIndex(lda, block.start, first) else matIndex(lda, first, block.start);
-                        gemm_impl.gemm(T, trans, .no_trans, @intCast(rows), @intCast(cols), @intCast(count), scalar.one(T), panel, lda, b + matIndex(ldb, first, rhs0), ldb, scalar.zero(T), output.ptr, @intCast(rows));
+                        gemm_impl.gemmWithResources(T, resources, trans, .no_trans, @intCast(rows), @intCast(cols), @intCast(count), scalar.one(T), panel, lda, b + matIndex(ldb, first, rhs0), ldb, scalar.zero(T), output.ptr, @intCast(rows));
                     } else {
                         const panel = a + if (trans == .no_trans) matIndex(lda, first, block.start) else matIndex(lda, block.start, first);
-                        gemm_impl.gemm(T, .no_trans, trans, @intCast(rows), @intCast(cols), @intCast(count), scalar.one(T), b + matIndex(ldb, rhs0, first), ldb, panel, lda, scalar.zero(T), output.ptr, @intCast(rows));
+                        gemm_impl.gemmWithResources(T, resources, .no_trans, trans, @intCast(rows), @intCast(cols), @intCast(count), scalar.one(T), b + matIndex(ldb, rhs0, first), ldb, panel, lda, scalar.zero(T), output.ptr, @intCast(rows));
                     }
                 }
                 const diagonal = packed_panel[0 .. block.len * block.len];
@@ -765,7 +811,7 @@ fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
                 const col0 = if (side == .left) rhs0 else block.start;
                 const rhs_panel = b + matIndex(ldb, row0, col0);
                 if (!trmmDiagonalNonfinite(T, side, effective, diag, rows, cols, diagonal, rhs_panel, ldb, output, count != 0)) {
-                    gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(rows), @intCast(cols), @intCast(block.len), scalar.one(T), if (side == .left) diagonal.ptr else rhs_panel, if (side == .left) @intCast(block.len) else ldb, if (side == .left) rhs_panel else diagonal.ptr, if (side == .left) ldb else @intCast(block.len), if (count == 0) scalar.zero(T) else scalar.one(T), output.ptr, @intCast(rows));
+                    gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(rows), @intCast(cols), @intCast(block.len), scalar.one(T), if (side == .left) diagonal.ptr else rhs_panel, if (side == .left) @intCast(block.len) else ldb, if (side == .left) rhs_panel else diagonal.ptr, if (side == .left) ldb else @intCast(block.len), if (count == 0) scalar.zero(T) else scalar.one(T), output.ptr, @intCast(rows));
                 }
                 storeScaledTile(T, rows, cols, alpha, output, b, ldb, row0, col0);
             }
@@ -789,7 +835,7 @@ fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
                     const panel = packed_panel[0 .. row_block.len * p_block.len];
                     packTriangularPanel(T, uplo, trans, diag, a, lda, row_block.start, p_block.start, row_block.len, p_block.len, panel);
                     if (!(pi == bi and trmmDiagonalNonfinite(T, .left, effective, diag, row_block.len, cols, panel, b + matIndex(ldb, row_block.start, col0), ldb, output, !first))) {
-                        gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(row_block.len), @intCast(cols), @intCast(p_block.len), scalar.one(T), panel.ptr, @intCast(row_block.len), b + matIndex(ldb, p_block.start, col0), ldb, if (first) scalar.zero(T) else scalar.one(T), output.ptr, @intCast(row_block.len));
+                        gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(row_block.len), @intCast(cols), @intCast(p_block.len), scalar.one(T), panel.ptr, @intCast(row_block.len), b + matIndex(ldb, p_block.start, col0), ldb, if (first) scalar.zero(T) else scalar.one(T), output.ptr, @intCast(row_block.len));
                     }
                     first = false;
                 }
@@ -812,7 +858,7 @@ fn trmmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
                     const panel = packed_panel[0 .. p_block.len * col_block.len];
                     packTriangularPanel(T, uplo, trans, diag, a, lda, p_block.start, col_block.start, p_block.len, col_block.len, panel);
                     if (!(pi == bj and trmmDiagonalNonfinite(T, .right, effective, diag, rows, col_block.len, panel, b + matIndex(ldb, row0, col_block.start), ldb, output, !first))) {
-                        gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(rows), @intCast(col_block.len), @intCast(p_block.len), scalar.one(T), b + matIndex(ldb, row0, p_block.start), ldb, panel.ptr, @intCast(p_block.len), if (first) scalar.zero(T) else scalar.one(T), output.ptr, @intCast(rows));
+                        gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(rows), @intCast(col_block.len), @intCast(p_block.len), scalar.one(T), b + matIndex(ldb, row0, p_block.start), ldb, panel.ptr, @intCast(p_block.len), if (first) scalar.zero(T) else scalar.one(T), output.ptr, @intCast(rows));
                     }
                     first = false;
                 }
@@ -888,7 +934,15 @@ fn updateRightPanel(comptime T: type, comptime columns: usize, rows: usize, pivo
     updateSolvePanel(T, columns, rows, b + matIndex(ldb, row0, col0 + pivot), coeff, dest);
 }
 
-fn solvePackedLeft(comptime T: type, triangle: packing.Triangle, diag: Diag, rows: usize, cols: usize, diagonal_block: []const T, b: [*]T, ldb: BlasInt, row0: usize, col0: usize) void {
+// Dispatch only: both arms reuse the existing triangular MV implementation.
+fn trsvWithResources(comptime T: type, resources: CallResources, uplo: Uplo, trans: Order, diag: Diag, n: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
+    switch (resources) {
+        .admitted => |operation| matrix_vector_ops.trsvAdmitted(T, operation, uplo, trans, diag, n, a, lda, x, incx),
+        .legacy_default => matrix_vector_ops.trsv(T, uplo, trans, diag, n, a, lda, x, incx),
+    }
+}
+
+fn solvePackedLeft(comptime T: type, resources: CallResources, triangle: packing.Triangle, diag: Diag, rows: usize, cols: usize, diagonal_block: []const T, b: [*]T, ldb: BlasInt, row0: usize, col0: usize) void {
     if (comptime builtin.target.cpu.arch == .x86_64) {
         var reciprocal: [256]T = undefined;
         for (0..rows) |i| reciprocal[i] = if (diag == .unit) scalar.one(T) else scalar.divv(T, scalar.one(T), diagonal_block[i + i * rows]);
@@ -898,10 +952,10 @@ fn solvePackedLeft(comptime T: type, triangle: packing.Triangle, diag: Diag, row
         while (j < cols) : (j += 1) solveLeftPanel(T, 1, triangle, diag, rows, diagonal_block, reciprocal[0..rows], b, ldb, row0, col0 + j);
         return;
     }
-    for (0..cols) |j| matrix_vector_ops.trsv(T, unpackTriangle(triangle), .no_trans, diag, @intCast(rows), diagonal_block.ptr, @intCast(rows), b + matIndex(ldb, row0, col0 + j), 1);
+    for (0..cols) |j| trsvWithResources(T, resources, unpackTriangle(triangle), .no_trans, diag, @intCast(rows), diagonal_block.ptr, @intCast(rows), b + matIndex(ldb, row0, col0 + j), 1);
 }
 
-fn solvePackedRight(comptime T: type, triangle: packing.Triangle, diag: Diag, rows: usize, cols: usize, diagonal_block: []const T, b: [*]T, ldb: BlasInt, row0: usize, col0: usize) void {
+fn solvePackedRight(comptime T: type, resources: CallResources, triangle: packing.Triangle, diag: Diag, rows: usize, cols: usize, diagonal_block: []const T, b: [*]T, ldb: BlasInt, row0: usize, col0: usize) void {
     if (comptime builtin.target.cpu.arch == .x86_64) {
         const columns = if (comptime scalar.isComplex(T)) 2 else 4;
         for (0..cols) |step| {
@@ -918,12 +972,17 @@ fn solvePackedRight(comptime T: type, triangle: packing.Triangle, diag: Diag, ro
         }
         return;
     }
-    for (0..rows) |i| matrix_vector_ops.trsv(T, unpackTriangle(triangle), .trans, diag, @intCast(cols), diagonal_block.ptr, @intCast(cols), b + matIndex(ldb, row0 + i, col0), ldb);
+    for (0..rows) |i| trsvWithResources(T, resources, unpackTriangle(triangle), .trans, diag, @intCast(cols), diagonal_block.ptr, @intCast(cols), b + matIndex(ldb, row0 + i, col0), ldb);
 }
 
 /// Blocked TRSM. Off-diagonal updates use GEMM and diagonal blocks use the
 /// existing triangular solve leaf after op(A) has been packed explicitly.
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn tryTrsm(comptime T: type, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+    return tryTrsmWithResources(T, .legacy_default, options, side, uplo, trans, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+pub fn tryTrsmWithResources(comptime T: type, resources: CallResources, options: Options, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
     if (m_ <= 0 or n_ <= 0) return true;
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -931,13 +990,14 @@ pub fn tryTrsm(comptime T: type, options: Options, side: Side, uplo: Uplo, trans
         zeroGeneral(T, m, n, b, ldb);
         return true;
     }
-    if (tryQueuedTriangular(T, true, options, side, uplo, trans, diag, m, n, alpha, a, lda, b, ldb)) return true;
-    const workspace = acquireWorkspace(T, options, 1) orelse return false;
-    defer std.heap.c_allocator.free(workspace);
-    return trsmWorkspace(T, options.block_size, side, uplo, trans, diag, m_, n_, alpha, a, lda, b, ldb, workspace);
+    if (tryQueuedTriangular(T, resources, true, options, side, uplo, trans, diag, m, n, alpha, a, lda, b, ldb)) return true;
+    const allocator = resources.scratchAllocator() orelse std.heap.c_allocator;
+    const workspace = acquireWorkspace(T, allocator, options, 1) orelse return false;
+    defer allocator.free(workspace);
+    return trsmWorkspace(T, resources, options.block_size, side, uplo, trans, diag, m_, n_, alpha, a, lda, b, ldb, workspace);
 }
 
-fn trsmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt, workspace: []T) bool {
+fn trsmWorkspace(comptime T: type, resources: CallResources, bs: usize, side: Side, uplo: Uplo, trans: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt, workspace: []T) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     if (!scalar.isOne(T, alpha)) scaleGeneral(T, m, n, alpha, b, ldb);
@@ -959,16 +1019,16 @@ fn trsmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
             const first = if (forward) block.start + block.len else 0;
             const count = if (forward) dimension - first else block.start;
             if (side == .left) {
-                solvePackedLeft(T, effective, diag, block.len, n, diagonal, b, ldb, block.start, 0);
+                solvePackedLeft(T, resources, effective, diag, block.len, n, diagonal, b, ldb, block.start, 0);
                 if (count > 0) {
                     const panel = a + if (trans == .no_trans) matIndex(lda, first, block.start) else matIndex(lda, block.start, first);
-                    gemm_impl.gemm(T, trans, .no_trans, @intCast(count), n_, @intCast(block.len), minus_one, panel, lda, b + block.start, ldb, scalar.one(T), b + first, ldb);
+                    gemm_impl.gemmWithResources(T, resources, trans, .no_trans, @intCast(count), n_, @intCast(block.len), minus_one, panel, lda, b + block.start, ldb, scalar.one(T), b + first, ldb);
                 }
             } else {
-                solvePackedRight(T, effective, diag, m, block.len, diagonal, b, ldb, 0, block.start);
+                solvePackedRight(T, resources, effective, diag, m, block.len, diagonal, b, ldb, 0, block.start);
                 if (count > 0) {
                     const panel = a + if (trans == .no_trans) matIndex(lda, block.start, first) else matIndex(lda, first, block.start);
-                    gemm_impl.gemm(T, .no_trans, trans, m_, @intCast(count), @intCast(block.len), minus_one, b + matIndex(ldb, 0, block.start), ldb, panel, lda, scalar.one(T), b + matIndex(ldb, 0, first), ldb);
+                    gemm_impl.gemmWithResources(T, resources, .no_trans, trans, m_, @intCast(count), @intCast(block.len), minus_one, b + matIndex(ldb, 0, block.start), ldb, panel, lda, scalar.one(T), b + matIndex(ldb, 0, first), ldb);
                 }
             }
         }
@@ -989,11 +1049,11 @@ fn trsmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
                     const p_block = blockExtent(m, bs, pi);
                     const panel = workspace[0 .. row_block.len * p_block.len];
                     packTriangularPanel(T, uplo, trans, diag, a, lda, row_block.start, p_block.start, row_block.len, p_block.len, panel);
-                    gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(row_block.len), @intCast(cols), @intCast(p_block.len), minus_one, panel.ptr, @intCast(row_block.len), b + matIndex(ldb, p_block.start, col0), ldb, scalar.one(T), b + matIndex(ldb, row_block.start, col0), ldb);
+                    gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(row_block.len), @intCast(cols), @intCast(p_block.len), minus_one, panel.ptr, @intCast(row_block.len), b + matIndex(ldb, p_block.start, col0), ldb, scalar.one(T), b + matIndex(ldb, row_block.start, col0), ldb);
                 }
                 const diagonal_block = workspace[0 .. row_block.len * row_block.len];
                 packTriangularPanel(T, uplo, trans, diag, a, lda, row_block.start, row_block.start, row_block.len, row_block.len, diagonal_block);
-                solvePackedLeft(T, effective, diag, row_block.len, cols, diagonal_block, b, ldb, row_block.start, col0);
+                solvePackedLeft(T, resources, effective, diag, row_block.len, cols, diagonal_block, b, ldb, row_block.start, col0);
             }
         }
     } else {
@@ -1010,11 +1070,11 @@ fn trsmWorkspace(comptime T: type, bs: usize, side: Side, uplo: Uplo, trans: Ord
                     const p_block = blockExtent(n, bs, pi);
                     const panel = workspace[0 .. p_block.len * col_block.len];
                     packTriangularPanel(T, uplo, trans, diag, a, lda, p_block.start, col_block.start, p_block.len, col_block.len, panel);
-                    gemm_impl.gemm(T, .no_trans, .no_trans, @intCast(rows), @intCast(col_block.len), @intCast(p_block.len), minus_one, b + matIndex(ldb, row0, p_block.start), ldb, panel.ptr, @intCast(p_block.len), scalar.one(T), b + matIndex(ldb, row0, col_block.start), ldb);
+                    gemm_impl.gemmWithResources(T, resources, .no_trans, .no_trans, @intCast(rows), @intCast(col_block.len), @intCast(p_block.len), minus_one, b + matIndex(ldb, row0, p_block.start), ldb, panel.ptr, @intCast(p_block.len), scalar.one(T), b + matIndex(ldb, row0, col_block.start), ldb);
                 }
                 const diagonal_block = workspace[0 .. col_block.len * col_block.len];
                 packTriangularPanel(T, uplo, trans, diag, a, lda, col_block.start, col_block.start, col_block.len, col_block.len, diagonal_block);
-                solvePackedRight(T, effective, diag, rows, col_block.len, diagonal_block, b, ldb, row0, col_block.start);
+                solvePackedRight(T, resources, effective, diag, rows, col_block.len, diagonal_block, b, ldb, row0, col_block.start);
             }
         }
     }

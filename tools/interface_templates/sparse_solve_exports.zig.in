@@ -1,0 +1,34 @@
+// Interface-only ordinary LP64/ILP64 solve boundary; all state and math come from binding.
+fn solveStatus(err: binding.RawSolve.Error) WireEnum {
+    return switch (err) {
+        error.NullHandle, error.NullInput, error.NullOutput => 1,
+        error.OutOfMemory => 2,
+        error.InvalidBase, error.InvalidDimension, error.InvalidOffsets, error.InvalidOrdinal,
+        error.SizeOverflow, error.InvalidAlignment, error.BufferOverlap, error.WrongFormat,
+        error.InvalidHandle, error.InvalidOperation, error.InvalidDescriptor, error.InvalidLayout,
+        error.InvalidLeadingDimension, error.InvalidRowOffsets, error.InvalidColumnIndex,
+        error.InvalidColumnOffsets, error.InvalidRowIndex, error.InvalidLength,
+        error.NonFiniteInput, error.NonFiniteScaling, error.AliasingNotAllowed => 3,
+        error.UnsupportedDomain, error.WrongScalar, error.WrongIndexWidth,
+        error.UnsupportedConfiguration, error.UnreviewedSolveDescriptor, error.UnsupportedTransform => 6,
+        else => 5,
+    };
+}
+fn TriangularVector(comptime T: type) type {
+    if (I != i32 and I != i64) @compileError("Sparse solve interface requires reviewed signed i32/i64 indices");
+    return struct {
+        fn call(operation: WireEnum, alpha: T, handle: ?Handle, descriptor: WireDescriptor, x: ?[*]align(1) const T, y: ?[*]align(1) T) callconv(.c) WireEnum {
+            const result = binding.RawSolve.vectorWithContract(T, I, handle, operation, .{ .matrix_type=descriptor.kind,.mode=descriptor.mode,.diag=descriptor.diagonal }, alpha, x, y, .sparse_ieee_v1) catch |err| return solveStatus(err);
+            return if (result.info==0) 0 else 4;
+        }
+    };
+}
+fn TriangularPanel(comptime T: type) type {
+    if (I != i32 and I != i64) @compileError("Sparse solve interface requires reviewed signed i32/i64 indices");
+    return struct {
+        fn call(operation: WireEnum, alpha: T, handle: ?Handle, descriptor: WireDescriptor, layout: WireEnum, x: ?[*]align(1) const T, columns: WireInt, ldx: WireInt, y: ?[*]align(1) T, ldy: WireInt) callconv(.c) WireEnum {
+            const result = binding.RawSolve.panelWithContract(T, I, handle, operation, .{ .matrix_type=descriptor.kind,.mode=descriptor.mode,.diag=descriptor.diagonal }, layout, alpha, x, @intCast(columns), @intCast(ldx), y, @intCast(ldy), .sparse_ieee_v1) catch |err| return solveStatus(err);
+            return if (result.info==0) 0 else 4;
+        }
+    };
+}

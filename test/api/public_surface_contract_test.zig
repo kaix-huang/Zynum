@@ -127,6 +127,8 @@ fn expectEnum(
 fn namespaceForRole(comptime Root: type, comptime role: inventory.NamespaceRole) type {
     return switch (role) {
         .root => Root,
+        .lapack => Root.lapack,
+        .sparse => Root.sparse,
         .types => Root.types,
         .runtime => Root.runtime,
         .api => Root.api,
@@ -193,6 +195,8 @@ fn expectRecordedOwnerContract(
 
 fn isForwardedNamespace(comptime name: []const u8) bool {
     return std.mem.eql(u8, name, "blas") or
+        std.mem.eql(u8, name, "lapack") or
+        std.mem.eql(u8, name, "sparse") or
         std.mem.eql(u8, name, "types") or
         std.mem.eql(u8, name, "runtime") or
         std.mem.eql(u8, name, "api") or
@@ -203,6 +207,8 @@ fn isForwardedNamespace(comptime name: []const u8) bool {
 
 fn canonicalForwardedNamespace(comptime CanonicalFacade: type, comptime name: []const u8) type {
     if (std.mem.eql(u8, name, "blas")) return CanonicalFacade;
+    if (std.mem.eql(u8, name, "lapack")) return surface.lapack;
+    if (std.mem.eql(u8, name, "sparse")) return surface.sparse;
     if (std.mem.eql(u8, name, "types")) return CanonicalFacade.types;
     if (std.mem.eql(u8, name, "runtime")) return CanonicalFacade.runtime;
     if (std.mem.eql(u8, name, "api")) return CanonicalFacade.api;
@@ -1573,7 +1579,39 @@ fn expectFacadeContract(comptime Facade: type) !void {
     expectType(ByteRange, inferredVectorRangePayload(Facade, Views.ComplexF64));
 }
 
+fn expectNumericalModuleComplexAliases() !void {
+    const Blas = surface.blas;
+    inline for (.{ surface.lapack, surface.sparse }) |Module| {
+        expectType(surface.ComplexF32, Module.ComplexF32);
+        expectType(surface.ComplexF64, Module.ComplexF64);
+        expectType(Blas.types.ComplexF32, Module.ComplexF32);
+        expectType(Blas.types.ComplexF64, Module.ComplexF64);
+        expectType(fn (f32, f32) Blas.ComplexF32, @TypeOf(Module.complexF32));
+        expectType(fn (f64, f64) Blas.ComplexF64, @TypeOf(Module.complexF64));
+        const single = Module.complexF32(1.25, -2.5);
+        const double = Module.complexF64(-3.5, 4.25);
+        expectType(Blas.ComplexF32, @TypeOf(single));
+        expectType(Blas.ComplexF64, @TypeOf(double));
+        try std.testing.expectEqual(@as(f32, 1.25), single.re);
+        try std.testing.expectEqual(@as(f32, -2.5), single.im);
+        try std.testing.expectEqual(@as(f64, -3.5), double.re);
+        try std.testing.expectEqual(@as(f64, 4.25), double.im);
+    }
+    inline for (.{ Blas.ComplexF32, Blas.ComplexF64 }) |C| {
+        expectType(Blas.Matrix(C), surface.lapack.Matrix(C));
+        expectType(Blas.ConstMatrix(C), surface.lapack.ConstMatrix(C));
+        expectType(C, surface.sparse.Matrix(C).Scalar);
+        expectType(C, surface.sparse.ConstMatrix(C).Scalar);
+        inline for (.{ i32, u32, i64, u64 }) |I| {
+            expectType(C, surface.sparse.ConstCsrMatrix(C, I).Scalar);
+            expectType(C, surface.sparse.ConstCscMatrix(C, I).Scalar);
+            expectType(C, surface.sparse.ConstCooMatrix(C, I).Scalar);
+        }
+    }
+}
+
 fn expectTopLevelFlatAliases() !void {
+    try expectNumericalModuleComplexAliases();
     const Blas = surface.blas;
     expectType(Blas.types, surface.types);
     expectType(Blas.runtime, surface.runtime);
@@ -1594,12 +1632,12 @@ fn expectTopLevelFlatAliases() !void {
     try std.testing.expect(!@hasDecl(surface, "shutdown"));
 }
 
-test "inventory is a complete three-surface partition" {
+test "inventory is a complete three-surface partition with numerical modules" {
     @setEvalBranchQuota(1_000_000);
-    try std.testing.expectEqual(@as(usize, 21), inventory.namespaces.len);
+    try std.testing.expectEqual(@as(usize, 23), inventory.namespaces.len);
     try std.testing.expectEqual(@as(usize, 15), inventory.signature_closure.len);
     try std.testing.expectEqual(@as(usize, 76), inventory.owner_declarations.len);
-    try std.testing.expectEqual(@as(usize, 211), inventory.facade_forwarding.len);
+    try std.testing.expectEqual(@as(usize, 213), inventory.facade_forwarding.len);
     inline for (inventory.namespaces, 0..) |entry, index| {
         try std.testing.expect(entry.namespace_path.len != 0);
         try std.testing.expect(entry.owner_namespace.len != 0);
@@ -1618,14 +1656,15 @@ test "inventory is a complete three-surface partition" {
         inline for (inventory.namespaces) |entry| {
             if (entry.surface == wanted_surface) surface_count += 1;
         }
-        try std.testing.expectEqual(@as(usize, 7), surface_count);
+        try std.testing.expectEqual(@as(usize, if (wanted_surface == .zynum) 9 else 7), surface_count);
 
         inline for (std.meta.tags(inventory.NamespaceRole)) |wanted_role| {
             var role_count: usize = 0;
             inline for (inventory.namespaces) |entry| {
                 if (entry.surface == wanted_surface and entry.role == wanted_role) role_count += 1;
             }
-            try std.testing.expectEqual(@as(usize, 1), role_count);
+            const expected_role_count: usize = if ((wanted_role == .lapack or wanted_role == .sparse) and wanted_surface != .zynum) 0 else 1;
+            try std.testing.expectEqual(expected_role_count, role_count);
         }
     }
 

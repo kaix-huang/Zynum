@@ -3,11 +3,12 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const runtime = @import("../../runtime.zig");
 
 const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
+const Operation = @import("zynum-execution").context.Operation;
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const gemm_catalog = @import("../../kernels/shared/matrix_matrix/catalog.zig");
 const planner = @import("planner.zig");
@@ -75,14 +76,21 @@ fn ComplexWorkspace(comptime T: type) type {
     return struct {
         data: []T,
         cached: bool,
+        allocator: std.mem.Allocator = std.heap.c_allocator,
 
         fn deinit(self: @This()) void {
-            if (!self.cached) std.heap.c_allocator.free(self.data);
+            if (!self.cached) self.allocator.free(self.data);
         }
     };
 }
 
-fn acquireComplexWorkspace(comptime T: type, len: usize) ?ComplexWorkspace(T) {
+fn acquireComplexWorkspace(comptime T: type, resources: CallResources, len: usize) ?ComplexWorkspace(T) {
+    if (resources.scratchAllocator()) |allocator| {
+        // Explicit Context storage is call-local and never enters legacy TLS.
+        // Failure stays on the existing numerical fallback chain.
+        const data = allocator.alloc(T, len) catch return null;
+        return .{ .data = data, .cached = false, .allocator = allocator };
+    }
     if (len * @sizeOf(T) > max_cached_complex_workspace_bytes) {
         const data = std.heap.c_allocator.alloc(T, len) catch return null;
         return .{ .data = data, .cached = false };
@@ -140,8 +148,14 @@ inline fn loadF64x2(src: []const f64, index: usize) F64x2 {
     return @as(*align(1) const F64x2, @ptrCast(&src[index])).*;
 }
 
+/// Legacy internal default-service bridge, without another admission.
+pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    gemmNoTransRealWithResources(T, .legacy_default, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
 noinline fn gemmNoTransRealShortWideTailN2048(
     comptime T: type,
+    resources: CallResources,
     m_: BlasInt,
     aligned_rows: BlasInt,
     k_: BlasInt,
@@ -154,7 +168,7 @@ noinline fn gemmNoTransRealShortWideTailN2048(
     c: [*]T,
     ldc: BlasInt,
 ) void {
-    planner.noTransReal(T, aligned_rows, 2048, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+    planner.noTransReal(T, resources, aligned_rows, 2048, k_, alpha, a, lda, b, ldb, beta, c, ldc);
 
     var x_tail: [1024]T = undefined;
     var y_tail: [2048]T = undefined;
@@ -164,12 +178,12 @@ noinline fn gemmNoTransRealShortWideTailN2048(
     for (aligned..m) |row| {
         for (0..k) |p| x_tail[p] = a[matIndex(lda, row, p)];
         for (0..y_tail.len) |j| y_tail[j] = c[matIndex(ldc, row, j)];
-        matrix_vector_ops.gemv(T, .trans, k_, 2048, alpha, b, ldb, &x_tail, 1, beta, &y_tail, 1);
+        matrix_vector_ops.gemvWithResources(T, resources, .trans, k_, 2048, alpha, b, ldb, &x_tail, 1, beta, &y_tail, 1);
         for (0..y_tail.len) |j| c[matIndex(ldc, row, j)] = y_tail[j];
     }
 }
 
-pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+fn gemmNoTransRealWithResources(comptime T: type, resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     if (k_ <= 0 or isZero(T, alpha)) {
         const m = toUsize(m_);
@@ -183,71 +197,71 @@ pub fn gemmNoTransReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, 
         return;
     }
     if (m_ == 17 and n_ == 2048 and k_ >= 128 and k_ <= 1024) {
-        gemmNoTransRealShortWideTailN2048(T, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        gemmNoTransRealShortWideTailN2048(T, resources, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         return;
     }
     if (m_ == 34 and n_ == 2048 and k_ >= 256 and k_ <= 1024) {
-        gemmNoTransRealShortWideTailN2048(T, m_, 32, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        gemmNoTransRealShortWideTailN2048(T, resources, m_, 32, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         return;
     }
     if (n_ == 1 and k_ > 0) {
-        matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
         return;
     }
     if (T == f32 and m_ == 1 and lda == 1 and ldc == 1 and k_ >= 128) {
-        matrix_vector_ops.gemv(T, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(T, resources, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
         return;
     }
     if (T == f64 and m_ == 1 and lda == 1 and ldc == 1 and k_ >= 128) {
-        matrix_vector_ops.gemv(T, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(T, resources, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
         return;
     }
     if (T == f32 and n_ == 17 and m_ >= 1024 and k_ >= 128) {
-        planner.noTransReal(T, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-        matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, 16), 1, beta, c + matIndex(ldc, 0, 16), 1);
+        planner.noTransReal(T, resources, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, 16), 1, beta, c + matIndex(ldc, 0, 16), 1);
         return;
     }
     if (T == f32 and n_ > 1 and n_ <= 17 and n_ != 16 and m_ >= 1024 and k_ >= 128) {
         const n = toUsize(n_);
         for (0..n) |j| {
-            matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, j), 1, beta, c + matIndex(ldc, 0, j), 1);
+            matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, j), 1, beta, c + matIndex(ldc, 0, j), 1);
         }
         return;
     }
     if (T == f64 and n_ == 17 and m_ >= 1024 and k_ >= 128) {
-        planner.noTransReal(T, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
-        matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, 16), 1, beta, c + matIndex(ldc, 0, 16), 1);
+        planner.noTransReal(T, resources, m_, 16, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, 16), 1, beta, c + matIndex(ldc, 0, 16), 1);
         return;
     }
     if (T == f64 and n_ > 1 and n_ <= 17 and n_ != 16 and m_ >= 1024 and k_ >= 128) {
         const n = toUsize(n_);
         for (0..n) |j| {
-            matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, j), 1, beta, c + matIndex(ldc, 0, j), 1);
+            matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b + matIndex(ldb, 0, j), 1, beta, c + matIndex(ldc, 0, j), 1);
         }
         return;
     }
-    planner.noTransReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+    planner.noTransReal(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 
-fn tryGemmNoTransTransposedBReal(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+fn tryGemmNoTransTransposedBReal(comptime T: type, resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
     if (k_ >= 128 and !isZero(T, alpha)) {
         if (n_ == 1 and m_ >= 128) {
-            matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b, ldb, beta, c, 1);
+            matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b, ldb, beta, c, 1);
             return true;
         }
         if (m_ == 1 and n_ >= 128) {
-            matrix_vector_ops.gemv(T, .no_trans, n_, k_, alpha, b, ldb, a, lda, beta, c, ldc);
+            matrix_vector_ops.gemvWithResources(T, resources, .no_trans, n_, k_, alpha, b, ldb, a, lda, beta, c, ldc);
             return true;
         }
     }
-    return planner.noTransTransposedBReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+    return planner.noTransTransposedBReal(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 
-fn tryGemmTransposedAReal(comptime T: type, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+fn tryGemmTransposedAReal(comptime T: type, resources: CallResources, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
     if (transb == .trans) {
-        return planner.transposedAReal(T, m_, n_, k_, alpha, a, lda, b, ldb, .trans, beta, c, ldc);
+        return planner.transposedAReal(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, .trans, beta, c, ldc);
     }
-    return planner.transposedAReal(T, m_, n_, k_, alpha, a, lda, b, ldb, .no_trans, beta, c, ldc);
+    return planner.transposedAReal(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, .no_trans, beta, c, ldc);
 }
 
 inline fn loadC32x4(ptr: [*]const ComplexF32, ld: BlasInt, row: usize, col: usize) C32x4 {
@@ -338,13 +352,13 @@ fn tailRowsC32(comptime tile_n: usize, m: usize, k: usize, alpha: ComplexF32, a:
     }
 }
 
-fn gemmNoTransComplexF32(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) void {
+fn gemmNoTransComplexF32(resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) void {
     if (n_ == 1 and k_ > 0) {
-        matrix_vector_ops.gemv(ComplexF32, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(ComplexF32, resources, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
         return;
     }
     if (m_ == 1 and lda == 1 and ldc == 1 and k_ >= 128) {
-        matrix_vector_ops.gemv(ComplexF32, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(ComplexF32, resources, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
         return;
     }
     const m = toUsize(m_);
@@ -448,7 +462,7 @@ fn threeMComplexF64Feasible(policy: ComplexExecutionPolicy, transa: Order, trans
     return m *| n *| k >= 128 * 1024;
 }
 
-noinline fn gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
+noinline fn gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(resources: CallResources, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -514,7 +528,7 @@ noinline fn gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa: Order, tra
     const k2_i: BlasInt = @intCast(k2);
     const m_compute_ld: BlasInt = @intCast(m_compute);
     const k2_ld: BlasInt = @intCast(k2);
-    gemmNoTransReal(f32, m_compute_i, n_compute_i, k2_i, 1, a2.ptr, m_compute_ld, b2.ptr, k2_ld, 0, c2.ptr, m_compute_ld);
+    gemmNoTransRealWithResources(f32, resources, m_compute_i, n_compute_i, k2_i, 1, a2.ptr, m_compute_ld, b2.ptr, k2_ld, 0, c2.ptr, m_compute_ld);
 
     for (0..n) |j| {
         const base = j * m_compute;
@@ -528,7 +542,7 @@ noinline fn gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa: Order, tra
     }
 }
 
-fn gemmComplexF32ViaExpandedRealWorkspace(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
+fn gemmComplexF32ViaExpandedRealWorkspace(resources: CallResources, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, workspace: []f32) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -585,7 +599,7 @@ fn gemmComplexF32ViaExpandedRealWorkspace(transa: Order, transb: Order, m_: Blas
     const k2_i: BlasInt = @intCast(k2);
     const m2_ld: BlasInt = @intCast(m2);
     const k2_ld: BlasInt = @intCast(k2);
-    gemmNoTransReal(f32, m2_i, n_, k2_i, 1, a2.ptr, m2_ld, b2.ptr, k2_ld, 0, c2.ptr, m2_ld);
+    gemmNoTransRealWithResources(f32, resources, m2_i, n_, k2_i, 1, a2.ptr, m2_ld, b2.ptr, k2_ld, 0, c2.ptr, m2_ld);
 
     for (0..n) |j| {
         const base = j * m2;
@@ -599,7 +613,7 @@ fn gemmComplexF32ViaExpandedRealWorkspace(transa: Order, transb: Order, m_: Blas
     }
 }
 
-fn tryGemmComplexF32ViaExpandedReal(policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
+fn tryGemmComplexF32ViaExpandedReal(resources: CallResources, policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -610,12 +624,12 @@ fn tryGemmComplexF32ViaExpandedReal(policy: ComplexExecutionPolicy, workspace_av
     const m2 = if (pad_small_non_nn) @as(usize, 128) else 2 * m;
     const n_compute = if (pad_small_non_nn) @as(usize, 64) else n;
     const workspace_len = m2 * (2 * k) + (2 * k) * n_compute + m2 * n_compute;
-    const workspace = acquireComplexWorkspace(f32, workspace_len) orelse return false;
+    const workspace = acquireComplexWorkspace(f32, resources, workspace_len) orelse return false;
     defer workspace.deinit();
     if (pad_small_non_nn) {
-        gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
+        gemmComplexF32ViaExpandedRealWorkspacePaddedSmall(resources, transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
     } else {
-        gemmComplexF32ViaExpandedRealWorkspace(transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
+        gemmComplexF32ViaExpandedRealWorkspace(resources, transa, transb, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
     }
     return true;
 }
@@ -943,10 +957,10 @@ fn runThreePack64(raw: *const anyopaque, index: usize) void {
     runThreePack(ComplexF64, raw, index);
 }
 
-fn parallelThreePack(comptime T: type, ta: Order, tb: Order, m: usize, n: usize, k: usize, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, stride: usize, ar: anytype, ai: @TypeOf(ar), am: @TypeOf(ar), br: @TypeOf(ar), bi: @TypeOf(ar), bp: @TypeOf(ar)) bool {
+fn parallelThreePack(comptime T: type, resources: CallResources, ta: Order, tb: Order, m: usize, n: usize, k: usize, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, stride: usize, ar: anytype, ai: @TypeOf(ar), am: @TypeOf(ar), br: @TypeOf(ar), bi: @TypeOf(ar), bp: @TypeOf(ar)) bool {
     if (comptime builtin.target.cpu.arch != .x86_64) return false;
-    if (m < 256 or n < 256 or k < 256 or runtime.maxThreads() <= 1) return false;
-    const count = @min(runtime.maxThreads(), 16);
+    if (m < 256 or n < 256 or k < 256 or resources.maxThreads() <= 1) return false;
+    const count = @min(resources.maxThreads(), 16);
     const acount = count / 2;
     const bcount = count - acount;
     var tasks: [16]ThreePackTask(T) = undefined;
@@ -960,7 +974,7 @@ fn parallelThreePack(comptime T: type, ta: Order, tb: Order, m: usize, n: usize,
         const end = (i + 1) * n / bcount;
         tasks[acount + i] = .{ .is_a = false, .trans = tb, .m = m, .n = n, .k = k, .stride = stride, .input = b, .ld = ldb, .first = first, .end = end, .p0 = br[first * k .. end * k], .p1 = bi[first * k .. end * k], .p2 = bp[first * k .. end * k] };
     }
-    return core_pool.runLowLatency(if (T == ComplexF32) runThreePack32 else runThreePack64, @ptrCast(&tasks), count);
+    return resources.runLowLatency(if (T == ComplexF32) runThreePack32 else runThreePack64, @ptrCast(&tasks), count);
 }
 
 fn mergeThree32(alpha: ComplexF32, beta: ComplexF32, m: usize, n: usize, m_compute: usize, c: [*]ComplexF32, ldc: BlasInt, cr: []f32, ci: []f32, tmp: []f32) void {
@@ -1014,25 +1028,25 @@ fn runThreeMerge32(raw: *const anyopaque, index: usize) void {
 fn runThreeMerge64(raw: *const anyopaque, index: usize) void {
     runThreeMerge(ComplexF64, raw, index);
 }
-fn parallelThreeMerge(comptime T: type, alpha: T, beta: T, m: usize, n: usize, stride: usize, c: [*]T, ldc: BlasInt, cr: anytype, ci: @TypeOf(cr), tmp: @TypeOf(cr)) bool {
+fn parallelThreeMerge(comptime T: type, resources: CallResources, alpha: T, beta: T, m: usize, n: usize, stride: usize, c: [*]T, ldc: BlasInt, cr: anytype, ci: @TypeOf(cr), tmp: @TypeOf(cr)) bool {
     if (comptime builtin.target.cpu.arch != .x86_64) return false;
-    if (m < 256 or n < 256 or runtime.maxThreads() <= 1) return false;
-    const count = @min(runtime.maxThreads(), 16);
+    if (m < 256 or n < 256 or resources.maxThreads() <= 1) return false;
+    const count = @min(resources.maxThreads(), 16);
     var tasks: [16]ThreeMergeTask(T) = undefined;
     for (0..count) |i| {
         const first = i * n / count;
         const end = (i + 1) * n / count;
         tasks[i] = .{ .alpha = alpha, .beta = beta, .m = m, .n = end - first, .stride = stride, .c = c + first * toUsize(ldc), .ldc = ldc, .cr = cr[first * stride .. end * stride], .ci = ci[first * stride .. end * stride], .tmp = tmp[first * stride .. end * stride] };
     }
-    return core_pool.runLowLatency(if (T == ComplexF32) runThreeMerge32 else runThreeMerge64, @ptrCast(&tasks), count);
+    return resources.runLowLatency(if (T == ComplexF32) runThreeMerge32 else runThreeMerge64, @ptrCast(&tasks), count);
 }
 
-fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, beta: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, m_compute: usize, ar: []f32, ai: []f32, am: []f32, br: []f32, bi: []f32, bp: []f32, cr: []f32, ci: []f32, tmp: []f32) void {
+fn gemmComplexF32ViaRealBuffers(resources: CallResources, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, beta: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, c: [*]ComplexF32, ldc: BlasInt, m_compute: usize, ar: []f32, ai: []f32, am: []f32, br: []f32, bi: []f32, bp: []f32, cr: []f32, ci: []f32, tmp: []f32) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
 
-    if (!parallelThreePack(ComplexF32, transa, transb, m, n, k, a, lda, b, ldb, m_compute, ar, ai, am, br, bi, bp)) {
+    if (!parallelThreePack(ComplexF32, resources, transa, transb, m, n, k, a, lda, b, ldb, m_compute, ar, ai, am, br, bi, bp)) {
         packThreeA32(transa, m, k, a, lda, m_compute, ar, ai, am);
         packThreeB32(transb, n, k, b, ldb, br, bi, bp, m_compute > m or n >= 256 or k >= 512);
     }
@@ -1042,26 +1056,26 @@ fn gemmComplexF32ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     const ldb_r: BlasInt = @intCast(k);
     const ldc_r: BlasInt = @intCast(m_compute);
     var parallel_real_products = false;
-    if (builtin.target.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192) {
+    if (builtin.target.cpu.arch == .x86_64 and resources.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192) {
         const real_tasks = [_]ComplexF32RealGemmTask{
-            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
-            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
-            .{ .m = m_compute_i, .n = n_, .k = k_, .a = am.ptr, .lda = lda_r, .b = br.ptr, .ldb = ldb_r, .c = ci.ptr, .ldc = ldc_r },
+            .{ .resources = resources, .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
+            .{ .resources = resources, .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
+            .{ .resources = resources, .m = m_compute_i, .n = n_, .k = k_, .a = am.ptr, .lda = lda_r, .b = br.ptr, .ldb = ldb_r, .c = ci.ptr, .ldc = ldc_r },
         };
-        parallel_real_products = core_pool.runLowLatency(runComplexF32RealGemmTask, @ptrCast(&real_tasks), real_tasks.len);
+        parallel_real_products = resources.runLowLatency(runComplexF32RealGemmTask, @ptrCast(&real_tasks), real_tasks.len);
     }
     if (!parallel_real_products) {
-        gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
-        gemmNoTransReal(f32, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
-        gemmNoTransReal(f32, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+        gemmNoTransRealWithResources(f32, resources, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
+        gemmNoTransRealWithResources(f32, resources, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
+        gemmNoTransRealWithResources(f32, resources, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
     }
 
-    if (!parallelThreeMerge(ComplexF32, alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp)) {
+    if (!parallelThreeMerge(ComplexF32, resources, alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp)) {
         mergeThree32(alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp);
     }
 }
 
-fn tryGemmComplexF32ViaReal(policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
+fn tryGemmComplexF32ViaReal(resources: CallResources, policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF32, a: [*]const ComplexF32, lda: BlasInt, b: [*]const ComplexF32, ldb: BlasInt, beta: ComplexF32, c: [*]ComplexF32, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -1074,7 +1088,7 @@ fn tryGemmComplexF32ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     const c_len = m_compute * n;
     const plane_padding = 64;
 
-    const workspace = acquireComplexWorkspace(f32, 3 * a_len + 3 * b_len + 3 * c_len + 8 * plane_padding) orelse return false;
+    const workspace = acquireComplexWorkspace(f32, resources, 3 * a_len + 3 * b_len + 3 * c_len + 8 * plane_padding) orelse return false;
     defer workspace.deinit();
     var workspace_offset: usize = 0;
     const ar = takeWorkspace(f32, workspace.data, &workspace_offset, a_len);
@@ -1094,7 +1108,7 @@ fn tryGemmComplexF32ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     const ci = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
     workspace_offset += plane_padding;
     const tmp = takeWorkspace(f32, workspace.data, &workspace_offset, c_len);
-    gemmComplexF32ViaRealBuffers(transa, transb, m_, n_, k_, alpha, beta, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
+    gemmComplexF32ViaRealBuffers(resources, transa, transb, m_, n_, k_, alpha, beta, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
 }
 
@@ -1176,13 +1190,13 @@ fn tailRowsC64(comptime tile_n: usize, m: usize, k: usize, alpha: ComplexF64, a:
     }
 }
 
-fn gemmNoTransComplexF64(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) void {
+fn gemmNoTransComplexF64(resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) void {
     if (n_ == 1 and k_ > 0) {
-        matrix_vector_ops.gemv(ComplexF64, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(ComplexF64, resources, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
         return;
     }
     if (m_ == 1 and lda == 1 and ldc == 1 and k_ >= 128) {
-        matrix_vector_ops.gemv(ComplexF64, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(ComplexF64, resources, .trans, k_, n_, alpha, b, ldb, a, 1, beta, c, 1);
         return;
     }
     const m = toUsize(m_);
@@ -1216,7 +1230,7 @@ fn gemmNoTransComplexF64(m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF6
     }
 }
 
-fn gemmNoTransComplexF64ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, workspace: []f64) void {
+fn gemmNoTransComplexF64ViaExpandedRealWorkspace(resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, workspace: []f64) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -1269,7 +1283,7 @@ fn gemmNoTransComplexF64ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
     const k2_i: BlasInt = @intCast(k2);
     const m2_ld: BlasInt = @intCast(m2);
     const k2_ld: BlasInt = @intCast(k2);
-    gemmNoTransReal(f64, m2_i, n_, k2_i, 1, a2.ptr, m2_ld, b2.ptr, k2_ld, 0, c2.ptr, m2_ld);
+    gemmNoTransRealWithResources(f64, resources, m2_i, n_, k2_i, 1, a2.ptr, m2_ld, b2.ptr, k2_ld, 0, c2.ptr, m2_ld);
 
     for (0..n) |j| {
         for (0..m) |i| {
@@ -1278,7 +1292,7 @@ fn gemmNoTransComplexF64ViaExpandedRealWorkspace(m_: BlasInt, n_: BlasInt, k_: B
     }
 }
 
-fn tryGemmNoTransComplexF64ViaExpandedReal(policy: ComplexExecutionPolicy, workspace_available: bool, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
+fn tryGemmNoTransComplexF64ViaExpandedReal(resources: CallResources, policy: ComplexExecutionPolicy, workspace_available: bool, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -1286,13 +1300,14 @@ fn tryGemmNoTransComplexF64ViaExpandedReal(policy: ComplexExecutionPolicy, works
     if (!workspace_available) return false;
 
     const workspace_len = (2 * m) * (2 * k) + (2 * k) * n + (2 * m) * n;
-    const workspace = acquireComplexWorkspace(f64, workspace_len) orelse return false;
+    const workspace = acquireComplexWorkspace(f64, resources, workspace_len) orelse return false;
     defer workspace.deinit();
-    gemmNoTransComplexF64ViaExpandedRealWorkspace(m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
+    gemmNoTransComplexF64ViaExpandedRealWorkspace(resources, m_, n_, k_, a, lda, b, ldb, c, ldc, workspace.data);
     return true;
 }
 
 const ComplexF32RealGemmTask = struct {
+    resources: CallResources,
     m: BlasInt,
     n: BlasInt,
     k: BlasInt,
@@ -1307,10 +1322,11 @@ const ComplexF32RealGemmTask = struct {
 fn runComplexF32RealGemmTask(raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const ComplexF32RealGemmTask = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    gemmNoTransReal(f32, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
+    gemmNoTransRealWithResources(f32, task.resources, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
 }
 
 const ComplexF64RealGemmTask = struct {
+    resources: CallResources,
     m: BlasInt,
     n: BlasInt,
     k: BlasInt,
@@ -1325,15 +1341,15 @@ const ComplexF64RealGemmTask = struct {
 fn runComplexF64RealGemmTask(raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const ComplexF64RealGemmTask = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    gemmNoTransReal(f64, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
+    gemmNoTransRealWithResources(f64, task.resources, task.m, task.n, task.k, 1, task.a, task.lda, task.b, task.ldb, 0, task.c, task.ldc);
 }
 
-fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, beta: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, m_compute: usize, ar: []f64, ai: []f64, am: []f64, br: []f64, bi: []f64, bp: []f64, cr: []f64, ci: []f64, tmp: []f64) void {
+fn gemmComplexF64ViaRealBuffers(resources: CallResources, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, beta: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, c: [*]ComplexF64, ldc: BlasInt, m_compute: usize, ar: []f64, ai: []f64, am: []f64, br: []f64, bi: []f64, bp: []f64, cr: []f64, ci: []f64, tmp: []f64) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
 
-    if (!parallelThreePack(ComplexF64, transa, transb, m, n, k, a, lda, b, ldb, m_compute, ar, ai, am, br, bi, bp)) {
+    if (!parallelThreePack(ComplexF64, resources, transa, transb, m, n, k, a, lda, b, ldb, m_compute, ar, ai, am, br, bi, bp)) {
         packThreeA64(transa, m, k, a, lda, m_compute, ar, ai, am);
         packThreeB64(transb, n, k, b, ldb, br, bi, bp);
     }
@@ -1351,27 +1367,27 @@ fn gemmComplexF64ViaRealBuffers(transa: Order, transb: Order, m_: BlasInt, n_: B
     const mac_small_k_products = builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and
         m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 24 and k <= 64 and
         m *| n *| k >= small_k_min_work and m_compute *| n *| k < single_real_parallel_floor and
-        runtime.maxThreads() >= 3;
-    if (mac_small_k_products or (m == 127 and n == 129 and k == 32) or (builtin.target.cpu.arch == .x86_64 and runtime.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
+        resources.maxThreads() >= 3;
+    if (mac_small_k_products or (m == 127 and n == 129 and k == 32) or (builtin.target.cpu.arch == .x86_64 and resources.maxThreads() >= 3 and m >= 96 and m <= 192 and n >= 96 and n <= 192 and k >= 96 and k <= 192)) {
         const real_tasks = [_]ComplexF64RealGemmTask{
-            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
-            .{ .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
-            .{ .m = m_compute_i, .n = n_, .k = k_, .a = am.ptr, .lda = lda_r, .b = br.ptr, .ldb = ldb_r, .c = ci.ptr, .ldc = ldc_r },
+            .{ .resources = resources, .m = m_compute_i, .n = n_, .k = k_, .a = ar.ptr, .lda = lda_r, .b = bp.ptr, .ldb = ldb_r, .c = cr.ptr, .ldc = ldc_r },
+            .{ .resources = resources, .m = m_compute_i, .n = n_, .k = k_, .a = ai.ptr, .lda = lda_r, .b = bi.ptr, .ldb = ldb_r, .c = tmp.ptr, .ldc = ldc_r },
+            .{ .resources = resources, .m = m_compute_i, .n = n_, .k = k_, .a = am.ptr, .lda = lda_r, .b = br.ptr, .ldb = ldb_r, .c = ci.ptr, .ldc = ldc_r },
         };
-        parallel_real_products = core_pool.runLowLatency(runComplexF64RealGemmTask, @ptrCast(&real_tasks), real_tasks.len);
+        parallel_real_products = resources.runLowLatency(runComplexF64RealGemmTask, @ptrCast(&real_tasks), real_tasks.len);
     }
     if (!parallel_real_products) {
-        gemmNoTransReal(f64, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
-        gemmNoTransReal(f64, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
-        gemmNoTransReal(f64, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
+        gemmNoTransRealWithResources(f64, resources, m_compute_i, n_, k_, 1, ar.ptr, lda_r, bp.ptr, ldb_r, 0, cr.ptr, ldc_r);
+        gemmNoTransRealWithResources(f64, resources, m_compute_i, n_, k_, 1, ai.ptr, lda_r, bi.ptr, ldb_r, 0, tmp.ptr, ldc_r);
+        gemmNoTransRealWithResources(f64, resources, m_compute_i, n_, k_, 1, am.ptr, lda_r, br.ptr, ldb_r, 0, ci.ptr, ldc_r);
     }
 
-    if (!parallelThreeMerge(ComplexF64, alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp)) {
+    if (!parallelThreeMerge(ComplexF64, resources, alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp)) {
         mergeThree64(alpha, beta, m, n, m_compute, c, ldc, cr, ci, tmp);
     }
 }
 
-fn tryGemmComplexF64ViaReal(policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
+fn tryGemmComplexF64ViaReal(resources: CallResources, policy: ComplexExecutionPolicy, workspace_available: bool, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: ComplexF64, a: [*]const ComplexF64, lda: BlasInt, b: [*]const ComplexF64, ldb: BlasInt, beta: ComplexF64, c: [*]ComplexF64, ldc: BlasInt) bool {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const k = toUsize(k_);
@@ -1383,7 +1399,7 @@ fn tryGemmComplexF64ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     const b_len = k * n;
     const c_len = m_compute * n;
 
-    const workspace = acquireComplexWorkspace(f64, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
+    const workspace = acquireComplexWorkspace(f64, resources, 3 * a_len + 3 * b_len + 3 * c_len) orelse return false;
     defer workspace.deinit();
     var workspace_offset: usize = 0;
     const ar = takeWorkspace(f64, workspace.data, &workspace_offset, a_len);
@@ -1395,7 +1411,7 @@ fn tryGemmComplexF64ViaReal(policy: ComplexExecutionPolicy, workspace_available:
     const cr = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     const ci = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
     const tmp = takeWorkspace(f64, workspace.data, &workspace_offset, c_len);
-    gemmComplexF64ViaRealBuffers(transa, transb, m_, n_, k_, alpha, beta, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
+    gemmComplexF64ViaRealBuffers(resources, transa, transb, m_, n_, k_, alpha, beta, a, lda, b, ldb, c, ldc, m_compute, ar, ai, am, br, bi, bp, cr, ci, tmp);
     return true;
 }
 
@@ -1471,13 +1487,13 @@ fn gemmComplexPortable(comptime T: type, transa: Order, transb: Order, m_: BlasI
     }
 }
 
-fn gemmComplexVectorEdge(comptime T: type, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+fn gemmComplexVectorEdge(comptime T: type, resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
     if (n_ == 1) {
-        matrix_vector_ops.gemv(T, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
+        matrix_vector_ops.gemvWithResources(T, resources, .no_trans, m_, k_, alpha, a, lda, b, 1, beta, c, 1);
         return true;
     }
     if (m_ == 1) {
-        matrix_vector_ops.gemv(T, .trans, k_, n_, alpha, b, ldb, a, lda, beta, c, ldc);
+        matrix_vector_ops.gemvWithResources(T, resources, .trans, k_, n_, alpha, b, ldb, a, lda, beta, c, ldc);
         return true;
     }
     return false;
@@ -1552,7 +1568,7 @@ pub fn hasComplexExecutorMapping(kernel: gemm_catalog.ComplexKernelId) bool {
     return complexExecutorRouteMatchesDescriptor(kernel, complexExecutorRoute(kernel));
 }
 
-fn tryExecuteComplexKernel(comptime T: type, kernel: gemm_catalog.ComplexKernelId, policy: ComplexExecutionPolicy, options: ComplexExecutionOptions, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
+fn tryExecuteComplexKernel(comptime T: type, resources: CallResources, kernel: gemm_catalog.ComplexKernelId, policy: ComplexExecutionPolicy, options: ComplexExecutionOptions, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) bool {
     const descriptor = gemm_catalog.complexDescriptorForKernel(kernel) orelse return false;
     if (descriptor.scalar != gemm_catalog.contractScalarKind(T)) return false;
 
@@ -1564,30 +1580,30 @@ fn tryExecuteComplexKernel(comptime T: type, kernel: gemm_catalog.ComplexKernelI
         .compact => compact: {
             if (transa != .no_trans or transb != .no_trans) break :compact false;
             if (T == ComplexF32) {
-                gemmNoTransComplexF32(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+                gemmNoTransComplexF32(resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
             } else {
-                gemmNoTransComplexF64(m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+                gemmNoTransComplexF64(resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
             }
             break :compact true;
         },
         .vector_edge => vector_edge: {
             if (transa != .no_trans or transb != .no_trans) break :vector_edge false;
-            break :vector_edge gemmComplexVectorEdge(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+            break :vector_edge gemmComplexVectorEdge(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         },
         .three_m => if (T == ComplexF32)
-            tryGemmComplexF32ViaReal(policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
+            tryGemmComplexF32ViaReal(resources, policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
         else
-            tryGemmComplexF64ViaReal(policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
+            tryGemmComplexF64ViaReal(resources, policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc),
         .expanded_real => if (T == ComplexF32)
-            tryGemmComplexF32ViaExpandedReal(policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
+            tryGemmComplexF32ViaExpandedReal(resources, policy, options.workspace_available, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
         else if (transa == .no_trans and transb == .no_trans)
-            tryGemmNoTransComplexF64ViaExpandedReal(policy, options.workspace_available, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
+            tryGemmNoTransComplexF64ViaExpandedReal(resources, policy, options.workspace_available, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)
         else
             false,
     };
 }
 
-fn executeComplexKernelWithFallback(comptime T: type, requested: gemm_catalog.ComplexKernelId, policy: ComplexExecutionPolicy, options: ComplexExecutionOptions, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) ComplexExecutionResult {
+fn executeComplexKernelWithFallback(comptime T: type, resources: CallResources, requested: gemm_catalog.ComplexKernelId, policy: ComplexExecutionPolicy, options: ComplexExecutionOptions, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) ComplexExecutionResult {
     if (T != ComplexF32 and T != ComplexF64) @compileError("complex GEMM execution requires a complex scalar type");
     if (m_ <= 0 or n_ <= 0 or k_ < 0) return .{ .requested = requested, .executed = null, .fallback_count = 0 };
     const requested_descriptor = gemm_catalog.complexDescriptorForKernel(requested) orelse
@@ -1599,7 +1615,7 @@ fn executeComplexKernelWithFallback(comptime T: type, requested: gemm_catalog.Co
     var current = requested;
     var fallback_count: usize = 0;
     while (fallback_count <= gemm_catalog.complex_registry.len) : (fallback_count += 1) {
-        if (tryExecuteComplexKernel(T, current, policy, options, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) {
+        if (tryExecuteComplexKernel(T, resources, current, policy, options, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) {
             return .{ .requested = requested, .executed = current, .fallback_count = fallback_count };
         }
         const descriptor = gemm_catalog.complexDescriptorForKernel(current) orelse break;
@@ -1612,20 +1628,42 @@ fn executeComplexKernelWithFallback(comptime T: type, requested: gemm_catalog.Co
 /// cutoffs but retains hard layout/epilogue requirements and follows the
 /// descriptor chain when the requested implementation is infeasible.
 pub fn executeForcedComplexKernel(comptime T: type, requested: gemm_catalog.ComplexKernelId, options: ComplexExecutionOptions, transa: Order, transb: Order, m: BlasInt, n: BlasInt, k: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) ComplexExecutionResult {
-    return executeComplexKernelWithFallback(T, requested, .forced, options, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
+    return executeComplexKernelWithFallback(T, .legacy_default, requested, .forced, options, transa, transb, m, n, k, alpha, a, lda, b, ldb, beta, c, ldc);
 }
 
+/// Internal admitted real GEMM. All synchronous task and scratch use remains
+/// borrowed from this Operation until the caller finishes output/copyback.
+pub fn gemmRealAdmitted(comptime T: type, operation: *const Operation, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    if (T != f32 and T != f64) @compileError("admitted real GEMM supports f32 and f64");
+    _ = operation.borrowedContext();
+    gemmWithResources(T, .{ .admitted = operation }, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+/// Internal admitted complex GEMM. The outer token owns all decomposition,
+/// GEMV and Level-1 helper resources until final output/copyback is complete.
+pub fn gemmComplexAdmitted(comptime T: type, operation: *const Operation, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    if (T != ComplexF32 and T != ComplexF64) @compileError("admitted complex GEMM requires a complex scalar type");
+    _ = operation.borrowedContext();
+    gemmWithResources(T, .{ .admitted = operation }, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+/// Legacy internal bridge without another admission. Only explicit no-token
+/// callers retain the default executor and existing TLS allocation policy.
 pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
+    gemmWithResources(T, .legacy_default, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+}
+
+pub fn gemmWithResources(comptime T: type, resources: CallResources, transa: Order, transb: Order, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     if ((T == f32 or T == f64) and transa == .no_trans and transb == .no_trans) {
-        gemmNoTransReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        gemmNoTransRealWithResources(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         return;
     }
     if ((T == f32 or T == f64) and transa == .no_trans and transb == .trans) {
-        if (tryGemmNoTransTransposedBReal(T, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+        if (tryGemmNoTransTransposedBReal(T, resources, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
     }
     if ((T == f32 or T == f64) and transa == .trans and (transb == .no_trans or transb == .trans)) {
-        if (tryGemmTransposedAReal(T, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
+        if (tryGemmTransposedAReal(T, resources, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc)) return;
     }
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -1641,7 +1679,7 @@ pub fn gemm(comptime T: type, transa: Order, transb: Order, m_: BlasInt, n_: Bla
     }
     if (T == ComplexF32 or T == ComplexF64) {
         const requested = preferredComplexKernel(T, transa, transb, m_, n_, k_, alpha, beta);
-        const result = executeComplexKernelWithFallback(T, requested, .tuned, .{}, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
+        const result = executeComplexKernelWithFallback(T, resources, requested, .tuned, .{}, transa, transb, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc);
         std.debug.assert(result.executed != null);
         return;
     }

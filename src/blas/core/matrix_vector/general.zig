@@ -8,6 +8,7 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const vector_ops = @import("../vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
 const matrix_vector_kernels = @import("../../kernels/dispatch/matrix_vector.zig");
 const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 const std = @import("std");
@@ -25,9 +26,9 @@ fn gemvTaskLimit(comptime T: type, m: usize, n: usize, transposed: bool, request
     return @min(requested, limit);
 }
 
-fn runGemvTasks(runner: core_pool.TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (comptime builtin.target.cpu.arch == .x86_64) return core_pool.runLowLatency(runner, tasks, count);
-    return core_pool.run(runner, tasks, count);
+fn runGemvTasks(resources: core_pool.CallResources, runner: core_pool.TaskFn, tasks: *const anyopaque, count: usize) bool {
+    if (comptime builtin.target.cpu.arch == .x86_64) return resources.runLowLatency(runner, tasks, count);
+    return resources.run(runner, tasks, count);
 }
 
 const BlasInt = scalar.BlasInt;
@@ -98,6 +99,30 @@ fn gemvWorkspace(comptime T: type, len: usize) ?[]T {
     return null;
 }
 
+fn GemvCallWorkspace(comptime T: type) type {
+    return struct {
+        values: []T,
+        allocator: ?std.mem.Allocator,
+
+        fn release(self: @This()) void {
+            if (self.allocator) |allocator| allocator.free(self.values);
+        }
+    };
+}
+
+fn gemvWorkspaceWithResources(comptime T: type, resources: core_pool.CallResources, len: usize) ?GemvCallWorkspace(T) {
+    return switch (resources) {
+        .admitted => blk: {
+            // An admitted call never borrows the caller's legacy TLS workspace,
+            // and allocation failure must not retry through the default allocator.
+            const allocator = resources.scratchAllocator().?;
+            const values = allocator.alloc(T, len) catch return null;
+            break :blk .{ .values = values, .allocator = allocator };
+        },
+        .legacy_default => .{ .values = gemvWorkspace(T, len) orelse return null, .allocator = null },
+    };
+}
+
 pub fn freeCurrentThreadCaches() void {
     if (gemv_workspace_f32_ptr) |ptr| std.heap.c_allocator.free(ptr[0..gemv_workspace_f32_len]);
     gemv_workspace_f32_ptr = null;
@@ -158,8 +183,8 @@ fn dotUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]const T) T {
     return vector_ops.dotUnitReal(T, n, x, y);
 }
 
-fn gemvNoTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) void {
-    if (matrix_vector_kernels.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y)) return;
+fn gemvNoTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T, scratch_allocator: ?std.mem.Allocator) void {
+    if (matrix_vector_kernels.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator)) return;
     const lane_count = lanes(T);
     const unroll_count = unroll(T);
     const V = @Vector(lane_count, T);
@@ -338,17 +363,19 @@ fn runGemvNoTransPackedRowsTaskF64(raw_tasks: *const anyopaque, index: usize) vo
     runGemvNoTransPackedRowsTask(f64, raw_tasks, index);
 }
 
-fn parallelGemvNoTransPackedRowsUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelGemvNoTransPackedRowsUnitReal(comptime T: type, resources: core_pool.CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferNoTransPacked(m, n)) return false;
     const pack_len = matrix_vector_kernels.gemvNoTransPackLenUnitReal(T, m, n, lda) orelse return false;
     const block_count = m / 8;
-    var task_count = gemvTaskLimit(T, m, n, false, core_pool.taskCount(block_count, tuning.noTransPackedMinBlocks()));
+    var task_count = gemvTaskLimit(T, m, n, false, resources.taskCount(block_count, tuning.noTransPackedMinBlocks()));
     if (comptime builtin.target.cpu.arch == .x86_64 and T == f32) {
         if (m >= n *| 4) task_count = level2_tuning.capTaskCountByWork(task_count, m *| n, 128 * 1024);
     }
     if (task_count <= 1) return false;
 
-    const workspace = gemvWorkspace(T, pack_len + m) orelse return false;
+    const workspace_lease = gemvWorkspaceWithResources(T, resources, pack_len + m) orelse return false;
+    defer workspace_lease.release();
+    const workspace = workspace_lease.values;
     const pack = workspace[0..pack_len];
     const scratch = workspace[pack_len .. pack_len + m];
     if (!matrix_vector_kernels.gemvNoTransPackUnitReal(T, n, alpha, x, pack)) return false;
@@ -368,12 +395,12 @@ fn parallelGemvNoTransPackedRowsUnitReal(comptime T: type, m: usize, n: usize, a
     }
 
     const runner = if (T == f32) runGemvNoTransPackedRowsTaskF32 else runGemvNoTransPackedRowsTaskF64;
-    return runGemvTasks(runner, @ptrCast(&tasks), task_count);
+    return runGemvTasks(resources, runner, @ptrCast(&tasks), task_count);
 }
 
-fn parallelGemvNoTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelGemvNoTransUnitReal(comptime T: type, resources: core_pool.CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferNoTransParallel(m, n)) return false;
-    const task_count = gemvTaskLimit(T, m, n, false, core_pool.taskCount(m, tuning.noTransRowMinRows()));
+    const task_count = gemvTaskLimit(T, m, n, false, resources.taskCount(m, tuning.noTransRowMinRows()));
     if (task_count <= 1) return false;
 
     var tasks: [core_pool.max_tasks]GemvNoTransTask(T) = undefined;
@@ -391,7 +418,7 @@ fn parallelGemvNoTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a
     }
 
     const runner = if (T == f32) runGemvNoTransTaskF32 else runGemvNoTransTaskF64;
-    return runGemvTasks(runner, @ptrCast(&tasks), task_count);
+    return runGemvTasks(resources, runner, @ptrCast(&tasks), task_count);
 }
 
 fn GemvNoTransColumnTask(comptime T: type) type {
@@ -404,13 +431,14 @@ fn GemvNoTransColumnTask(comptime T: type) type {
         lda: BlasInt,
         x: [*]const T,
         y_delta: [*]T,
+        scratch_allocator: ?std.mem.Allocator,
     };
 }
 
 fn runGemvNoTransColumnTask(comptime T: type, raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const GemvNoTransColumnTask(T) = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    gemvNoTransUnitReal(T, task.m, task.n1 - task.n0, task.alpha, task.a + matIndex(task.lda, 0, task.n0), task.lda, task.x + task.n0, task.y_delta);
+    gemvNoTransUnitReal(T, task.m, task.n1 - task.n0, task.alpha, task.a + matIndex(task.lda, 0, task.n0), task.lda, task.x + task.n0, task.y_delta, task.scratch_allocator);
 }
 
 fn runGemvNoTransColumnTaskF32(raw_tasks: *const anyopaque, index: usize) void {
@@ -430,14 +458,16 @@ fn addUnitReal(comptime T: type, n: usize, x: [*]const T, y: [*]T) void {
     while (i < n) : (i += 1) y[i] += x[i];
 }
 
-fn parallelGemvNoTransColumnsUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelGemvNoTransColumnsUnitReal(comptime T: type, resources: core_pool.CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferNoTransParallel(m, n)) return false;
-    const task_count = gemvTaskLimit(T, m, n, false, core_pool.taskCount(n, tuning.noTransColumnMinColumns()));
+    const task_count = gemvTaskLimit(T, m, n, false, resources.taskCount(n, tuning.noTransColumnMinColumns()));
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * m;
     if (!tuning.workspaceAllowed(workspace_len, @sizeOf(T))) return false;
-    const workspace = gemvWorkspace(T, workspace_len) orelse return false;
+    const workspace_lease = gemvWorkspaceWithResources(T, resources, workspace_len) orelse return false;
+    defer workspace_lease.release();
+    const workspace = workspace_lease.values;
     @memset(workspace, 0);
 
     var tasks: [core_pool.max_tasks]GemvNoTransColumnTask(T) = undefined;
@@ -453,11 +483,12 @@ fn parallelGemvNoTransColumnsUnitReal(comptime T: type, m: usize, n: usize, alph
             .lda = lda,
             .x = x,
             .y_delta = workspace.ptr + task_index * m,
+            .scratch_allocator = resources.scratchAllocator(),
         };
     }
 
     const runner = if (T == f32) runGemvNoTransColumnTaskF32 else runGemvNoTransColumnTaskF64;
-    if (!runGemvTasks(runner, @ptrCast(&tasks), task_count)) return false;
+    if (!runGemvTasks(resources, runner, @ptrCast(&tasks), task_count)) return false;
 
     for (0..task_count) |task_index| {
         addUnitReal(T, m, workspace.ptr + task_index * m, y);
@@ -515,8 +546,8 @@ fn gemvTransUnitRealF64(m: usize, n: usize, alpha: f64, a: [*]const f64, lda: Bl
     }
 }
 
-fn gemvTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) void {
-    if (matrix_vector_kernels.gemvTransUnitReal(T, m, n, alpha, a, lda, x, y)) return;
+fn gemvTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T, scratch_allocator: ?std.mem.Allocator) void {
+    if (matrix_vector_kernels.gemvTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator)) return;
     if (comptime T == f64) return gemvTransUnitRealF64(m, n, alpha, a, lda, x, y);
 
     const lane_count = lanes(T);
@@ -604,13 +635,14 @@ fn GemvTransTask(comptime T: type) type {
         lda: BlasInt,
         x: [*]const T,
         y: [*]T,
+        scratch_allocator: ?std.mem.Allocator,
     };
 }
 
 fn runGemvTransTask(comptime T: type, raw_tasks: *const anyopaque, index: usize) void {
     const tasks: [*]const GemvTransTask(T) = @ptrCast(@alignCast(raw_tasks));
     const task = tasks[index];
-    gemvTransUnitReal(T, task.m, task.n1 - task.n0, task.alpha, task.a + matIndex(task.lda, 0, task.n0), task.lda, task.x, task.y + task.n0);
+    gemvTransUnitReal(T, task.m, task.n1 - task.n0, task.alpha, task.a + matIndex(task.lda, 0, task.n0), task.lda, task.x, task.y + task.n0, task.scratch_allocator);
 }
 
 fn runGemvTransTaskF32(raw_tasks: *const anyopaque, index: usize) void {
@@ -621,9 +653,9 @@ fn runGemvTransTaskF64(raw_tasks: *const anyopaque, index: usize) void {
     runGemvTransTask(f64, raw_tasks, index);
 }
 
-fn parallelGemvTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelGemvTransUnitReal(comptime T: type, resources: core_pool.CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferTransParallel(T, m, n)) return false;
-    var task_count = gemvTaskLimit(T, m, n, true, core_pool.taskCount(n, tuning.transMinColumns()));
+    var task_count = gemvTaskLimit(T, m, n, true, resources.taskCount(n, tuning.transMinColumns()));
     if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n >= m *| 4) task_count = level2_tuning.capTaskCountByWork(task_count, m *| n, 64 * 1024);
     }
@@ -651,41 +683,43 @@ fn parallelGemvTransUnitReal(comptime T: type, m: usize, n: usize, alpha: T, a: 
             .lda = lda,
             .x = x,
             .y = y,
+            .scratch_allocator = resources.scratchAllocator(),
         };
     }
 
     const runner = if (T == f32) runGemvTransTaskF32 else runGemvTransTaskF64;
-    if (T == f32 and n < 1536) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    if (T == f64 and m == 512 and n == 512) return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
-    return runGemvTasks(runner, @ptrCast(&tasks), task_count);
+    if (T == f32 and n < 1536) return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    if (T == f64 and m == 512 and n == 512) return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    return runGemvTasks(resources, runner, @ptrCast(&tasks), task_count);
 }
 
-fn gemvUnitReal(comptime T: type, trans_: Order, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
+fn gemvUnitReal(comptime T: type, resources: core_pool.CallResources, trans_: Order, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
     if (alpha == 0) {
         scaleUnitReal(T, if (trans_ == .no_trans) m else n, beta, y);
         return;
     }
+    const scratch_allocator = resources.scratchAllocator();
     if (trans_ == .no_trans) {
-        if (matrix_vector_kernels.gemvNoTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y)) return;
+        if (matrix_vector_kernels.gemvNoTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y, scratch_allocator)) return;
     } else {
         // Keep very wide f64 outputs available to the shared task planner;
         // each independent task can still use the architecture SME2 body.
         const prefer_parallel_wide_f64 = tuning.preferWideF64Parallel(T, m, n);
-        if (!prefer_parallel_wide_f64 and matrix_vector_kernels.gemvTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y)) return;
+        if (!prefer_parallel_wide_f64 and matrix_vector_kernels.gemvTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y, scratch_allocator)) return;
     }
 
     const leny = if (trans_ == .no_trans) m else n;
     scaleUnitReal(T, leny, beta, y);
 
     if (trans_ == .no_trans) {
-        if (matrix_vector_kernels.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y)) return;
-        if (parallelGemvNoTransPackedRowsUnitReal(T, m, n, alpha, a, lda, x, y)) return;
-        if (parallelGemvNoTransColumnsUnitReal(T, m, n, alpha, a, lda, x, y)) return;
-        if (parallelGemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y)) return;
-        gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y);
+        if (matrix_vector_kernels.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator)) return;
+        if (parallelGemvNoTransPackedRowsUnitReal(T, resources, m, n, alpha, a, lda, x, y)) return;
+        if (parallelGemvNoTransColumnsUnitReal(T, resources, m, n, alpha, a, lda, x, y)) return;
+        if (parallelGemvNoTransUnitReal(T, resources, m, n, alpha, a, lda, x, y)) return;
+        gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator);
     } else {
-        if (parallelGemvTransUnitReal(T, m, n, alpha, a, lda, x, y)) return;
-        gemvTransUnitReal(T, m, n, alpha, a, lda, x, y);
+        if (parallelGemvTransUnitReal(T, resources, m, n, alpha, a, lda, x, y)) return;
+        gemvTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator);
     }
 }
 
@@ -1080,7 +1114,7 @@ fn runGemvNoTransTiledFullComplexTaskC32(raw_tasks: *const anyopaque, index: usi
     runGemvNoTransTiledFullComplexTask(scalar.ComplexF32, raw_tasks, index);
 }
 
-fn parallelGemvNoTransTiledFullComplex(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) bool {
+fn parallelGemvNoTransTiledFullComplex(comptime T: type, resources: CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) bool {
     if (!tuning.preferComplexTiledFull(T, m, n)) return false;
     if (!matrix_vector_kernels.supportsGemvNoTransFullUnitComplex(T, 128, 128, lda)) return false;
 
@@ -1100,10 +1134,10 @@ fn parallelGemvNoTransTiledFullComplex(comptime T: type, m: usize, n: usize, alp
     }
 
     const runner = if (T == scalar.ComplexF32) runGemvNoTransTiledFullComplexTaskC32 else runGemvNoTransTiledFullComplexTaskC64;
-    return core_pool.runLowLatency(runner, @ptrCast(&tasks), row_tiles);
+    return resources.runLowLatency(runner, @ptrCast(&tasks), row_tiles);
 }
 
-fn parallelGemvNoTransRowsUnitComplex(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelGemvNoTransRowsUnitComplex(comptime T: type, resources: CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferNoTransRowsComplex(T, m, n, lda)) return false;
 
     const row_count: usize = 64;
@@ -1123,18 +1157,20 @@ fn parallelGemvNoTransRowsUnitComplex(comptime T: type, m: usize, n: usize, alph
         };
     }
 
-    return core_pool.runLowLatency(runGemvNoTransRowsComplexTaskC64, @ptrCast(&tasks), tasks.len);
+    return resources.runLowLatency(runGemvNoTransRowsComplexTaskC64, @ptrCast(&tasks), tasks.len);
 }
 
-fn parallelGemvNoTransUnitComplex(comptime T: type, m: usize, n: usize, m_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
+fn parallelGemvNoTransUnitComplex(comptime T: type, resources: CallResources, m: usize, n: usize, m_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T) bool {
     if (!tuning.preferComplexParallel(T, m, n)) return false;
-    var task_count = gemvTaskLimit(T, m, n, false, core_pool.taskCount(n, tuning.complexMinColumns(T)));
+    var task_count = gemvTaskLimit(T, m, n, false, resources.taskCount(n, tuning.complexMinColumns(T)));
     task_count = tuning.capComplexTasks(T, m, n, task_count, true);
     if (task_count <= 1) return false;
 
     const workspace_len = task_count * m;
     if (!tuning.workspaceAllowed(workspace_len, @sizeOf(T))) return false;
-    const workspace = gemvWorkspace(T, workspace_len) orelse return false;
+    const call_workspace = gemvWorkspaceWithResources(T, resources, workspace_len) orelse return false;
+    defer call_workspace.release();
+    const workspace = call_workspace.values;
     const block_cols = tuning.complexBlockColumns();
     const block_count = n / block_cols;
     var task_overwrites_workspace = (T == scalar.ComplexF32 or T == scalar.ComplexF64) and m == 512 and n == 512;
@@ -1165,7 +1201,7 @@ fn parallelGemvNoTransUnitComplex(comptime T: type, m: usize, n: usize, m_: Blas
     }
 
     const runner = if (T == scalar.ComplexF32) runGemvNoTransComplexTaskC32 else runGemvNoTransComplexTaskC64;
-    if (!core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
+    if (!resources.runLowLatency(runner, @ptrCast(&tasks), task_count)) return false;
 
     if (task_overwrites_workspace) {
         if (T == scalar.ComplexF32) {
@@ -1188,7 +1224,7 @@ fn parallelGemvNoTransUnitComplex(comptime T: type, m: usize, n: usize, m_: Blas
 
     const add_alpha = one(T);
     for (0..task_count) |task_index| {
-        vector_ops.axpy(T, m_, add_alpha, workspace.ptr + task_index * m, 1, y, 1);
+        vector_ops.axpyUnitWithResources(T, resources, m_, add_alpha, workspace.ptr + task_index * m, y);
     }
     return true;
 }
@@ -1820,7 +1856,7 @@ fn runGemvTransTiledFullComplexTaskC32(raw_tasks: *const anyopaque, index: usize
     runGemvTransTiledFullComplexTask(scalar.ComplexF32, raw_tasks, index);
 }
 
-fn parallelGemvTransTiledFullComplex(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T, do_conj: bool) bool {
+fn parallelGemvTransTiledFullComplex(comptime T: type, resources: CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T, do_conj: bool) bool {
     if (!tuning.preferComplexTiledFull(T, m, n)) return false;
     if (!matrix_vector_kernels.supportsGemvTransFullUnitComplex(T, 128, 128, lda, false)) return false;
 
@@ -1841,10 +1877,10 @@ fn parallelGemvTransTiledFullComplex(comptime T: type, m: usize, n: usize, alpha
     }
 
     const runner = if (T == scalar.ComplexF32) runGemvTransTiledFullComplexTaskC32 else runGemvTransTiledFullComplexTaskC64;
-    return core_pool.runLowLatency(runner, @ptrCast(&tasks), col_tiles);
+    return resources.runLowLatency(runner, @ptrCast(&tasks), col_tiles);
 }
 
-fn parallelGemvTransTaskFullComplex(comptime T: type, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T, do_conj: bool) bool {
+fn parallelGemvTransTaskFullComplex(comptime T: type, resources: CallResources, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T, do_conj: bool) bool {
     if (!tuning.preferTransTaskFullComplex(T, m, n)) return false;
     const task_n: usize = 64;
     if (!matrix_vector_kernels.supportsGemvTransTaskFullUnitComplex(T, m, task_n, lda, do_conj)) return false;
@@ -1863,13 +1899,13 @@ fn parallelGemvTransTaskFullComplex(comptime T: type, m: usize, n: usize, alpha:
         };
     }
 
-    return core_pool.runLowLatency(runGemvTransFullComplexTaskC64, @ptrCast(&tasks), tasks.len);
+    return resources.runLowLatency(runGemvTransFullComplexTaskC64, @ptrCast(&tasks), tasks.len);
 }
 
-fn parallelGemvTransUnitComplex(comptime T: type, m: usize, n: usize, m_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T, do_conj: bool) bool {
+fn parallelGemvTransUnitComplex(comptime T: type, resources: CallResources, m: usize, n: usize, m_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, y: [*]T, do_conj: bool) bool {
     if (!tuning.preferComplexParallel(T, m, n)) return false;
     const min_columns = if (builtin.target.cpu.arch == .x86_64) 64 else tuning.complexMinColumns(T);
-    var task_count = gemvTaskLimit(T, m, n, true, core_pool.taskCount(n, min_columns));
+    var task_count = gemvTaskLimit(T, m, n, true, resources.taskCount(n, min_columns));
     task_count = tuning.capComplexTasks(T, m, n, task_count, false);
     if (task_count <= 1) return false;
 
@@ -1898,10 +1934,10 @@ fn parallelGemvTransUnitComplex(comptime T: type, m: usize, n: usize, m_: BlasIn
     }
 
     const runner = if (T == scalar.ComplexF32) runGemvTransComplexTaskC32 else runGemvTransComplexTaskC64;
-    return core_pool.runLowLatency(runner, @ptrCast(&tasks), task_count);
+    return resources.runLowLatency(runner, @ptrCast(&tasks), task_count);
 }
 
-fn gemvUnitComplex(comptime T: type, trans_: Order, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
+fn gemvUnitComplex(comptime T: type, resources: CallResources, trans_: Order, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, beta: T, y: [*]T) void {
     const m = toUsize(m_);
     const n = toUsize(n_);
     const leny = if (trans_ == .no_trans) m_ else n_;
@@ -1909,39 +1945,51 @@ fn gemvUnitComplex(comptime T: type, trans_: Order, m_: BlasInt, n_: BlasInt, al
     if (beta_zero) @memset(y[0..toUsize(leny)], zero(T));
     if (trans_ == .no_trans and !isZero(T, alpha)) {
         if (matrix_vector_kernels.gemvNoTransFullUnitComplex(T, m, n, alpha, a, lda, x, beta, y)) return;
-        if (parallelGemvNoTransTiledFullComplex(T, m, n, alpha, a, lda, x, beta, y)) return;
+        if (parallelGemvNoTransTiledFullComplex(T, resources, m, n, alpha, a, lda, x, beta, y)) return;
     } else if (!isZero(T, alpha)) {
         const do_conj = trans_ == .conj_trans;
         if (matrix_vector_kernels.gemvTransFullUnitComplex(T, m, n, alpha, a, lda, x, beta, y, do_conj)) return;
-        if (parallelGemvTransTiledFullComplex(T, m, n, alpha, a, lda, x, beta, y, do_conj)) return;
-        if (parallelGemvTransTaskFullComplex(T, m, n, alpha, a, lda, x, beta, y, do_conj)) return;
+        if (parallelGemvTransTiledFullComplex(T, resources, m, n, alpha, a, lda, x, beta, y, do_conj)) return;
+        if (parallelGemvTransTaskFullComplex(T, resources, m, n, alpha, a, lda, x, beta, y, do_conj)) return;
     }
-    if (!beta_zero) vector_ops.scal(T, leny, beta, y, 1);
+    if (!beta_zero) vector_ops.scalUnitWithResources(T, resources, leny, beta, y);
     if (isZero(T, alpha)) return;
 
     if (trans_ == .no_trans) {
-        if (parallelGemvNoTransRowsUnitComplex(T, m, n, alpha, a, lda, x, y)) return;
+        if (parallelGemvNoTransRowsUnitComplex(T, resources, m, n, alpha, a, lda, x, y)) return;
         if (matrix_vector_kernels.supportsGemvNoTransUnitComplex(T)) {
             if (matrix_vector_kernels.gemvNoTransUnitComplex(T, m, n, alpha, a, lda, x, y)) return;
         }
-        if (parallelGemvNoTransUnitComplex(T, m, n, m_, alpha, a, lda, x, y)) return;
+        if (parallelGemvNoTransUnitComplex(T, resources, m, n, m_, alpha, a, lda, x, y)) return;
         gemvNoTransUnitComplex(T, m_, n, alpha, a, lda, x, y);
     } else {
         const do_conj = trans_ == .conj_trans;
         // The full unit kernel must not preempt a useful column partition.
         // Keep each AVX2 task large enough for the paired-column leaf.
-        if (builtin.target.cpu.arch == .x86_64 and m >= 256 and n >= 256 and m *| n <= 512 * 512 and @import("../../runtime.zig").maxThreads() > 1) {
-            if (parallelGemvTransUnitComplex(T, m, n, m_, alpha, a, lda, x, y, do_conj)) return;
+        if (builtin.target.cpu.arch == .x86_64 and m >= 256 and n >= 256 and m *| n <= 512 * 512 and resources.maxThreads() > 1) {
+            if (parallelGemvTransUnitComplex(T, resources, m, n, m_, alpha, a, lda, x, y, do_conj)) return;
         }
         if (matrix_vector_kernels.supportsGemvTransUnitComplex(T)) {
             if (matrix_vector_kernels.gemvTransUnitComplex(T, m, n, alpha, a, lda, x, y, do_conj)) return;
         }
-        if (parallelGemvTransUnitComplex(T, m, n, m_, alpha, a, lda, x, y, do_conj)) return;
+        if (parallelGemvTransUnitComplex(T, resources, m, n, m_, alpha, a, lda, x, y, do_conj)) return;
         gemvTransUnitComplex(T, m_, n, alpha, a, lda, x, y, do_conj);
     }
 }
 
+/// Borrow an already admitted operation for this synchronous GEMV call.
+/// The caller retains admission until all tasks and call-local scratch complete.
+pub fn gemvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, trans_: Order, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt) void {
+    return gemvWithResources(T, .{ .admitted = operation }, trans_, m_, n_, alpha, a, lda, x, incx_, beta, y, incy_);
+}
+
 pub fn gemv(comptime T: type, trans_: Order, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt) void {
+    return gemvWithResources(T, .legacy_default, trans_, m_, n_, alpha, a, lda, x, incx_, beta, y, incy_);
+}
+
+/// Borrow one enclosing call's resources; this entry does not admit an operation.
+/// Real and complex GEMV use its executor and temporary allocator.
+pub fn gemvWithResources(comptime T: type, resources: core_pool.CallResources, trans_: Order, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, x: [*]const T, incx_: BlasInt, beta: T, y: [*]T, incy_: BlasInt) void {
     if (m_ <= 0 or n_ <= 0 or incx_ == 0 or incy_ == 0) return;
     const m = toUsize(m_);
     const n = toUsize(n_);
@@ -1952,8 +2000,8 @@ pub fn gemv(comptime T: type, trans_: Order, m_: BlasInt, n_: BlasInt, alpha: T,
         .incy = incy_,
     });
     if (selected.kernel.implementation == .core_unit) {
-        if (comptime isReal(T)) return gemvUnitReal(T, trans_, m, n, alpha, a, lda, x, beta, y);
-        if (comptime isComplex(T)) return gemvUnitComplex(T, trans_, m_, n_, alpha, a, lda, x, beta, y);
+        if (comptime isReal(T)) return gemvUnitReal(T, resources, trans_, m, n, alpha, a, lda, x, beta, y);
+        if (comptime isComplex(T)) return gemvUnitComplex(T, resources, trans_, m_, n_, alpha, a, lda, x, beta, y);
     }
     const lenx: BlasInt = if (trans_ == .no_trans) n_ else m_;
     const leny: BlasInt = if (trans_ == .no_trans) m_ else n_;
@@ -2085,8 +2133,8 @@ pub const testing = struct {
         y: [*]T,
     ) void {
         if (comptime isReal(T)) {
-            if (trans_ == .no_trans) return gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y);
-            return gemvTransUnitReal(T, m, n, alpha, a, lda, x, y);
+            if (trans_ == .no_trans) return gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y, null);
+            return gemvTransUnitReal(T, m, n, alpha, a, lda, x, y, null);
         }
         if (trans_ == .no_trans) return gemvNoTransUnitComplex(T, @intCast(m), n, alpha, a, lda, x, y);
         return gemvTransUnitComplex(T, @intCast(m), n, alpha, a, lda, x, y, trans_ == .conj_trans);

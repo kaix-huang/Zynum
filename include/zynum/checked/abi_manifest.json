@@ -1,0 +1,283 @@
+{
+  "schema": 1,
+  "schema_id": "zynum-checked-abi-v1",
+  "abi_revision": 1,
+  "stability": "experimental",
+  "target_pointer_bits": 64,
+  "export_count": 8,
+  "object_support_symbols": {
+    "macho": [
+      "__dso_handle",
+      "_mh_dylib_header"
+    ],
+    "elf": [],
+    "coff": []
+  },
+  "layouts": {
+    "result": {
+      "size": 16,
+      "alignment": 8,
+      "offsets": {
+        "status": 0,
+        "reserved": 4,
+        "info": 8
+      }
+    },
+    "buffer": {
+      "size": 16,
+      "alignment": 8,
+      "offsets": {
+        "data": 0,
+        "length": 8
+      }
+    },
+    "const_buffer": {
+      "size": 16,
+      "alignment": 8,
+      "offsets": {
+        "data": 0,
+        "length": 8
+      }
+    },
+    "dense": {
+      "size": 40,
+      "alignment": 8,
+      "offsets": {
+        "storage": 0,
+        "rows": 16,
+        "cols": 24,
+        "ld": 32
+      }
+    },
+    "const_dense": {
+      "size": 40,
+      "alignment": 8,
+      "offsets": {
+        "storage": 0,
+        "rows": 16,
+        "cols": 24,
+        "ld": 32
+      }
+    },
+    "csr": {
+      "size": 64,
+      "alignment": 8,
+      "offsets": {
+        "row_offsets": 0,
+        "column_indices": 16,
+        "values": 32,
+        "rows": 48,
+        "cols": 56
+      }
+    }
+  },
+  "statuses": {
+    "OK": 0,
+    "INVALID_FLAG": 1,
+    "INVALID_DIMENSION": 2,
+    "INVALID_LEADING_DIMENSION": 3,
+    "BUFFER_TOO_SMALL": 4,
+    "NULL_POINTER": 5,
+    "MISALIGNED_POINTER": 6,
+    "SIZE_OVERFLOW": 7,
+    "DIMENSION_MISMATCH": 8,
+    "ALIASING_NOT_ALLOWED": 9,
+    "INVALID_SPARSE_STRUCTURE": 10,
+    "NONFINITE_INPUT": 11,
+    "NUMERICAL_FAILURE": 12,
+    "INVALID_LENGTH": 13,
+    "INTERNAL_ERROR": 14
+  },
+  "flags": {
+    "LOWER": 1,
+    "UPPER": 2,
+    "NORMAL": 0,
+    "TRANSPOSED": 1
+  },
+  "exports": [
+    {
+      "name": "zynum_checked_cholesky_factor_f32",
+      "args": [
+        [
+          "a",
+          "dense"
+        ],
+        [
+          "triangle",
+          "i32"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_cholesky_solve_f32",
+      "args": [
+        [
+          "a",
+          "const_dense"
+        ],
+        [
+          "b",
+          "dense"
+        ],
+        [
+          "triangle",
+          "i32"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_csr_spmv_f32_u32",
+      "args": [
+        [
+          "a",
+          "csr"
+        ],
+        [
+          "operation",
+          "i32"
+        ],
+        [
+          "alpha",
+          "f32"
+        ],
+        [
+          "x",
+          "const_buffer"
+        ],
+        [
+          "beta",
+          "f32"
+        ],
+        [
+          "y",
+          "buffer"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_csr_spmv_f32_u64",
+      "args": [
+        [
+          "a",
+          "csr"
+        ],
+        [
+          "operation",
+          "i32"
+        ],
+        [
+          "alpha",
+          "f32"
+        ],
+        [
+          "x",
+          "const_buffer"
+        ],
+        [
+          "beta",
+          "f32"
+        ],
+        [
+          "y",
+          "buffer"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_cholesky_factor_f64",
+      "args": [
+        [
+          "a",
+          "dense"
+        ],
+        [
+          "triangle",
+          "i32"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_cholesky_solve_f64",
+      "args": [
+        [
+          "a",
+          "const_dense"
+        ],
+        [
+          "b",
+          "dense"
+        ],
+        [
+          "triangle",
+          "i32"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_csr_spmv_f64_u32",
+      "args": [
+        [
+          "a",
+          "csr"
+        ],
+        [
+          "operation",
+          "i32"
+        ],
+        [
+          "alpha",
+          "f64"
+        ],
+        [
+          "x",
+          "const_buffer"
+        ],
+        [
+          "beta",
+          "f64"
+        ],
+        [
+          "y",
+          "buffer"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "name": "zynum_checked_csr_spmv_f64_u64",
+      "args": [
+        [
+          "a",
+          "csr"
+        ],
+        [
+          "operation",
+          "i32"
+        ],
+        [
+          "alpha",
+          "f64"
+        ],
+        [
+          "x",
+          "const_buffer"
+        ],
+        [
+          "beta",
+          "f64"
+        ],
+        [
+          "y",
+          "buffer"
+        ]
+      ],
+      "result": "result"
+    }
+  ]
+}

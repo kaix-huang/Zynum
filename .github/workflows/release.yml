@@ -386,7 +386,7 @@ jobs:
           PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
-        run: zig build ${{ matrix.target_args }} --release=fast --summary failures
+        run: zig build ${{ matrix.target_args }} -Dchecked-abi=true --release=fast --summary failures
 
       - name: Check ABI manifest
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
@@ -399,6 +399,7 @@ jobs:
             --manifest include/zynum/blas/abi_manifest.json \
             --dynamic "${{ matrix.dynlib }}" \
             --static zig-out/lib/libzynum_blas.a
+          zig build check-checked-abi ${{ matrix.target_args }} --release=fast --summary failures
 
       - name: Require clean committed checkout before archiving
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}

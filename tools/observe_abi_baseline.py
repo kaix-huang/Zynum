@@ -881,7 +881,36 @@ def _routine_family(name: str) -> str:
     return base
 
 
+CHECKED_SOURCE_EXPORTS = {
+    "src/checked/exports.zig": frozenset({
+        "zynum_checked_cholesky_factor_f32", "zynum_checked_cholesky_solve_f32",
+        "zynum_checked_cholesky_factor_f64", "zynum_checked_cholesky_solve_f64",
+        "zynum_checked_csr_spmv_f32_u32", "zynum_checked_csr_spmv_f32_u64",
+        "zynum_checked_csr_spmv_f64_u32", "zynum_checked_csr_spmv_f64_u64",
+    }),
+    "src/checked/cholesky_exports.zig": frozenset(
+        f"zynum_checked_cholesky_{operation}_complex_{precision}"
+        for operation in ("factor", "solve") for precision in ("f32", "f64")
+    ),
+    "src/checked/sparse_exports.zig": frozenset(
+        f"zynum_checked_csr_{operation}_{scalar}_{offset}_{column}"
+        for operation in ("spmv", "spmm")
+        for scalar in ("f32", "f64", "complex_f32", "complex_f64")
+        for offset in ("i32", "u32", "i64", "u64")
+        for column in ("i32", "u32", "i64", "u64")
+    ),
+}
+NON_BLAS_ARTIFACT_CATEGORIES = frozenset({"separate_checked_interface", "test_probe"})
+
+
 def classify_symbol(name: str, source_path: str, visibility: str) -> str:
+    # These exact source declarations belong to separate checked packages or a
+    # test executable. They remain observed, without entering the legacy BLAS
+    # artifact's required symbol set or granting any checked-ABI readiness.
+    if name in CHECKED_SOURCE_EXPORTS.get(source_path, ()):
+        return "separate_checked_interface"
+    if source_path == "src/blas/runtime_lifecycle_probe.zig" and name == "main":
+        return "test_probe"
     family = _routine_family(name)
     if name.startswith("zynum_internal_") or visibility == "hidden":
         return "internal_bridge"
@@ -900,6 +929,17 @@ def classify_symbol(name: str, source_path: str, visibility: str) -> str:
     if family in LEVEL3:
         return "standard_level3"
     return "unclassified"
+
+
+def artifact_source_symbol_sets(
+    declarations: list[dict[str, Any]],
+) -> tuple[set[str], set[str]]:
+    scoped = [entry for entry in declarations if entry["category"] not in NON_BLAS_ARTIFACT_CATEGORIES]
+    public = {entry["exported_name"] for entry in scoped
+              if entry["exported_name"] != "not_observed" and entry["visibility"] != "hidden"}
+    hidden = {entry["exported_name"] for entry in scoped
+              if entry["exported_name"] != "not_observed" and entry["visibility"] == "hidden"}
+    return public, hidden
 
 
 def scan_zig_exports(source_root: Path, repository_root: Path) -> list[dict[str, Any]]:
@@ -2829,16 +2869,7 @@ def build_observation(args: argparse.Namespace) -> dict[str, Any]:
         )
     source_declarations = scan_zig_exports(root / "src", root)
     projection, projection_inputs, projection_counts = observe_projections(root)
-    public_source_names = {
-        item["exported_name"]
-        for item in source_declarations
-        if item["exported_name"] != "not_observed" and item["visibility"] != "hidden"
-    }
-    hidden_source_names = {
-        item["exported_name"]
-        for item in source_declarations
-        if item["exported_name"] != "not_observed" and item["visibility"] == "hidden"
-    }
+    public_source_names, hidden_source_names = artifact_source_symbol_sets(source_declarations)
     generator_declarations = [
         item
         for item in source_declarations

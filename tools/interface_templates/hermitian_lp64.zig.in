@@ -1,0 +1,43 @@
+// Interface-only template. Numerical/data/resource policy comes from one binding.
+fn HermitianReal(comptime T: type) type {
+    return if (T == C) f32 else if (T == Z) f64 else @compileError("Hermitian complex scalar required");
+}
+fn HermitianStandard(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("Hermitian interface acceptance is LP64 only");
+    return struct {
+        fn invoke(layout: c_int, jobz: i8, uplo: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt, w: ?[*]align(1) HermitianReal(T), work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) HermitianReal(T)) WireInt {
+            const info = binding.Shared.hermitianRawManagedWithDefaults(true, T, .heev, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout, .jobz = @bitCast(jobz), .uplo = @bitCast(uplo), .n = @intCast(n),
+                .a = a, .lda = @intCast(lda), .w = w, .work = work, .lwork = @intCast(lwork), .rwork = rwork,
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return @intCast(info);
+        }
+        fn high(layout: c_int, jobz: i8, uplo: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt, w: ?[*]align(1) HermitianReal(T)) callconv(.c) WireInt {
+            return invoke(layout, jobz, uplo, n, a, lda, w, null, 0, null);
+        }
+        fn workEntry(layout: c_int, jobz: i8, uplo: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt, w: ?[*]align(1) HermitianReal(T), work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) HermitianReal(T)) callconv(.c) WireInt {
+            return invoke(layout, jobz, uplo, n, a, lda, w, work, lwork, rwork);
+        }
+        pub const call = if (level == .high) high else workEntry;
+    };
+}
+fn HermitianGeneralized(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("Hermitian interface acceptance is LP64 only");
+    return struct {
+        fn invoke(layout: c_int, itype: WireInt, jobz: i8, uplo: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt, w: ?[*]align(1) HermitianReal(T), work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) HermitianReal(T)) WireInt {
+            const info = binding.Shared.hermitianRawManagedWithDefaults(true, T, .hegv, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout, .itype = @intCast(itype), .jobz = @bitCast(jobz), .uplo = @bitCast(uplo), .n = @intCast(n),
+                .a = a, .lda = @intCast(lda), .b = b, .ldb = @intCast(ldb), .w = w,
+                .work = work, .lwork = @intCast(lwork), .rwork = rwork,
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return @intCast(info);
+        }
+        fn high(layout: c_int, itype: WireInt, jobz: i8, uplo: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt, w: ?[*]align(1) HermitianReal(T)) callconv(.c) WireInt {
+            return invoke(layout, itype, jobz, uplo, n, a, lda, b, ldb, w, null, 0, null);
+        }
+        fn workEntry(layout: c_int, itype: WireInt, jobz: i8, uplo: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt, w: ?[*]align(1) HermitianReal(T), work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) HermitianReal(T)) callconv(.c) WireInt {
+            return invoke(layout, itype, jobz, uplo, n, a, lda, b, ldb, w, work, lwork, rwork);
+        }
+        pub const call = if (level == .high) high else workEntry;
+    };
+}

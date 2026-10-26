@@ -168,6 +168,8 @@
       "retained_extension",
       "architecture_extension",
       "internal_bridge",
+      "separate_checked_interface",
+      "test_probe",
       "toolchain_owned",
       "unclassified"
     ],

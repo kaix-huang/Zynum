@@ -39,14 +39,19 @@ fn AmxPackWorkspace(comptime T: type) type {
     return struct {
         data: []T,
         cached: bool,
+        allocator: std.mem.Allocator = std.heap.c_allocator,
 
         fn deinit(self: @This()) void {
-            if (!self.cached) std.heap.c_allocator.free(self.data);
+            if (!self.cached) self.allocator.free(self.data);
         }
     };
 }
 
-fn acquirePack(comptime T: type, len: usize, cache_bytes: usize) ?AmxPackWorkspace(T) {
+fn acquirePack(comptime T: type, len: usize, cache_bytes: usize, scratch_allocator: ?std.mem.Allocator) ?AmxPackWorkspace(T) {
+    if (scratch_allocator) |allocator| {
+        const data = allocator.alloc(T, len) catch return null;
+        return .{ .data = data, .cached = false, .allocator = allocator };
+    }
     const max_cached_elems = cache_bytes / @sizeOf(T);
     if (len > max_cached_elems) {
         const data = std.heap.c_allocator.alloc(T, len) catch return null;
@@ -120,11 +125,12 @@ fn amxGemmWithPack(
     ldc: usize,
     pack_elems: usize,
     workspace: gemm_task.PackWorkspacePlan,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
     if (canUseStackPack(T, pack_elems, workspace)) {
         amxGemmStackPack(T, loop_fn, max_stack_pack_elems, pack_elems, m, n, k, a, lda, b, ldb, c, ldc);
     } else {
-        const heap_workspace = acquirePack(T, pack_elems, workspace.cache_bytes) orelse return false;
+        const heap_workspace = acquirePack(T, pack_elems, workspace.cache_bytes, scratch_allocator) orelse return false;
         defer heap_workspace.deinit();
         loop_fn(m, n, k, a, lda, b, ldb, c, ldc, heap_workspace.data.ptr);
     }
@@ -458,23 +464,27 @@ fn amxSgemmN32TransBLoop(m: usize, n: usize, k: usize, a: [*]const f32, lda: usi
     amxSgemmN32LoopForLayout(true, m, n, k, a, lda, b, ldb, c, ldc, b_pack);
 }
 
-fn amxSgemmN16WithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f32, amxSgemmN16Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxSgemmN16WithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f32, amxSgemmN16Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
-fn amxSgemmN32WithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f32, amxSgemmN32Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxSgemmN32WithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f32, amxSgemmN32Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
-fn amxSgemmN16TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f32, amxSgemmN16TransBLoop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxSgemmN16TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f32, amxSgemmN16TransBLoop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
-fn amxSgemmN32TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f32, amxSgemmN32TransBLoop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxSgemmN32TransBWithPack(m: usize, n: usize, k: usize, a: [*]const f32, lda: usize, b: [*]const f32, ldb: usize, c: [*]f32, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f32, amxSgemmN32TransBLoop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
 pub fn sgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return sgemmN16WithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn sgemmN16WithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 15) != 0 or (n_ & 15) != 0) return 0;
@@ -487,7 +497,7 @@ pub fn sgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b
     const ldc: usize = @intCast(ldc_);
 
     const pack_elems = k * 16;
-    return if (amxSgemmN16WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxSgemmN16WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn zynum_blas_amx_sgemm_nn_f32_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
@@ -496,6 +506,10 @@ pub fn zynum_blas_amx_sgemm_nn_f32_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]co
 }
 
 pub fn sgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return sgemmN32WithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn sgemmN32WithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 31) != 0 or (n_ & 31) != 0) return 0;
@@ -508,10 +522,14 @@ pub fn sgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b
     const ldc: usize = @intCast(ldc_);
 
     const pack_elems = k * 32;
-    return if (amxSgemmN32WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxSgemmN32WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn sgemmN16TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return sgemmN16TransBWithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn sgemmN16TransBWithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 15) != 0 or (n_ & 15) != 0) return 0;
@@ -524,10 +542,14 @@ pub fn sgemmN16TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_
     const ldc: usize = @intCast(ldc_);
 
     const pack_elems = k * 16;
-    return if (amxSgemmN16TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxSgemmN16TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn sgemmN32TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return sgemmN32TransBWithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn sgemmN32TransBWithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 31) != 0 or (n_ & 31) != 0) return 0;
@@ -540,7 +562,7 @@ pub fn sgemmN32TransB(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_
     const ldc: usize = @intCast(ldc_);
 
     const pack_elems = k * 32;
-    return if (amxSgemmN32TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxSgemmN32TransBWithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn zynum_blas_amx_sgemm_nn_f32_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f32, lda_: c_int, b: [*]const f32, ldb_: c_int, c: [*]f32, ldc_: c_int) callconv(.c) c_int {
@@ -797,6 +819,10 @@ fn packDgemvTransA8(k: usize, a: [*]const f64, lda: usize, j: usize, a_pack: [*]
 }
 
 pub fn dgemvTransN8(m_: c_int, n_: c_int, alpha: f64, a: [*]const f64, lda_: c_int, x: [*]const f64, y: [*]f64) c_int {
+    return dgemvTransN8WithScratch(m_, n_, alpha, a, lda_, x, y, null);
+}
+
+pub fn dgemvTransN8WithScratch(m_: c_int, n_: c_int, alpha: f64, a: [*]const f64, lda_: c_int, x: [*]const f64, y: [*]f64, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0) return 1;
     if ((n_ & 7) != 0) return 0;
@@ -808,7 +834,7 @@ pub fn dgemvTransN8(m_: c_int, n_: c_int, alpha: f64, a: [*]const f64, lda_: c_i
 
     const panel_elems = m * 8;
     const pack_elems = panel_elems * 2;
-    const heap_workspace = acquirePack(f64, pack_elems, compat_pack_plan.cache_bytes) orelse return 0;
+    const heap_workspace = acquirePack(f64, pack_elems, compat_pack_plan.cache_bytes, scratch_allocator) orelse return 0;
     defer heap_workspace.deinit();
 
     const a_pack = heap_workspace.data.ptr;
@@ -836,15 +862,19 @@ pub fn dgemvTransN8(m_: c_int, n_: c_int, alpha: f64, a: [*]const f64, lda_: c_i
     return 1;
 }
 
-fn amxDgemmN16WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: [*]const f64, ldb: usize, c: [*]f64, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f64, amxDgemmN16Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxDgemmN16WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: [*]const f64, ldb: usize, c: [*]f64, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f64, amxDgemmN16Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
-fn amxDgemmN8WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: [*]const f64, ldb: usize, c: [*]f64, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f64, amxDgemmN8Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxDgemmN8WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: [*]const f64, ldb: usize, c: [*]f64, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f64, amxDgemmN8Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
 pub fn dgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return dgemmN16WithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn dgemmN16WithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 31) != 0 or (n_ & 15) != 0) return 0;
@@ -857,7 +887,7 @@ pub fn dgemmN16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b
     const ldc: usize = @intCast(ldc_);
 
     const pack_elems = k * 16;
-    return if (amxDgemmN16WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxDgemmN16WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn zynum_blas_amx_dgemm_nn_f64_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
@@ -866,6 +896,10 @@ pub fn zynum_blas_amx_dgemm_nn_f64_n16(m_: c_int, n_: c_int, k_: c_int, a: [*]co
 }
 
 pub fn dgemmN8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return dgemmN8WithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn dgemmN8WithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
     if ((m_ & 7) != 0 or (n_ & 7) != 0) return 0;
@@ -878,7 +912,7 @@ pub fn dgemmN8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b:
     const ldc: usize = @intCast(ldc_);
 
     const pack_elems = k * 8;
-    return if (amxDgemmN8WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxDgemmN8WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn zynum_blas_amx_dgemm_nn_f64_n8(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {
@@ -938,11 +972,15 @@ fn amxDgemmN32Loop(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b:
     }
 }
 
-fn amxDgemmN32WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: [*]const f64, ldb: usize, c: [*]f64, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan) bool {
-    return amxGemmWithPack(f64, amxDgemmN32Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace);
+fn amxDgemmN32WithPack(m: usize, n: usize, k: usize, a: [*]const f64, lda: usize, b: [*]const f64, ldb: usize, c: [*]f64, ldc: usize, pack_elems: usize, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) bool {
+    return amxGemmWithPack(f64, amxDgemmN32Loop, m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator);
 }
 
 pub fn dgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan) c_int {
+    return dgemmN32WithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, workspace, null);
+}
+
+pub fn dgemmN32WithScratch(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int, workspace: gemm_task.PackWorkspacePlan, scratch_allocator: ?std.mem.Allocator) c_int {
     if (comptime !enabled) return 0;
     if (m_ <= 0 or n_ <= 0 or k_ <= 0) return 1;
 
@@ -956,7 +994,7 @@ pub fn dgemmN32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b
     if ((m & 15) != 0 or (n & 31) != 0) return 0;
 
     const pack_elems = k * 32;
-    return if (amxDgemmN32WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace)) 1 else 0;
+    return if (amxDgemmN32WithPack(m, n, k, a, lda, b, ldb, c, ldc, pack_elems, workspace, scratch_allocator)) 1 else 0;
 }
 
 pub fn zynum_blas_amx_dgemm_nn_f64_n32(m_: c_int, n_: c_int, k_: c_int, a: [*]const f64, lda_: c_int, b: [*]const f64, ldb_: c_int, c: [*]f64, ldc_: c_int) callconv(.c) c_int {

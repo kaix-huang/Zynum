@@ -1,0 +1,11 @@
+{
+  "schema": "zynum-external-interface-profile-v1",
+  "profile": "feast4.lp64.abplas-v1",
+  "target": "apple-arm64-default-c-v1",
+  "integer_bits": 32,
+  "complex_f64_bytes": 16,
+  "symbols": ["feastinit_", "zfeast_hcsrev_"],
+  "coverage": "ABPLaS complex Hermitian standard CSR driver",
+  "full_feast_compatibility": false,
+  "pending_modes": ["Zolotarev", "zero-height contour", "stochastic count", "first-filter-only", "extreme eigenvalue interval search", "verbose output format", "other FEAST routines and profiles"]
+}

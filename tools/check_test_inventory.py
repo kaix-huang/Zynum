@@ -72,346 +72,155 @@ LEGACY_WORKFLOW_MODE_COMMANDS = {
     "workflow-launch:.github/workflows/ci.yml:target-tests:test-releasefast-target": "zig build --release=fast test ${{ matrix.target_args }} -Dtest-optimize=fast -Dhost-tool-smoke=${{ matrix.host_tool_smoke }} --summary failures",
     "workflow-launch:.github/workflows/release.yml:artifacts:test": "zig build test ${{ matrix.target_args }} -Dtest-optimize=safe --summary failures",
 }
-_PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (
-    (
-        "bench/tools/test_benchmark_artifact_snapshot.py",
-        "eef6fb1aaf709f4720b2c16bb7bb9d932cccf95d93970d544c105c06113c8cc9",
-    ),
-    (
-        "bench/tools/test_benchmark_metadata.py",
-        "e273afdd1f2f0bf5af640b148fff5f6bc0028fe2dc5f4392f379f67b9b8eb030",
-    ),
-    (
-        "bench/tools/test_full_benchmark_report.py",
-        "066421c364f32bc25f44687c55c3086902d2a30e2661af8bf1862dc8d7c34726",
-    ),
-    (
-        "bench/tools/test_gemm_sweep_tools.py",
-        "a5a319a8c561a9507b8d7fbd8635c0d86c21b5b886aef576bb3813625d1f53b4",
-    ),
-    (
-        "bench/tools/test_level1_report.py",
-        "00f94923e2bae67768c3d21dc619fd26c307175b14ad5fbfbeddef15283851f8",
-    ),
-    (
-        "bench/tools/test_level2_report.py",
-        "11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1",
-    ),
-    (
-        "bench/tools/test_rank_k_report.py",
-        "ec91dc5e8f0a7927cc9d7afc7c19e2eb50aef4bad87c32f59a80088221e1c778",
-    ),
-    (
-        "bench/tools/test_report_comparison.py",
-        "29514c5ced81ec8ca8e5665ccbead524c84098d3f04ec045a41d182a59bc7250",
-    ),
-    (
-        "bench/tools/test_report_plotters.py",
-        "29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10",
-    ),
-    (
-        "bench/tools/test_report_publication.py",
-        "521d5237d9c5f99d87f07e7305becd09b98d43b4a94d6f5457c1b4483de4a01c",
-    ),
-    (
-        "bench/tools/test_report_schedule.py",
-        "4e008b60e2272bc8f09fd02676a164f5d25aa919dfd560a03f66530829ae2ae3",
-    ),
-    (
-        "bench/tools/test_rotg_latency_report.py",
-        "bbae21d0d23b5d839c857724405ae21fd8ddfcf9f9211880a020b5b5642ca558",
-    ),
-    (
-        "bench/tools/test_symm_report.py",
-        "6ed521a556b1b3d7b13e01fe597b0ddb7337f3f5adcd3cc1ca42b8b7decc6103",
-    ),
-    (
-        "bench/tools/test_triangular_matrix_report.py",
-        "bbb65fe3765ed95bec6f6059e0b5decd968cbfb3afd36eefa1f24cc61deb524d",
-    ),
-    (
-        "bench/tools/test_windows_benchmark.py",
-        "ae57182bf5eb9746ba65ecc93a4db17054f983e40812d1c108bf82dee304d177",
-    ),
-    (
-        "bench/tools/test_windows_comparison.py",
-        "e25be7997b556bc0d9bacb887c885f06afb1a8ac45462efcfc20b7c282e8697e",
-    ),
-    (
-        "bench/tools/test_windows_comparison_plot.py",
-        "d5e0623582cb7b327ee8065fc79df17cf6631d195f06552f95c66d75d18b2b39",
-    ),
-)
-_PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (
-    (
-        "bench/tools/test_benchmark_artifact_snapshot.py",
-        "eef6fb1aaf709f4720b2c16bb7bb9d932cccf95d93970d544c105c06113c8cc9",
-    ),
-    (
-        "bench/tools/test_benchmark_metadata.py",
-        "e273afdd1f2f0bf5af640b148fff5f6bc0028fe2dc5f4392f379f67b9b8eb030",
-    ),
-    (
-        "bench/tools/test_full_benchmark_report.py",
-        "066421c364f32bc25f44687c55c3086902d2a30e2661af8bf1862dc8d7c34726",
-    ),
-    (
-        "bench/tools/test_gemm_sweep_tools.py",
-        "a5a319a8c561a9507b8d7fbd8635c0d86c21b5b886aef576bb3813625d1f53b4",
-    ),
-    (
-        "bench/tools/test_level1_report.py",
-        "00f94923e2bae67768c3d21dc619fd26c307175b14ad5fbfbeddef15283851f8",
-    ),
-    (
-        "bench/tools/test_level2_report.py",
-        "11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1",
-    ),
-    (
-        "bench/tools/test_rank_k_report.py",
-        "ec91dc5e8f0a7927cc9d7afc7c19e2eb50aef4bad87c32f59a80088221e1c778",
-    ),
-    (
-        "bench/tools/test_report_comparison.py",
-        "29514c5ced81ec8ca8e5665ccbead524c84098d3f04ec045a41d182a59bc7250",
-    ),
-    (
-        "bench/tools/test_report_plotters.py",
-        "29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10",
-    ),
-    (
-        "bench/tools/test_report_publication.py",
-        "521d5237d9c5f99d87f07e7305becd09b98d43b4a94d6f5457c1b4483de4a01c",
-    ),
-    (
-        "bench/tools/test_report_schedule.py",
-        "4e008b60e2272bc8f09fd02676a164f5d25aa919dfd560a03f66530829ae2ae3",
-    ),
-    (
-        "bench/tools/test_rotg_latency_report.py",
-        "bbae21d0d23b5d839c857724405ae21fd8ddfcf9f9211880a020b5b5642ca558",
-    ),
-    (
-        "bench/tools/test_symm_report.py",
-        "6ed521a556b1b3d7b13e01fe597b0ddb7337f3f5adcd3cc1ca42b8b7decc6103",
-    ),
-    (
-        "bench/tools/test_triangular_matrix_report.py",
-        "bbb65fe3765ed95bec6f6059e0b5decd968cbfb3afd36eefa1f24cc61deb524d",
-    ),
-    (
-        "bench/tools/test_windows_benchmark.py",
-        "ae57182bf5eb9746ba65ecc93a4db17054f983e40812d1c108bf82dee304d177",
-    ),
-    (
-        "bench/tools/test_windows_comparison.py",
-        "e25be7997b556bc0d9bacb887c885f06afb1a8ac45462efcfc20b7c282e8697e",
-    ),
-    (
-        "bench/tools/test_windows_comparison_plot.py",
-        "d5e0623582cb7b327ee8065fc79df17cf6631d195f06552f95c66d75d18b2b39",
-    ),
-    (
-        "bench/tools/benchmark_artifacts.py",
-        "9d0cdbd974c97564e549582ddf540d07968f66ddf9abe34273daa618426d287b",
-    ),
-    (
-        "bench/tools/benchmark_metadata.py",
-        "d68efcaf8f1f7aa0a23e7e54f6f27fee3ac593c7c85a5060850350c68dc80dc9",
-    ),
-    (
-        "bench/tools/check_gemm_sweep.py",
-        "14a53b9f0e3938e93bdcb37bbd819ea244474d74d274c4cfecb65227fdd5cbcd",
-    ),
-    (
-        "bench/tools/check_level1_report.py",
-        "81fc7446e099071a2278a772d64b5aa2c24bebb161c70f0b4fa8e7af10c60fb1",
-    ),
-    (
-        "bench/tools/check_level2_report.py",
-        "1e3a8c84edf2e605bff838118659f72aa5ba2a3118a572a5d63145f3bdc6702f",
-    ),
-    (
-        "bench/tools/check_rank_k_report.py",
-        "464f4b4542f7476e7a001b9069b866667a88d8a4a616a84505fa056d82ca1fae",
-    ),
-    (
-        "bench/tools/check_rotg_latency_report.py",
-        "c4713814b42839476ed380120f4fdd8e6c05d065837380848cf8215090e92a96",
-    ),
-    (
-        "bench/tools/check_symm_report.py",
-        "9a483b0ea55aa722ba52f898ac7fda3c8dc8385c742f9e4f947bb3a7f8c958d4",
-    ),
-    (
-        "bench/tools/check_triangular_matrix_report.py",
-        "934b0bc68602eb7a83de98b8faa4e7419aeeddba2f867fafbb27127ba292981d",
-    ),
-    (
-        "bench/tools/plot_gemm_sweep.py",
-        "c7f6dbf74b706951153de4262b23d804379bda931e1981d79f2b3bfff0b6db29",
-    ),
-    (
-        "bench/tools/plot_level1_report.py",
-        "ce4e439ae7775f5c7d3d3cb801fbe86fd19d424073ccc58b2dc6b1218dfd5772",
-    ),
-    (
-        "bench/tools/plot_level2_report.py",
-        "6ae1dfd588127c9a96e6e2eb892d0a4e0553f11a7a193a4892e985106f58b6f3",
-    ),
-    (
-        "bench/tools/render_full_benchmark_report.py",
-        "4619d481895aa0bd6dae66f77279a9f8a6520c3ae94d76ebdab3edc1af928bac",
-    ),
-    (
-        "bench/tools/report_comparison.py",
-        "c2b658e116e079faa3064c83a2699b9983e7a260f5b9fee55afef35cff98baf7",
-    ),
-    (
-        "bench/tools/report_publication.py",
-        "602427b0a55522432ccbd7812b00fe9cf2eab9f8c868758500230a1477f5dd53",
-    ),
-    (
-        "bench/tools/report_schedule.py",
-        "29b78ce69ce08068e73913f53a04fa95dfbf7793eaffc3d5bc17f1ca503e0477",
-    ),
-    (
-        "bench/tools/run_gemm_sweep_isolated.py",
-        "350c5d47310cde887af91c5ccc6b3d5932e192c46fed416bf3a1413ca9a26961",
-    ),
-    (
-        "bench/tools/run_level1_report.py",
-        "58b3ae68feef3b73e487f6d7d354d989cda50bfa7f5041c755fcce6c6253fcae",
-    ),
-    (
-        "bench/tools/run_level2_report.py",
-        "987a558291e509760e517d37cf5e04d5541b100aeea961382e64eb73cdcbe361",
-    ),
-    (
-        "bench/tools/run_rank_k_report.py",
-        "e81385fc61863de059d47f81f7620487566853290a44e07f1831e4b59e5ce63a",
-    ),
-    (
-        "bench/tools/run_rotg_latency_report.py",
-        "18af91edceb521e787ef63a439c56c9fbc3a54f0b5f2384cbc64bd989a0f9b5f",
-    ),
-    (
-        "bench/tools/run_symm_report.py",
-        "5836bacbf83ec82dad45224c38d4390f0e044fe53f28d1dc8144a3cde8fbd019",
-    ),
-    (
-        "bench/tools/run_triangular_matrix_report.py",
-        "2f101f8cd50b035fecb215815b709d90d1956d3ee57eb4d7261acfc5c996a138",
-    ),
-    (
-        "tools/repository_git.py",
-        "0335896512a2ae707b1321a44f2e749fe015b04b9de6809816cc8ddd6a078cec",
-    ),
-    (
-        "tools/repository_snapshot.py",
-        "5ce200930baaa090170b65c393f04eab786e8c831eb72d5120c9344b465aff35",
-    ),
-    (
-        "bench/tools/run_windows_benchmark.py",
-        "0f95907fa2f6640dc7ee459b068085170f90968bdbbcefc52b8b05e0e42a6206",
-    ),
-    (
-        "bench/tools/run_windows_comparison.py",
-        "c6ded4ba4595c49bcedb61145ca5bb69f2d175c5363e2dbd122db3509e22e908",
-    ),
-    (
-        "bench/tools/plot_windows_comparison.py",
-        "496f6b52dd9934173703644caefda544cbc2dc3e0ecfecbd4489a4af450d2608",
-    ),
-)
-_PYTHON_TOOLING_EXECUTION_MODULES = (
-    (
-        "test_benchmark_artifact_snapshot",
-        "bench/tools/test_benchmark_artifact_snapshot.py",
-    ),
-    ("test_benchmark_metadata", "bench/tools/test_benchmark_metadata.py"),
-    ("test_full_benchmark_report", "bench/tools/test_full_benchmark_report.py"),
-    ("test_gemm_sweep_tools", "bench/tools/test_gemm_sweep_tools.py"),
-    ("test_level1_report", "bench/tools/test_level1_report.py"),
-    ("test_level2_report", "bench/tools/test_level2_report.py"),
-    ("test_rank_k_report", "bench/tools/test_rank_k_report.py"),
-    ("test_report_comparison", "bench/tools/test_report_comparison.py"),
-    ("test_report_plotters", "bench/tools/test_report_plotters.py"),
-    ("test_report_publication", "bench/tools/test_report_publication.py"),
-    ("test_report_schedule", "bench/tools/test_report_schedule.py"),
-    ("test_rotg_latency_report", "bench/tools/test_rotg_latency_report.py"),
-    ("test_symm_report", "bench/tools/test_symm_report.py"),
-    (
-        "test_triangular_matrix_report",
-        "bench/tools/test_triangular_matrix_report.py",
-    ),
-    ("benchmark_artifacts", "bench/tools/benchmark_artifacts.py"),
-    ("benchmark_metadata", "bench/tools/benchmark_metadata.py"),
-    ("check_gemm_sweep", "bench/tools/check_gemm_sweep.py"),
-    ("check_level1_report", "bench/tools/check_level1_report.py"),
-    ("check_level2_report", "bench/tools/check_level2_report.py"),
-    ("check_rank_k_report", "bench/tools/check_rank_k_report.py"),
-    ("check_rotg_latency_report", "bench/tools/check_rotg_latency_report.py"),
-    ("check_symm_report", "bench/tools/check_symm_report.py"),
-    ("check_triangular_matrix_report", "bench/tools/check_triangular_matrix_report.py"),
-    ("plot_gemm_sweep", "bench/tools/plot_gemm_sweep.py"),
-    ("plot_level1_report", "bench/tools/plot_level1_report.py"),
-    ("plot_level2_report", "bench/tools/plot_level2_report.py"),
-    (
-        "render_full_benchmark_report",
-        "bench/tools/render_full_benchmark_report.py",
-    ),
-    ("report_comparison", "bench/tools/report_comparison.py"),
-    ("report_publication", "bench/tools/report_publication.py"),
-    ("report_schedule", "bench/tools/report_schedule.py"),
-    ("run_gemm_sweep_isolated", "bench/tools/run_gemm_sweep_isolated.py"),
-    ("run_level1_report", "bench/tools/run_level1_report.py"),
-    ("run_level2_report", "bench/tools/run_level2_report.py"),
-    ("run_rank_k_report", "bench/tools/run_rank_k_report.py"),
-    ("run_rotg_latency_report", "bench/tools/run_rotg_latency_report.py"),
-    ("run_symm_report", "bench/tools/run_symm_report.py"),
-    ("run_triangular_matrix_report", "bench/tools/run_triangular_matrix_report.py"),
-    ("_zynum_repository_git", "tools/repository_git.py"),
-    (
-        "_zynum_benchmark_artifact_repository_snapshot",
-        "tools/repository_snapshot.py",
-    ),
-    ("_zynum_benchmark_repository_snapshot", "tools/repository_snapshot.py"),
-    ("_zynum_report_repository_snapshot", "tools/repository_snapshot.py"),
-    (
-        "test_windows_benchmark",
-        "bench/tools/test_windows_benchmark.py",
-    ),
-    (
-        "test_windows_comparison",
-        "bench/tools/test_windows_comparison.py",
-    ),
-    (
-        "test_windows_comparison_plot",
-        "bench/tools/test_windows_comparison_plot.py",
-    ),
-    (
-        "run_windows_benchmark",
-        "bench/tools/run_windows_benchmark.py",
-    ),
-    (
-        "run_windows_comparison",
-        "bench/tools/run_windows_comparison.py",
-    ),
-    (
-        "plot_windows_comparison",
-        "bench/tools/plot_windows_comparison.py",
-    ),
-)
-_PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = (
-    "c98e1334264a7251f3a86a8c59ee46dbcfebfae30b69efafa8b00af57e03e4a9"
-)
-_PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = (
-    "a4b328fc2834a8120f988f28809f74130949a3f565cd0a5934b591d4663b0469"
-)
+_PYTHON_TOOLING_REVIEWED_SOURCE_SHA256 = (('bench/tools/test_benchmark_artifact_snapshot.py', 'eef6fb1aaf709f4720b2c16bb7bb9d932cccf95d93970d544c105c06113c8cc9'), ('bench/tools/test_benchmark_metadata.py', 'e273afdd1f2f0bf5af640b148fff5f6bc0028fe2dc5f4392f379f67b9b8eb030'), ('bench/tools/test_full_benchmark_report.py', '066421c364f32bc25f44687c55c3086902d2a30e2661af8bf1862dc8d7c34726'), ('bench/tools/test_gemm_sweep_tools.py', 'a5a319a8c561a9507b8d7fbd8635c0d86c21b5b886aef576bb3813625d1f53b4'), ('bench/tools/test_level1_report.py', '00f94923e2bae67768c3d21dc619fd26c307175b14ad5fbfbeddef15283851f8'), ('bench/tools/test_level2_report.py', '11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1'), ('bench/tools/test_module_foundation.py', '00bf80368d1856cef7986b5848090685ccb4f66b81c24efab8586c356110b6df'), ('bench/tools/test_rank_k_report.py', 'ec91dc5e8f0a7927cc9d7afc7c19e2eb50aef4bad87c32f59a80088221e1c778'), ('bench/tools/test_report_comparison.py', '29514c5ced81ec8ca8e5665ccbead524c84098d3f04ec045a41d182a59bc7250'), ('bench/tools/test_report_plotters.py', '29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10'), ('bench/tools/test_report_publication.py', '521d5237d9c5f99d87f07e7305becd09b98d43b4a94d6f5457c1b4483de4a01c'), ('bench/tools/test_report_schedule.py', '4e008b60e2272bc8f09fd02676a164f5d25aa919dfd560a03f66530829ae2ae3'), ('bench/tools/test_rotg_latency_report.py', 'bbae21d0d23b5d839c857724405ae21fd8ddfcf9f9211880a020b5b5642ca558'), ('bench/tools/test_symm_report.py', '6ed521a556b1b3d7b13e01fe597b0ddb7337f3f5adcd3cc1ca42b8b7decc6103'), ('bench/tools/test_triangular_matrix_report.py', 'bbb65fe3765ed95bec6f6059e0b5decd968cbfb3afd36eefa1f24cc61deb524d'), ('bench/tools/test_windows_benchmark.py', 'ae57182bf5eb9746ba65ecc93a4db17054f983e40812d1c108bf82dee304d177'), ('bench/tools/test_windows_comparison.py', 'e25be7997b556bc0d9bacb887c885f06afb1a8ac45462efcfc20b7c282e8697e'), ('bench/tools/test_windows_comparison_plot.py', 'd5e0623582cb7b327ee8065fc79df17cf6631d195f06552f95c66d75d18b2b39'))
+_PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (('bench/tools/test_benchmark_artifact_snapshot.py',
+  'eef6fb1aaf709f4720b2c16bb7bb9d932cccf95d93970d544c105c06113c8cc9'),
+ ('bench/tools/test_benchmark_metadata.py',
+  'e273afdd1f2f0bf5af640b148fff5f6bc0028fe2dc5f4392f379f67b9b8eb030'),
+ ('bench/tools/test_full_benchmark_report.py',
+  '066421c364f32bc25f44687c55c3086902d2a30e2661af8bf1862dc8d7c34726'),
+ ('bench/tools/test_gemm_sweep_tools.py',
+  'a5a319a8c561a9507b8d7fbd8635c0d86c21b5b886aef576bb3813625d1f53b4'),
+ ('bench/tools/test_level1_report.py',
+  '00f94923e2bae67768c3d21dc619fd26c307175b14ad5fbfbeddef15283851f8'),
+ ('bench/tools/test_level2_report.py',
+  '11672c3396566ad43b9443c8db50523135ff7cb721bb0af11f2222d1a8daabc1'),
+ ('bench/tools/test_rank_k_report.py',
+  'ec91dc5e8f0a7927cc9d7afc7c19e2eb50aef4bad87c32f59a80088221e1c778'),
+ ('bench/tools/test_report_comparison.py',
+  '29514c5ced81ec8ca8e5665ccbead524c84098d3f04ec045a41d182a59bc7250'),
+ ('bench/tools/test_report_plotters.py',
+  '29cd8f5f8565fd46f82a5e6cacde3e44c8d74704615a4b52679ea4015c480a10'),
+ ('bench/tools/test_report_publication.py',
+  '521d5237d9c5f99d87f07e7305becd09b98d43b4a94d6f5457c1b4483de4a01c'),
+ ('bench/tools/test_report_schedule.py',
+  '4e008b60e2272bc8f09fd02676a164f5d25aa919dfd560a03f66530829ae2ae3'),
+ ('bench/tools/test_rotg_latency_report.py',
+  'bbae21d0d23b5d839c857724405ae21fd8ddfcf9f9211880a020b5b5642ca558'),
+ ('bench/tools/test_symm_report.py',
+  '6ed521a556b1b3d7b13e01fe597b0ddb7337f3f5adcd3cc1ca42b8b7decc6103'),
+ ('bench/tools/test_triangular_matrix_report.py',
+  'bbb65fe3765ed95bec6f6059e0b5decd968cbfb3afd36eefa1f24cc61deb524d'),
+ ('bench/tools/test_windows_benchmark.py',
+  'ae57182bf5eb9746ba65ecc93a4db17054f983e40812d1c108bf82dee304d177'),
+ ('bench/tools/test_windows_comparison.py',
+  'e25be7997b556bc0d9bacb887c885f06afb1a8ac45462efcfc20b7c282e8697e'),
+ ('bench/tools/test_windows_comparison_plot.py',
+  'd5e0623582cb7b327ee8065fc79df17cf6631d195f06552f95c66d75d18b2b39'),
+ ('bench/tools/benchmark_artifacts.py',
+  '9d0cdbd974c97564e549582ddf540d07968f66ddf9abe34273daa618426d287b'),
+ ('bench/tools/benchmark_metadata.py',
+  'd68efcaf8f1f7aa0a23e7e54f6f27fee3ac593c7c85a5060850350c68dc80dc9'),
+ ('bench/tools/check_gemm_sweep.py',
+  '14a53b9f0e3938e93bdcb37bbd819ea244474d74d274c4cfecb65227fdd5cbcd'),
+ ('bench/tools/check_level1_report.py',
+  '81fc7446e099071a2278a772d64b5aa2c24bebb161c70f0b4fa8e7af10c60fb1'),
+ ('bench/tools/check_level2_report.py',
+  '1e3a8c84edf2e605bff838118659f72aa5ba2a3118a572a5d63145f3bdc6702f'),
+ ('bench/tools/check_rank_k_report.py',
+  '464f4b4542f7476e7a001b9069b866667a88d8a4a616a84505fa056d82ca1fae'),
+ ('bench/tools/check_rotg_latency_report.py',
+  'c4713814b42839476ed380120f4fdd8e6c05d065837380848cf8215090e92a96'),
+ ('bench/tools/check_symm_report.py',
+  '9a483b0ea55aa722ba52f898ac7fda3c8dc8385c742f9e4f947bb3a7f8c958d4'),
+ ('bench/tools/check_triangular_matrix_report.py',
+  '934b0bc68602eb7a83de98b8faa4e7419aeeddba2f867fafbb27127ba292981d'),
+ ('bench/tools/plot_gemm_sweep.py',
+  'c7f6dbf74b706951153de4262b23d804379bda931e1981d79f2b3bfff0b6db29'),
+ ('bench/tools/plot_level1_report.py',
+  'ce4e439ae7775f5c7d3d3cb801fbe86fd19d424073ccc58b2dc6b1218dfd5772'),
+ ('bench/tools/plot_level2_report.py',
+  '6ae1dfd588127c9a96e6e2eb892d0a4e0553f11a7a193a4892e985106f58b6f3'),
+ ('bench/tools/render_full_benchmark_report.py',
+  '4619d481895aa0bd6dae66f77279a9f8a6520c3ae94d76ebdab3edc1af928bac'),
+ ('bench/tools/report_comparison.py',
+  'c2b658e116e079faa3064c83a2699b9983e7a260f5b9fee55afef35cff98baf7'),
+ ('bench/tools/report_publication.py',
+  '602427b0a55522432ccbd7812b00fe9cf2eab9f8c868758500230a1477f5dd53'),
+ ('bench/tools/report_schedule.py',
+  '29b78ce69ce08068e73913f53a04fa95dfbf7793eaffc3d5bc17f1ca503e0477'),
+ ('bench/tools/run_gemm_sweep_isolated.py',
+  '350c5d47310cde887af91c5ccc6b3d5932e192c46fed416bf3a1413ca9a26961'),
+ ('bench/tools/run_level1_report.py',
+  '58b3ae68feef3b73e487f6d7d354d989cda50bfa7f5041c755fcce6c6253fcae'),
+ ('bench/tools/run_level2_report.py',
+  '987a558291e509760e517d37cf5e04d5541b100aeea961382e64eb73cdcbe361'),
+ ('bench/tools/run_rank_k_report.py',
+  'e81385fc61863de059d47f81f7620487566853290a44e07f1831e4b59e5ce63a'),
+ ('bench/tools/run_rotg_latency_report.py',
+  '18af91edceb521e787ef63a439c56c9fbc3a54f0b5f2384cbc64bd989a0f9b5f'),
+ ('bench/tools/run_symm_report.py',
+  '5836bacbf83ec82dad45224c38d4390f0e044fe53f28d1dc8144a3cde8fbd019'),
+ ('bench/tools/run_triangular_matrix_report.py',
+  '2f101f8cd50b035fecb215815b709d90d1956d3ee57eb4d7261acfc5c996a138'),
+ ('tools/repository_git.py', '0335896512a2ae707b1321a44f2e749fe015b04b9de6809816cc8ddd6a078cec'),
+ ('tools/repository_snapshot.py',
+  '5ce200930baaa090170b65c393f04eab786e8c831eb72d5120c9344b465aff35'),
+ ('bench/tools/run_windows_benchmark.py',
+  '0f95907fa2f6640dc7ee459b068085170f90968bdbbcefc52b8b05e0e42a6206'),
+ ('bench/tools/run_windows_comparison.py',
+  'c6ded4ba4595c49bcedb61145ca5bb69f2d175c5363e2dbd122db3509e22e908'),
+ ('bench/tools/plot_windows_comparison.py',
+  '496f6b52dd9934173703644caefda544cbc2dc3e0ecfecbd4489a4af450d2608'),
+ ('bench/tools/test_module_foundation.py',
+  '00bf80368d1856cef7986b5848090685ccb4f66b81c24efab8586c356110b6df'),
+ ('bench/modules/run_foundation_comparison.py',
+  '7c1b40a964a86ee8bc8de026d1d1a7d0ddfd4b2198d574f3e1e6bbee79f6c48d'))
+_PYTHON_TOOLING_EXECUTION_MODULES = (('test_benchmark_artifact_snapshot', 'bench/tools/test_benchmark_artifact_snapshot.py'),
+ ('test_benchmark_metadata', 'bench/tools/test_benchmark_metadata.py'),
+ ('test_full_benchmark_report', 'bench/tools/test_full_benchmark_report.py'),
+ ('test_gemm_sweep_tools', 'bench/tools/test_gemm_sweep_tools.py'),
+ ('test_level1_report', 'bench/tools/test_level1_report.py'),
+ ('test_level2_report', 'bench/tools/test_level2_report.py'),
+ ('test_rank_k_report', 'bench/tools/test_rank_k_report.py'),
+ ('test_report_comparison', 'bench/tools/test_report_comparison.py'),
+ ('test_report_plotters', 'bench/tools/test_report_plotters.py'),
+ ('test_report_publication', 'bench/tools/test_report_publication.py'),
+ ('test_report_schedule', 'bench/tools/test_report_schedule.py'),
+ ('test_rotg_latency_report', 'bench/tools/test_rotg_latency_report.py'),
+ ('test_symm_report', 'bench/tools/test_symm_report.py'),
+ ('test_triangular_matrix_report', 'bench/tools/test_triangular_matrix_report.py'),
+ ('benchmark_artifacts', 'bench/tools/benchmark_artifacts.py'),
+ ('benchmark_metadata', 'bench/tools/benchmark_metadata.py'),
+ ('check_gemm_sweep', 'bench/tools/check_gemm_sweep.py'),
+ ('check_level1_report', 'bench/tools/check_level1_report.py'),
+ ('check_level2_report', 'bench/tools/check_level2_report.py'),
+ ('check_rank_k_report', 'bench/tools/check_rank_k_report.py'),
+ ('check_rotg_latency_report', 'bench/tools/check_rotg_latency_report.py'),
+ ('check_symm_report', 'bench/tools/check_symm_report.py'),
+ ('check_triangular_matrix_report', 'bench/tools/check_triangular_matrix_report.py'),
+ ('plot_gemm_sweep', 'bench/tools/plot_gemm_sweep.py'),
+ ('plot_level1_report', 'bench/tools/plot_level1_report.py'),
+ ('plot_level2_report', 'bench/tools/plot_level2_report.py'),
+ ('render_full_benchmark_report', 'bench/tools/render_full_benchmark_report.py'),
+ ('report_comparison', 'bench/tools/report_comparison.py'),
+ ('report_publication', 'bench/tools/report_publication.py'),
+ ('report_schedule', 'bench/tools/report_schedule.py'),
+ ('run_gemm_sweep_isolated', 'bench/tools/run_gemm_sweep_isolated.py'),
+ ('run_level1_report', 'bench/tools/run_level1_report.py'),
+ ('run_level2_report', 'bench/tools/run_level2_report.py'),
+ ('run_rank_k_report', 'bench/tools/run_rank_k_report.py'),
+ ('run_rotg_latency_report', 'bench/tools/run_rotg_latency_report.py'),
+ ('run_symm_report', 'bench/tools/run_symm_report.py'),
+ ('run_triangular_matrix_report', 'bench/tools/run_triangular_matrix_report.py'),
+ ('_zynum_repository_git', 'tools/repository_git.py'),
+ ('_zynum_benchmark_artifact_repository_snapshot', 'tools/repository_snapshot.py'),
+ ('_zynum_benchmark_repository_snapshot', 'tools/repository_snapshot.py'),
+ ('_zynum_report_repository_snapshot', 'tools/repository_snapshot.py'),
+ ('test_windows_benchmark', 'bench/tools/test_windows_benchmark.py'),
+ ('test_windows_comparison', 'bench/tools/test_windows_comparison.py'),
+ ('test_windows_comparison_plot', 'bench/tools/test_windows_comparison_plot.py'),
+ ('run_windows_benchmark', 'bench/tools/run_windows_benchmark.py'),
+ ('run_windows_comparison', 'bench/tools/run_windows_comparison.py'),
+ ('plot_windows_comparison', 'bench/tools/plot_windows_comparison.py'),
+ ('test_module_foundation', 'bench/tools/test_module_foundation.py'),
+ ('module_controller', 'bench/modules/run_foundation_comparison.py'))
+_PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = 'f754daccade50166ac42b7331ef76da7b13934c2407c16e13b8e18a6e511a993'
+_PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = '0a3701d5d563f58cf54e878af1b01a4ccf4591d773ccc4262f0d2ee7e0c1c191'
 _PYTHON_TOOLING_CAPSULE_MAGIC = b"ZYNUM-PYTHON-CAPSULE-V1\0"
 _PYTHON_TOOLING_CAPSULE_MAX_BYTES = 16 * 1024 * 1024
 _PYTHON_TOOLING_TRUSTED_SUBPROCESS_RUN = subprocess.run
+_PYTHON_TOOLING_TRUSTED_GETFRAME = sys._getframe
 _PYTHON_TOOLING_TRUSTED_COMPILE = compile
 _PYTHON_TOOLING_TRUSTED_EXEC = exec
 _PYTHON_TOOLING_TRUSTED_SPEC_FROM_FILE_LOCATION = importlib.util.spec_from_file_location
@@ -446,7 +255,7 @@ _PYTHON_TOOLING_BOOTSTRAP_SOURCE = (
     "root=frame().decode('utf-8')\n"
     "if not os.path.isabs(root): raise SystemExit(126)\n"
     "source_count=int.from_bytes(body[pos:pos+8],'big');pos+=8\n"
-    "if source_count!=45: raise SystemExit(127)\n"
+    "if source_count!=47: raise SystemExit(127)\n"
     "sources={}\n"
     "for _ in range(source_count):\n"
     " path=frame().decode('utf-8');digest=frame().decode('ascii');payload=frame()\n"
@@ -454,7 +263,7 @@ _PYTHON_TOOLING_BOOTSTRAP_SOURCE = (
     " if hashlib.sha256(payload).hexdigest()!=digest: raise SystemExit(129)\n"
     " sources[path]=(digest,payload)\n"
     "module_count=int.from_bytes(body[pos:pos+8],'big');pos+=8\n"
-    "if module_count!=47: raise SystemExit(130)\n"
+    "if module_count!=49: raise SystemExit(130)\n"
     "modules={}\n"
     "for _ in range(module_count):\n"
     " name=frame().decode('utf-8');path=frame().decode('utf-8')\n"
@@ -575,9 +384,7 @@ _PYTHON_TOOLING_BOOTSTRAP_SOURCE = (
     " if artifact is not None and getattr(artifact,'_FROZEN_SOURCE_RESOLVER',None) is not frozen_source: raise SystemExit(135)\n"
     "if mode=='probe': sys.stdout.write('zynum-capsule-target-ok|'+main.__name__+'|'+main.__file__+'|'+repr(sys.argv)+'|'+repr(sys.orig_argv)+'\\n')\n"
 )
-_PYTHON_TOOLING_BOOTSTRAP_SHA256 = (
-    "7531ce10270f8fd150765f7ad57e5cea9a172f6b955b9de15f6527669db8678b"
-)
+_PYTHON_TOOLING_BOOTSTRAP_SHA256 = '33bfc25162a8e6f77f359dde8202e2812ba44295216e6cc4355d11cd626db7d2'
 
 
 def _python_tooling_posix_capsule_probe(
@@ -638,6 +445,15 @@ class _PythonToolingCapsuleLauncher:
         self._run_wrapper = self._run
         self._resolver_wrapper = self._resolve_frozen_source
         self._benchmark_module: types.ModuleType | None = None
+        offline_controller = closure.instances["module_controller"]
+        if offline_controller.source.inventory_path != "bench/modules/run_foundation_comparison.py":
+            raise InventoryError("Python tooling offline controller source is noncanonical")
+        self._offline_controller_codes = (
+            offline_controller.module.capture.__code__,
+            offline_controller.module.main.__code__,
+        )
+        if self._offline_controller_codes[0] is self._offline_controller_codes[1]:
+            raise InventoryError("Python tooling offline controller code identities changed")
         self._source_by_path = {
             str(source.source_path): source for source in closure.sources.values()
         }
@@ -690,6 +506,14 @@ class _PythonToolingCapsuleLauncher:
         return admitted[0]
 
     def _run(self, args: Any, *positional: Any, **kwargs: Any) -> Any:
+        caller = _PYTHON_TOOLING_TRUSTED_GETFRAME(1)
+        try:
+            while caller is not None:
+                if any(caller.f_code is code for code in self._offline_controller_codes):
+                    raise InventoryError("Python tooling offline controller process dispatch is forbidden")
+                caller = caller.f_back
+        finally:
+            del caller
         if positional or kwargs.get("shell"):
             raise InventoryError("Python tooling subprocess invocation is noncanonical")
         if "executable" in kwargs:
@@ -774,6 +598,11 @@ class _PythonToolingCapsuleLauncher:
         return result
 
     def verify(self) -> None:
+        if sys._getframe is not _PYTHON_TOOLING_TRUSTED_GETFRAME:
+            raise InventoryError("Python tooling trusted caller identity primitive changed")
+        controller = self._closure.instances["module_controller"].module
+        if any(actual is not expected for actual, expected in zip((controller.capture.__code__, controller.main.__code__), self._offline_controller_codes, strict=True)):
+            raise InventoryError("Python tooling offline controller code identities changed")
         if subprocess.run is not self._run_wrapper:
             raise InventoryError("Python tooling subprocess launcher changed")
         if (
@@ -910,16 +739,16 @@ def _decode_python_tooling_execution_capsule(
         raise InventoryError("Python tooling execution capsule is invalid") from exc
     if (
         cursor != len(body)
-        or source_count != 45
-        or module_count != 47
+        or source_count != 47
+        or module_count != 49
         or tuple((path, digest) for path, digest, _ in sources)
         != _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256
         or modules != _PYTHON_TOOLING_EXECUTION_MODULES
         or any(
             hashlib.sha256(data).hexdigest() != digest for _, digest, data in sources
         )
-        or len({path for path, _, _ in sources}) != 45
-        or len({name for name, _ in modules}) != 47
+        or len({path for path, _, _ in sources}) != 47
+        or len({name for name, _ in modules}) != 49
         or any(
             PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts
             for path, _, _ in sources
@@ -1017,13 +846,9 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = (
-    "10563ab5eb3df8440e3735f9e60f63e6951dd843b93e5f4a1f310a8f56b92a63"
-)
-NEXT_TEST_INVENTORY_SHA256: str | None = None
-CURRENT_NATIVE_PROJECTION_SHA256 = (
-    "5c3a795584c102eb1d1cc0b3af32a26809e31f068b3b81594eb6c7b6a84d07f9"
-)
+CURRENT_TEST_INVENTORY_SHA256 = '6fd46a264d81a34a03e66bc23ef683608132842e80b849b1aabf7ffb34d69626'
+NEXT_TEST_INVENTORY_SHA256 = None
+CURRENT_NATIVE_PROJECTION_SHA256 = '94521f6f5d581d4de647108492c0e04675f4b15758f92a6a3ca095b0febc8508'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 TOP_LEVEL_KEYS = {
     "schema_id",
@@ -1182,25 +1007,79 @@ ROOT_VARIANTS = {
     "blas_public_surface_contract_tests": "blas-module",
     "zynum_public_surface_contract_tests": "top-level",
 }
-ROOT_ENTRY_PATHS = {
-    "modern_tests": ("src/zynum.zig",),
-    "blas_module_tests": ("src/blas.zig",),
-    "zynum_public_surface_contract_tests": ("src/zynum.zig",),
-    "blas_public_surface_contract_tests": ("src/blas.zig",),
-    "fortran_tests": ("src/blas/compat_fortran.zig", "src/blas.zig"),
-    "cblas_tests": ("src/blas/compat_cblas.zig",),
-}
-ROOT_MODULE_SYMBOLS = {
-    "modern_tests": "zynum_test_mod",
-    "blas_module_tests": "zynum_blas_test_mod",
-    "fortran_tests": "fortran_compat_test_mod",
-    "cblas_tests": "cblas_compat_test_mod",
-    "structured_object_tests": "structured_object_test_mod",
-    "triangular_packed_unit_tests": "triangular_packed_unit_test_mod",
-    "triangular_band_solve_tests": "triangular_band_solve_test_mod",
-    "vector_stride2_parallel_tests": "vector_stride2_parallel_test_mod",
-}
+# Source entries and inherited object owners come from the reviewed Build.Module
+# graph below; a source path alone does not identify a module instance.
+CHECKED_CHOLESKY_COMPILE_ID = "compile:build.zig:build:checked_cholesky_tests"
+CHECKED_CHOLESKY_LAUNCH_ID = "launch:build.zig:build:anonymous-2"
+CHECKED_CHOLESKY_STEP_ID = "step:build.zig:build:test-checked-cholesky-lifecycle"
+POSV_COMPILE_ID = "compile:build.zig:build:lapacke_posv_tests"
+POSV_LAUNCH_ID = "launch:build.zig:build:anonymous"
+POSV_STEP_ID = "step:build.zig:build:test-lapacke-posv"
 PYTHON_ROOTS = (
+    {"id": "python-root:lapacke-evd-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_evd_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_evd_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-gvd-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_gvd_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_gvd_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-gels-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_gels_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_gels_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-gelss-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_gelss_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_gelss_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-controls-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_controls_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_controls_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-sygv-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_sygv_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_sygv_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-syev-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_syev_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_syev_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:contour-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_contour_profile.py",),
+     "launch_ids": ("launch:build.zig:build:contour_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:feast-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_feast_profile.py",),
+     "launch_ids": ("launch:build.zig:build:feast_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-potri-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_potri_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_potri_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-getri-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_getri_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_getri_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-trtri-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_trtri_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_trtri_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-trtrs-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_trtrs_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_trtrs_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:lapacke-posv-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_lapacke_posv_profile.py",),
+     "launch_ids": ("launch:build.zig:build:lapacke_posv_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:checked-cholesky-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_checked_cholesky_profile.py",),
+     "launch_ids": ("launch:build.zig:build:checked_cholesky_profile_tests",),
+     "aggregate": False, "matrix": True},
+    {"id": "python-root:unified-blas-profile-direct", "kind": "direct",
+     "module_paths": ("test/build/test_unified_blas_profile.py",), "launch_ids": (),
+     "aggregate": False, "matrix": False},
+    {"id": "python-root:checked-sparse-profile-direct", "kind": "direct", "module_paths": ("test/build/test_checked_sparse_profile.py",), "launch_ids": ("launch:build.zig:build:checked_sparse_profile_tests",), "aggregate": False, "matrix": True},
     {"id": "python-root:darwin-archive-repack-direct", "kind": "direct",
      "module_paths": ("test/build/test_repack_darwin_archive.py",), "launch_ids": (),
      "aggregate": False, "matrix": False},
@@ -2198,64 +2077,88 @@ def _expected_test_rows(root_id: str, names: Iterable[str]) -> list[dict[str, An
 
 
 def _python_tests(text: str, path: str) -> list[dict[str, Any]]:
+    """Resolve declared local TestCase inheritance without executing test code."""
     try:
         tree = ast.parse(text, filename=path)
     except SyntaxError as exc:
         raise InventoryError(f"Python test discovery failed for {path}: {exc}") from exc
-    if any(
-        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-        and node.name == "load_tests"
-        for node in ast.walk(tree)
-    ):
+    if any(isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name == "load_tests" for n in ast.walk(tree)):
         raise InventoryError(f"{path}: dynamic unittest discovery is unknown")
-    tests: list[dict[str, Any]] = []
+    if any(isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == "setattr"
+           and len(n.args) >= 2 and isinstance(n.args[1], ast.Constant)
+           and isinstance(n.args[1].value, str) and n.args[1].value.startswith("test_")
+           for n in ast.walk(tree)):
+        raise InventoryError(f"{path}: dynamic unittest discovery is unknown")
+    case_root, object_root = "<reviewed-unittest-TestCase>", "<object>"
+    mros: dict[Any, list[Any]] = {object_root: [object_root], case_root: [case_root, object_root]}
+    bindings: dict[str, ast.ClassDef] = {}
+    definitions: dict[ast.ClassDef, list[ast.AST]] = {}
+    local_names = {n.name for n in tree.body if isinstance(n, ast.ClassDef)}
+    classes = []
     for node in tree.body:
         if not isinstance(node, ast.ClassDef):
             continue
-        is_case = any(
-            (isinstance(base, ast.Name) and base.id.endswith("TestCase"))
-            or (isinstance(base, ast.Attribute) and base.attr.endswith("TestCase"))
-            for base in node.bases
-        )
-        if not is_case:
+        bases = []
+        for base in node.bases:
+            if isinstance(base, ast.Name) and base.id in bindings:
+                bases.append(bindings[base.id])
+            elif isinstance(base, ast.Name) and base.id in local_names:
+                raise InventoryError(f"{path}: forward local unittest inheritance is unknown")
+            elif ((isinstance(base, ast.Name) and base.id.endswith("TestCase"))
+                  or (isinstance(base, ast.Attribute) and base.attr.endswith("TestCase"))):
+                # Retain the existing reviewed direct TestCase-root contract.
+                bases.append(case_root)
+            elif isinstance(base, ast.Name) and base.id == "object":
+                bases.append(object_root)
+            else:
+                key = "<external:" + ast.unparse(base) + ">"
+                mros.setdefault(key, [key, object_root])
+                bases.append(key)
+        if not bases:
+            bases = [object_root]
+        if len(bases) != len(set(bases)):
+            raise InventoryError(f"{path}: inconsistent local unittest inheritance")
+        sequences = [list(mros[b]) for b in bases] + [list(bases)]
+        linearized = [node]
+        while any(sequences):
+            sequences = [s for s in sequences if s]
+            head = next((s[0] for s in sequences if not any(s[0] in t[1:] for t in sequences)), None)
+            if head is None:
+                raise InventoryError(f"{path}: inconsistent local unittest inheritance")
+            linearized.append(head)
+            for sequence in sequences:
+                if sequence and sequence[0] == head:
+                    sequence.pop(0)
+        mros[node] = linearized
+        definitions[node] = list(node.body)
+        bindings[node.name] = node
+        classes.append(node)
+    tests = []
+    for node in classes:
+        lineage = mros[node]
+        if case_root not in lineage:
             continue
-        for member in node.body:
-            if isinstance(
-                member, (ast.FunctionDef, ast.AsyncFunctionDef)
-            ) and member.name.startswith("test_"):
-                ordinal = len(tests)
-                name = f"{node.name}.{member.name}"
-                tests.append(
-                    {
-                        "id": f"python-decl:{path}:{ordinal}",
-                        "name": name,
-                        "ordinal": ordinal,
-                    }
-                )
-            elif isinstance(member, (ast.Assign, ast.AnnAssign)):
-                targets = (
-                    member.targets
-                    if isinstance(member, ast.Assign)
-                    else [member.target]
-                )
-                if any(
-                    isinstance(target, ast.Name) and target.id.startswith("test_")
-                    for target in targets
-                ):
-                    raise InventoryError(
-                        f"{path}: dynamic unittest discovery is unknown"
-                    )
-    if any(
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "setattr"
-        and len(node.args) >= 2
-        and isinstance(node.args[1], ast.Constant)
-        and isinstance(node.args[1].value, str)
-        and node.args[1].value.startswith("test_")
-        for node in ast.walk(tree)
-    ):
-        raise InventoryError(f"{path}: dynamic unittest discovery is unknown")
+        if any(isinstance(parent, str) and parent.startswith("<external:") for parent in lineage):
+            raise InventoryError(f"{path}: external unittest inheritance is unknown")
+        if node.keywords:
+            raise InventoryError(f"{path}: dynamic unittest class construction is unknown")
+        found = set()
+        for parent in lineage:
+            if not isinstance(parent, ast.ClassDef):
+                continue
+            for member in definitions[parent]:
+                if isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    if member.name in {"__init_subclass__", "__mro_entries__"}:
+                        raise InventoryError(f"{path}: dynamic unittest inheritance is unknown")
+                    if not member.name.startswith("test_") or member.name in found:
+                        continue
+                    found.add(member.name)
+                    ordinal = len(tests)
+                    tests.append({"id": f"python-decl:{path}:{ordinal}", "name": f"{node.name}.{member.name}", "ordinal": ordinal})
+                elif isinstance(member, (ast.Assign, ast.AnnAssign)):
+                    targets = member.targets if isinstance(member, ast.Assign) else [member.target]
+                    if any(isinstance(target, ast.Name) and target.id.startswith("test_") for target in targets):
+                        raise InventoryError(f"{path}: dynamic unittest discovery is unknown")
     return tests
 
 
@@ -2363,6 +2266,135 @@ def _section_summary(inventory: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+
+# Compiler facilities and generated non-source modules only. Public aliases and
+# zynum-core MUST resolve through their actual reviewed owner's import table.
+_ZIG_NON_RELATIVE_IMPORTS = frozenset({
+    "std", "builtin", "root",
+})
+
+
+def _zig_module_source(provider: str, graph: dict[str, Any]) -> str:
+    source = graph["module_sources"].get(provider)
+    if source is not None:
+        return source
+    if provider in graph.get("module_borrow_variants", {}):
+        raise InventoryError("conditionally borrowed Zig owner requires an explicitly selected production profile: " + provider)
+    if provider in graph["module_source_variants"]:
+        raise InventoryError("profile-selected Zig owner requires an explicitly selected production profile: " + provider)
+    raise InventoryError("Zig module source is missing: " + provider)
+
+
+def _zig_source_entries(root_symbol: str, graph: dict[str, Any]) -> list[str]:
+    owner = graph["root_owners"].get(root_symbol)
+    if owner is None:
+        raise InventoryError("numerics resources traversal root/owner binding changed")
+    return [graph["root_sources"][root_symbol], *[
+        _zig_module_source(provider, graph)
+        for alias, provider in graph["imports"].get(owner, {}).items()
+        if alias != BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS
+    ], *[entry["path"] for entry in graph["linked_module_entries"].get(root_symbol, ())]]
+
+
+def _zig_generated_test_dependency(provider: str, graph: dict[str, Any]) -> dict[str, Any] | None:
+    """Describe the one reviewed wire output without inventing output bytes."""
+    if provider != "contour_wire_test_mod":
+        return None
+    path = "<generated:contour_test_generate:contour_v1_types.zig>"
+    if (graph["module_sources"].get(provider) != path
+        or graph["imports"].get(provider, {}) != {}
+        or graph["imports"].get("general_operator_test_mod", {}).get("zynum-contour-wire") != provider):
+        raise InventoryError("generated Contour test wire owner/source binding changed")
+    inputs = ("tools/generate_contour_interface.py", "tools/contour_wire_profile.json",
+              "tools/interface_templates/contour_wire_types.zig.in")
+    return {
+        "path": path, "source_kind": "generated-non-source",
+        "generator_observation_id": "launch:build.zig:build:contour_test_generate",
+        "generator": inputs[0], "output_name": "contour_v1_types.zig",
+        "input_sha256": {name: BUILD_CHECKER.CONTOUR_SOURCE_SHA256[name] for name in inputs},
+    }
+
+
+def _zig_source_closure(
+    zig_text: dict[str, str], public_paths: frozenset[str], entry_paths: list[str],
+    *, resource_root: str, resource_graph: dict[str, Any],
+    named_dependencies: list[dict[str, Any]] | None = None,
+) -> set[str]:
+    if entry_paths != _zig_source_entries(resource_root, resource_graph):
+        raise InventoryError("numerics resources traversal root/owner binding changed")
+    root_owner = resource_graph["root_owners"][resource_root]
+    sources = resource_graph["module_sources"]
+    imports = resource_graph["imports"]
+    # Each seeded module retains its owner even when two owners share a path.
+    pending = [(root_owner, entry_paths[0])]
+    pending.extend((provider, _zig_module_source(provider, resource_graph)) for alias, provider in imports.get(root_owner, {}).items()
+                   if alias != BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS)
+    # Four reviewed x86 host-runtime object attachments are source dependencies
+    # of their actual consumers. Static reachability is not native enumeration.
+    pending.extend((entry["module"], entry["path"])
+                   for entry in resource_graph["linked_module_entries"].get(resource_root, ()))
+    visited: set[tuple[str, str]] = set()
+    dependencies: set[tuple[str, str, str]] = set()
+    # Entry seeds are build imports, including lazy source-only dependencies.
+    dependencies.update((root_owner, alias, provider) for alias, provider in imports.get(root_owner, {}).items()
+                        if alias != BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS)
+    while pending:
+        owner, path = pending.pop()
+        if (owner, path) in visited:
+            continue
+        generated = _zig_generated_test_dependency(owner, resource_graph)
+        if generated is not None:
+            if path != generated["path"]:
+                raise InventoryError("generated Contour test wire path changed")
+            visited.add((owner, path))
+            continue
+        if path not in public_paths or path not in zig_text:
+            raise InventoryError(f"Zig dependency source is missing: {path}")
+        visited.add((owner, path))
+        for imported in _zig_imports(zig_text[path], path):
+            provider = imports.get(owner, {}).get(imported)
+            if provider is not None:
+                candidate = _zig_module_source(provider, resource_graph)
+                dependencies.add((owner, imported, provider))
+                pending.append((provider, candidate))
+            elif imported in _ZIG_NON_RELATIVE_IMPORTS or imported in resource_graph["generated_imports"].get(owner, ()):
+                continue
+            elif "/" not in imported and not imported.endswith(".zig"):
+                raise InventoryError(f"{path}: unreviewed named Zig dependency: {imported} (owner {owner})")
+            else:
+                candidate = posixpath.normpath((PurePosixPath(path).parent / imported).as_posix())
+                if candidate in public_paths:
+                    pending.append((owner, candidate))
+    if named_dependencies is not None:
+        for owner, alias, provider in sorted(dependencies):
+            path = _zig_module_source(provider, resource_graph)
+            generated = _zig_generated_test_dependency(provider, resource_graph)
+            if generated is not None:
+                named_dependencies.append({
+                    "alias": alias, **generated,
+                    "module": provider, "target": "target",
+                    "compile_symbol": resource_root, "attachment_owner": owner,
+                    "build_contract_sha256": BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256,
+                })
+                continue
+            named_dependencies.append({
+                "alias": alias, "path": path,
+                "source_sha256": hashlib.sha256(zig_text[path].encode()).hexdigest(),
+                "module": provider, "target": "target",
+                "compile_symbol": resource_root, "attachment_owner": owner,
+                "build_contract_sha256": BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256,
+            })
+    return {path for _, path in visited if path in public_paths}
+
+
+def _zig_object_owners(root_symbol: str, graph: dict[str, Any]) -> set[str]:
+    if root_symbol in {"numerics_contract_tests", "execution_contract_tests"}:
+        return set()
+    if root_symbol in BUILD_CHECKER.SHARED_FACADE_TEST_ROOTS:
+        return {"zynum_core_test_mod"}
+    return {"official_tests.root_module", graph["root_owners"][root_symbol]}
+
+
 def discover(
     root: Path, inventory_path: Path, *, _context: Any | None = None
 ) -> dict[str, Any]:
@@ -2373,12 +2405,20 @@ def discover(
     )
     build_inventory = _load_build_inventory(context)
     observations = build_inventory["build_observations"]
+    resource_graph = BUILD_CHECKER._numerics_resources_build_contract(_cached_text(context, "build.zig"))
+    BUILD_CHECKER._numerics_resources_source_contract(context)
     workflow_observations = build_inventory.get("workflow_launches", [])
     if not isinstance(workflow_observations, list) or not all(
         isinstance(item, dict) for item in workflow_observations
     ):
         raise InventoryError("build inventory workflow observations are malformed")
     by_id = {item["id"]: item for item in [*observations, *workflow_observations]}
+    lifecycle_errors: list[str] = []
+    BUILD_CHECKER._validate_runtime_lifecycle_contract(build_inventory, lifecycle_errors)
+    if lifecycle_errors:
+        raise InventoryError("runtime lifecycle supplementary gate: " + "; ".join(lifecycle_errors))
+    BUILD_CHECKER._runtime_lifecycle_build_span(_cached_text(context, "build.zig"))
+    BUILD_CHECKER._runtime_lifecycle_source_contract(context)
     compile_tests = sorted(
         (
             item
@@ -2387,12 +2427,14 @@ def discover(
             and item.get("id") != FACTORY_COMPILE_ID
             and item.get("artifact_role") != FACTORY_ROLE
             and item.get("id") != "compile:build.zig:build:dynamic_tests"
+            and item.get("id") != CHECKED_CHOLESKY_COMPILE_ID
+            and item.get("id") != POSV_COMPILE_ID
         ),
         key=lambda item: item["id"],
     )
-    if len(compile_tests) != 21:
+    if len(compile_tests) != 25:
         raise InventoryError(
-            f"expected exactly 21 b.addTest logical roots, found {len(compile_tests)}"
+            f"expected exactly 25 b.addTest logical roots, found {len(compile_tests)}"
         )
 
     dynamic_compile_id = "compile:build.zig:build:dynamic_tests"
@@ -2421,6 +2463,59 @@ def discover(
         "enumeration_source": "static-source-reachability-only",
         "native_inventory_evidence": False,
     }]
+    cholesky_compile = by_id.get(CHECKED_CHOLESKY_COMPILE_ID, {})
+    cholesky_launch = by_id.get(CHECKED_CHOLESKY_LAUNCH_ID, {})
+    cholesky_step = by_id.get(CHECKED_CHOLESKY_STEP_ID, {})
+    if (cholesky_compile.get("call") != "b.addTest"
+        or cholesky_compile.get("root_source") != ["src/checked/cholesky_adapter_test.zig"]
+        or cholesky_compile.get("artifact_role") != "checked-cholesky-correctness-only"
+        or cholesky_launch.get("call") != "b.addRunArtifact"
+        or cholesky_launch.get("source_artifact") != CHECKED_CHOLESKY_COMPILE_ID
+        or cholesky_launch.get("launch_role") != "checked-cholesky-correctness-only"
+        or cholesky_launch.get("native_inventory_evidence") is not False
+        or cholesky_step.get("aggregate_test_membership") != "not-member"
+        or cholesky_step.get("direct_dependencies") != [{"id": CHECKED_CHOLESKY_LAUNCH_ID, "condition": "always"}]):
+        raise InventoryError("checked Cholesky correctness-only root/launch/step contract changed")
+    correctness_only_roots.append({
+        "id": "correctness-root:checked-cholesky-lifecycle", "language": "zig",
+        "physical_path": "src/checked/cholesky_adapter_test.zig",
+        "compile_observation_id": CHECKED_CHOLESKY_COMPILE_ID,
+        "launch_observation_ids": [CHECKED_CHOLESKY_LAUNCH_ID],
+        "selector_step_observation_id": CHECKED_CHOLESKY_STEP_ID,
+        "guard": "explicit test-checked-cholesky-lifecycle step; requested target must be host-runnable",
+        "executor_guard_dependency": None, "process_environments": [{}],
+        "enumeration_source": "static-source-reachability-only", "native_inventory_evidence": False,
+    })
+    posv_compile = by_id.get(POSV_COMPILE_ID, {})
+    posv_launch = by_id.get(POSV_LAUNCH_ID, {})
+    posv_step = by_id.get(POSV_STEP_ID, {})
+    if (posv_compile.get("call") != "b.addTest"
+        or posv_compile.get("root_source") != ["test/lapack/interop/posv_adapter_test.zig"]
+        or posv_compile.get("artifact_role") != "lapacke-posv-correctness-only"
+        or posv_launch.get("call") != "b.addRunArtifact"
+        or posv_launch.get("source_artifact") != POSV_COMPILE_ID
+        or posv_launch.get("launch_role") != "lapacke-posv-correctness-only"
+        or posv_launch.get("native_inventory_evidence") is not False
+        or posv_step.get("aggregate_test_membership") != "not-member"
+        or posv_step.get("direct_dependencies") != [{"id": POSV_LAUNCH_ID, "condition": "always"}]):
+        raise InventoryError("POSV correctness-only root/launch/step contract changed")
+    correctness_only_roots.append({
+        "id": "correctness-root:lapacke-posv", "language": "zig",
+        "physical_path": "test/lapack/interop/posv_adapter_test.zig",
+        "compile_observation_id": POSV_COMPILE_ID,
+        "launch_observation_ids": [POSV_LAUNCH_ID],
+        "selector_step_observation_id": POSV_STEP_ID,
+        "guard": "explicit test-lapacke-posv step; requested target must be host-runnable",
+        "executor_guard_dependency": None, "process_environments": [{}],
+        "enumeration_source": "static-source-reachability-only", "native_inventory_evidence": False,
+    })
+    for module, launch_id in zip(("lapack", "sparse", "numerics_contract", "execution_contract"), BUILD_CHECKER.DYNAMIC_FOUNDATION_LAUNCH_IDS, strict=True):
+        launch = by_id.get(launch_id, {})
+        if (launch.get("call") != "b.addRunArtifact"
+            or launch.get("source_artifact") != f"compile:build.zig:build:{module}_tests"
+            or launch.get("launch_role") != "dynamic-dispatch-correctness-only"
+            or launch.get("executor_guard_dependency") != BUILD_CHECKER.NATIVE_EXECUTION_CHECK_ID):
+            raise InventoryError("dynamic foundation correctness launch must match its reviewed canonical Compile node")
     public_paths = context.public_files.path_set
     zig_text: dict[str, str] = {}
     zig_declarations: dict[str, list[dict[str, Any]]] = {}
@@ -2437,6 +2532,16 @@ def discover(
     for observation in observations:
         source_artifact = observation.get("source_artifact")
         if isinstance(source_artifact, str):
+            if observation["id"] in BUILD_CHECKER.DYNAMIC_FOUNDATION_LAUNCH_IDS:
+                continue
+            if source_artifact == POSV_COMPILE_ID:
+                if observation["id"] != POSV_LAUNCH_ID:
+                    raise InventoryError("unreviewed POSV correctness launch")
+                continue
+            if source_artifact == CHECKED_CHOLESKY_COMPILE_ID:
+                if observation["id"] != CHECKED_CHOLESKY_LAUNCH_ID:
+                    raise InventoryError("unreviewed checked Cholesky correctness launch")
+                continue
             if source_artifact == dynamic_compile_id:
                 if observation["id"] not in dynamic_launch_ids:
                     raise InventoryError("unreviewed dynamic correctness launch")
@@ -2561,25 +2666,16 @@ def discover(
             raise InventoryError(
                 f"{compile_observation['id']}: aggregate edge is missing"
             )
-        entry_paths = [physical_path, *ROOT_ENTRY_PATHS.get(symbol, ())]
+        entry_paths = _zig_source_entries(symbol, resource_graph)
+        named_dependencies: list[dict[str, Any]] = []
         if any(path not in public_paths for path in entry_paths):
             raise InventoryError(
                 f"{compile_observation['id']}: source entry is missing"
             )
-        reached: set[str] = set()
-        pending = list(entry_paths)
-        while pending:
-            path = pending.pop()
-            if path in reached:
-                continue
-            reached.add(path)
-            if path not in zig_text:
-                continue
-            parent = PurePosixPath(path).parent
-            for imported in _zig_imports(zig_text[path], path):
-                candidate = posixpath.normpath((parent / imported).as_posix())
-                if candidate in public_paths and candidate not in reached:
-                    pending.append(candidate)
+        reached = _zig_source_closure(
+            zig_text, public_paths, entry_paths,
+            resource_root=symbol, resource_graph=resource_graph, named_dependencies=named_dependencies,
+        )
         reaching_files = sorted(path for path in reached if path in zig_declarations)
         for path in reaching_files:
             root_reach[path].append(root_id)
@@ -2594,11 +2690,8 @@ def discover(
             )
         root_expected_names[root_id] = names
 
-        module_symbol = ROOT_MODULE_SYMBOLS.get(symbol)
         required_objects: list[dict[str, str]] = []
-        link_symbols = {"official_tests.root_module"}
-        if module_symbol is not None:
-            link_symbols.add(module_symbol)
+        link_symbols = _zig_object_owners(symbol, resource_graph)
         links = sorted(
             (
                 item
@@ -2609,6 +2702,11 @@ def discover(
             ),
             key=lambda item: item["id"],
         )
+        if symbol in BUILD_CHECKER.SHARED_FACADE_TEST_ROOTS:
+            expected_links = {f"link:build.zig:build:zynum_core_test_mod<-{provider}"
+                              for provider in BUILD_CHECKER.SHARED_CORE_TEST_PROVIDERS[1:]}
+            if {link["id"] for link in links} != expected_links:
+                raise InventoryError(f"{root_id}: shared core isolated object observations missing or changed")
         for link in links:
             producer_symbol = link["id"].rsplit("<-", 1)[1]
             compile_id = f"compile:build.zig:build:{producer_symbol}"
@@ -2652,6 +2750,8 @@ def discover(
                     else "predicate:always"
                 ),
                 "source_entry_paths": entry_paths,
+                "source_reachability": sorted(reached),
+                "named_dependency_sources": named_dependencies,
                 "required_isolated_objects": required_objects,
             }
         )
@@ -2659,20 +2759,14 @@ def discover(
     # Track source declarations of the correctness-only root without adding native
     # protocol rows or manufacturing compiler-enumerated test names.
     for correctness_root in correctness_only_roots:
-        reached: set[str] = set()
-        pending = [correctness_root["physical_path"]]
-        while pending:
-            path = pending.pop()
-            if path in reached:
-                continue
-            reached.add(path)
-            if path not in zig_text:
-                raise InventoryError(f"correctness-only source is missing: {path}")
-            for imported in _zig_imports(zig_text[path], path):
-                candidate = posixpath.normpath((PurePosixPath(path).parent / imported).as_posix())
-                if candidate in public_paths and candidate not in reached:
-                    pending.append(candidate)
+        symbol = correctness_root["compile_observation_id"].rsplit(":", 1)[1]
+        named_dependencies = []
+        reached = _zig_source_closure(
+            zig_text, public_paths, _zig_source_entries(symbol, resource_graph),
+            resource_root=symbol, resource_graph=resource_graph, named_dependencies=named_dependencies,
+        )
         correctness_root["source_reachability"] = sorted(reached)
+        correctness_root["named_dependency_sources"] = named_dependencies
         for path in sorted(reached):
             if path in zig_declarations:
                 root_reach[path].append(correctness_root["id"])
@@ -2709,16 +2803,16 @@ def discover(
         if PurePosixPath(path).suffix == ".py"
         and PurePosixPath(path).name.startswith("test_")
     )
-    if len(python_paths) != 24:
+    if len(python_paths) != 42:
         raise InventoryError(
-            f"expected exactly 24 Python test candidates, found {len(python_paths)}"
+            f"expected exactly 42 Python test candidates, found {len(python_paths)}"
         )
     benchmark_paths = tuple(
         path for path in python_paths if path.startswith("bench/tools/")
     )
-    if len(benchmark_paths) != 17:
+    if len(benchmark_paths) != 18:
         raise InventoryError(
-            f"expected exactly 17 benchmark Python test candidates, found {len(benchmark_paths)}"
+            f"expected exactly 18 benchmark Python test candidates, found {len(benchmark_paths)}"
         )
     python_root_specs: list[dict[str, Any]] = []
     host_tool_dependency_ids = {
@@ -3751,7 +3845,7 @@ def _validate_factory_projection(
                 "condition": "outside the exact native Windows canonical baseline guard",
             },
         ],
-        "compile_node_relation": "same-21-applicable-factory-Compile-nodes",
+        "compile_node_relation": "same-25-applicable-factory-Compile-nodes",
         "structure_checker_dependency": None,
         "run_artifact": None,
         "test_body_execution": False,
@@ -6556,7 +6650,7 @@ def _reviewed_python_tooling_source_modules(
     discovery_pattern: str,
 ) -> tuple[_PythonReviewedSourceModule, ...]:
     admission = _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256
-    if type(admission) is not tuple or len(admission) != 17:
+    if type(admission) is not tuple or len(admission) != 18:
         raise InventoryError("Python tooling source admission registry is noncanonical")
     expected_paths: list[str] = []
     expected_digests: list[str] = []
@@ -6607,9 +6701,9 @@ def _freeze_python_tooling_execution_closure(
     instance_manifest = _PYTHON_TOOLING_EXECUTION_MODULES
     if (
         type(source_manifest) is not tuple
-        or len(source_manifest) != 45
+        or len(source_manifest) != 47
         or type(instance_manifest) is not tuple
-        or len(instance_manifest) != 47
+        or len(instance_manifest) != 49
         or tuple(module_paths)
         != tuple(path for path, _ in _PYTHON_TOOLING_REVIEWED_SOURCE_SHA256)
     ):
@@ -7024,6 +7118,14 @@ _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES = frozenset(
         ("bench/tools/run_level2_report.py", 2879, "subprocess.run"),
     }
 )
+_PYTHON_TOOLING_OFFLINE_ONLY_SUBPROCESS_SITES = frozenset(
+    {
+        ("bench/modules/run_foundation_comparison.py", 43, "subprocess.run"),
+        ("bench/modules/run_foundation_comparison.py", 274, "subprocess.run"),
+    }
+)
+
+
 _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES = frozenset(
     {
         (
@@ -7157,6 +7259,7 @@ def _python_tooling_subprocess_source_audit(
         allowed = (
             _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES
             | _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES
+            | _PYTHON_TOOLING_OFFLINE_ONLY_SUBPROCESS_SITES
         )
         if site not in allowed:
             raise InventoryError("Python tooling raw subprocess site is not admitted")
@@ -7185,6 +7288,7 @@ def _python_tooling_subprocess_source_audit(
         for site in (
             _PYTHON_TOOLING_PYTHON_SUBPROCESS_SITES
             | _PYTHON_TOOLING_NONPYTHON_SUBPROCESS_SITES
+            | _PYTHON_TOOLING_OFFLINE_ONLY_SUBPROCESS_SITES
         )
         if site[0] == source.inventory_path
     }
@@ -7683,6 +7787,8 @@ def _python_windows_blas_source_audit(
         ),
         ("from", "unittest", 0, (("mock", None),)),
     }
+    if reviewed.inventory_path == "bench/tools/test_module_foundation.py":
+        allowed_import_shapes.add(("import", (("copy", None),)))
     allowed_sys_attributes = {
         "argv",
         "executable",
@@ -11390,8 +11496,8 @@ def _python_tooling_runtime_order_projection(
                 )
     projection = tuple(runtime_ids)
     if (
-        len(projection) != 486
-        or len(set(projection)) != 486
+        len(projection) != 492
+        or len(set(projection)) != 492
         or _python_tooling_runtime_order_digest(projection)
         != _PYTHON_TOOLING_RUNTIME_ORDER_SHA256
     ):

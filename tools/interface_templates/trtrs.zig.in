@@ -1,0 +1,20 @@
+// Generated boundary only. Existing binding owns the sole operation and Core.
+fn TriangularSolve(comptime T: type, comptime level: Level) type {
+    return struct {
+        pub fn call(layout: c_int, uplo: i8, trans: i8, diag: i8, n: WireInt, nrhs: WireInt, a: ?[*]align(1) const T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt) callconv(.c) WireInt {
+            const result = binding.Shared.trtrsRawManagedWithDefaults(true, T, InternalInt, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout,
+                .uplo = @bitCast(uplo),
+                .trans = @bitCast(trans),
+                .diag = @bitCast(diag),
+                .n = @intCast(n),
+                .nrhs = @intCast(nrhs),
+                .a = a,
+                .lda = @intCast(lda),
+                .b = b,
+                .ldb = @intCast(ldb),
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return finish(result);
+        }
+    };
+}

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
-
-const runtime = @import("../../runtime.zig");
+const execution_owner = @import("zynum-execution").owner;
+const default_owner = @import("zynum-execution");
 fn freeWorkerCaches() void {
     // Only SME owns persistent kernel pack allocations. Keep the baseline
     // scheduler independent of the matrix kernel graph (and its test roots).
@@ -15,305 +15,87 @@ fn freeWorkerCaches() void {
     }
 }
 
-pub const max_tasks = 64;
-pub const TaskFn = *const fn (*const anyopaque, usize) void;
-const persistent_spin_iters: u32 = 500_000;
-const persistent_done_spin_iters: u32 = 100_000;
+pub const max_tasks = execution_owner.max_tasks;
+pub const TaskFn = execution_owner.TaskFn;
+const blas_cache_domain: execution_owner.WorkerCacheDomain = .{ .release_current_worker = freeWorkerCaches };
 
-var io_init_state = std.atomic.Value(u8).init(0);
-var io_busy = std.atomic.Value(u8).init(0);
-var io_threaded: std.Io.Threaded = undefined;
-var persistent_threaded: std.Io.Threaded = undefined;
+/// Synchronous internal borrow, never an independently owned executor/allocator
+/// pair. Admitted calls derive both from the same live Operation. Existing
+/// internal callers retain their default services until their entrypoint is
+/// migrated; this bridge does not acquire a second operation.
+pub const CallResources = union(enum) {
+    admitted: *const default_owner.context.Operation,
+    legacy_default,
 
-var persistent_init_state = std.atomic.Value(u8).init(0);
-var persistent_group: std.Io.Group = .init;
-var persistent_worker_count = std.atomic.Value(u32).init(0);
-var persistent_ready_count = std.atomic.Value(u32).init(0);
-var persistent_exited_count = std.atomic.Value(u32).init(0);
-var persistent_worker_generation: [max_tasks]std.atomic.Value(u32) = @splat(std.atomic.Value(u32).init(0));
-var persistent_worker_waiting: [max_tasks]std.atomic.Value(u8) = @splat(std.atomic.Value(u8).init(0));
-var persistent_active_helpers = std.atomic.Value(u32).init(0);
-var persistent_first_helper = std.atomic.Value(u32).init(0);
-var persistent_done_target = std.atomic.Value(u32).init(0);
-var persistent_done_count = std.atomic.Value(u32).init(0);
-var persistent_job_count = std.atomic.Value(u32).init(0);
-var persistent_shutdown_requested = std.atomic.Value(u8).init(0);
-var persistent_task_fn: TaskFn = undefined;
-var persistent_tasks: *const anyopaque = undefined;
-
-fn configuredHelperCount() usize {
-    return runtime.helperThreadCount(max_tasks - 1);
-}
-
-fn ensureIoThreaded() bool {
-    if (configuredHelperCount() == 0) return false;
-
-    const state = io_init_state.load(.acquire);
-    if (state == 2) return true;
-    if (state == 3) return false;
-
-    if (io_init_state.cmpxchgStrong(0, 1, .acq_rel, .acquire) == null) {
-        const helper_count = configuredHelperCount();
-        if (helper_count == 0) {
-            io_init_state.store(3, .release);
-            return false;
-        }
-        io_threaded = std.Io.Threaded.init(std.heap.c_allocator, .{
-            .stack_size = runtime.worker_stack_size,
-            .async_limit = .limited(helper_count),
-            .concurrent_limit = .limited(helper_count),
-        });
-        io_init_state.store(2, .release);
-        return true;
+    pub fn executor(self: CallResources) *execution_owner.Executor {
+        return switch (self) {
+            .admitted => |operation| &operation.borrowedContext().executor,
+            .legacy_default => default_owner.get(),
+        };
     }
 
-    while (true) {
-        const current = io_init_state.load(.acquire);
-        if (current == 2) return true;
-        if (current == 3) return false;
-        std.atomic.spinLoopHint();
+    /// A non-null allocator owns call-local kernel packs. Null preserves the
+    /// existing legacy allocation/cache policy; it never selects another Context.
+    pub fn scratchAllocator(self: CallResources) ?std.mem.Allocator {
+        return switch (self) {
+            .admitted => |operation| operation.allocator(),
+            .legacy_default => null,
+        };
     }
-}
 
-fn runIoTask(task_fn: TaskFn, tasks: *const anyopaque, index: usize) void {
-    runtime.configureWorkerThread(index);
-    // Io.Threaded owns its worker lifetimes; release this task's thread-local
-    // kernel allocations before returning to a thread we cannot finalize.
-    defer freeWorkerCaches();
-    task_fn(tasks, index);
-}
-
-fn runPersistentWorker(worker_id: usize) void {
-    runtime.configureWorkerThread(worker_id + 1);
-    const io = persistent_threaded.io();
-    defer {
-        // A TLS pointer disappearing at thread exit does not free its backing
-        // allocation. Dispatch cleanup on the owner thread before reporting exit.
-        freeWorkerCaches();
-        const exited = persistent_exited_count.fetchAdd(1, .acq_rel) + 1;
-        if (exited >= persistent_worker_count.load(.acquire)) {
-            io.futexWake(u32, &persistent_exited_count.raw, 1);
-        }
+    pub fn maxThreads(self: CallResources) usize {
+        return self.executor().policy.max_threads();
     }
-    var seen = persistent_worker_generation[worker_id].load(.acquire);
-    _ = persistent_ready_count.fetchAdd(1, .acq_rel);
-    io.futexWake(u32, &persistent_ready_count.raw, 1);
 
-    while (true) {
-        var current = persistent_worker_generation[worker_id].load(.acquire);
-        var spin_count: u32 = 0;
-        while (current == seen and spin_count < persistent_spin_iters) : (spin_count += 1) {
-            std.atomic.spinLoopHint();
-            current = persistent_worker_generation[worker_id].load(.acquire);
-        }
-        if (current == seen) {
-            if (comptime @import("builtin").target.os.tag == .macos) persistent_worker_waiting[worker_id].store(1, .release);
-            current = persistent_worker_generation[worker_id].load(.acquire);
-            while (current == seen) {
-                io.futexWaitUncancelable(u32, &persistent_worker_generation[worker_id].raw, seen);
-                current = persistent_worker_generation[worker_id].load(.acquire);
+    pub fn taskCount(self: CallResources, items: usize, min_items_per_task: usize) usize {
+        return self.executor().taskCount(items, min_items_per_task);
+    }
+
+    pub fn run(self: CallResources, task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
+        return self.executor().run(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
+    }
+
+    pub fn runLowLatency(self: CallResources, task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
+        return self.executor().runLowLatency(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
+    }
+
+    pub fn runQueued(self: CallResources, task_fn: TaskFn, tasks: *const anyopaque, count: usize, worker_limit: usize) bool {
+        return self.executor().runQueued(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain }, worker_limit);
+    }
+
+    pub fn runTyped(self: CallResources, comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
+        const Adapter = struct {
+            fn call(raw: *const anyopaque, index: usize) void {
+                const typed: [*]const Task = @ptrCast(@alignCast(raw));
+                task_fn(typed[index]);
             }
-            if (comptime @import("builtin").target.os.tag == .macos) persistent_worker_waiting[worker_id].store(0, .release);
-        }
-        seen = current;
-        if (persistent_shutdown_requested.load(.acquire) != 0) break;
-
-        const task_fn = persistent_task_fn;
-        const tasks = persistent_tasks;
-        const count = persistent_job_count.load(.acquire);
-        const done_target = persistent_done_target.load(.acquire);
-        const active_helpers = persistent_active_helpers.load(.acquire);
-        const first_helper = persistent_first_helper.load(.acquire);
-        if (worker_id < first_helper or worker_id >= first_helper + active_helpers) continue;
-        const index = worker_id - first_helper + 1;
-        if (index < count) task_fn(tasks, @intCast(index));
-
-        const done = persistent_done_count.fetchAdd(1, .acq_rel) + 1;
-        if (done >= done_target) io.futexWake(u32, &persistent_done_count.raw, 1);
-    }
-}
-
-fn ensurePersistentWorkers() bool {
-    if (configuredHelperCount() == 0) return false;
-
-    const state = persistent_init_state.load(.acquire);
-    if (state == 2) return true;
-    if (state == 3) return false;
-
-    if (persistent_init_state.cmpxchgStrong(0, 1, .acq_rel, .acquire) == null) {
-        const helper_count = configuredHelperCount();
-        if (helper_count == 0) {
-            persistent_init_state.store(3, .release);
-            return false;
-        }
-        persistent_shutdown_requested.store(0, .release);
-        persistent_exited_count.store(0, .release);
-        persistent_threaded = std.Io.Threaded.init(std.heap.c_allocator, .{
-            .stack_size = runtime.worker_stack_size,
-            .async_limit = .limited(helper_count),
-            .concurrent_limit = .limited(helper_count),
-        });
-
-        const io = persistent_threaded.io();
-        persistent_ready_count.store(0, .release);
-        var submitted: u32 = 0;
-        for (0..helper_count) |worker_id| {
-            persistent_group.concurrent(io, runPersistentWorker, .{worker_id}) catch break;
-            submitted += 1;
-        }
-        if (submitted == 0) {
-            persistent_init_state.store(3, .release);
-            return false;
-        }
-        persistent_worker_count.store(submitted, .release);
-
-        while (true) {
-            const ready = persistent_ready_count.load(.acquire);
-            if (ready >= submitted) break;
-            io.futexWaitUncancelable(u32, &persistent_ready_count.raw, ready);
-        }
-
-        persistent_init_state.store(2, .release);
-        return true;
+        };
+        return self.run(Adapter.call, @ptrCast(tasks.ptr), tasks.len);
     }
 
-    while (true) {
-        const current = persistent_init_state.load(.acquire);
-        if (current == 2) return true;
-        if (current == 3) return false;
-        std.atomic.spinLoopHint();
+    pub fn runTypedLowLatency(self: CallResources, comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
+        const Adapter = struct {
+            fn call(raw: *const anyopaque, index: usize) void {
+                const typed: [*]const Task = @ptrCast(@alignCast(raw));
+                task_fn(typed[index]);
+            }
+        };
+        return self.runLowLatency(Adapter.call, @ptrCast(tasks.ptr), tasks.len);
     }
-}
+};
 
 pub fn taskCount(items: usize, min_items_per_task: usize) usize {
-    const limit = runtime.maxThreads();
-    if (limit <= 1 or items < min_items_per_task * 2) return 1;
-    const by_size = @max(@as(usize, 1), items / min_items_per_task);
-    return @min(@min(limit, max_tasks), by_size);
+    return default_owner.get().taskCount(items, min_items_per_task);
 }
-
-fn runPersistent(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (!ensurePersistentWorkers()) return false;
-    const workers = persistent_worker_count.load(.acquire);
-    if (workers == 0) return false;
-    const task_helpers: u32 = @intCast(count - 1);
-    const allowed_helpers: u32 = @intCast(configuredHelperCount());
-    if (workers < task_helpers or allowed_helpers < task_helpers) return false;
-    const active_helpers = task_helpers;
-    if (active_helpers == 0) return false;
-    const first_helper: u32 = if (count == 3 and workers >= active_helpers + 2) 2 else 0;
-
-    persistent_task_fn = task_fn;
-    persistent_tasks = tasks;
-    persistent_job_count.store(@intCast(count), .release);
-    persistent_done_count.store(0, .release);
-    persistent_done_target.store(active_helpers, .release);
-    persistent_first_helper.store(first_helper, .release);
-    persistent_active_helpers.store(active_helpers, .release);
-
-    const io = persistent_threaded.io();
-    // Wake sleeping macOS subset helpers before the caller starts its tile,
-    // but avoid a syscall for hot helpers. This flag is only a latency hint:
-    // the unconditional late wake below also covers a stale or racing hint.
-    const wake_waiting_helpers = @import("builtin").target.os.tag == .macos and
-        (first_helper != 0 or active_helpers != workers);
-    for (0..active_helpers) |worker_id| {
-        const target_worker = first_helper + worker_id;
-        // io_busy serializes jobs, and completion acknowledges each worker's
-        // observed generation before another job can be submitted. Increment
-        // locally so even wraparound differs from an idle worker's last value.
-        // The release publishes the task payload to the worker's acquire load.
-        _ = persistent_worker_generation[target_worker].fetchAdd(1, .release);
-        if (wake_waiting_helpers and persistent_worker_waiting[target_worker].load(.acquire) != 0)
-            io.futexWake(u32, &persistent_worker_generation[target_worker].raw, 1);
-    }
-
-    runtime.configureWorkerThread(null);
-    task_fn(tasks, 0);
-    var woke_sleepers = false;
-    while (true) {
-        var done = persistent_done_count.load(.acquire);
-        const done_target = persistent_done_target.load(.acquire);
-        var spin_count: u32 = 0;
-        while (done < done_target and spin_count < persistent_done_spin_iters) : (spin_count += 1) {
-            std.atomic.spinLoopHint();
-            done = persistent_done_count.load(.acquire);
-        }
-        if (done >= done_target) break;
-        if (!woke_sleepers) {
-            for (0..active_helpers) |worker_id| {
-                io.futexWake(u32, &persistent_worker_generation[first_helper + worker_id].raw, 1);
-            }
-            woke_sleepers = true;
-            done = persistent_done_count.load(.acquire);
-            if (done >= done_target) break;
-        }
-        io.futexWaitUncancelable(u32, &persistent_done_count.raw, done);
-    }
-    return true;
-}
-
-fn runGroup(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (!ensureIoThreaded()) return false;
-    if (count - 1 > configuredHelperCount()) return false;
-
-    var group: std.Io.Group = .init;
-    var submitted = false;
-    const io = io_threaded.io();
-    for (1..count) |index| {
-        group.concurrent(io, runIoTask, .{ task_fn, tasks, index }) catch {
-            task_fn(tasks, index);
-            continue;
-        };
-        submitted = true;
-    }
-    runtime.configureWorkerThread(null);
-    task_fn(tasks, 0);
-    if (submitted) group.await(io) catch {};
-    return true;
-}
-
 pub fn run(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (count <= 1) return false;
-    if (io_busy.cmpxchgStrong(0, 1, .acq_rel, .acquire) != null) return false;
-    defer io_busy.store(0, .release);
-
-    return runGroup(task_fn, tasks, count);
+    return default_owner.get().run(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
 }
-
 pub fn runLowLatency(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-    if (count <= 1) return false;
-    if (io_busy.cmpxchgStrong(0, 1, .acq_rel, .acquire) != null) return false;
-    defer io_busy.store(0, .release);
-
-    if (runPersistent(task_fn, tasks, count)) return true;
-    return runGroup(task_fn, tasks, count);
+    return default_owner.get().runLowLatency(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
 }
-
-/// Distribute independent output regions without a barrier between tiles.
-/// A false return guarantees that no job has modified caller output.
 pub fn runQueued(task_fn: TaskFn, tasks: *const anyopaque, count: usize, worker_limit: usize) bool {
-    const workers = @min(count, @min(worker_limit, configuredHelperCount() + 1));
-    if (workers <= 1) return false;
-    const Queue = struct {
-        next: std.atomic.Value(usize) = .init(0),
-        count: usize,
-        task_fn: TaskFn,
-        tasks: *const anyopaque,
-
-        fn execute(raw: *const anyopaque, _: usize) void {
-            const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
-            while (true) {
-                const index = self.next.fetchAdd(1, .monotonic);
-                if (index >= self.count) return;
-                self.task_fn(self.tasks, index);
-            }
-        }
-    };
-    var queue = Queue{ .count = count, .task_fn = task_fn, .tasks = tasks };
-    return runLowLatency(Queue.execute, &queue, workers);
+    return default_owner.get().runQueued(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain }, worker_limit);
 }
-
 pub fn runTyped(comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
     const Adapter = struct {
         fn run(ctx: *const anyopaque, index: usize) void {
@@ -334,165 +116,79 @@ pub fn runTypedLowLatency(comptime Task: type, comptime task_fn: fn (Task) void,
     return runLowLatency(Adapter.run, @ptrCast(tasks.ptr), tasks.len);
 }
 
-fn waitForInitState(state: *std.atomic.Value(u8)) u8 {
-    while (true) {
-        const current = state.load(.acquire);
-        if (current != 1) return current;
-        std.atomic.spinLoopHint();
-    }
-}
-
-fn shutdownPersistentLocked() void {
-    const state = waitForInitState(&persistent_init_state);
-    if (state == 3) {
-        persistent_init_state.store(0, .release);
-        return;
-    }
-    if (state != 2) return;
-
-    const worker_count = persistent_worker_count.load(.acquire);
-    if (worker_count != 0) {
-        const io = persistent_threaded.io();
-        persistent_shutdown_requested.store(1, .release);
-        persistent_exited_count.store(0, .release);
-
-        for (0..worker_count) |worker_id| {
-            _ = persistent_worker_generation[worker_id].fetchAdd(1, .release);
-            io.futexWake(u32, &persistent_worker_generation[worker_id].raw, 1);
-        }
-
-        while (true) {
-            const exited = persistent_exited_count.load(.acquire);
-            if (exited >= worker_count) break;
-            io.futexWaitUncancelable(u32, &persistent_exited_count.raw, exited);
-        }
-        persistent_group.await(io) catch {};
-    }
-
-    persistent_threaded.deinit();
-    persistent_group = .init;
-    persistent_worker_count.store(0, .release);
-    persistent_ready_count.store(0, .release);
-    persistent_exited_count.store(0, .release);
-    persistent_shutdown_requested.store(0, .release);
-    persistent_init_state.store(0, .release);
-}
-
-fn shutdownIoThreadedLocked() void {
-    const state = waitForInitState(&io_init_state);
-    if (state == 2) io_threaded.deinit();
-    if (state == 2 or state == 3) io_init_state.store(0, .release);
-}
-
 pub fn shutdown() void {
-    while (io_busy.cmpxchgStrong(0, 1, .acq_rel, .acquire) != null) {
-        std.atomic.spinLoopHint();
-    }
-    defer io_busy.store(0, .release);
-
-    shutdownPersistentLocked();
-    shutdownIoThreadedLocked();
+    default_owner.get().drainAndReset();
 }
 
-test "queued jobs execute exactly once and refusal leaves output untouched" {
-    const Jobs = struct {
-        counters: [257]std.atomic.Value(u32) = @as([257]std.atomic.Value(u32), @splat(.init(0))),
-        fn execute(raw: *const anyopaque, index: usize) void {
-            const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
-            _ = self.counters[index].fetchAdd(1, .monotonic);
+const WrapperTestWork = struct {
+    entered: std.atomic.Value(bool) = .init(false),
+    release: std.atomic.Value(bool) = .init(false),
+    visits: [2]std.atomic.Value(u32) = @splat(.init(0)),
+    accepted: bool = false,
+    finished: std.atomic.Value(bool) = .init(false),
+    fn execute(raw: *const anyopaque, index: usize) void {
+        const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
+        _ = self.visits[index].fetchAdd(1, .monotonic);
+        if (index == 0) {
+            self.entered.store(true, .release);
+            while (!self.release.load(.acquire)) std.Thread.yield() catch {};
         }
-    };
-    var jobs: Jobs = .{};
-    runtime.setMaxThreads(4);
-    defer {
-        shutdown();
-        runtime.setMaxThreads(0);
     }
-    try std.testing.expect(!runQueued(Jobs.execute, &jobs, 257, 1));
-    io_busy.store(1, .release);
-    const busy_result = runQueued(Jobs.execute, &jobs, 257, 4);
-    io_busy.store(0, .release);
-    try std.testing.expect(!busy_result);
-    for (&jobs.counters) |*counter| try std.testing.expectEqual(@as(u32, 0), counter.load(.monotonic));
-    if (configuredHelperCount() == 0) return;
-    for (1..5) |iteration| {
-        try std.testing.expect(runQueued(Jobs.execute, &jobs, 257, 3));
-        for (&jobs.counters) |*counter| try std.testing.expectEqual(@as(u32, @intCast(iteration)), counter.load(.monotonic));
+    fn run(self: *@This()) void {
+        defer self.finished.store(true, .release);
+        self.accepted = runLowLatency(execute, self, 2);
     }
-}
-
-test "runLowLatency refuses partial execution when helpers cannot cover tasks" {
-    const CounterTask = struct {
-        counter: *std.atomic.Value(u32),
-
-        fn run(raw_tasks: *const anyopaque, index: usize) void {
-            const tasks: [*]const @This() = @ptrCast(@alignCast(raw_tasks));
-            _ = tasks[index].counter.fetchAdd(1, .monotonic);
-        }
-    };
-
-    var counter = std.atomic.Value(u32).init(0);
-    var tasks = [_]CounterTask{
-        .{ .counter = &counter },
-        .{ .counter = &counter },
-        .{ .counter = &counter },
-        .{ .counter = &counter },
-    };
-
+};
+test "BLAS wrappers and neutral default share admission and policy" {
+    const runtime = @import("../../runtime.zig");
+    const policy = default_owner.policy;
+    try std.testing.expect(runtime.setMaxThreads == policy.setMaxThreads);
+    try std.testing.expect(runtime.configureWorkerThread == policy.configureWorkerThread);
+    try std.testing.expect(TaskFn == execution_owner.TaskFn);
+    try std.testing.expect(@TypeOf(default_owner.get()) == *execution_owner.Executor);
+    const before = runtime.maxThreadsOverride();
     runtime.setMaxThreads(2);
     defer {
-        runtime.setMaxThreads(0);
         shutdown();
+        runtime.setMaxThreads(before);
     }
+    try std.testing.expectEqual(@as(usize, 2), policy.maxThreadsOverride());
+    policy.setMaxThreads(3);
+    try std.testing.expectEqual(@as(usize, 3), runtime.maxThreadsOverride());
+    runtime.setMaxThreads(2);
+    if (runtime.maxThreads() < 2) return error.SkipZigTest;
+    var active: WrapperTestWork = .{};
+    const caller = try std.Thread.spawn(.{}, WrapperTestWork.run, .{&active});
+    defer {
+        active.release.store(true, .release);
+        caller.join();
+    }
+    while (!active.entered.load(.acquire) and !active.finished.load(.acquire)) std.Thread.yield() catch {};
+    try std.testing.expect(active.entered.load(.acquire));
+    var refused: WrapperTestWork = .{};
+    try std.testing.expect(!default_owner.get().run(.{ .task_fn = WrapperTestWork.execute, .tasks = &refused, .count = 2 }));
+    for (&refused.visits) |*v| try std.testing.expectEqual(@as(u32, 0), v.load(.acquire));
+    active.release.store(true, .release);
+}
 
-    try std.testing.expect(!runLowLatency(CounterTask.run, @ptrCast(&tasks), tasks.len));
-    try std.testing.expectEqual(@as(u32, 0), counter.load(.monotonic));
-
-    shutdown();
-    runtime.setMaxThreads(5);
-    if (configuredHelperCount() == 0) return;
-
-    // Seed only while stopped: workers must acquire the seed before announcing
-    // readiness. The first phase wraps on shutdown, the second on submission.
-    for ([_]u32{ std.math.maxInt(u32) - 1, std.math.maxInt(u32) }) |seed| {
-        for (&persistent_worker_generation) |*generation| generation.store(seed, .release);
-        try std.testing.expect(ensurePersistentWorkers());
-        const workers = persistent_worker_count.load(.acquire);
-        try std.testing.expect(workers > 0);
-        var counters: [5]std.atomic.Value(u32) = @splat(std.atomic.Value(u32).init(0));
-        var distinct_tasks: [5]CounterTask = undefined;
-        for (&distinct_tasks, &counters) |*task, *task_counter| task.* = .{ .counter = task_counter };
-
-        const counts = [_]usize{ 2, @min(workers + 1, 3), 2, workers + 1 };
-        const runs: usize = if (seed == std.math.maxInt(u32) - 1) 1 else counts.len;
-        for (counts[0..runs]) |count| {
-            // Exercise a sleeping subset whose first helper is not zero,
-            // as well as the hot generation-wraparound path.
-            if (count == 3 and workers >= 4) try std.Io.sleep(persistent_threaded.io(), .fromMilliseconds(100), .awake);
-            var before: [max_tasks]u32 = undefined;
-            for (0..workers) |worker_id| before[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
-            for (&counters) |*task_counter| task_counter.store(0, .monotonic);
-            try std.testing.expect(runLowLatency(CounterTask.run, @ptrCast(&distinct_tasks), count));
-            // Separate counters catch a duplicated index hiding a missing one.
-            for (&counters, 0..) |*task_counter, index| {
-                try std.testing.expectEqual(@as(u32, if (index < count) 1 else 0), task_counter.load(.monotonic));
-            }
-            const active_helpers = count - 1;
-            const first_helper: usize = if (count == 3 and workers >= active_helpers + 2) 2 else 0;
-            for (0..workers) |worker_id| {
-                const active = worker_id >= first_helper and worker_id < first_helper + active_helpers;
-                const expected = before[worker_id] +% @as(u32, if (active) 1 else 0);
-                try std.testing.expectEqual(expected, persistent_worker_generation[worker_id].load(.acquire));
-            }
+test "BLAS typed adapters preserve function types and exactly-once task slices" {
+    const runtime = @import("../../runtime.zig");
+    const Task = struct {
+        value: *u32,
+        fn call(t: @This()) void {
+            t.value.* += 1;
         }
-
-        var before_shutdown: [max_tasks]u32 = undefined;
-        for (0..workers) |worker_id| before_shutdown[worker_id] = persistent_worker_generation[worker_id].load(.acquire);
+    };
+    const before = runtime.maxThreadsOverride();
+    runtime.setMaxThreads(2);
+    defer {
         shutdown();
-        try std.testing.expectEqual(@as(u8, 0), persistent_init_state.load(.acquire));
-        try std.testing.expectEqual(@as(u32, 0), persistent_worker_count.load(.acquire));
-        for (0..workers) |worker_id| {
-            try std.testing.expectEqual(before_shutdown[worker_id] +% 1, persistent_worker_generation[worker_id].load(.acquire));
-        }
+        runtime.setMaxThreads(before);
     }
+    if (runtime.maxThreads() < 2) return error.SkipZigTest;
+    var values = [_]u32{ 0, 0 };
+    const tasks = [_]Task{ .{ .value = &values[0] }, .{ .value = &values[1] } };
+    try std.testing.expect(runTyped(Task, Task.call, &tasks));
+    try std.testing.expect(runTypedLowLatency(Task, Task.call, &tasks));
+    try std.testing.expectEqualSlices(u32, &.{ 2, 2 }, &values);
 }

@@ -4,6 +4,7 @@
 //! Core dispatch entries for packed and banded triangular operations.
 
 const std = @import("std");
+const resources = @import("zynum-numerics-resources");
 const catalog = @import("../../kernels/shared/matrix_vector/catalog.zig");
 const level2_tuning = @import("../../kernels/shared/matrix_vector/tuning.zig");
 
@@ -11,6 +12,7 @@ const builtin = @import("builtin");
 
 const scalar = @import("../shared/scalar.zig");
 const triangular = @import("triangular.zig");
+const CallResources = @import("../execution/thread_pool.zig").CallResources;
 const isolated = @import("../../kernels/isolated/x86_64_compact_triangular_bridge.zig");
 
 const BlasInt = scalar.BlasInt;
@@ -19,23 +21,31 @@ const Uplo = scalar.Uplo;
 const Diag = scalar.Diag;
 
 pub noinline fn tpmv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
+    return tpmvWithResources(T, .legacy_default, uplo, trans_, diag, n, ap, x, incx);
+}
+
+/// Borrow one live operation until finite scratch is freed and output copied back.
+pub fn tpmvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
+    return tpmvWithResources(T, .{ .admitted = operation }, uplo, trans_, diag, n, ap, x, incx);
+}
+
+noinline fn tpmvWithResources(comptime T: type, call_resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
     if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n > 0 and incx != 0 and isolated.tryTpmv(T, uplo, trans_, diag, n, ap, x, incx)) return;
     }
     if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and (T == f32 or T == f64)) {
         const profile = level2_tuning.active.triangular;
         if (profile.selectFiniteTpmv(T, n) == .compact_triangular_packed_finite)
-            return tpmvFiniteCandidate(T, uplo, trans_, diag, n, ap, x, incx);
+            return tpmvFiniteCandidate(T, call_resources, uplo, trans_, diag, n, ap, x, incx);
     }
     return legacyTpmv(T, uplo, trans_, diag, n, ap, x, incx);
 }
 
-// Keep the non-tail candidate attempt out of the public dispatch entry. Both
-// dispatch targets have the same argument ABI, so off-gate calls need not retain
-// their arguments across an attempt that they cannot use.
-noinline fn tpmvFiniteCandidate(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
+// Keep the finite candidate attempt separate from dispatch. The legacy compute
+// leaves below retain their original argument ABI and arithmetic.
+noinline fn tpmvFiniteCandidate(comptime T: type, call_resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, ap: [*]const T, x: [*]T, incx: BlasInt) void {
     const profile = level2_tuning.active.triangular;
-    if (tryFiniteTpmv(T, true, std.heap.c_allocator, profile.finite_tpmv_workspace_max_bytes, uplo, trans_, diag, n, ap, x, incx)) return;
+    if (tryFiniteTpmv(T, true, call_resources.scratchAllocator() orelse std.heap.c_allocator, profile.finite_tpmv_workspace_max_bytes, uplo, trans_, diag, n, ap, x, incx)) return;
     return legacyTpmv(T, uplo, trans_, diag, n, ap, x, incx);
 }
 
@@ -77,13 +87,22 @@ pub noinline fn tpsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n:
 }
 
 pub noinline fn tbsv(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, k: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
+    return tbsvWithResources(T, .legacy_default, uplo, trans_, diag, n, k, a, lda, x, incx);
+}
+
+/// Borrow one live operation until finite scratch is freed and output copied back.
+pub fn tbsvAdmitted(comptime T: type, operation: *const @import("zynum-execution").context.Operation, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, k: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
+    return tbsvWithResources(T, .{ .admitted = operation }, uplo, trans_, diag, n, k, a, lda, x, incx);
+}
+
+noinline fn tbsvWithResources(comptime T: type, call_resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n: BlasInt, k: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
     if (comptime builtin.target.cpu.arch == .x86_64) {
         if (n > 0 and incx != 0 and k >= 0 and isolated.tryTbsv(T, uplo, trans_, diag, n, k, a, lda, x, incx)) return;
     }
     if (comptime T == f32 or T == f64) {
         const profile = level2_tuning.active.triangular;
         if (profile.selectFiniteTbsv(T, n, k) == .compact_triangular_band_finite and
-            tryFiniteTbsv(T, std.heap.c_allocator, profile.finite_tbsv_workspace_max_bytes, uplo, trans_, diag, n, k, a, lda, x, incx)) return;
+            tryFiniteTbsv(T, call_resources.scratchAllocator() orelse std.heap.c_allocator, profile.finite_tbsv_workspace_max_bytes, uplo, trans_, diag, n, k, a, lda, x, incx)) return;
     }
     triangular.tbsv(T, uplo, trans_, diag, n, k, a, lda, x, incx);
 }
@@ -232,8 +251,9 @@ noinline fn tryFiniteTbsvImpl(
     if (x_addr >= a_addr) {
         if (x_addr - a_addr < a_bytes) return false;
     } else if (a_addr - x_addr < x_bytes) return false;
-    const work = allocator.alloc(T, n) catch return false;
-    defer allocator.free(work);
+    var workspace = resources.ScratchLease(T).acquire(allocator, n) catch return false;
+    defer workspace.deinit();
+    const work = workspace.values;
     if (incx == 1) {
         @memcpy(work, x[0..n]);
     } else {

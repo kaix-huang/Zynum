@@ -118,7 +118,7 @@ jobs:
           PATH: ${{ steps.trusted-posix-tools.outputs.path }}
           BASH_ENV: /dev/null
           ENV: /dev/null
-        run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py tools/*.py
+        run: env PYTHONDONTWRITEBYTECODE=1 python3 -m py_compile bench/tools/*.py bench/modules/*.py tools/*.py
 
       - name: Check build inventory
         shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
@@ -152,6 +152,7 @@ jobs:
           ENV: /dev/null
         run: |
           zig build generate-headers --summary failures
+          zig build generate-checked-abi --summary failures
           zig build generate-kernel-coverage --summary failures
           python3 tools/generate_multiversion.py --check
           python3 -B test/build/test_repack_darwin_archive.py
@@ -164,10 +165,10 @@ jobs:
           ENV: /dev/null
         run: |
           set -euo pipefail
-          git --no-pager diff --exit-code -- include/zynum/blas docs/kernel_coverage.json
-          status="$(git status --porcelain --untracked-files=all -- include/zynum/blas docs/kernel_coverage.json)"
+          git --no-pager diff --exit-code -- include/zynum/blas include/zynum/checked src/checked/abi_types.zig src/checked/exports.zig src/checked/exports.def docs/kernel_coverage.json
+          status="$(git status --porcelain --untracked-files=all -- include/zynum/blas include/zynum/checked src/checked/abi_types.zig src/checked/exports.zig src/checked/exports.def docs/kernel_coverage.json)"
           if [[ -n "$status" ]]; then
-            echo "Generated compatibility headers or kernel coverage are out of date."
+            echo "Generated compatibility interfaces or kernel coverage are out of date."
             printf '%s\n' "$status"
             exit 1
           fi
@@ -849,6 +850,24 @@ jobs:
           BASH_ENV: /dev/null
           ENV: /dev/null
         run: zig build ${{ matrix.target_args }} --release=fast --summary failures
+
+      - name: Run checked C and C++ consumers
+        if: runner.os != 'Windows'
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: zig build test-checked-abi ${{ matrix.target_args }} --release=safe -Dtest-optimize=safe --summary failures
+
+      - name: Run checked Fortran consumer
+        if: matrix.full_smoke
+        shell: /usr/bin/env BASH_ENV=/dev/null ENV=/dev/null GITHUB_ENV=/dev/null GITHUB_PATH=/dev/null /bin/bash --noprofile --norc -p -eo pipefail {0}
+        env:
+          PATH: ${{ steps.trusted-posix-tools.outputs.path }}
+          BASH_ENV: /dev/null
+          ENV: /dev/null
+        run: zig build test-checked-fortran ${{ matrix.target_args }} --release=safe -Dtest-optimize=safe -Dchecked-gfortran="${{ steps.trusted-posix-tools.outputs.gfortran }}" --summary failures
 
       - name: Check ABI symbols
         if: matrix.install

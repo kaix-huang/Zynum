@@ -1,0 +1,16 @@
+// Generated boundary only; the existing owner supplies mathematics and work.
+fn TriangularInverse(comptime T: type, comptime level: Level) type {
+    return struct {
+        pub fn call(layout: c_int, uplo: i8, diag: i8, n: WireInt, a: ?[*]align(1) T, lda: WireInt) callconv(.c) WireInt {
+            const result = binding.Shared.trtriRawManagedWithDefaults(true, T, InternalInt, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout,
+                .uplo = @bitCast(uplo),
+                .diag = @bitCast(diag),
+                .n = @intCast(n),
+                .a = a,
+                .lda = @intCast(lda),
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return finish(result);
+        }
+    };
+}

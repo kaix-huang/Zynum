@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+const std = @import("std");
 const types = @import("../../../types.zig");
 const catalog = @import("catalog.zig");
 
@@ -66,6 +67,8 @@ pub fn Task(comptime T: type) type {
         allow_sme: bool = false,
         kernel: catalog.KernelId = .auto,
         execution: ExecutionPlan = .{},
+        /// Borrowed for this synchronous call; null retains legacy pack ownership.
+        scratch_allocator: ?std.mem.Allocator = null,
     };
 }
 

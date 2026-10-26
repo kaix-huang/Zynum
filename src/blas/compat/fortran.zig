@@ -3,8 +3,7 @@
 
 //! Compatibility namespace for classic Fortran BLAS ABI declarations.
 //!
-//! Tests import `src/blas/abi/fortran.zig` directly so the test surface cannot
-//! drift from the exported ABI implementation. This leaf remains as a documented
-//! namespace for compatibility-focused consumers that prefer an explicit path.
+//! Consumers and tests share the named adapter owner. Numerical implementations
+//! remain exclusively in its injected Core module.
 
-pub const abi = @import("../abi/fortran.zig");
+pub const abi = @import("zynum-blas-abi").fortran;

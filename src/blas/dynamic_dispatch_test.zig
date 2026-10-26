@@ -5,12 +5,12 @@
 //! This root is deliberately separate from canonical inventory evidence.
 const std = @import("std");
 const builtin = @import("builtin");
-const hardware = @import("hardware.zig");
-const client = @import("kernels/multiversion/client.zig");
-const protocol = @import("kernels/multiversion/protocol.zig");
-const runtime = @import("runtime.zig");
-const api = @import("api.zig");
-const fortran = @import("abi/fortran.zig");
+const hardware = @import("zynum-core").internal.testing.hardware;
+const client = @import("zynum-core").internal.testing.client;
+const protocol = @import("zynum-core").internal.testing.protocol;
+const runtime = @import("zynum-core").blas.runtime;
+const api = @import("zynum-core").blas.api;
+const fortran = @import("zynum-blas-abi").fortran;
 
 const scalars = .{ f32, f64, api.ComplexF32, api.ComplexF64 };
 
@@ -44,7 +44,7 @@ test "prefetched reductions preserve ordinary values across cache-policy boundar
 }
 
 test "streaming copy preserves unaligned edges and declines unsupported tiers" {
-    const binary = @import("kernels/dispatch/vector_binary.zig");
+    const binary = @import("zynum-core").internal.testing.vector_binary;
     var source: [8320]u8 align(64) = undefined;
     var target: [8320]u8 align(64) = undefined;
     for (&source, 0..) |*v, i| v.* = @intCast(i % 251);
@@ -508,7 +508,7 @@ const ComplexGemvCalleeSavedProbe = struct {
     fn check() !void {
         if (comptime builtin.target.cpu.arch != .aarch64) return;
         if (comptime !builtin.target.cpu.has(.aarch64, .complxnum)) return;
-        const kernels = @import("kernels/arch/aarch64/asm/matrix_vector.zig");
+        const kernels = @import("zynum-core").internal.testing.aarch64_matrix_vector;
         const T = api.ComplexF64;
         var a: [259 * 128]T = @splat(.{ .re = 1, .im = 2 });
         var x: [128]T = @splat(.{ .re = 1, .im = -1 });
@@ -527,7 +527,7 @@ const ComplexGemvCalleeSavedProbe = struct {
 
 test "paired complex transposed GEMV preserves odd rows columns and unaligned guards" {
     try ComplexGemvCalleeSavedProbe.check();
-    const scalar = @import("core/shared/scalar.zig");
+    const scalar = @import("zynum-core").internal.blas_unchecked.scalar;
     defer runtime.setMaxThreads(0);
     defer fortran.zynum_blas_shutdown();
     for ([_]usize{ 1, 4 }) |cap| {
@@ -908,4 +908,912 @@ test "parallel complex 3M packing preserves uneven task fringes and coefficients
             }
         }
     }
+}
+
+// Cross-object ownership coverage uses the same Core-owned Context as admitted
+// BLAS, with a private allocator and a one-thread policy. Buffer fixtures are
+// allocated separately, so the observed allocations are numerical scratch only.
+const DynamicResourceExecution = @import("zynum-core").internal.numerics.Execution;
+const DynamicResourceContext = DynamicResourceExecution.context.Context;
+const DynamicResourceAllocations = DynamicResourceExecution.test_support.Allocations;
+
+const DynamicResourceProbe = struct {
+    var context: ?*DynamicResourceContext = null;
+    var allocations: ?*DynamicResourceAllocations = null;
+    var actual: []const u8 = &.{};
+    var expected: []const u8 = &.{};
+    var admitted: usize = 0;
+    var finished: usize = 0;
+    var watch: bool = false;
+
+    fn maxThreads() usize {
+        return 1;
+    }
+    fn helpers(_: usize) usize {
+        return 0;
+    }
+    fn configure(_: ?usize) void {
+        @panic("serial dynamic GEMM unexpectedly created a worker");
+    }
+    const policy: DynamicResourceExecution.owner.Policy = .{
+        .max_threads = maxThreads,
+        .helper_count = helpers,
+        .configure_thread = configure,
+        .worker_stack_size = 2 * 1024 * 1024,
+    };
+    fn setup(ctx: *DynamicResourceContext, log: *DynamicResourceAllocations) void {
+        context = ctx;
+        allocations = log;
+        admitted = 0;
+        finished = 0;
+        watch = false;
+        actual = &.{};
+        expected = &.{};
+        DynamicResourceContext.testing.configure(ctx, std.math.maxInt(usize), observe);
+    }
+    fn observe(ctx: *DynamicResourceContext, event: DynamicResourceExecution.context.TestEvent) void {
+        if (ctx != context.? or ctx == DynamicResourceExecution.getContext())
+            @panic("dynamic GEMM changed its admitted Context");
+        const state = ctx.snapshot();
+        if (state.active_operations != 1 or state.resource_pins != 0)
+            @panic("dynamic GEMM nested admission or retained a scratch pin");
+        switch (event) {
+            .admitted => admitted += 1,
+            .finishing => {
+                if (watch) {
+                    if (!std.mem.eql(u8, actual, expected))
+                        @panic("dynamic GEMM ended before complete output or damaged padding");
+                    const stats = allocations.?.stats();
+                    if (stats.accepted != stats.freed)
+                        @panic("dynamic object retained the borrowed allocator's scratch");
+                }
+                finished += 1;
+            },
+        }
+    }
+};
+
+const DynamicResourceDefaultGuard = struct {
+    const State = struct {
+        context: DynamicResourceExecution.context.Snapshot,
+        busy: u8,
+        io_init: u8,
+        persistent_init: u8,
+        workers: u32,
+        job_count: u32,
+        generations: [DynamicResourceExecution.owner.max_tasks]u32,
+        cache_domain: ?*const DynamicResourceExecution.owner.WorkerCacheDomain,
+        max_threads_override: usize,
+    };
+    before: State,
+    fn state() State {
+        const executor = DynamicResourceExecution.get();
+        var generations: [DynamicResourceExecution.owner.max_tasks]u32 = undefined;
+        for (&generations, 0..) |*generation, i|
+            generation.* = executor.persistent_worker_generation[i].load(.acquire);
+        return .{
+            .context = DynamicResourceExecution.getContext().snapshot(),
+            .busy = executor.io_busy.load(.acquire),
+            .io_init = executor.io_init_state.load(.acquire),
+            .persistent_init = executor.persistent_init_state.load(.acquire),
+            .workers = executor.persistent_worker_count.load(.acquire),
+            .job_count = executor.persistent_job_count.load(.acquire),
+            .generations = generations,
+            .cache_domain = executor.persistent_cache_domain,
+            .max_threads_override = DynamicResourceExecution.policy.maxThreadsOverride(),
+        };
+    }
+    fn unexpected(_: *DynamicResourceContext, _: DynamicResourceExecution.context.TestEvent) void {
+        @panic("dynamic borrowed GEMM used default Context admission");
+    }
+    fn init() !DynamicResourceDefaultGuard {
+        const before = state();
+        try std.testing.expectEqual(@as(usize, 0), before.context.active_operations);
+        try std.testing.expectEqual(@as(usize, 0), before.context.resource_pins);
+        try std.testing.expectEqual(@as(u8, 0), before.busy);
+        DynamicResourceContext.testing.configure(DynamicResourceExecution.getContext(), std.math.maxInt(usize), unexpected);
+        return .{ .before = before };
+    }
+    fn check(self: DynamicResourceDefaultGuard) !void {
+        try std.testing.expectEqualDeep(self.before, state());
+    }
+    fn deinit(_: DynamicResourceDefaultGuard) void {
+        DynamicResourceContext.testing.configure(DynamicResourceExecution.getContext(), std.math.maxInt(usize), null);
+    }
+};
+
+fn dynamicResourceValue(index: usize, modulus: usize, bias: i64) i64 {
+    return @as(i64, @intCast(index % modulus)) - bias;
+}
+
+fn dynamicResourceGemm(comptime T: type, m: usize, n: usize, k: usize, budget: usize) !DynamicResourceAllocations.Stats {
+    try std.testing.expect(@import("zynum-build-options").dynamic_dispatch);
+    const buffers = std.testing.allocator;
+    const lda = m + 3;
+    const ldb = k + 5;
+    const ldc = m + 7;
+    const a = try buffers.alloc(T, lda * k + 2);
+    defer buffers.free(a);
+    const b = try buffers.alloc(T, ldb * n + 2);
+    defer buffers.free(b);
+    const c = try buffers.alloc(T, ldc * n + 2);
+    defer buffers.free(c);
+    @memset(a, 203);
+    @memset(b, 211);
+    @memset(c, 137);
+    for (0..k) |p| for (0..m) |i| {
+        a[1 + i + p * lda] = @floatFromInt(dynamicResourceValue(i, 5, 2) + dynamicResourceValue(p, 7, 3));
+    };
+    for (0..n) |j| for (0..k) |p| {
+        b[1 + p + j * ldb] = @floatFromInt(dynamicResourceValue(p, 3, 1) + dynamicResourceValue(j, 11, 5));
+    };
+    for (0..n) |j| for (0..m) |i| {
+        c[1 + i + j * ldc] = @floatFromInt(2 * ((i + j) % 5) + 1);
+    };
+    const a_before = try buffers.dupe(T, a);
+    defer buffers.free(a_before);
+    const b_before = try buffers.dupe(T, b);
+    defer buffers.free(b_before);
+    const expected = try buffers.dupe(T, c);
+    defer buffers.free(expected);
+    // Independent rank-two formula, not a second GEMM loop. Small integral
+    // inputs/intermediates and odd nonzero outputs are exact in both types.
+    var sum_u: i64 = 0;
+    var sum_v: i64 = 0;
+    var sum_uv: i64 = 0;
+    for (0..k) |p| {
+        const u = dynamicResourceValue(p, 7, 3);
+        const v = dynamicResourceValue(p, 3, 1);
+        sum_u += u;
+        sum_v += v;
+        sum_uv += u * v;
+    }
+    for (0..n) |j| for (0..m) |i| {
+        const r = dynamicResourceValue(i, 5, 2);
+        const s = dynamicResourceValue(j, 11, 5);
+        const product = r * sum_v + r * s * @as(i64, @intCast(k)) + sum_uv + s * sum_u;
+        const old: i64 = @intCast(2 * ((i + j) % 5) + 1);
+        expected[1 + i + j * ldc] = @floatFromInt(2 * product - 3 * old);
+    };
+
+    const default_guard = try DynamicResourceDefaultGuard.init();
+    defer default_guard.deinit();
+    var allocations: DynamicResourceAllocations = .{ .budget = budget };
+    var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicResourceProbe.policy, .internal_closable);
+    DynamicResourceProbe.setup(&ctx, &allocations);
+    var operation = try ctx.begin();
+    var ended = false;
+    defer if (!ended) {
+        DynamicResourceProbe.watch = false;
+        operation.end();
+    };
+    DynamicResourceProbe.actual = std.mem.sliceAsBytes(c);
+    DynamicResourceProbe.expected = std.mem.sliceAsBytes(expected);
+    DynamicResourceProbe.watch = true;
+    // The original admitted Fortran body reaches gemmRealAdmitted, its actual
+    // CallResources/planner, and the linked object's packet dispatch.
+    const mi: fortran.BlasInt = @intCast(m);
+    const ni: fortran.BlasInt = @intCast(n);
+    const ki: fortran.BlasInt = @intCast(k);
+    const ldai: fortran.BlasInt = @intCast(lda);
+    const ldbi: fortran.BlasInt = @intCast(ldb);
+    const ldci: fortran.BlasInt = @intCast(ldc);
+    const alpha: T = 2;
+    const beta: T = -3;
+    @field(fortran.internal_admitted, prefix(T) ++ "gemm_")(&operation, "N", "N", &mi, &ni, &ki, &alpha, a.ptr + 1, &ldai, b.ptr + 1, &ldbi, &beta, c.ptr + 1, &ldci);
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(c));
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(a_before), std.mem.sliceAsBytes(a));
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(b_before), std.mem.sliceAsBytes(b));
+    // No Executor allocation can explain observed scratch traffic in this
+    // one-thread fixture. This also guards unintended default-pool fallback.
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+    const stats = allocations.stats();
+    try std.testing.expectEqual(stats.accepted, stats.freed);
+    operation.end();
+    ended = true;
+    DynamicResourceProbe.watch = false;
+    try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.admitted);
+    try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.finished);
+    try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
+    try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try default_guard.check();
+    return stats;
+}
+
+test "dynamic GEMM heap packs use the borrowed Context allocator and preserve OOM fallback" {
+    inline for (.{ f32, f64 }) |T| {
+        // Arbitrary coefficients exclude SME/AMX direct GEMM. 13 rows disable
+        // x86 K blocking/packed A; 4097*tile_n elements exceed the 64 KiB SIMD
+        // stack pack. NN plus one task has no host-side allocation.
+        const success = try dynamicResourceGemm(T, 13, 19, 4097, std.math.maxInt(usize));
+        try std.testing.expectEqual(@as(usize, 1), success.attempts);
+        try std.testing.expectEqual(@as(usize, 1), success.accepted);
+        try std.testing.expectEqual(@as(usize, 1), success.freed);
+        try std.testing.expectEqual(@as(usize, 0), success.rejected);
+        const failed = try dynamicResourceGemm(T, 13, 19, 4097, 0);
+        try std.testing.expectEqual(@as(usize, 1), failed.attempts);
+        try std.testing.expectEqual(@as(usize, 0), failed.accepted);
+        try std.testing.expectEqual(@as(usize, 0), failed.freed);
+        try std.testing.expectEqual(@as(usize, 1), failed.rejected);
+    }
+}
+
+test "dynamic GEMM vector shortcut carries borrowed allocation ownership across object tiers" {
+    inline for (.{ f32, f64 }) |T| {
+        // GEMM n=1 enters GEMV before planner. At these shapes an SME2 object
+        // with 64-byte streaming vectors uses an allocation-free fused kernel;
+        // Apple AMX otherwise owns two call-local B/C buffers. Baseline runs
+        // with apple_amx enabled must exercise both actual allocations.
+        const rows: usize = if (T == f32) 256 else 512;
+        const stats = try dynamicResourceGemm(T, rows, 1, 257, std.math.maxInt(usize));
+        const apple_amx = builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and @import("zynum-build-options").apple_amx;
+        const tier = client.selectedTier();
+        const may_use_sme2 = tier == .aarch64_sme2 or tier == .aarch64_sme2p1;
+        if (!apple_amx) {
+            try std.testing.expectEqual(@as(usize, 0), stats.attempts);
+        } else if (!may_use_sme2) {
+            try std.testing.expectEqual(@as(usize, 2), stats.attempts);
+        } else {
+            try std.testing.expect(stats.attempts == 0 or stats.attempts == 2);
+        }
+        try std.testing.expectEqual(@as(usize, 0), stats.rejected);
+        try std.testing.expectEqual(stats.attempts, stats.accepted);
+        try std.testing.expectEqual(stats.accepted, stats.freed);
+        std.debug.print("dynamic GEMM shortcut {s} tier={s} scratch allocations={d} frees={d}\n", .{ @typeName(T), @tagName(tier), stats.accepted, stats.freed });
+    }
+}
+
+fn dynamicComplexResourceGemm(comptime T: type, budget: usize) !DynamicResourceAllocations.Stats {
+    try std.testing.expect(@import("zynum-build-options").dynamic_dispatch);
+    const m = 13;
+    const n = 19;
+    const k = 4097;
+    const lda = m + 3;
+    const ldb = k + 5;
+    const ldc = m + 7;
+    const buffers = std.testing.allocator;
+    const a = try buffers.alloc(T, lda * k + 2);
+    defer buffers.free(a);
+    const b = try buffers.alloc(T, ldb * n + 2);
+    defer buffers.free(b);
+    const c = try buffers.alloc(T, ldc * n + 2);
+    defer buffers.free(c);
+    @memset(a, .{ .re = 203, .im = -207 });
+    @memset(b, .{ .re = 211, .im = -219 });
+    @memset(c, .{ .re = 137, .im = -149 });
+    for (0..k) |p| for (0..m) |i| {
+        a[1 + i + p * lda] = .{ .re = 2, .im = 3 };
+    };
+    for (0..n) |j| for (0..k) |p| {
+        b[1 + p + j * ldb] = .{ .re = 4, .im = -1 };
+    };
+    for (0..n) |j| for (0..m) |i| {
+        c[1 + i + j * ldc] = .{ .re = 3, .im = 1 };
+    };
+    const a_before = try buffers.dupe(T, a);
+    defer buffers.free(a_before);
+    const b_before = try buffers.dupe(T, b);
+    defer buffers.free(b_before);
+    const expected = try buffers.dupe(T, c);
+    defer buffers.free(expected);
+    // (2+3i)(4-i)=11+10i; (2+i)k(11+10i)+(-3+2i)(3+i).
+    // This closed-form integer expectation is independent of 3M and the real
+    // object kernels and fits exactly in both scalar formats.
+    for (0..n) |j| for (0..m) |i| {
+        expected[1 + i + j * ldc] = .{ .re = 12 * k - 11, .im = 31 * k + 3 };
+    };
+    const guard = try DynamicResourceDefaultGuard.init();
+    defer guard.deinit();
+    var allocations: DynamicResourceAllocations = .{ .budget = budget };
+    var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicResourceProbe.policy, .internal_closable);
+    DynamicResourceProbe.setup(&ctx, &allocations);
+    defer {
+        DynamicResourceProbe.watch = false;
+        _ = ctx.requestClose();
+        _ = ctx.tryProgressClose();
+    }
+    var operation = try ctx.begin();
+    var ended = false;
+    defer if (!ended) {
+        DynamicResourceProbe.watch = false;
+        operation.end();
+    };
+    DynamicResourceProbe.actual = std.mem.sliceAsBytes(c);
+    DynamicResourceProbe.expected = std.mem.sliceAsBytes(expected);
+    DynamicResourceProbe.watch = true;
+    const mi: fortran.BlasInt = m;
+    const ni: fortran.BlasInt = n;
+    const ki: fortran.BlasInt = k;
+    const ldai: fortran.BlasInt = lda;
+    const ldbi: fortran.BlasInt = ldb;
+    const ldci: fortran.BlasInt = ldc;
+    const alpha: T = .{ .re = 2, .im = 1 };
+    const beta: T = .{ .re = -3, .im = 2 };
+    @field(fortran.internal_admitted, prefix(T) ++ "gemm_")(&operation, "N", "N", &mi, &ni, &ki, &alpha, a.ptr + 1, &ldai, b.ptr + 1, &ldbi, &beta, c.ptr + 1, &ldci);
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(c));
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(a_before), std.mem.sliceAsBytes(a));
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(b_before), std.mem.sliceAsBytes(b));
+    const stats = allocations.stats();
+    try std.testing.expectEqual(stats.accepted, stats.freed);
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+    operation.end();
+    ended = true;
+    DynamicResourceProbe.watch = false;
+    try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.admitted);
+    try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.finished);
+    _ = ctx.requestClose();
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try guard.check();
+    return stats;
+}
+
+test "dynamic complex decomposition carries borrowed allocation into real object packs" {
+    inline for (.{ api.ComplexF32, api.ComplexF64 }) |T| {
+        // The first allocation is the host 3M workspace. Thirteen real rows
+        // exclude packed-A plans; long K exceeds the real SIMD stack pack.
+        // Normal and forced-baseline invocations are separate actual runs.
+        const success = try dynamicComplexResourceGemm(T, std.math.maxInt(usize));
+        try std.testing.expect(success.accepted > 1);
+        try std.testing.expectEqual(@as(usize, 0), success.rejected);
+        const outer_oom = try dynamicComplexResourceGemm(T, 0);
+        try std.testing.expectEqual(@as(usize, 0), outer_oom.accepted);
+        try std.testing.expect(outer_oom.rejected > 0);
+        const inner_oom = try dynamicComplexResourceGemm(T, 1);
+        try std.testing.expectEqual(@as(usize, 1), inner_oom.accepted);
+        try std.testing.expect(inner_oom.rejected > 0);
+    }
+}
+
+const ComplexUnitResourceProbe = struct {
+    var queries: std.atomic.Value(usize) = .init(0);
+    var configurations: std.atomic.Value(usize) = .init(0);
+    var expected: []const u8 = &.{};
+    var actual: []const u8 = &.{};
+    var context: ?*DynamicResourceContext = null;
+    var watching: bool = false;
+    var finishes: usize = 0;
+    fn maxThreads() usize {
+        _ = queries.fetchAdd(1, .monotonic);
+        return 2;
+    }
+    fn helpers(limit: usize) usize {
+        return @min(limit, 1);
+    }
+    fn configure(_: ?usize) void {
+        _ = configurations.fetchAdd(1, .monotonic);
+    }
+    const policy: DynamicResourceExecution.owner.Policy = .{
+        .max_threads = maxThreads,
+        .helper_count = helpers,
+        .configure_thread = configure,
+        .worker_stack_size = 2 * 1024 * 1024,
+    };
+    fn observe(ctx: *DynamicResourceContext, event: DynamicResourceExecution.context.TestEvent) void {
+        if (ctx != context.? or ctx == DynamicResourceExecution.getContext()) @panic("unit helper changed Context");
+        if (ctx.snapshot().active_operations != 1 or ctx.snapshot().resource_pins != 0) @panic("unit helper lost operation ownership");
+        if (event == .finishing and watching) {
+            if (!std.mem.eql(u8, actual, expected)) @panic("unit helper finished before final stores or damaged a guard");
+            finishes += 1;
+        }
+    }
+};
+
+test "complex GEMV unit helpers retain resources at actual Level 1 scheduling boundaries" {
+    const core = @import("zynum-core").internal.blas_unchecked;
+    const guard = try DynamicResourceDefaultGuard.init();
+    defer guard.deinit();
+    var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
+    var ctx = DynamicResourceContext.init(allocations.allocator(), ComplexUnitResourceProbe.policy, .internal_closable);
+    ComplexUnitResourceProbe.context = &ctx;
+    ComplexUnitResourceProbe.queries.store(0, .release);
+    ComplexUnitResourceProbe.configurations.store(0, .release);
+    ComplexUnitResourceProbe.finishes = 0;
+    DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), ComplexUnitResourceProbe.observe);
+    defer {
+        ComplexUnitResourceProbe.watching = false;
+        _ = ctx.requestClose();
+        _ = ctx.tryProgressClose();
+    }
+    var calls: usize = 0;
+    inline for (.{ api.ComplexF32, api.ComplexF64 }) |T| {
+        // Independent helper boundary tests; these do not claim a giant GEMM
+        // end-to-end run. 2*n crosses the AArch64 real-f32 scaling cutoff too.
+        for ([_]usize{ 512 * 1024 - 1, 512 * 1024, 1024 * 1024 + 1 }) |n| {
+            for ([_]bool{ false, true }) |real_coefficient| {
+                const x = try std.testing.allocator.alloc(T, n + 2);
+                defer std.testing.allocator.free(x);
+                const y = try std.testing.allocator.alloc(T, n + 2);
+                defer std.testing.allocator.free(y);
+                const expected = try std.testing.allocator.alloc(T, n + 2);
+                defer std.testing.allocator.free(expected);
+                @memset(x, .{ .re = 101, .im = -103 });
+                @memset(y, .{ .re = 107, .im = -109 });
+                @memset(expected, .{ .re = 107, .im = -109 });
+                @memset(x[1 .. n + 1], .{ .re = 3, .im = 2 });
+                @memset(y[1 .. n + 1], .{ .re = 5, .im = 7 });
+                @memset(expected[1 .. n + 1], if (real_coefficient) T{ .re = 16, .im = 18 } else T{ .re = 7, .im = 26 });
+                const alpha: T = .{ .re = 2, .im = if (real_coefficient) 0 else 1 };
+                var operation = try ctx.begin();
+                var ended = false;
+                defer if (!ended) {
+                    ComplexUnitResourceProbe.watching = false;
+                    operation.end();
+                };
+                const resources: core.execution.CallResources = .{ .admitted = &operation };
+                ComplexUnitResourceProbe.actual = std.mem.sliceAsBytes(y);
+                ComplexUnitResourceProbe.expected = std.mem.sliceAsBytes(expected);
+                ComplexUnitResourceProbe.watching = true;
+                core.vector.scalUnitWithResources(T, resources, @intCast(n), alpha, y.ptr + 1);
+                core.vector.axpyUnitWithResources(T, resources, @intCast(n), alpha, x.ptr + 1, y.ptr + 1);
+                try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(y));
+                for (x, 0..) |element, i| {
+                    const wanted: T = if (i == 0 or i == n + 1) .{ .re = 101, .im = -103 } else .{ .re = 3, .im = 2 };
+                    try std.testing.expectEqualDeep(wanted, element);
+                }
+                operation.end();
+                ended = true;
+                ComplexUnitResourceProbe.watching = false;
+                calls += 1;
+                try guard.check();
+            }
+        }
+    }
+    try std.testing.expectEqual(calls, ComplexUnitResourceProbe.finishes);
+    try std.testing.expect(ComplexUnitResourceProbe.queries.load(.acquire) > 0);
+    try std.testing.expect(ComplexUnitResourceProbe.configurations.load(.acquire) > 0);
+    _ = ctx.requestClose();
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
+    try std.testing.expectEqual(@as(usize, 0), allocations.stats().rejected);
+    try guard.check();
+}
+
+fn dynamicIndependentGemv(comptime T: type, budget: usize) !DynamicResourceAllocations.Stats {
+    const rows: usize = if (T == f32) 256 else 512;
+    const cols: usize = 257;
+    const lda_u = rows + 3;
+    const buffers = std.testing.allocator;
+    const a = try buffers.alloc(T, lda_u * cols + 2);
+    defer buffers.free(a);
+    const x = try buffers.alloc(T, cols + 2);
+    defer buffers.free(x);
+    const y = try buffers.alloc(T, rows + 2);
+    defer buffers.free(y);
+    @memset(a, 101);
+    @memset(x, 103);
+    @memset(y, 107);
+    for (0..cols) |j| for (0..rows) |i| {
+        a[1 + i + j * lda_u] = 2;
+    };
+    @memset(x[1 .. cols + 1], 3);
+    @memset(y[1 .. rows + 1], 5);
+    const a_before = try buffers.dupe(T, a);
+    defer buffers.free(a_before);
+    const x_before = try buffers.dupe(T, x);
+    defer buffers.free(x_before);
+    const expected = try buffers.dupe(T, y);
+    defer buffers.free(expected);
+    // Closed-form independent reference; a second GEMV implementation is not used.
+    @memset(expected[1 .. rows + 1], @as(T, @floatFromInt(12 * cols - 15)));
+    const guard = try DynamicResourceDefaultGuard.init();
+    defer guard.deinit();
+    var allocations: DynamicResourceAllocations = .{ .budget = budget };
+    var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicResourceProbe.policy, .internal_closable);
+    defer {
+        DynamicResourceProbe.watch = false;
+        _ = ctx.requestClose();
+        _ = ctx.tryProgressClose();
+    }
+    DynamicResourceProbe.setup(&ctx, &allocations);
+    var operation = try ctx.begin();
+    var ended = false;
+    defer if (!ended) {
+        DynamicResourceProbe.watch = false;
+        operation.end();
+    };
+    DynamicResourceProbe.actual = std.mem.sliceAsBytes(y);
+    DynamicResourceProbe.expected = std.mem.sliceAsBytes(expected);
+    DynamicResourceProbe.watch = true;
+    try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, ctx.tryProgressClose());
+    const m: i32 = @intCast(rows);
+    const n: i32 = @intCast(cols);
+    const lda: i32 = @intCast(lda_u);
+    const inc: i32 = 1;
+    const alpha: T = 2;
+    const beta: T = -3;
+    @field(fortran.internal_admitted, prefix(T) ++ "gemv_")(&operation, "N", &m, &n, &alpha, a.ptr + 1, &lda, x.ptr + 1, &inc, &beta, y.ptr + 1, &inc);
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(y));
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(a_before), std.mem.sliceAsBytes(a));
+    try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(x_before), std.mem.sliceAsBytes(x));
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+    const stats = allocations.stats();
+    try std.testing.expectEqual(stats.accepted, stats.freed);
+    operation.end();
+    ended = true;
+    DynamicResourceProbe.watch = false;
+    try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.admitted);
+    try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.finished);
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try guard.check();
+    return stats;
+}
+
+test "dynamic independent GEMV forwards borrowed allocator to the selected object and its OOM fallback" {
+    try std.testing.expect(@import("zynum-build-options").dynamic_dispatch);
+    inline for (.{ f32, f64 }) |T| {
+        const success = try dynamicIndependentGemv(T, std.math.maxInt(usize));
+        const apple_amx = builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos and @import("zynum-build-options").apple_amx;
+        const tier = client.selectedTier();
+        const may_use_sme2 = tier == .aarch64_sme2 or tier == .aarch64_sme2p1;
+        if (!apple_amx) {
+            try std.testing.expectEqual(@as(usize, 0), success.attempts);
+        } else if (!may_use_sme2) {
+            try std.testing.expectEqual(@as(usize, 2), success.attempts);
+        } else {
+            try std.testing.expect(success.attempts == 0 or success.attempts == 2);
+        }
+        try std.testing.expectEqual(@as(usize, 0), success.rejected);
+        try std.testing.expectEqual(success.attempts, success.accepted);
+        try std.testing.expectEqual(success.accepted, success.freed);
+        const refused = try dynamicIndependentGemv(T, 0);
+        try std.testing.expectEqual(@as(usize, 0), refused.accepted);
+        try std.testing.expectEqual(@as(usize, 0), refused.freed);
+        try std.testing.expectEqual(refused.attempts, refused.rejected);
+        if (success.attempts != 0) try std.testing.expect(refused.rejected > 0);
+    }
+}
+
+const DynamicWorkspaceProbe = struct {
+    var context: ?*DynamicResourceContext = null;
+    var allocation_log: ?*DynamicResourceAllocations = null;
+    var live_allocations: usize = 0;
+    var result: []const f64 = &.{};
+    var workspace: []const f64 = &.{};
+    var expected_result: []const f64 = &.{};
+    var expected_workspace: []const f64 = &.{};
+    var watch: bool = false;
+    var finishes: usize = 0;
+    fn maxThreads() usize {
+        return 4;
+    }
+    fn helpers(limit: usize) usize {
+        return @min(limit, 3);
+    }
+    fn configure(_: ?usize) void {}
+    const policy: DynamicResourceExecution.owner.Policy = .{
+        .max_threads = maxThreads,
+        .helper_count = helpers,
+        .configure_thread = configure,
+        .worker_stack_size = 2 * 1024 * 1024,
+    };
+    fn observe(ctx: *DynamicResourceContext, event: DynamicResourceExecution.context.TestEvent) void {
+        if (ctx != context.? or ctx == DynamicResourceExecution.getContext()) @panic("workspace COPY changed its owner");
+        if (ctx.snapshot().active_operations == 0 or ctx.snapshot().resource_pins != 0) @panic("workspace COPY lost admission");
+        if (event == .finishing and watch) {
+            if (!std.mem.eql(f64, result, expected_result) or !std.mem.eql(f64, workspace, expected_workspace))
+                @panic("workspace operation ended before final copyback or damaged padding");
+            const stats = allocation_log.?.stats();
+            if (stats.accepted - stats.freed != live_allocations) @panic("workspace call retained scratch at finishing");
+            finishes += 1;
+        }
+    }
+};
+
+const DynamicWorkspaceBatch = struct {
+    context: *DynamicResourceContext,
+    entered: std.atomic.Value(bool) = .init(false),
+    release: std.atomic.Value(bool) = .init(false),
+    finished: std.atomic.Value(bool) = .init(false),
+    visits: [4]std.atomic.Value(u32) = @splat(.init(0)),
+    accepted: bool = false,
+    fn execute(raw: *const anyopaque, index: usize) void {
+        const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
+        _ = self.visits[index].fetchAdd(1, .monotonic);
+        if (index == 0) {
+            self.entered.store(true, .release);
+            while (!self.release.load(.acquire)) std.Thread.yield() catch {};
+        }
+    }
+    fn run(self: *@This()) void {
+        defer self.finished.store(true, .release);
+        var operation = self.context.begin() catch return;
+        defer operation.end();
+        self.accepted = self.context.executor.runLowLatency(.{ .task_fn = execute, .tasks = self, .count = 4 });
+    }
+};
+
+test "checked GEMV workspace COPY uses both batches of the borrowed executor and finishes after closing" {
+    // Four MiB crosses both existing architecture COPY gates, with only one
+    // matrix column. These are valid prechecked views; the test-only alias runs
+    // the exact public post-validation body, without another admission.
+    const length = 4 * 1024 * 1024 / @sizeOf(f64);
+    const buffers = std.testing.allocator;
+    const a = try buffers.alloc(f64, length + 2);
+    defer buffers.free(a);
+    const y = try buffers.alloc(f64, length + 2);
+    defer buffers.free(y);
+    const scratch = try buffers.alloc(f64, length + 2);
+    defer buffers.free(scratch);
+    const expected = try buffers.alloc(f64, length + 2);
+    defer buffers.free(expected);
+    const expected_scratch = try buffers.alloc(f64, length + 2);
+    defer buffers.free(expected_scratch);
+    @memset(a, 97);
+    const x = [_]f64{2};
+    const matrix_view = try api.constMatrix(f64, a[1 .. length + 1], .{ .row_count = length, .column_count = 1 });
+    const input_view = try api.constVector(f64, &x, .{});
+    const result_view = try api.vector(f64, y[1 .. length + 1], .{});
+    const guard = try DynamicResourceDefaultGuard.init();
+    defer guard.deinit();
+    for ([_]bool{ false, true }) |busy| {
+        @memset(y, 101);
+        @memset(scratch, 103);
+        @memset(expected, 101);
+        @memset(expected_scratch, 103);
+        for (0..length) |i| {
+            y[1 + i] = @floatFromInt(1 + i % 7);
+            expected[1 + i] = -3 * y[1 + i];
+            expected_scratch[1 + i] = expected[1 + i];
+        }
+        var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
+        var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicWorkspaceProbe.policy, .internal_closable);
+        defer {
+            DynamicWorkspaceProbe.watch = false;
+            _ = ctx.requestClose();
+            _ = ctx.tryProgressClose();
+        }
+        // Warm the actual four-task persistent executor, then record its exact
+        // generation counters; COPY must issue two jobs, or none while busy.
+        var warm: DynamicWorkspaceBatch = .{ .context = &ctx };
+        warm.release.store(true, .release);
+        DynamicWorkspaceBatch.run(&warm);
+        try std.testing.expect(warm.accepted);
+        for (&warm.visits) |*v| try std.testing.expectEqual(@as(u32, 1), v.load(.acquire));
+        try std.testing.expectEqual(@as(u32, 3), ctx.executor.persistent_worker_count.load(.acquire));
+        DynamicWorkspaceProbe.context = &ctx;
+        DynamicWorkspaceProbe.allocation_log = &allocations;
+        const before_allocations = allocations.stats();
+        DynamicWorkspaceProbe.live_allocations = before_allocations.accepted - before_allocations.freed;
+        DynamicWorkspaceProbe.result = y;
+        DynamicWorkspaceProbe.workspace = scratch;
+        DynamicWorkspaceProbe.expected_result = expected;
+        DynamicWorkspaceProbe.expected_workspace = expected_scratch;
+        DynamicWorkspaceProbe.watch = false;
+        DynamicWorkspaceProbe.finishes = 0;
+        DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), DynamicWorkspaceProbe.observe);
+        var active: DynamicWorkspaceBatch = .{ .context = &ctx };
+        var caller: ?std.Thread = null;
+        defer {
+            DynamicWorkspaceProbe.watch = false;
+            active.release.store(true, .release);
+            if (caller) |thread| thread.join();
+        }
+        if (busy) {
+            caller = try std.Thread.spawn(.{}, DynamicWorkspaceBatch.run, .{&active});
+            while (!active.entered.load(.acquire) and !active.finished.load(.acquire)) std.Thread.yield() catch {};
+            try std.testing.expect(active.entered.load(.acquire));
+        }
+        var generations: [3]u32 = undefined;
+        for (&generations, 0..) |*generation, i| generation.* = ctx.executor.persistent_worker_generation[i].load(.acquire);
+        var operation = try ctx.begin();
+        var ended = false;
+        defer if (!ended) {
+            DynamicWorkspaceProbe.watch = false;
+            operation.end();
+        };
+        DynamicWorkspaceProbe.watch = true;
+        try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, ctx.tryProgressClose());
+        api.operations.testing.executeMatrixVectorWithWorkspaceAdmitted(f64, &operation, matrix_view, input_view, result_view, scratch[1 .. length + 1], length, 0, -3);
+        for (generations, 0..) |generation, i|
+            try std.testing.expectEqual(generation +% @as(u32, if (busy) 0 else 2), ctx.executor.persistent_worker_generation[i].load(.acquire));
+        if (busy) {
+            try std.testing.expect(!active.finished.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+            try std.testing.expect(ctx.executor.persistent_task_fn == DynamicWorkspaceBatch.execute);
+        }
+        try std.testing.expectEqualSlices(f64, expected, y);
+        try std.testing.expectEqualSlices(f64, expected_scratch, scratch);
+        for (a) |element| try std.testing.expectEqual(@as(f64, 97), element);
+        try std.testing.expectEqual(@as(f64, 2), x[0]);
+        operation.end();
+        ended = true;
+        DynamicWorkspaceProbe.watch = false;
+        try std.testing.expectEqual(@as(usize, 1), DynamicWorkspaceProbe.finishes);
+        if (caller) |thread| {
+            active.release.store(true, .release);
+            thread.join();
+            caller = null;
+            try std.testing.expect(active.accepted);
+            for (&active.visits) |*v| try std.testing.expectEqual(@as(u32, 1), v.load(.acquire));
+        }
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
+        try guard.check();
+    }
+}
+
+test "checked Level 1 Into COPY and combine retain one closing Context across object dispatch" {
+    const n = 512 * 1024; // four MiB per vector: actual COPY and f64 AXPBY gates
+    const buffers = std.testing.allocator;
+    const x = try buffers.alloc(f64, n + 2);
+    defer buffers.free(x);
+    const input = try buffers.alloc(f64, n + 2);
+    defer buffers.free(input);
+    const output = try buffers.alloc(f64, n + 2);
+    defer buffers.free(output);
+    const expected = try buffers.alloc(f64, n + 2);
+    defer buffers.free(expected);
+    @memset(x, 97);
+    @memset(input, 101);
+    for (0..n) |i| {
+        x[1 + i] = @floatFromInt(i % 7 + 1);
+        input[1 + i] = @floatFromInt(i % 5 + 4);
+    }
+    const x_before = try buffers.dupe(f64, x);
+    defer buffers.free(x_before);
+    const input_before = try buffers.dupe(f64, input);
+    defer buffers.free(input_before);
+    const xv = try api.constVector(f64, x[1 .. n + 1], .{});
+    const iv = try api.constVector(f64, input[1 .. n + 1], .{});
+    const ov = try api.vector(f64, output[1 .. n + 1], .{});
+    const guard = try DynamicResourceDefaultGuard.init();
+    defer guard.deinit();
+    for ([_]bool{ false, true }) |busy| {
+        @memset(output, 103);
+        @memset(expected, 103);
+        for (0..n) |i| expected[1 + i] = 2 * x_before[1 + i] - 3 * input_before[1 + i];
+        var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
+        var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicWorkspaceProbe.policy, .internal_closable);
+        defer {
+            DynamicWorkspaceProbe.watch = false;
+            _ = ctx.requestClose();
+            _ = ctx.tryProgressClose();
+        }
+        var warm: DynamicWorkspaceBatch = .{ .context = &ctx };
+        warm.release.store(true, .release);
+        DynamicWorkspaceBatch.run(&warm);
+        try std.testing.expect(warm.accepted);
+        try std.testing.expectEqual(@as(u32, 3), ctx.executor.persistent_worker_count.load(.acquire));
+        DynamicWorkspaceProbe.context = &ctx;
+        DynamicWorkspaceProbe.allocation_log = &allocations;
+        DynamicWorkspaceProbe.result = output;
+        DynamicWorkspaceProbe.expected_result = expected;
+        DynamicWorkspaceProbe.workspace = input;
+        DynamicWorkspaceProbe.expected_workspace = input_before;
+        DynamicWorkspaceProbe.finishes = 0;
+        DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), DynamicWorkspaceProbe.observe);
+        var active: DynamicWorkspaceBatch = .{ .context = &ctx };
+        var caller: ?std.Thread = null;
+        defer {
+            DynamicWorkspaceProbe.watch = false;
+            active.release.store(true, .release);
+            if (caller) |thread| thread.join();
+        }
+        if (busy) {
+            caller = try std.Thread.spawn(.{}, DynamicWorkspaceBatch.run, .{&active});
+            while (!active.entered.load(.acquire) and !active.finished.load(.acquire)) std.Thread.yield() catch {};
+            try std.testing.expect(active.entered.load(.acquire));
+        }
+        var generations: [3]u32 = undefined;
+        for (&generations, 0..) |*generation, i| generation.* = ctx.executor.persistent_worker_generation[i].load(.acquire);
+        const allocation_state = allocations.stats();
+        DynamicWorkspaceProbe.live_allocations = allocation_state.accepted - allocation_state.freed;
+        var operation = try ctx.begin();
+        var ended = false;
+        defer if (!ended) {
+            DynamicWorkspaceProbe.watch = false;
+            operation.end();
+        };
+        DynamicWorkspaceProbe.watch = true;
+        try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, ctx.tryProgressClose());
+        // This alias is the exact checked post-validation helper. Public
+        // validation/alias handling has separate modern-root coverage.
+        api.operations.testing.executeCombineVectorsIntoAdmitted(f64, &operation, xv, iv, ov, 2, -3);
+        if (comptime builtin.target.cpu.arch == .aarch64 or builtin.target.cpu.arch == .x86_64) {
+            for (generations, 0..) |generation, i|
+                try std.testing.expectEqual(generation +% @as(u32, if (busy) 0 else 2), ctx.executor.persistent_worker_generation[i].load(.acquire));
+        }
+        try std.testing.expectEqualSlices(f64, expected, output);
+        try std.testing.expectEqualSlices(f64, x_before, x);
+        try std.testing.expectEqualSlices(f64, input_before, input);
+        operation.end();
+        ended = true;
+        DynamicWorkspaceProbe.watch = false;
+        try std.testing.expectEqual(@as(usize, 1), DynamicWorkspaceProbe.finishes);
+        if (caller) |thread| {
+            try std.testing.expect(!active.finished.load(.acquire));
+            try std.testing.expect(ctx.executor.persistent_task_fn == DynamicWorkspaceBatch.execute);
+            active.release.store(true, .release);
+            thread.join();
+            caller = null;
+            try std.testing.expect(active.accepted);
+            for (&active.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
+        }
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
+        try guard.check();
+    }
+}
+
+test "dynamic Level 1 reductions retain borrowed policy across real complex and mixed accumulation" {
+    const guard = try DynamicResourceDefaultGuard.init();
+    defer guard.deinit();
+    var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
+    var ctx = DynamicResourceContext.init(allocations.allocator(), ComplexUnitResourceProbe.policy, .internal_closable);
+    ComplexUnitResourceProbe.context = &ctx;
+    ComplexUnitResourceProbe.queries.store(0, .release);
+    ComplexUnitResourceProbe.configurations.store(0, .release);
+    ComplexUnitResourceProbe.watching = false;
+    DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), ComplexUnitResourceProbe.observe);
+    defer {
+        ComplexUnitResourceProbe.watching = false;
+        _ = ctx.requestClose();
+        _ = ctx.tryProgressClose();
+    }
+    inline for (.{ f32, f64, api.ComplexF32, api.ComplexF64 }) |T| {
+        const complex = T == api.ComplexF32 or T == api.ComplexF64;
+        const n: usize = if (complex) 512 * 1024 else 2 * 1024 * 1024 + 1;
+        const x = try std.testing.allocator.alloc(T, n + 2);
+        defer std.testing.allocator.free(x);
+        const y = try std.testing.allocator.alloc(T, n + 2);
+        defer std.testing.allocator.free(y);
+        @memset(x, value(T, 97, 43));
+        @memset(y, value(T, 101, 47));
+        @memset(x[1 .. n + 1], value(T, 1, 2));
+        @memset(y[1 .. n + 1], value(T, 2, -1));
+        // Equal largest values in distinct worker partitions: first tie wins.
+        x[2] = value(T, 3, 4);
+        x[n] = value(T, 3, 4);
+        const ni: i32 = @intCast(n);
+        const inc: i32 = 1;
+        const nf: f64 = @floatFromInt(n);
+        var operation = try ctx.begin();
+        var ended = false;
+        defer if (!ended) operation.end();
+        const queries_before = ComplexUnitResourceProbe.queries.load(.acquire);
+        if (comptime complex) {
+            var result = value(T, 0, 0);
+            @field(fortran.internal_admitted, prefix(T) ++ "dotu_sub_")(&operation, &ni, x.ptr + 1, &inc, y.ptr + 1, &inc, &result);
+            try expectValue(T, 4 * nf + 12, 3 * nf + 4, result);
+            @field(fortran.internal_admitted, prefix(T) ++ "dotc_sub_")(&operation, &ni, x.ptr + 1, &inc, y.ptr + 1, &inc, &result);
+            try expectValue(T, 4, -5 * nf - 12, result);
+        } else {
+            const result = @field(fortran.internal_admitted, prefix(T) ++ "dot_")(&operation, &ni, x.ptr + 1, &inc, y.ptr + 1, &inc);
+            try std.testing.expectEqual(value(T, 2 * nf + 8, 0), result);
+        }
+        if (T == f32) {
+            const offset: f32 = 1;
+            try std.testing.expectEqual(2 * nf + 8, fortran.internal_admitted.dsdot_(&operation, &ni, x.ptr + 1, &inc, y.ptr + 1, &inc));
+            try std.testing.expectEqual(@as(f32, @floatCast(2 * nf + 9)), fortran.internal_admitted.sdsdot_(&operation, &ni, &offset, x.ptr + 1, &inc, y.ptr + 1, &inc));
+        }
+        const ap = comptime if (T == api.ComplexF32) "sc" else if (T == api.ComplexF64) "dz" else prefix(T);
+        const sum = @field(fortran.internal_admitted, ap ++ "asum_")(&operation, &ni, x.ptr + 1, &inc);
+        try std.testing.expectEqual(@as(f64, if (complex) 3 * nf + 8 else nf + 4), @as(f64, sum));
+        const norm = @field(fortran.internal_admitted, ap ++ "nrm2_")(&operation, &ni, x.ptr + 1, &inc);
+        try std.testing.expectApproxEqRel(@sqrt(if (complex) 5 * nf + 40 else nf + 16), @as(f64, norm), 0.000002);
+        try std.testing.expectEqual(@as(i32, 2), @field(fortran.internal_admitted, "i" ++ prefix(T) ++ "amax_")(&operation, &ni, x.ptr + 1, &inc));
+        try std.testing.expect(ComplexUnitResourceProbe.queries.load(.acquire) > queries_before);
+        for (x[1 .. n + 1], 0..) |element, i| try std.testing.expectEqualDeep(value(T, if (i == 1 or i == n - 1) 3 else 1, if (i == 1 or i == n - 1) 4 else 2), element);
+        for (y[1 .. n + 1]) |element| try std.testing.expectEqualDeep(value(T, 2, -1), element);
+        try std.testing.expectEqualDeep(value(T, 97, 43), x[0]);
+        try std.testing.expectEqualDeep(x[0], x[n + 1]);
+        try std.testing.expectEqualDeep(value(T, 101, 47), y[0]);
+        try std.testing.expectEqualDeep(y[0], y[n + 1]);
+        operation.end();
+        ended = true;
+    }
+    try std.testing.expect(ComplexUnitResourceProbe.configurations.load(.acquire) > 0);
+    try std.testing.expect(allocations.stats().accepted > 0);
+    _ = ctx.requestClose();
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
+    try guard.check();
 }

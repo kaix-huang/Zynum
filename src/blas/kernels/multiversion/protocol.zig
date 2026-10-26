@@ -91,7 +91,7 @@ pub const Operation = enum(u32) {
     matrix_matrix_noTransRealF32 = 62,
     matrix_matrix_noTransRealF64 = 63,
 };
-pub const signature_sha256 = "2242a6e0eb644f0a3a6bc7cf11da05330c4a0cdee450dae434bb1dbe544df428";
+pub const signature_sha256 = "e04e8dd9a6074f551c6e7099db107b716f0c75b8e752e72234dd925841f478cf";
 pub fn validScalar(comptime operation: Operation, comptime T: type) bool {
     return switch (operation) {
         .vector_unary_scalUnitReal => T == f32 or T == f64,
@@ -258,10 +258,10 @@ pub fn Args(comptime operation: Operation, comptime T: type) type {
         .vector_binary_rotUnitRealStreaming => @Tuple(&.{ usize, [*]T, [*]T, T, T }),
         .vector_binary_supportsRotmUnitRealStreaming => @Tuple(&.{usize}),
         .vector_binary_rotmUnitReal => @Tuple(&.{ usize, [*]T, [*]T, T, T, T, T, T }),
-        .matrix_vector_gemvTransUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T }),
-        .matrix_vector_gemvTransFullUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, T, [*]T }),
-        .matrix_vector_gemvTransAmxUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T }),
-        .matrix_vector_gemvNoTransUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T }),
+        .matrix_vector_gemvTransUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T, ?std.mem.Allocator }),
+        .matrix_vector_gemvTransFullUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, T, [*]T, ?std.mem.Allocator }),
+        .matrix_vector_gemvTransAmxUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T, ?std.mem.Allocator }),
+        .matrix_vector_gemvNoTransUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T, ?std.mem.Allocator }),
         .matrix_vector_gemvNoTransUnitComplex => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T }),
         .matrix_vector_supportsGemvNoTransRowsUnitComplex => @Tuple(&.{ usize, usize, BlasInt }),
         .matrix_vector_gemvNoTransRowsUnitComplex => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T }),
@@ -280,7 +280,7 @@ pub fn Args(comptime operation: Operation, comptime T: type) type {
         .matrix_vector_supportsGemvTransFullUnitComplex => @Tuple(&.{ usize, usize, BlasInt, bool }),
         .matrix_vector_supportsGemvNoTransUnitComplex => @Tuple(&.{}),
         .matrix_vector_supportsGemvTransUnitComplex => @Tuple(&.{}),
-        .matrix_vector_gemvNoTransFullUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, T, [*]T }),
+        .matrix_vector_gemvNoTransFullUnitReal => @Tuple(&.{ usize, usize, T, [*]const T, BlasInt, [*]const T, T, [*]T, ?std.mem.Allocator }),
         .matrix_vector_gemvNoTransPackLenUnitReal => @Tuple(&.{ usize, usize, BlasInt }),
         .matrix_vector_gemvNoTransPackUnitReal => @Tuple(&.{ usize, T, [*]const T, []T }),
         .matrix_vector_gemvNoTransPackedRowsUnitReal => @Tuple(&.{ usize, usize, [*]const T, BlasInt, [*]const T, [*]T, [*]T }),
@@ -292,7 +292,7 @@ pub fn Args(comptime operation: Operation, comptime T: type) type {
         .matrix_vector_symmetricColumnsUnit => @Tuple(&.{ bool, bool, usize, usize, usize, T, [*]const T, BlasInt, [*]const T, [*]T }),
         .matrix_matrix_candidates => @Tuple(&.{}),
         .matrix_matrix_noTransReal => @Tuple(&.{Task(T)}),
-        .matrix_matrix_tryNoTransRealF32Fast => @Tuple(&.{ gemm_task.BlasInt, gemm_task.BlasInt, gemm_task.BlasInt, f32, [*]const f32, gemm_task.BlasInt, [*]const f32, gemm_task.BlasInt, f32, [*]f32, gemm_task.BlasInt }),
+        .matrix_matrix_tryNoTransRealF32Fast => @Tuple(&.{ gemm_task.BlasInt, gemm_task.BlasInt, gemm_task.BlasInt, f32, [*]const f32, gemm_task.BlasInt, [*]const f32, gemm_task.BlasInt, f32, [*]f32, gemm_task.BlasInt, ?std.mem.Allocator }),
         .matrix_matrix_freeCurrentThreadCaches => @Tuple(&.{}),
         .matrix_matrix_noTransRealF32 => @Tuple(&.{Task(f32)}),
         .matrix_matrix_noTransRealF64 => @Tuple(&.{Task(f64)}),

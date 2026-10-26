@@ -9,6 +9,8 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
+const Operation = @import("zynum-execution").context.Operation;
 const blocked = @import("structured_blocked.zig");
 const gemm_dispatch = @import("../../kernels/dispatch/matrix_matrix.zig");
 const runtime = @import("../../runtime.zig");
@@ -35,8 +37,19 @@ const isOne = scalar.isOne;
 const toUsize = indexing.toUsize;
 const matIndex = indexing.matIndex;
 const triValue = matrix_vector_ops.triValue;
-const trmv = matrix_vector_ops.trmv;
-const trsv = matrix_vector_ops.trsv;
+fn trmv(comptime T: type, resources: CallResources, uplo: Uplo, trans: Order, diag: Diag, n: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
+    switch (resources) {
+        .admitted => |operation| matrix_vector_ops.trmvAdmitted(T, operation, uplo, trans, diag, n, a, lda, x, incx),
+        .legacy_default => matrix_vector_ops.trmv(T, uplo, trans, diag, n, a, lda, x, incx),
+    }
+}
+
+fn trsv(comptime T: type, resources: CallResources, uplo: Uplo, trans: Order, diag: Diag, n: BlasInt, a: [*]const T, lda: BlasInt, x: [*]T, incx: BlasInt) void {
+    switch (resources) {
+        .admitted => |operation| matrix_vector_ops.trsvAdmitted(T, operation, uplo, trans, diag, n, a, lda, x, incx),
+        .legacy_default => matrix_vector_ops.trsv(T, uplo, trans, diag, n, a, lda, x, incx),
+    }
+}
 
 const parallel_left_min_work = structured_tuning.triangular_parallel_left_min_work;
 const parallel_left_max_tasks = 32;
@@ -75,15 +88,15 @@ fn conjugateDenseRow(comptime T: type, n: usize, row: usize, b: [*]T, ldb: BlasI
     }
 }
 
-fn solveRightRow(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, n: usize, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt, row: usize) void {
+fn solveRightRow(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, diag: Diag, n_: BlasInt, n: usize, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt, row: usize) void {
     const x = b + matIndex(ldb, row, 0);
     switch (trans_) {
-        .no_trans => trsv(T, uplo, .trans, diag, n_, a, lda, x, ldb),
-        .trans => trsv(T, uplo, .no_trans, diag, n_, a, lda, x, ldb),
+        .no_trans => trsv(T, resources, uplo, .trans, diag, n_, a, lda, x, ldb),
+        .trans => trsv(T, resources, uplo, .no_trans, diag, n_, a, lda, x, ldb),
         .conj_trans => {
             // Transposing X * A^H = B requires a conj(A) solve.
             if (comptime scalar.isComplex(T)) conjugateDenseRow(T, n, row, b, ldb);
-            trsv(T, uplo, .no_trans, diag, n_, a, lda, x, ldb);
+            trsv(T, resources, uplo, .no_trans, diag, n_, a, lda, x, ldb);
             if (comptime scalar.isComplex(T)) conjugateDenseRow(T, n, row, b, ldb);
         },
     }
@@ -91,6 +104,7 @@ fn solveRightRow(comptime T: type, uplo: Uplo, trans_: Order, diag: Diag, n_: Bl
 
 fn LeftTask(comptime T: type) type {
     return struct {
+        resources: CallResources,
         operation: LeftOperation,
         uplo: Uplo,
         trans: Order,
@@ -110,14 +124,14 @@ fn runLeftColumns(comptime T: type, task: LeftTask(T)) void {
     switch (task.operation) {
         .multiply => {
             for (task.first_col..task.end_col) |j| {
-                trmv(T, task.uplo, task.trans, task.diag, @intCast(task.m), task.a, task.lda, task.b + matIndex(task.ldb, 0, j), 1);
+                trmv(T, task.resources, task.uplo, task.trans, task.diag, @intCast(task.m), task.a, task.lda, task.b + matIndex(task.ldb, 0, j), 1);
                 scaleDenseColumns(T, task.m, j, j + 1, task.alpha, task.b, task.ldb);
             }
         },
         .solve => {
             scaleDenseColumns(T, task.m, task.first_col, task.end_col, task.alpha, task.b, task.ldb);
             for (task.first_col..task.end_col) |j| {
-                trsv(T, task.uplo, task.trans, task.diag, @intCast(task.m), task.a, task.lda, task.b + matIndex(task.ldb, 0, j), 1);
+                trsv(T, task.resources, task.uplo, task.trans, task.diag, @intCast(task.m), task.a, task.lda, task.b + matIndex(task.ldb, 0, j), 1);
             }
         },
     }
@@ -144,7 +158,7 @@ fn runLeftTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runLeftTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn runParallelLeft(comptime T: type, tasks: []const LeftTask(T)) bool {
+fn runParallelLeft(comptime T: type, resources: CallResources, tasks: []const LeftTask(T)) bool {
     const runner = if (T == f32)
         runLeftTaskF32
     else if (T == f64)
@@ -155,14 +169,14 @@ fn runParallelLeft(comptime T: type, tasks: []const LeftTask(T)) bool {
         runLeftTaskC64
     else
         @compileError("parallel TRMM/TRSM supports BLAS scalar types");
-    return core_pool.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
+    return resources.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
 }
 
-fn runLeft(comptime T: type, operation: LeftOperation, uplo: Uplo, trans_: Order, diag: Diag, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+fn runLeft(comptime T: type, resources: CallResources, operation: LeftOperation, uplo: Uplo, trans_: Order, diag: Diag, m: usize, n: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
     var tasks: [core_pool.max_tasks]LeftTask(T) = undefined;
     const work = m *| m *| n;
     const task_count = if (work >= parallel_left_min_work)
-        @min(core_pool.taskCount(n, parallel_left_min_columns_per_task), parallel_left_max_tasks)
+        @min(resources.taskCount(n, parallel_left_min_columns_per_task), parallel_left_max_tasks)
     else
         1;
     if (task_count > 1) {
@@ -172,6 +186,7 @@ fn runLeft(comptime T: type, operation: LeftOperation, uplo: Uplo, trans_: Order
         for (tasks[0..task_count], 0..) |*task, task_index| {
             const column_count = base_columns + @intFromBool(task_index < extra_columns);
             task.* = .{
+                .resources = resources,
                 .operation = operation,
                 .uplo = uplo,
                 .trans = trans_,
@@ -187,9 +202,10 @@ fn runLeft(comptime T: type, operation: LeftOperation, uplo: Uplo, trans_: Order
             };
             first_col += column_count;
         }
-        if (runParallelLeft(T, tasks[0..task_count])) return;
+        if (runParallelLeft(T, resources, tasks[0..task_count])) return;
     }
     runLeftColumns(T, .{
+        .resources = resources,
         .operation = operation,
         .uplo = uplo,
         .trans = trans_,
@@ -205,17 +221,28 @@ fn runLeft(comptime T: type, operation: LeftOperation, uplo: Uplo, trans_: Order
     });
 }
 
-noinline fn tryMacTrmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+noinline fn tryMacTrmm(comptime T: type, resources: CallResources, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
     const profile = structured_tuning.aarch64_macos_trmm_candidate;
-    return blocked.tryTrmm(T, .{ .block_size = profile.block_size }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+    return blocked.tryTrmmWithResources(T, resources, .{ .block_size = profile.block_size }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
 }
 
-noinline fn tryMacTrsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
+noinline fn tryMacTrsm(comptime T: type, resources: CallResources, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) bool {
     const profile = structured_tuning.aarch64_macos_trsm_candidate;
-    return blocked.tryTrsm(T, .{ .block_size = profile.block_size }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+    return blocked.tryTrsmWithResources(T, resources, .{ .block_size = profile.block_size }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    return trmmWithResources(T, .legacy_default, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+/// Synchronous borrow of the entrypoint Operation; never admits again.
+pub fn trmmAdmitted(comptime T: type, operation: *const Operation, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    _ = operation.borrowedContext();
+    return trmmWithResources(T, .{ .admitted = operation }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+pub fn trmmWithResources(comptime T: type, resources: CallResources, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     if (scalar.isZero(T, alpha)) {
         // BLAS alpha-zero semantics do not read A or the old contents of B.
@@ -227,17 +254,17 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     // order. AArch64 never enters the queued x86 workspace branch.
     if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_trmm_candidate;
-        if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, runtime.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
+        if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, resources.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
             const capability = gemm_dispatch.activeCapability();
             if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
-                if (tryMacTrmm(T, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+                if (tryMacTrmm(T, resources, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
             }
         }
     }
     // Large parallel updates need enough work per GEMM to amortize dispatch.
     if (comptime builtin.target.cpu.arch == .x86_64) {
-        if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
-            if (blocked.tryTrmm(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+        if (m_ >= 128 and n_ >= 128 and (resources.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.tryTrmmWithResources(T, resources, .{ .block_size = if (resources.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
         }
     }
     if (m_ <= 0 or n_ <= 0) return;
@@ -245,10 +272,10 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     const n = toUsize(n_);
     if (comptime use_isolated_structured and builtin.target.cpu.arch == .x86_64) {
         if (side == .right and structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n) and
-            isolated_structured.tryTrmmRight(T, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+            isolated_structured.tryTrmmRightWithResources(T, resources, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
     }
     if (side == .left) {
-        runLeft(T, .multiply, uplo, trans_, diag, m, n, alpha, a, lda, b, ldb);
+        runLeft(T, resources, .multiply, uplo, trans_, diag, m, n, alpha, a, lda, b, ldb);
     } else {
         for (0..m) |i| {
             if (opIsUpper(uplo, trans_)) {
@@ -270,7 +297,18 @@ pub fn trmm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     }
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    return trsmWithResources(T, .legacy_default, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+/// Synchronous borrow of the entrypoint Operation; never admits again.
+pub fn trsmAdmitted(comptime T: type, operation: *const Operation, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
+    _ = operation.borrowedContext();
+    return trsmWithResources(T, .{ .admitted = operation }, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb);
+}
+
+pub fn trsmWithResources(comptime T: type, resources: CallResources, side: Side, uplo: Uplo, trans_: Order, diag: Diag, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]T, ldb: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     if (scalar.isZero(T, alpha)) {
         // BLAS alpha-zero semantics do not read A or the old contents of B.
@@ -282,17 +320,17 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     // order. AArch64 never enters the queued x86 workspace branch.
     if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_trsm_candidate;
-        if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, runtime.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
+        if (m_ > 0 and n_ > 0 and profile.candidate(structured_tuning.scalarKind(T), if (side == .left) .left else .right, resources.maxThreads() > 1, toUsize(m_), toUsize(n_))) {
             const capability = gemm_dispatch.activeCapability();
             if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
-                if (tryMacTrsm(T, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+                if (tryMacTrsm(T, resources, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
             }
         }
     }
     // Shared diagonal solves and trailing GEMM updates amortize work across RHS.
     if (comptime builtin.target.cpu.arch == .x86_64) {
-        if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
-            if (blocked.tryTrsm(T, .{}, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+        if (m_ >= 128 and n_ >= 128 and (resources.maxThreads() == 1 or (side == .right and m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.tryTrsmWithResources(T, resources, .{}, side, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
         }
     }
     if (m_ <= 0 or n_ <= 0) return;
@@ -300,14 +338,14 @@ pub fn trsm(comptime T: type, side: Side, uplo: Uplo, trans_: Order, diag: Diag,
     const n = toUsize(n_);
     if (comptime use_isolated_structured and builtin.target.cpu.arch == .x86_64) {
         if (side == .right and structured_tuning.x86_64_object_profile.rightTriangularCandidate(m, n) and
-            isolated_structured.tryTrsmRight(T, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
+            isolated_structured.tryTrsmRightWithResources(T, resources, uplo, trans_, diag, m_, n_, alpha, a, lda, b, ldb)) return;
     }
     if (side == .left) {
-        runLeft(T, .solve, uplo, trans_, diag, m, n, alpha, a, lda, b, ldb);
+        runLeft(T, resources, .solve, uplo, trans_, diag, m, n, alpha, a, lda, b, ldb);
     } else {
         scaleDenseMatrix(T, m, n, alpha, b, ldb);
         for (0..m) |i| {
-            solveRightRow(T, uplo, trans_, diag, n_, n, a, lda, b, ldb, i);
+            solveRightRow(T, resources, uplo, trans_, diag, n_, n, a, lda, b, ldb, i);
         }
     }
 }
@@ -353,6 +391,7 @@ fn expectParallelLeftMatchesSingle(comptime T: type, operation: LeftOperation, u
     var actual = initial_b;
 
     runLeftColumns(T, .{
+        .resources = .legacy_default,
         .operation = operation,
         .uplo = uplo,
         .trans = trans_,
@@ -375,6 +414,7 @@ fn expectParallelLeftMatchesSingle(comptime T: type, operation: LeftOperation, u
     for (tasks[0..task_count], 0..) |*task, task_index| {
         const column_count = base_columns + @intFromBool(task_index < extra_columns);
         task.* = .{
+            .resources = .legacy_default,
             .operation = operation,
             .uplo = uplo,
             .trans = trans_,
@@ -390,7 +430,7 @@ fn expectParallelLeftMatchesSingle(comptime T: type, operation: LeftOperation, u
         };
         first_col += column_count;
     }
-    try std.testing.expect(runParallelLeft(T, tasks[0..task_count]));
+    try std.testing.expect(runParallelLeft(T, .legacy_default, tasks[0..task_count]));
     try std.testing.expectEqualSlices(T, &expected, &actual);
 }
 
@@ -415,6 +455,7 @@ fn expectPublicLeftGateMatchesSingle(comptime T: type) !void {
         @memcpy(expected, initial_b);
         @memcpy(actual, initial_b);
         runLeftColumns(T, .{
+            .resources = .legacy_default,
             .operation = operation,
             .uplo = .lower,
             .trans = .trans,

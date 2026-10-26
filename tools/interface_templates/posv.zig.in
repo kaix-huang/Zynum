@@ -1,0 +1,18 @@
+// Generated boundary only. The injected binding owns the sole operation.
+fn CholeskyDriver(comptime T: type, comptime level: Level) type {
+    return struct {
+        pub fn call(layout: c_int, uplo: i8, n: WireInt, nrhs: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt) callconv(.c) WireInt {
+            const result = binding.Shared.posvRawManagedWithDefaults(true, T, InternalInt, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout,
+                .uplo = @bitCast(uplo),
+                .n = @intCast(n),
+                .nrhs = @intCast(nrhs),
+                .a = a,
+                .lda = @intCast(lda),
+                .b = b,
+                .ldb = @intCast(ldb),
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return finish(result);
+        }
+    };
+}

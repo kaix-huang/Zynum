@@ -64,6 +64,690 @@ def _pending_gap_count(inventory: dict[str, Any]) -> int:
     )
 
 
+
+def _source_refreshed_build_fixture(context: Any) -> dict[str, Any]:
+    """Refresh source observations in memory, never native sets or on-disk pins.
+
+    This permits old-ledger fixtures to copy newly reviewed sources before the
+    parent publishes CURRENT/NEXT. It uses the same exact observation templates.
+    """
+    inventory = CHECKER._load_build_inventory(context)
+    inventory = copy.deepcopy(inventory)
+    recorded = {row["id"]: row for row in inventory["build_observations"]}
+    observed = CHECKER.BUILD_CHECKER._discover_build_root(context.root, "build.zig", context)
+    rows = []
+    for row in observed:
+        item = copy.deepcopy(recorded.get(row["id"]))
+        if item is None:
+            item = CHECKER.BUILD_CHECKER._new_test_inventory_observation(row["id"], inventory)
+        item.update(CHECKER.BUILD_CHECKER._reviewed_observation_refresh_fields(row["id"]))
+        item.update(row)
+        rows.append(item)
+    # The default install step is implicit, not a b.step source occurrence.
+    rows.append(copy.deepcopy(recorded["step:build.zig:build:install"]))
+    inventory["build_observations"] = rows
+    CHECKER.BUILD_CHECKER._apply_reviewed_build_inventory_migrations(inventory)
+    for row in inventory["python_launches"]:
+        row.update(CHECKER.BUILD_CHECKER._reviewed_observation_refresh_fields(row["id"]))
+    return inventory
+
+
+class PosvLedgerTests(unittest.TestCase):
+    def test_seven_source_bodies_are_correctness_only_without_native_claim(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        root = next(row for row in inventory["correctness_only_roots"] if row["id"] == "correctness-root:lapacke-posv")
+        self.assertEqual(CHECKER.POSV_COMPILE_ID, root["compile_observation_id"])
+        self.assertEqual([CHECKER.POSV_LAUNCH_ID], root["launch_observation_ids"])
+        self.assertEqual(CHECKER.POSV_STEP_ID, root["selector_step_observation_id"])
+        self.assertFalse(root["native_inventory_evidence"])
+        self.assertEqual("static-source-reachability-only", root["enumeration_source"])
+        path = "test/lapack/interop/posv_adapter_test.zig"
+        file_row = next(row for row in inventory["zig_test_files"] if row["path"] == path)
+        self.assertEqual(7, len(file_row["declarations"]))
+        self.assertEqual([root["id"]], file_row["reaching_root_ids"])
+        self.assertIn("src/interop/lapacke_posv.zig", root["source_reachability"])
+        self.assertFalse(any(row["root_id"] == root["id"] for row in inventory["test_mode_rows"]))
+        self.assertEqual(72, len(inventory["native_observation_bindings"]))
+        self.assertEqual(CHECKER.CURRENT_NATIVE_PROJECTION_SHA256, CHECKER._native_projection_digest(inventory))
+
+    def test_profile_root_has_five_static_methods_and_real_explicit_launch(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        root = next(row for row in inventory["test_roots"] if row["id"] == "python-root:lapacke-posv-profile-direct")
+        self.assertEqual(["launch:build.zig:build:lapacke_posv_profile_tests"], root["launch_observation_ids"])
+        self.assertIsNone(root["aggregate_step_observation_id"])
+        expected = next(row for row in inventory["expected_test_sets"] if row["root_id"] == root["id"])
+        self.assertEqual(5, expected["count"])
+        self.assertEqual("static", expected["enumeration_source"])
+        self.assertIsNone(CHECKER.NEXT_TEST_INVENTORY_SHA256)
+        self.assertIsNone(CHECKER.NEXT_NATIVE_PROJECTION_SHA256)
+
+
+class CheckedCholeskyLedgerTests(unittest.TestCase):
+    def test_lifecycle_root_is_explicit_without_native_enumeration_claim(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT/"tools/test_inventory.json").read_text())
+        root = next(row for row in inventory["correctness_only_roots"] if row["id"] == "correctness-root:checked-cholesky-lifecycle")
+        self.assertEqual("src/checked/cholesky_adapter_test.zig", root["physical_path"])
+        self.assertEqual(CHECKER.CHECKED_CHOLESKY_COMPILE_ID, root["compile_observation_id"])
+        self.assertEqual([CHECKER.CHECKED_CHOLESKY_LAUNCH_ID], root["launch_observation_ids"])
+        self.assertEqual(CHECKER.CHECKED_CHOLESKY_STEP_ID, root["selector_step_observation_id"])
+        self.assertFalse(root["native_inventory_evidence"])
+        self.assertEqual("static-source-reachability-only", root["enumeration_source"])
+        self.assertIn(root["physical_path"], root["source_reachability"])
+        self.assertIn("src/checked/implementation.zig", root["source_reachability"])
+        self.assertFalse(any("checked-cholesky" in row["row_id"] for row in inventory["native_observation_bindings"]))
+        self.assertFalse(any(row["root_id"] == "zig-root:checked-cholesky-tests" for row in inventory["test_mode_rows"]))
+
+    def test_profile_root_binds_the_real_explicit_python_launch(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT/"tools/test_inventory.json").read_text())
+        root = next(row for row in inventory["test_roots"] if row["id"] == "python-root:checked-cholesky-profile-direct")
+        self.assertEqual(["test/build/test_checked_cholesky_profile.py"], root["module_paths"])
+        self.assertEqual(["launch:build.zig:build:checked_cholesky_profile_tests"], root["launch_observation_ids"])
+        self.assertIsNone(root["aggregate_step_observation_id"])
+        expected = next(row for row in inventory["expected_test_sets"] if row["root_id"] == root["id"])
+        self.assertEqual(3, expected["count"])
+        self.assertEqual("static", expected["enumeration_source"])
+
+
+class ContourGeneratedReachabilityTests(unittest.TestCase):
+    """Generated test types retain their real owner and exact source inputs."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.context = CHECKER.BUILD_CHECKER._make_discovery_context(
+            REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json")
+        cls.graph = CHECKER.BUILD_CHECKER._numerics_resources_build_contract(
+            CHECKER._cached_text(cls.context, "build.zig"))
+        CHECKER.BUILD_CHECKER._numerics_resources_source_contract(cls.context)
+
+    def test_wire_receipt_binds_inputs_without_inventing_output_bytes(self) -> None:
+        sources = {path: CHECKER._cached_text(self.context, path)
+                   for path in self.context.public_files.paths if path.endswith(".zig")}
+        receipts = []
+        reached = CHECKER._zig_source_closure(
+            sources, self.context.public_files.path_set,
+            CHECKER._zig_source_entries("lapack_tests", self.graph),
+            resource_root="lapack_tests", resource_graph=self.graph,
+            named_dependencies=receipts)
+        self.assertIn("src/contour_binding_candidate_test.zig", reached)
+        receipt, = [row for row in receipts if row["module"] == "contour_wire_test_mod"]
+        self.assertEqual("general_operator_test_mod", receipt["attachment_owner"])
+        self.assertEqual("generated-non-source", receipt["source_kind"])
+        self.assertNotIn(receipt["path"], reached)
+        self.assertNotIn("source_sha256", receipt)
+        self.assertEqual(3, len(receipt["input_sha256"]))
+        for path, digest in receipt["input_sha256"].items():
+            frozen = CHECKER.BUILD_CHECKER._frozen_regular_bytes(self.context, path, "Contour generator input")
+            self.assertEqual(hashlib.sha256(frozen).hexdigest(), digest)
+
+    def test_unreviewed_generated_source_and_owner_imports_are_rejected(self) -> None:
+        for kind in ("source", "imports"):
+            graph = copy.deepcopy(self.graph)
+            if kind == "source":
+                graph["module_sources"]["contour_wire_test_mod"] = "<generated:unreviewed:types.zig>"
+            else:
+                graph["imports"]["contour_wire_test_mod"] = {"zynum-core": "zynum_core_test_mod"}
+            with self.subTest(kind=kind):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "generated Contour test wire owner/source"):
+                    CHECKER._zig_generated_test_dependency("contour_wire_test_mod", graph)
+
+
+class NumericsResourcesReachabilityTests(unittest.TestCase):
+    """Exercise both real source walkers without native inventory evidence."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.context = CHECKER.BUILD_CHECKER._make_discovery_context(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json")
+        cls.source_inventory = _source_refreshed_build_fixture(cls.context)
+        with mock.patch.object(CHECKER, "_load_build_inventory", return_value=cls.source_inventory):
+            cls.discovered = CHECKER.discover(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json", _context=cls.context)
+        cls.graph = CHECKER.BUILD_CHECKER._numerics_resources_build_contract(CHECKER._cached_text(cls.context, "build.zig"))
+        cls.zig_text = {path: CHECKER._cached_text(cls.context, path)
+                        for path in cls.context.public_files.paths if path.endswith(".zig")}
+
+    def test_both_walkers_retain_resource_bytes_without_test_declarations(self) -> None:
+        path = CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_PATH
+        self.assertEqual([], CHECKER._zig_declarations(self.zig_text[path], path))
+        self.assertNotIn(path, [row["path"] for row in self.discovered["zig_test_files"]])
+        rows = [next(row for row in self.discovered["test_roots"] if row["id"] == "zig-root:triangular-band-solve-tests"),
+                self.discovered["correctness_only_roots"][0]]
+        for row in rows:
+            with self.subTest(root=row["id"]):
+                self.assertIn(path, row["source_reachability"])
+                receipts = [r for r in row["named_dependency_sources"] if r["alias"] == CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS]
+                self.assertTrue(receipts)
+                for receipt in receipts:
+                    self.assertEqual(path, receipt["path"])
+                    self.assertEqual(hashlib.sha256(self.zig_text[path].encode()).hexdigest(), receipt["source_sha256"])
+                    self.assertEqual("numerics_resources_mod", receipt["module"])
+                    self.assertEqual("target", receipt["target"])
+                    self.assertEqual(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256, receipt["build_contract_sha256"])
+        self.assertFalse(rows[1]["native_inventory_evidence"])
+
+    def test_both_walkers_reject_missing_source_and_unknown_alias(self) -> None:
+        resource = CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_PATH
+        for symbol in ("triangular_band_solve_tests", "dynamic_tests"):
+            path = self.graph["root_sources"][symbol]
+            for missing in (True, False):
+                sources = dict(self.zig_text)
+                if missing:
+                    del sources[resource]
+                else:
+                    sources[path] += '\nconst rejected = @import("unreviewed-resource-alias");\n'
+                with self.subTest(root=symbol, missing_source=missing):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "(dependency source is missing|unreviewed named Zig dependency)"):
+                        CHECKER._zig_source_closure(sources, frozenset(sources), CHECKER._zig_source_entries(symbol, self.graph), resource_root=symbol, resource_graph=self.graph)
+            with self.subTest(root=symbol, wrong_owner=True):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "root/owner binding"):
+                    CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                        [path], resource_root="unreviewed_root", resource_graph=self.graph)
+
+    def test_source_discovery_rejects_missing_swapped_and_wrong_target_edges(self) -> None:
+        source = CHECKER._cached_text(self.context, "build.zig")
+        edge = 'official_tests.root_module.addImport("zynum-numerics-resources", numerics_resources_mod);'
+        dynamic = 'execution_test_mod.addImport("zynum-numerics-resources", numerics_resources_mod);'
+        mutations = (source.replace(edge, "", 1),
+                     source.replace(dynamic, dynamic.replace("numerics_resources_mod", "host_numerics_resources_mod"), 1),
+                     source.replace('.target = target,\n    });\n    // The coverage generator', '.target = b.graph.host,\n    });\n    // The coverage generator', 1))
+        original = CHECKER._cached_text
+        for text in mutations:
+            self.assertNotEqual(source, text)
+            with self.subTest(build_sha256=hashlib.sha256(text.encode()).hexdigest()):
+                with mock.patch.object(CHECKER, "_cached_text", side_effect=lambda context, path: text if path == "build.zig" else original(context, path)):
+                    with self.assertRaisesRegex(CHECKER.BUILD_CHECKER.InventoryError, "numerics resources"):
+                        CHECKER.discover(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json", _context=self.context)
+
+
+class SharedFacadeReachabilityTests(NumericsResourcesReachabilityTests):
+    """Shared ownership remains explicit in both walkers and source receipts."""
+
+    def test_all_facades_converge_on_one_test_core_and_retain_all_sources(self) -> None:
+        row = next(row for row in self.discovered["test_roots"] if row["id"] == "zig-root:modern-tests")
+        self.assertTrue(set(CHECKER.BUILD_CHECKER.SHARED_FACADE_SOURCE_SHA256) <= set(row["source_reachability"]))
+        cores = [receipt for receipt in row["named_dependency_sources"] if receipt["alias"] == "zynum-core"]
+        self.assertEqual(4, len(cores))
+        self.assertEqual({"zynum_core_test_mod"}, {receipt["module"] for receipt in cores})
+        self.assertEqual({"src/zynum.zig"}, {receipt["path"] for receipt in cores})
+        resource = [receipt for receipt in row["named_dependency_sources"] if receipt["alias"] == CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS]
+        self.assertEqual({"zynum_core_test_mod", "execution_test_mod"}, {receipt["attachment_owner"] for receipt in resource})
+        for receipt in row["named_dependency_sources"]:
+            self.assertEqual(hashlib.sha256(self.zig_text[receipt["path"]].encode()).hexdigest(), receipt["source_sha256"])
+
+    def test_facade_consumers_inherit_exact_core_objects_and_numerics_stays_empty(self) -> None:
+        rows = {row["compile_observation_id"].rsplit(":", 1)[1]: row for row in self.discovered["test_roots"] if row["language"] == "zig"}
+        expected = {f"link:build.zig:build:zynum_core_test_mod<-{p}" for p in CHECKER.BUILD_CHECKER.SHARED_CORE_TEST_PROVIDERS[1:]}
+        for symbol in CHECKER.BUILD_CHECKER.SHARED_FACADE_TEST_ROOTS:
+            with self.subTest(symbol=symbol):
+                self.assertEqual(expected, {obj["link_observation_id"] for obj in rows[symbol]["required_isolated_objects"]})
+        self.assertEqual([], rows["numerics_contract_tests"]["required_isolated_objects"])
+        self.assertEqual(4, len(rows["structured_object_tests"]["required_isolated_objects"]))
+        self.assertIn("src/blas/compat_fortran.zig", rows["fortran_tests"]["source_reachability"])
+
+    def test_missing_facade_core_resource_and_unknown_owner_alias_fail(self) -> None:
+        entries = CHECKER._zig_source_entries("modern_tests", self.graph)
+        for path in (*CHECKER.BUILD_CHECKER.SHARED_FACADE_SOURCE_SHA256, "src/zynum.zig", CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_PATH):
+            sources = dict(self.zig_text)
+            del sources[path]
+            with self.subTest(missing=path), self.assertRaisesRegex(CHECKER.InventoryError, "dependency source is missing"):
+                CHECKER._zig_source_closure(sources, frozenset(sources), entries, resource_root="modern_tests", resource_graph=self.graph)
+        for path, alias in ((entries[0], "zynum-build-options"), ("src/facades/lapack.zig", "zynum-numerics-resources"),
+                            ("src/zynum.zig", "zynum-lapack")):
+            sources = dict(self.zig_text)
+            sources[path] += f'\nconst rejected = @import("{alias}");\n'
+            with self.subTest(path=path, alias=alias), self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency"):
+                CHECKER._zig_source_closure(sources, frozenset(sources), entries, resource_root="modern_tests", resource_graph=self.graph)
+
+    def test_missing_inherited_object_observation_is_not_silently_empty(self) -> None:
+        inventory = copy.deepcopy(self.source_inventory)
+        inventory["build_observations"] = [row for row in inventory["build_observations"] if row["id"] != "link:build.zig:build:zynum_core_test_mod<-stride2_isolated_test_library"]
+        with mock.patch.object(CHECKER, "_load_build_inventory", return_value=inventory):
+            with self.assertRaisesRegex(CHECKER.InventoryError, "shared core isolated object observations"):
+                CHECKER.discover(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json", _context=self.context)
+
+    def test_same_path_distinct_owner_does_not_skip_second_bindings(self) -> None:
+        # Test the traversal state, not acceptance of an unreviewed graph: derive
+        # a deliberately malformed second owner after graph admission. The same
+        # src/zynum.zig path must be visited again and expose its absent imports.
+        graph = copy.deepcopy(self.graph)
+        graph["imports"]["zynum_lapack_test_mod"]["zynum-core"] = "zynum_core_mod"
+        del graph["imports"]["zynum_core_mod"][CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS]
+        with self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency"):
+            CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                CHECKER._zig_source_entries("modern_tests", graph), resource_root="modern_tests", resource_graph=graph)
+
+
+class SharedExecutionReachabilityTests(NumericsResourcesReachabilityTests):
+    """Real admitted graph in both source walkers, without native test claims."""
+
+    def test_all_four_linked_object_sources_and_execution_receipts_are_retained(self) -> None:
+        rows = {row['compile_observation_id'].rsplit(':', 1)[1]: row for row in self.discovered['test_roots'] if row['language'] == 'zig'}
+        path = 'src/blas/task_runtime_host_object_root.zig'
+        for symbol in CHECKER.BUILD_CHECKER.EXECUTION_OBJECT_CONSUMERS:
+            row = rows[symbol]
+            with self.subTest(root=symbol):
+                self.assertIn(path, row['source_entry_paths'])
+                self.assertIn(path, row['source_reachability'])
+                for suffix in ('default', 'owner', 'policy', 'test_support'):
+                    self.assertIn(f'src/numerics/execution/{suffix}.zig', row['source_reachability'])
+                receipt, = [r for r in row['named_dependency_sources'] if r['alias'] == 'zynum-execution' and r['attachment_owner'] == 'task_runtime_host_test_library.root_module']
+                self.assertEqual('execution_test_mod', receipt['module'])
+                self.assertEqual(CHECKER.BUILD_CHECKER.EXECUTION_SOURCE_SHA256['src/numerics/execution/default.zig'], receipt['source_sha256'])
+                source = dict(self.zig_text)
+                del source[path]
+                with self.assertRaisesRegex(CHECKER.InventoryError, 'dependency source is missing'):
+                    CHECKER._zig_source_closure(source, self.context.public_files.path_set,
+                        CHECKER._zig_source_entries(symbol, self.graph), resource_root=symbol, resource_graph=self.graph)
+
+    def test_execution_root_retains_context_scratch_and_only_shared_resource_dependency(self) -> None:
+        row = next(row for row in self.discovered['test_roots'] if row['id'] == 'zig-root:execution-contract-tests')
+        self.assertEqual(['src/numerics/execution/owner.zig'], row['source_entry_paths'])
+        self.assertEqual(sorted(['src/numerics/execution/owner.zig', 'src/numerics/execution/test_support.zig',
+            'src/numerics/execution/context.zig', 'src/numerics/execution/context_test.zig',
+            'src/numerics/execution/context_scratch_test.zig', 'src/numerics/resources.zig']), row['source_reachability'])
+        receipt, = row['named_dependency_sources']
+        self.assertEqual('zynum-numerics-resources', receipt['alias'])
+        self.assertEqual('execution_contract_tests.root_module', receipt['attachment_owner'])
+        self.assertEqual('numerics_resources_mod', receipt['module'])
+        self.assertEqual([], row['required_isolated_objects'])
+        self.assertEqual(['step:build.zig:build:test-execution-contract'], row['selector_step_observation_ids'])
+        self.assertEqual(25, sum(r['language'] == 'zig' for r in self.discovered['test_roots']))
+        self.assertEqual(64, CHECKER.MAX_PROTOCOL_BLOCKS)
+
+    def test_both_walkers_bind_execution_source_and_options_owner(self) -> None:
+        roots = {row['id']: row for row in self.discovered['test_roots']}
+        rows = [roots['zig-root:blas-module-tests'], roots['zig-root:numerics-contract-tests'],
+                self.discovered['correctness_only_roots'][0]]
+        for row in rows:
+            with self.subTest(root=row['id']):
+                for suffix in ('default', 'owner', 'policy', 'test_support'):
+                    self.assertIn(f'src/numerics/execution/{suffix}.zig', row['source_reachability'])
+                receipts = [r for r in row['named_dependency_sources'] if r['alias'] == 'zynum-execution']
+                self.assertGreaterEqual(len(receipts), 1)
+                for receipt in receipts:
+                    self.assertEqual('execution_test_mod', receipt['module'])
+                    self.assertEqual(CHECKER.BUILD_CHECKER.EXECUTION_PATH, receipt['path'])
+                    self.assertEqual(CHECKER.BUILD_CHECKER.EXECUTION_SOURCE_SHA256[receipt['path']], receipt['source_sha256'])
+        self.assertEqual([], roots['zig-root:numerics-contract-tests']['required_isolated_objects'])
+
+    def test_execution_missing_source_wrong_owner_and_unknown_alias_fail(self) -> None:
+        for symbol in ('blas_module_tests', 'dynamic_tests', 'numerics_contract_tests'):
+            entries = CHECKER._zig_source_entries(symbol, self.graph)
+            for path in ('src/numerics/execution/default.zig', 'src/numerics/execution/owner.zig',
+                         'src/numerics/execution/policy.zig', 'src/numerics/execution/test_support.zig'):
+                sources = dict(self.zig_text)
+                del sources[path]
+                with self.subTest(root=symbol, missing=path), self.assertRaisesRegex(CHECKER.InventoryError, 'dependency source is missing'):
+                    CHECKER._zig_source_closure(sources, self.context.public_files.path_set, entries, resource_root=symbol, resource_graph=self.graph)
+            graph = copy.deepcopy(self.graph)
+            graph['generated_imports']['execution_test_mod'] = []
+            with self.subTest(root=symbol, missing_options=True), self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed named Zig dependency: zynum-build-options'):
+                CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set, entries, resource_root=symbol, resource_graph=graph)
+        sources = dict(self.zig_text)
+        sources['src/numerics/execution/owner.zig'] += '\nconst wrong = @import("zynum-execution");\n'
+        with self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed named Zig dependency: zynum-execution'):
+            CHECKER._zig_source_closure(sources, frozenset(sources), CHECKER._zig_source_entries('execution_contract_tests', self.graph), resource_root='execution_contract_tests', resource_graph=self.graph)
+
+    def test_numeric_root_execution_binding_cannot_be_dropped(self) -> None:
+        source = CHECKER._cached_text(self.context, 'build.zig')
+        before = ' or\n            official_tests == numerics_contract_tests;'
+        self.assertEqual(1, source.count(before))
+        with self.assertRaisesRegex(CHECKER.BUILD_CHECKER.InventoryError, 'owner/source/target/attachment graph drifted'):
+            CHECKER.BUILD_CHECKER._numerics_resources_build_contract(source.replace(before, ';', 1))
+        # This exact missing binding was discovered before the approved product fix.
+        graph = copy.deepcopy(self.graph)
+        del graph['imports'][graph['root_owners']['numerics_contract_tests']]['zynum-execution']
+        with self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed named Zig dependency: zynum-execution'):
+            CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                CHECKER._zig_source_entries('numerics_contract_tests', graph), resource_root='numerics_contract_tests', resource_graph=graph)
+
+
+class CommonCoreContextReachabilityTests(NumericsResourcesReachabilityTests):
+    """Single-path canonical/correctness closure, never a guessed production profile."""
+
+    def test_both_walkers_follow_abi_core_context_and_one_resources_owner(self) -> None:
+        canonical = {row['id']: row for row in self.discovered['test_roots']}
+        rows = [canonical['zig-root:fortran-tests'], canonical['zig-root:cblas-tests'], self.discovered['correctness_only_roots'][0]]
+        for row in rows:
+            with self.subTest(root=row['id']):
+                for path in ('src/blas/abi/root.zig', 'src/zynum.zig', 'src/numerics/execution/context.zig',
+                             'src/numerics/execution/context_scratch_test.zig', 'src/numerics/resources.zig'):
+                    self.assertIn(path, row['source_reachability'])
+                abi = [r for r in row['named_dependency_sources'] if r['alias'] == 'zynum-blas-abi']
+                self.assertTrue(abi)
+                self.assertEqual({'blas_abi_test_mod'}, {r['module'] for r in abi})
+                resources = [r for r in row['named_dependency_sources'] if r['alias'] == 'zynum-numerics-resources']
+                self.assertTrue(resources)
+                self.assertEqual({'numerics_resources_mod'}, {r['module'] for r in resources})
+                for receipt in row['named_dependency_sources']:
+                    self.assertEqual(hashlib.sha256(self.zig_text[receipt['path']].encode()).hexdigest(), receipt['source_sha256'])
+        for symbol, root_id in (('fortran_tests', 'zig-root:fortran-tests'), ('cblas_tests', 'zig-root:cblas-tests')):
+            with self.subTest(direct_execution_root=root_id):
+                row = canonical[root_id]
+                path = 'src/numerics/execution/default.zig'
+                self.assertIn(path, row['source_entry_paths'])
+                owner = self.graph['root_owners'][symbol]
+                execution = [receipt for receipt in row['named_dependency_sources'] if receipt['alias'] == 'zynum-execution']
+                direct = [receipt for receipt in execution if receipt['attachment_owner'] == owner]
+                core = [receipt for receipt in execution if receipt['attachment_owner'] == 'zynum_core_test_mod']
+                self.assertEqual(1, len(direct))
+                self.assertEqual(1, len(core))
+                self.assertEqual({'execution_test_mod'}, {receipt['module'] for receipt in execution})
+                for receipt in (direct[0], core[0]):
+                    self.assertEqual(path, receipt['path'])
+                    self.assertEqual(symbol, receipt['compile_symbol'])
+                    self.assertEqual(hashlib.sha256(self.zig_text[path].encode()).hexdigest(), receipt['source_sha256'])
+                    self.assertEqual(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256, receipt['build_contract_sha256'])
+
+    def test_missing_context_abi_and_wrong_module_alias_fail_in_both_walkers(self) -> None:
+        for symbol in ('fortran_tests', 'cblas_tests'):
+            graph = copy.deepcopy(self.graph)
+            del graph['imports'][graph['root_owners'][symbol]]['zynum-execution']
+            entries = CHECKER._zig_source_entries(symbol, graph)
+            with self.subTest(root=symbol, missing_direct_execution=True), self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed named Zig dependency: zynum-execution'):
+                CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set, entries, resource_root=symbol, resource_graph=graph)
+        for symbol in ('cblas_tests', 'dynamic_tests'):
+            entries = CHECKER._zig_source_entries(symbol, self.graph)
+            for path in ('src/blas/abi/root.zig', 'src/numerics/execution/context.zig', 'src/numerics/resources.zig'):
+                source = dict(self.zig_text);del source[path]
+                with self.subTest(root=symbol, missing=path), self.assertRaisesRegex(CHECKER.InventoryError, 'dependency source is missing'):
+                    CHECKER._zig_source_closure(source, self.context.public_files.path_set, entries, resource_root=symbol, resource_graph=self.graph)
+            graph = copy.deepcopy(self.graph)
+            del graph['imports']['blas_abi_test_mod']['zynum-core']
+            with self.subTest(root=symbol, missing_core=True), self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed named Zig dependency: zynum-core'):
+                CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set, entries, resource_root=symbol, resource_graph=graph)
+        source = dict(self.zig_text)
+        source['src/numerics/execution/context.zig'] += '\nconst wrong = @import("zynum-build-options");\n'
+        with self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed named Zig dependency: zynum-build-options'):
+            CHECKER._zig_source_closure(source, frozenset(source), CHECKER._zig_source_entries('execution_contract_tests', self.graph), resource_root='execution_contract_tests', resource_graph=self.graph)
+
+    def test_unselected_production_profile_is_explicitly_rejected(self) -> None:
+        with self.assertRaisesRegex(CHECKER.InventoryError, 'profile-selected Zig owner requires an explicitly selected production profile'):
+            CHECKER._zig_module_source('blas_compat_mod', self.graph)
+        self.assertEqual('src/blas/abi/root.zig', CHECKER._zig_module_source('blas_abi_test_mod', self.graph))
+        with self.assertRaisesRegex(CHECKER.InventoryError, 'Zig module source is missing'):
+            CHECKER._zig_module_source('unreviewed_owner', self.graph)
+
+
+class ManagedLapackeReachabilityTests(NumericsResourcesReachabilityTests):
+    """Exact source closure and owner receipts, independently of native counts."""
+
+    def test_lapack_binding_receipts_converge_on_existing_test_core(self) -> None:
+        row = next(row for row in self.discovered["test_roots"] if row["id"] == "zig-root:lapack-tests")
+        self.assertEqual(["test/lapack/lapack_test.zig", "src/general_operator_candidate_test.zig",
+                          "src/facades/lapack.zig", "src/interop/lapacke_binding.zig", "src/interop/fftw_binding.zig",
+                          "src/zynum.zig", "src/numerics/execution/default.zig"], row["source_entry_paths"])
+        self.assertEqual(284, len(row["source_reachability"]))
+        self.assertEqual('bc837b1395b6e1383f02fd12f98a0b63b8ae55ed81d4cb0a91a4387c65bb825b',
+                         CHECKER._fact_digest(row["source_reachability"]))
+        # Installed headers, manifests and package roots are packaging facts.
+        # This canonical Zig root borrows runtime engines and their Zig tests.
+        runtime_paths = {entry["path"] for entry in (*CHECKER.BUILD_CHECKER.MANAGED_LAPACKE_CLASSIFICATIONS, *CHECKER.BUILD_CHECKER.EVD_COMPONENT_CLASSIFICATIONS, *CHECKER.BUILD_CHECKER.GVD_COMPONENT_CLASSIFICATIONS, *CHECKER.BUILD_CHECKER.GELS_COMPONENT_CLASSIFICATIONS, *CHECKER.BUILD_CHECKER.GELSS_COMPONENT_CLASSIFICATIONS)
+                         if entry["path"].endswith(".zig") and entry["path"].startswith(("src/interop/", "src/lapack/", "test/lapack/"))}
+        self.assertTrue(runtime_paths <= set(row["source_reachability"]))
+        self.assertFalse(any(path.startswith("interface_subset/") for path in row["source_reachability"]))
+        named = row["named_dependency_sources"]
+        bindings = [receipt for receipt in named if receipt["alias"] == "numerical-owner"]
+        self.assertEqual(2, len(bindings))
+        self.assertEqual({"lapacke_binding_test_mod"}, {receipt["module"] for receipt in bindings})
+        self.assertEqual({"lapack_tests.root_module", "general_operator_test_mod"},
+                         {receipt["attachment_owner"] for receipt in bindings})
+        cores = [receipt for receipt in named if receipt["alias"] == "zynum-core"]
+        self.assertEqual({"lapack_tests.root_module", "lapacke_binding_test_mod", "zynum_lapack_test_mod",
+                          "fftw_binding_test_mod", "general_operator_test_mod"},
+                         {receipt["attachment_owner"] for receipt in cores})
+        self.assertEqual({"zynum_core_test_mod"}, {receipt["module"] for receipt in cores})
+        self.assertEqual({"execution_test_mod"}, {receipt["module"] for receipt in named if receipt["alias"] == "zynum-execution"})
+        self.assertEqual({"numerics_resources_mod"}, {receipt["module"] for receipt in named if receipt["alias"] == "zynum-numerics-resources"})
+        self.assertEqual(["zynum-contour-wire"],
+                         sorted(r["alias"] for r in named if r.get("source_kind") == "generated-non-source"))
+        for receipt in named:
+            self.assertEqual("target", receipt["target"])
+            self.assertEqual(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256, receipt["build_contract_sha256"])
+            if receipt.get("source_kind") == "generated-non-source":
+                inputs = ("tools/generate_contour_interface.py", "tools/contour_wire_profile.json",
+                          "tools/interface_templates/contour_wire_types.zig.in")
+                self.assertEqual({
+                    "alias": "zynum-contour-wire",
+                    "path": "<generated:contour_test_generate:contour_v1_types.zig>",
+                    "source_kind": "generated-non-source",
+                    "generator_observation_id": "launch:build.zig:build:contour_test_generate",
+                    "generator": inputs[0], "output_name": "contour_v1_types.zig",
+                    "input_sha256": {name: CHECKER.BUILD_CHECKER.CONTOUR_SOURCE_SHA256[name] for name in inputs},
+                    "module": "contour_wire_test_mod", "target": "target",
+                    "compile_symbol": "lapack_tests", "attachment_owner": "general_operator_test_mod",
+                    "build_contract_sha256": CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256,
+                }, receipt)
+                # A generated output has no invented source-file byte hash.
+                self.assertNotIn("source_sha256", receipt)
+                for name in inputs:
+                    self.assertEqual(receipt["input_sha256"][name], hashlib.sha256((REPOSITORY_ROOT / name).read_bytes()).hexdigest())
+            else:
+                self.assertEqual(hashlib.sha256(self.zig_text[receipt["path"]].encode()).hexdigest(), receipt["source_sha256"])
+        self.assertEqual({"zynum_core_test_mod"}, CHECKER._zig_object_owners("lapack_tests", self.graph))
+
+    def test_numerics_and_correctness_walkers_do_not_gain_adapter_ownership(self) -> None:
+        canonical = {row["id"]: row for row in self.discovered["test_roots"]}
+        rows = [canonical["zig-root:numerics-contract-tests"], self.discovered["correctness_only_roots"][0]]
+        for row in rows:
+            with self.subTest(root=row["id"]):
+                self.assertIn("src/lapack/core/triangular_substitute.zig", row["source_reachability"])
+                # Typed FEAST factories borrow a supplied Core; they add no
+                # named binding owner, global Context or exported C adapter.
+                expected_typed_seams = {
+                    "zig-root:numerics-contract-tests": {
+                        "src/interop/feast.zig", "src/interop/feast_parameters.zig", "src/interop/feast_test.zig"},
+                    "correctness-root:dynamic-dispatch": set(),
+                }
+                self.assertEqual(expected_typed_seams[row["id"]],
+                                 {path for path in row["source_reachability"] if path.startswith("src/interop/")})
+                self.assertFalse(any(path.startswith("test/lapack/interop/") for path in row["source_reachability"]))
+                self.assertNotIn("numerical-owner", {receipt["alias"] for receipt in row["named_dependency_sources"]})
+        self.assertEqual(["src/numerics_contract_test.zig", "src/numerics/execution/default.zig"], rows[0]["source_entry_paths"])
+        self.assertEqual([], rows[0]["required_isolated_objects"])
+        self.assertFalse(rows[1]["native_inventory_evidence"])
+        self.assertNotIn("src/lapack/core/triangular_substitute.zig", {row["path"] for row in self.discovered["zig_test_files"]})
+
+    def test_missing_binding_engine_support_and_primitive_bytes_are_rejected(self) -> None:
+        symbols = {
+            "lapack_tests": ("src/interop/lapacke_getrf.zig", "test/lapack/interop/getrf_adapter_test.zig", "src/interop/lapacke_getrs.zig", "test/lapack/interop/getrs_adapter_test.zig", "src/interop/lapacke_access.zig", "test/lapack/interop/raw_access_test.zig", "src/interop/lapacke_binding.zig", "src/interop/lapacke_common.zig",
+                "src/interop/lapacke_potrf.zig", "src/interop/lapacke_potrs.zig",
+                "test/lapack/interop/managed_support.zig", "test/lapack/interop/potrs_support.zig",
+                "src/lapack/core/triangular_substitute.zig"),
+            "numerics_contract_tests": ("src/lapack/core/triangular_substitute.zig", "src/lapack/core/lu_policy_test.zig", "src/numerics/dense.zig", "src/sparse/operations.zig"),
+            "dynamic_tests": ("src/lapack/core/triangular_substitute.zig",),
+        }
+        for symbol, paths in symbols.items():
+            for path in paths:
+                sources = dict(self.zig_text)
+                del sources[path]
+                # Keep classification/path membership intact while withholding
+                # source bytes. Repository admission separately freezes hashes.
+                with self.subTest(root=symbol, missing=path), self.assertRaisesRegex(CHECKER.InventoryError, "Zig dependency source is missing: " + re.escape(path)):
+                    CHECKER._zig_source_closure(sources, self.context.public_files.path_set,
+                        CHECKER._zig_source_entries(symbol, self.graph), resource_root=symbol, resource_graph=self.graph)
+
+    def test_binding_missing_core_and_unreviewed_named_dependency_are_rejected(self) -> None:
+        graph = copy.deepcopy(self.graph)
+        del graph["imports"]["lapacke_binding_test_mod"]["zynum-core"]
+        with self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: zynum-core"):
+            CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                CHECKER._zig_source_entries("lapack_tests", graph), resource_root="lapack_tests", resource_graph=graph)
+        for path, alias in (("src/interop/lapacke_binding.zig", "zynum-numerics-resources"),
+                            ("src/zynum.zig", "numerical-owner")):
+            sources = dict(self.zig_text)
+            sources[path] += f'\nconst rejected = @import("{alias}");\n'
+            with self.subTest(source=path, alias=alias), self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: " + alias):
+                CHECKER._zig_source_closure(sources, self.context.public_files.path_set,
+                    CHECKER._zig_source_entries("lapack_tests", self.graph), resource_root="lapack_tests", resource_graph=self.graph)
+
+    def test_same_core_path_does_not_hide_binding_owner_split(self) -> None:
+        # Deliberately corrupt an admitted traversal fixture after graph admission.
+        # The binding and facade now reach the same Core path through different
+        # owners. Actual build acceptance separately rejects this mode swap.
+        graph = copy.deepcopy(self.graph)
+        graph["imports"]["lapack_tests.root_module"]["numerical-owner"] = "lapacke_binding_mod"
+        del graph["imports"]["zynum_core_mod"]["zynum-numerics-resources"]
+        with self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: zynum-numerics-resources"):
+            CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                CHECKER._zig_source_entries("lapack_tests", graph), resource_root="lapack_tests", resource_graph=graph)
+
+
+class ManagedSparseReachabilityTests(unittest.TestCase):
+    """Source-only checks; lexical cases are never a native enumeration receipt."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        NumericsResourcesReachabilityTests.setUpClass.__func__(cls)
+
+    def test_sparse_control_closure_and_direct_receipts_keep_one_owner(self) -> None:
+        row = next(row for row in self.discovered["test_roots"] if row["id"] == "zig-root:sparse-tests")
+        self.assertEqual(["test/sparse/sparse_test.zig", "src/checked/mixed_adapter_test.zig", "src/facades/sparse.zig", "src/interop/mkl_sparse_binding.zig", "src/zynum.zig",
+                          "src/numerics/execution/default.zig"], row["source_entry_paths"])
+        self.assertEqual(201, len(row["source_reachability"]))
+        self.assertEqual("d9fcc3a92fa5eaf419fda14c42960c37f435213e2b7e8024be03f43820c94baa",
+                         CHECKER._fact_digest(row["source_reachability"]))
+        self.assertTrue(set(CHECKER.BUILD_CHECKER.MANAGED_SPARSE_SOURCE_SHA256) <= set(row["source_reachability"]))
+        self.assertEqual({"src/interop/mkl_sparse_binding.zig", "src/interop/mkl_sparse.zig", "src/interop/sparse_handle.zig",
+                          "src/interop/mkl_sparse_access.zig", "src/interop/mkl_sparse_raw.zig",
+                          "src/interop/mkl_sparse_solve.zig", "src/interop/mkl_sparse_solve_raw.zig"},
+                         {path for path in row["source_reachability"] if path.startswith("src/interop/")})
+        self.assertFalse(any(path.startswith("test/lapack/interop/") for path in row["source_reachability"]))
+        for path in ("test/sparse/object_test.zig", "test/sparse/context_object_test.zig"):
+            self.assertEqual(9, len(CHECKER._zig_declarations(self.zig_text[path], path)))
+        named = row["named_dependency_sources"]
+        cores = [receipt for receipt in named if receipt["alias"] == "zynum-core"]
+        self.assertEqual({"sparse_tests.root_module", "zynum_sparse_test_mod", "mkl_sparse_binding_test_mod", "checked_sparse_test_mod"}, {r["attachment_owner"] for r in cores})
+        self.assertEqual({"zynum_core_test_mod"}, {r["module"] for r in cores})
+        executions = [receipt for receipt in named if receipt["alias"] == "zynum-execution"]
+        self.assertEqual({"sparse_tests.root_module", "zynum_core_test_mod", "checked_sparse_test_mod"}, {r["attachment_owner"] for r in executions})
+        self.assertEqual({"execution_test_mod"}, {r["module"] for r in executions})
+        resources = [receipt for receipt in named if receipt["alias"] == "zynum-numerics-resources"]
+        self.assertEqual({"sparse_tests.root_module", "zynum_core_test_mod", "execution_test_mod"},
+                         {r["attachment_owner"] for r in resources})
+        self.assertEqual({"numerics_resources_mod"}, {r["module"] for r in resources})
+        for receipt in named:
+            self.assertEqual("target", receipt["target"])
+            self.assertEqual(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256, receipt["build_contract_sha256"])
+            self.assertEqual(hashlib.sha256(self.zig_text[receipt["path"]].encode()).hexdigest(), receipt["source_sha256"])
+        self.assertEqual({"zynum_core_test_mod"}, CHECKER._zig_object_owners("sparse_tests", self.graph))
+
+    def test_sparse_missing_control_sources_or_direct_dependencies_are_rejected(self) -> None:
+        entries = CHECKER._zig_source_entries("sparse_tests", self.graph)
+        for path in ("src/sparse/object.zig", "test/sparse/object_test.zig", "test/sparse/context_object_test.zig", "test/sparse/interop/mkl_sparse_mv_test.zig", "test/sparse/interop/mkl_sparse_mm_test.zig"):
+            sources = dict(self.zig_text)
+            del sources[path]
+            with self.subTest(missing=path), self.assertRaisesRegex(CHECKER.InventoryError, "Zig dependency source is missing: " + re.escape(path)):
+                CHECKER._zig_source_closure(sources, self.context.public_files.path_set, entries,
+                    resource_root="sparse_tests", resource_graph=self.graph)
+        for alias in ("zynum-core", "zynum-execution"):
+            graph = copy.deepcopy(self.graph)
+            del graph["imports"]["sparse_tests.root_module"][alias]
+            with self.subTest(missing_alias=alias), self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: " + alias):
+                CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                    CHECKER._zig_source_entries("sparse_tests", graph), resource_root="sparse_tests", resource_graph=graph)
+
+    def test_same_source_paths_do_not_hide_sparse_core_or_execution_owner_split(self) -> None:
+        entries = CHECKER._zig_source_entries("sparse_tests", self.graph)
+        for alias, wrong_owner in (("zynum-core", "zynum_core_mod"), ("zynum-execution", "execution_mod")):
+            # Corrupt only a traversal fixture after exact graph admission. A
+            # distinct owner cannot borrow the resources of an already seen path.
+            graph = copy.deepcopy(self.graph)
+            graph["imports"]["sparse_tests.root_module"][alias] = wrong_owner
+            del graph["imports"][wrong_owner]["zynum-numerics-resources"]
+            self.assertEqual(entries, CHECKER._zig_source_entries("sparse_tests", graph))
+            with self.subTest(alias=alias), self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: zynum-numerics-resources"):
+                CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set, entries,
+                    resource_root="sparse_tests", resource_graph=graph)
+
+    def test_control_import_does_not_seed_sparse_tests_into_other_roots(self) -> None:
+        tests = {"test/sparse/object_test.zig", "test/sparse/context_object_test.zig"}
+        rows = [row for row in self.discovered["test_roots"] if row["language"] == "zig"]
+        rows.extend(self.discovered["correctness_only_roots"])
+        for row in rows:
+            with self.subTest(root=row["id"]):
+                present = set(row["source_reachability"]) & tests
+                self.assertEqual(tests if row["id"] == "zig-root:sparse-tests" else set(), present)
+        lapack = next(row for row in rows if row["id"] == "zig-root:lapack-tests")
+        self.assertIn("src/sparse/object.zig", lapack["source_reachability"])
+        numerics = next(row for row in rows if row["id"] == "zig-root:numerics-contract-tests")
+        self.assertNotIn("src/sparse/object.zig", numerics["source_reachability"])
+        self.assertEqual(157, len(numerics["source_reachability"]))
+        self.assertEqual("50dbf32c3647bab015e499e1d99bd737ef59f2cdfd01a2b7dd7b3cdc2a5e602b",
+                         CHECKER._fact_digest(numerics["source_reachability"]))
+
+
+class InterfaceServicesReachabilityTests(unittest.TestCase):
+    """Source-owner evidence only; native enumeration and ABI remain separate."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        NumericsResourcesReachabilityTests.setUpClass.__func__(cls)
+
+    def test_configuration_and_shell_closures_stay_in_their_interface_roots(self) -> None:
+        lapack = {"src/interop/lapacke_getrf.zig", "test/lapack/interop/getrf_adapter_test.zig", "src/interop/lapacke_getrs.zig", "test/lapack/interop/getrs_adapter_test.zig", "src/interop/lapacke_services.zig", "test/lapack/interop/shared_services_test.zig",
+                  "src/interop/lapacke_access.zig", "test/lapack/interop/raw_access_test.zig"}
+        posv_services = {"src/interop/lapacke_getrf.zig", "src/interop/lapacke_getrs.zig",
+                         "src/interop/lapacke_services.zig", "src/interop/lapacke_access.zig"}
+        sparse = {"src/interop/mkl_sparse_binding.zig", "src/interop/mkl_sparse.zig", "src/interop/sparse_handle.zig",
+                  "src/interop/mkl_sparse_access.zig", "src/interop/mkl_sparse_raw.zig",
+                  "src/interop/mkl_sparse_solve.zig", "src/interop/mkl_sparse_solve_raw.zig",
+                  "test/sparse/interop/raw_lifecycle_test.zig", "test/sparse/interop/mkl_sparse_mv_test.zig", "test/sparse/interop/mkl_sparse_mm_test.zig",
+                  "test/sparse/interop/handle_test.zig", "test/sparse/interop/mkl_sparse_adapter_test.zig"}
+        rows = [r for r in self.discovered["test_roots"] if r["language"] == "zig"] + self.discovered["correctness_only_roots"]
+        for row in rows:
+            reached = set(row["source_reachability"])
+            with self.subTest(root=row["id"]):
+                expected_lapack = {
+                    "zig-root:lapack-tests": lapack,
+                    "correctness-root:lapacke-posv": posv_services,
+                }.get(row["id"], set())
+                self.assertEqual(expected_lapack, reached & lapack)
+                self.assertEqual(sparse if row["id"] == "zig-root:sparse-tests" else set(), reached & sparse)
+        self.assertEqual(25, len([r for r in rows if r["language"] == "zig" and r["id"].startswith("zig-root:")]))
+
+    def test_sparse_interface_receipts_bind_actual_core_execution_and_resources(self) -> None:
+        row = next(r for r in self.discovered["test_roots"] if r["id"] == "zig-root:sparse-tests")
+        receipts = row["named_dependency_sources"]
+        binding, = [r for r in receipts if r["alias"] == "sparse-interface-owner"]
+        self.assertEqual("mkl_sparse_binding_test_mod", binding["module"])
+        self.assertEqual("sparse_tests.root_module", binding["attachment_owner"])
+        self.assertEqual("src/interop/mkl_sparse_binding.zig", binding["path"])
+        core, = [r for r in receipts if r["attachment_owner"] == "mkl_sparse_binding_test_mod"]
+        self.assertEqual("zynum-core", core["alias"])
+        self.assertEqual("zynum_core_test_mod", core["module"])
+        self.assertEqual({"execution_test_mod"}, {r["module"] for r in receipts if r["alias"] == "zynum-execution"})
+        self.assertEqual({"numerics_resources_mod"}, {r["module"] for r in receipts if r["alias"] == "zynum-numerics-resources"})
+        for receipt in receipts:
+            self.assertEqual(hashlib.sha256(self.zig_text[receipt["path"]].encode()).hexdigest(), receipt["source_sha256"])
+            self.assertEqual(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_GRAPH_SHA256, receipt["build_contract_sha256"])
+        self.assertEqual("numerical-owner", next(r for r in next(r for r in self.discovered["test_roots"] if r["id"] == "zig-root:lapack-tests")["named_dependency_sources"] if r["module"] == "lapacke_binding_test_mod")["alias"])
+
+    def test_missing_interface_sources_and_unknown_service_alias_fail(self) -> None:
+        for root, paths in (("lapack_tests", ("src/interop/lapacke_services.zig", "test/lapack/interop/shared_services_test.zig", "src/interop/lapacke_access.zig", "test/lapack/interop/raw_access_test.zig")),
+                ("sparse_tests", ("src/interop/mkl_sparse_binding.zig", "src/interop/mkl_sparse.zig", "src/interop/sparse_handle.zig", "src/interop/mkl_sparse_access.zig", "src/interop/mkl_sparse_raw.zig",
+                                  "test/sparse/interop/raw_lifecycle_test.zig", "test/sparse/interop/mkl_sparse_mv_test.zig", "test/sparse/interop/mkl_sparse_mm_test.zig",
+                                  "test/sparse/interop/handle_test.zig", "test/sparse/interop/mkl_sparse_adapter_test.zig"))):
+            for path in paths:
+                sources = dict(self.zig_text)
+                del sources[path]
+                with self.subTest(root=root, missing=path), self.assertRaisesRegex(CHECKER.InventoryError, "Zig dependency source is missing"):
+                    CHECKER._zig_source_closure(sources, self.context.public_files.path_set,
+                        CHECKER._zig_source_entries(root, self.graph), resource_root=root, resource_graph=self.graph)
+        for root, path in (("lapack_tests", "src/interop/lapacke_binding.zig"), ("sparse_tests", "src/interop/mkl_sparse_binding.zig")):
+            sources = dict(self.zig_text)
+            sources[path] += '\nconst split = @import("private-service-owner");\n'
+            with self.subTest(root=root), self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: private-service-owner"):
+                CHECKER._zig_source_closure(sources, self.context.public_files.path_set,
+                    CHECKER._zig_source_entries(root, self.graph), resource_root=root, resource_graph=self.graph)
+
+    def test_same_binding_source_cannot_hide_wrong_core_owner(self) -> None:
+        graph = copy.deepcopy(self.graph)
+        graph["imports"]["sparse_tests.root_module"]["sparse-interface-owner"] = "mkl_sparse_binding_mod"
+        del graph["imports"]["zynum_core_mod"]["zynum-numerics-resources"]
+        with self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed named Zig dependency: zynum-numerics-resources"):
+            CHECKER._zig_source_closure(self.zig_text, self.context.public_files.path_set,
+                CHECKER._zig_source_entries("sparse_tests", graph), resource_root="sparse_tests", resource_graph=graph)
+
+
 class TestInventoryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -81,13 +765,46 @@ class TestInventoryTests(unittest.TestCase):
             "tools/repository_snapshot.py",
             "tools/test_inventory.json",
             "tools/test_inventory_runner.zig",
+            "test/headers/unified_blas_smoke.c",
         }
         files.update(row["path"] for row in cls.inventory["zig_test_files"])
         files.update(row["path"] for row in cls.inventory["python_test_modules"])
         files.update(path for path, _ in CHECKER._PYTHON_TOOLING_EXECUTION_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.RUNTIME_LIFECYCLE_SOURCE_SHA256)
+        files.add(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_PATH)
+        files.update(CHECKER.BUILD_CHECKER.SHARED_FACADE_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.EXECUTION_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.COMMON_CORE_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.MANAGED_LAPACKE_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.MANAGED_SPARSE_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.EXECUTION_OBJECT_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.OPERATOR_PHASE_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.FFTW_F32_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.FEAST_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.CONTOUR_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.SYEV_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.SYGV_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.CONTROLS_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.EVD_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.GVD_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.GELS_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.GELSS_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.CONTROLS_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.EVD_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.GVD_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.GELS_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.GELSS_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.SYGV_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.SYEV_COMPONENT_CLASSIFICATIONS)
+        files.update(CHECKER.BUILD_CHECKER.POSV_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.POSV_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.BUILD_CHECKER.POTRI_COMPONENT_CLASSIFICATIONS)
+        files.add("src/lapack/core/cholesky_contract.zig")
         build_inventory = json.loads(
             (REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8")
         )
+        # Include the supported reviewed source migration in old-ledger fixtures.
+        CHECKER.BUILD_CHECKER._apply_reviewed_build_inventory_migrations(build_inventory)
         files.update(
             row["path"]
             for row in build_inventory["repository_file_classifications"]
@@ -578,16 +1295,39 @@ class TestInventoryTests(unittest.TestCase):
             )
 
         environment["GIT_PAGER"] = "less"
+        git_marker = self.root / ".git"
+        marker_created = False
         try:
+            self.assertFalse(git_marker.exists())
+            archive_stdout = io.StringIO()
+            archive_stderr = io.StringIO()
+            with (
+                self._reviewed_digest_slots(
+                    inventory_current=fixture_generation, inventory_next=None
+                ),
+                contextlib.redirect_stdout(archive_stdout),
+                contextlib.redirect_stderr(archive_stderr),
+            ):
+                archive_result = CHECKER.main(
+                    ["--root", str(self.root), "--structure-only", "--require-current-only"]
+                )
+            self.assertEqual(0, archive_result, archive_stderr.getvalue())
+            self.assertEqual("", archive_stderr.getvalue())
+            self.assertIn("test inventory structure valid:", archive_stdout.getvalue())
+
+            # A safe marker must reject the ambient Git name before resolving
+            # or executing Git. No repository commands are needed for this fixture.
+            git_marker.mkdir()
+            marker_created = True
             ambient_commands = (
                 [
                     "--root",
-                    str(REPOSITORY_ROOT),
+                    str(self.root),
                     "--structure-only",
                 ],
                 [
                     "--root",
-                    str(REPOSITORY_ROOT),
+                    str(self.root),
                     "--refresh-from-protocol",
                     "--protocol-log",
                     "env:aarch64-linux-gnu-baseline=missing-protocol.log",
@@ -605,11 +1345,29 @@ class TestInventoryTests(unittest.TestCase):
                     self.assertIn("test inventory error:", output)
                     self.assertIn("GIT_PAGER", output)
         finally:
-            if ambient_git_pager is None:
-                environment.pop("GIT_PAGER", None)
-            else:
-                environment["GIT_PAGER"] = ambient_git_pager
-        self.assertEqual(336, len(self.inventory["test_mode_rows"]))
+            try:
+                if marker_created:
+                    git_marker.rmdir()
+            finally:
+                if ambient_git_pager is None:
+                    environment.pop("GIT_PAGER", None)
+                else:
+                    environment["GIT_PAGER"] = ambient_git_pager
+        self.assertEqual(588, len(self.inventory["test_mode_rows"]))
+        for root in self.inventory["test_roots"]:
+            if root["language"] != "zig":
+                continue
+            expected_objects = (
+                0 if root["id"] in {
+                    "zig-root:numerics-contract-tests",
+                    "zig-root:execution-contract-tests",
+                }
+                else 4 if root["id"] == "zig-root:structured-object-tests"
+                else 3
+            )
+            self.assertEqual(
+                expected_objects, len(root["required_isolated_objects"]), root["id"]
+            )
         self.assertEqual(
             _referenced_set_count(self.inventory),
             len(self.inventory["expected_test_sets"]),
@@ -625,12 +1383,172 @@ class TestInventoryTests(unittest.TestCase):
 
     def test_fixture_positive_validation(self) -> None:
         correctness_roots = self.inventory["correctness_only_roots"]
-        self.assertEqual(1, len(correctness_roots))
+        self.assertEqual(3, len(correctness_roots))
         self.assertFalse(correctness_roots[0]["native_inventory_evidence"])
         self.assertEqual([{}, {"ZYNUM_MAX_ISA": "baseline"}], correctness_roots[0]["process_environments"])
         self.assertEqual(2, len(correctness_roots[0]["launch_observation_ids"]))
+        self.assertEqual("correctness-root:checked-cholesky-lifecycle", correctness_roots[1]["id"])
+        self.assertFalse(correctness_roots[1]["native_inventory_evidence"])
+        self.assertEqual([{}], correctness_roots[1]["process_environments"])
         self.assertNotIn("correctness_only_roots", CHECKER._native_projection(self.inventory))
-        self.assertEqual(21, sum(root["language"] == "zig" for root in self.inventory["test_roots"]))
+        self.assertEqual(25, sum(root["language"] == "zig" for root in self.inventory["test_roots"]))
+        numerics_root_id = "zig-root:numerics-contract-tests"
+        numerics_roots = [
+            root for root in self.inventory["test_roots"]
+            if root["id"] == numerics_root_id
+        ]
+        self.assertEqual(1, len(numerics_roots))
+        numerics_step_id = "step:build.zig:build:test-numerics-contract"
+        self.assertEqual(
+            {
+                "id": numerics_root_id,
+                "language": "zig",
+                "physical_path": "src/numerics_contract_test.zig",
+                "variant_id": None,
+                "compile_observation_id": "compile:build.zig:build:numerics_contract_tests",
+                "launch_observation_id": "launch:build.zig:build:run_numerics_contract_tests",
+                "selector_step_observation_ids": [numerics_step_id],
+                "aggregate_step_observation_id": CHECKER.AGGREGATE_STEP_ID,
+                "aggregate_predicate_id": "predicate:always",
+                "source_entry_paths": ["src/numerics_contract_test.zig", "src/numerics/execution/default.zig"],
+                "required_isolated_objects": [],
+            },
+            {key: value for key, value in numerics_roots[0].items()
+             if key not in {"source_reachability", "named_dependency_sources"}},
+        )
+        # The reviewed source closure includes the common execution owner and
+        # factor policy; it does not imply dependency test execution.
+        self.assertEqual(157, len(numerics_roots[0]["source_reachability"]))
+        self.assertEqual(
+            "50dbf32c3647bab015e499e1d99bd737ef59f2cdfd01a2b7dd7b3cdc2a5e602b",
+            CHECKER._fact_digest(numerics_roots[0]["source_reachability"]),
+        )
+        self.assertEqual(
+            [{'alias': 'zynum-numerics-resources',
+              'path': 'src/numerics/resources.zig',
+              'source_sha256': '7c35ddf131ee7832140921c794291a80d54a69e1d99815ecb11759c785906e0f',
+              'module': 'numerics_resources_mod',
+              'target': 'target',
+              'compile_symbol': 'numerics_contract_tests',
+              'attachment_owner': 'execution_test_mod',
+              'build_contract_sha256': 'dd2bbd5974b25df393618184bb10447f7da83909d15da77b7948b0be35e8d1b6'},
+             {'alias': 'zynum-execution',
+              'path': 'src/numerics/execution/default.zig',
+              'source_sha256': '270086f74d74bd28bc3000d287c2d9a29b0c3111a29dae8126105c07be4ac732',
+              'module': 'execution_test_mod',
+              'target': 'target',
+              'compile_symbol': 'numerics_contract_tests',
+              'attachment_owner': 'numerics_contract_tests.root_module',
+              'build_contract_sha256': 'dd2bbd5974b25df393618184bb10447f7da83909d15da77b7948b0be35e8d1b6'},
+             {'alias': 'zynum-numerics-resources',
+              'path': 'src/numerics/resources.zig',
+              'source_sha256': '7c35ddf131ee7832140921c794291a80d54a69e1d99815ecb11759c785906e0f',
+              'module': 'numerics_resources_mod',
+              'target': 'target',
+              'compile_symbol': 'numerics_contract_tests',
+              'attachment_owner': 'numerics_contract_tests.root_module',
+              'build_contract_sha256': 'dd2bbd5974b25df393618184bb10447f7da83909d15da77b7948b0be35e8d1b6'}],
+            numerics_roots[0]["named_dependency_sources"],
+        )
+        reaching_sources = {
+            row["path"]: len(row["declarations"])
+            for row in self.inventory["zig_test_files"]
+            if numerics_root_id in row["reaching_root_ids"]
+        }
+        self.assertEqual(
+            {
+                # Static reachability includes lazy/uninstantiated paths.
+                # Native execution evidence remains independently bound.
+                'src/blas/core/execution/thread_pool.zig': 2,
+                'src/blas/core/matrix_matrix/triangular.zig': 2,
+                'src/blas/core/matrix_vector/rank_update.zig': 2,
+                'src/blas/hardware.zig': 3,
+                'src/blas/kernels/arch/aarch64/features.zig': 1,
+                'src/blas/kernels/arch/x86_64/simd_config.zig': 2,
+                'src/blas/kernels/contract.zig': 6,
+                'src/blas/kernels/isolated/structured_services_host.zig': 1,
+                'src/blas/kernels/isolated/x86_64_compact_triangular_abi.zig': 1,
+                'src/blas/kernels/isolated/x86_64_level2_width_abi.zig': 1,
+                'src/blas/kernels/isolated/x86_64_structured_abi.zig': 2,
+                'src/blas/kernels/shared/matrix_matrix/catalog.zig': 3,
+                'src/blas/kernels/shared/matrix_matrix/structured_catalog.zig': 1,
+                'src/blas/kernels/shared/matrix_matrix/structured_packing.zig': 1,
+                'src/blas/kernels/shared/matrix_matrix/tuning.zig': 4,
+                'src/blas/kernels/shared/matrix_vector/catalog.zig': 7,
+                'src/blas/kernels/shared/matrix_vector/tuning.zig': 5,
+                'src/blas/kernels/shared/vector/tuning.zig': 3,
+                'src/blas/kernels/tuning/structured.zig': 2,
+                'src/fft/core_test.zig': 5,
+                'src/interop/feast_test.zig': 5,
+                'src/lapack/core/cholesky.zig': 2,
+                'src/lapack/core/lu.zig': 1,
+                'src/lapack/core/lu_policy_test.zig': 8,
+                'src/numerics/bicgstab_test.zig': 14,
+                'src/numerics/cholesky_inverse_range_test.zig': 2,
+                'src/numerics/cholesky_inverse_test.zig': 4,
+                'src/numerics/contour_eigensolver_test.zig': 15,
+                'src/numerics/contour_quadrature_test.zig': 6,
+                'src/numerics/dense.zig': 2,
+                'src/numerics/execution/context_scratch_test.zig': 8,
+                'src/numerics/execution/context_test.zig': 8,
+                'src/numerics/execution/owner.zig': 7,
+                'src/numerics/lu_inverse_range_test.zig': 1,
+                'src/numerics/lu_inverse_test.zig': 4,
+                'src/numerics/normalized_chebyshev_test.zig': 10,
+                'src/numerics/pattern_operator_test.zig': 2,
+                'src/numerics/pivot.zig': 5,
+                'src/numerics/rank_reduced_ritz_test.zig': 6,
+                'src/numerics/rational_filter_test.zig': 14,
+                'src/numerics/residual_filter_test.zig': 4,
+                'src/numerics/series_set_test.zig': 9,
+                'src/numerics/subspace_projection_test.zig': 8,
+                'src/numerics/triangular_ieee_test.zig': 3,
+                'src/numerics/triangular_inverse_range_test.zig': 1,
+                'src/numerics/triangular_inverse_test.zig': 6,
+                'src/numerics_contract_test.zig': 61,
+                'src/sparse/pattern.zig': 10,
+            },
+            reaching_sources,
+        )
+        numerics_rows = [
+            row for row in self.inventory["test_mode_rows"]
+            if row["root_id"] == numerics_root_id
+        ]
+        self.assertEqual(12, len(numerics_rows))
+        self.assertEqual({"execute"}, {row["disposition"] for row in numerics_rows})
+        self.assertEqual(
+            {
+                (environment["id"], f"mode:{mode}")
+                for environment in self.inventory["environment_profiles"]
+                for mode in CHECKER.MODES
+            },
+            {(row["environment_id"], row["optimize_mode_id"]) for row in numerics_rows},
+        )
+        build_inventory = json.loads(
+            (self.root / "tools/build_inventory.json").read_text(encoding="utf-8")
+        )
+        observations = {row["id"]: row for row in build_inventory["build_observations"]}
+        lifecycle_errors: list[str] = []
+        CHECKER.BUILD_CHECKER._validate_runtime_lifecycle_contract(build_inventory, lifecycle_errors)
+        self.assertEqual([], lifecycle_errors)
+        self.assertNotIn(
+            CHECKER.BUILD_CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID,
+            {row["compile_observation_id"] for row in self.inventory["test_roots"] if row["language"] == "zig"},
+        )
+        self.assertFalse(any("runtime-lifecycle" in row["root_id"] for row in self.inventory["test_mode_rows"]))
+        for selector in ("test-lapack", "test-sparse"):
+            self.assertEqual(
+                [{"id": numerics_step_id, "condition": "always"}],
+                [
+                    edge for edge in observations[f"step:build.zig:build:{selector}"]["direct_dependencies"]
+                    if edge["id"] == numerics_step_id
+                ],
+            )
+        dynamic_numerics = observations["launch:build.zig:build:run_dynamic_numerics_contract_tests"]
+        self.assertEqual("b.addRunArtifact", dynamic_numerics["call"])
+        self.assertEqual(numerics_roots[0]["compile_observation_id"], dynamic_numerics["source_artifact"])
+        self.assertEqual("dynamic-dispatch-correctness-only", dynamic_numerics["launch_role"])
+        self.assertEqual(CHECKER.BUILD_CHECKER.NATIVE_EXECUTION_CHECK_ID, dynamic_numerics["executor_guard_dependency"])
         self.assertEqual(
             [],
             CHECKER.validate(self.root, self.inventory_path, structure_only=True),
@@ -785,7 +1703,7 @@ class TestInventoryTests(unittest.TestCase):
                     binding,
                 )
         self.assertEqual(
-            60,
+            72,
             sum(
                 row["environment_id"] == "env:aarch64-macos-baseline"
                 and row["root_id"].startswith("zig-root:")
@@ -809,19 +1727,61 @@ class TestInventoryTests(unittest.TestCase):
         }
         self.assertEqual(
             {
-                "gap:native-test-enumeration:env-aarch64-linux-gnu-baseline": 60,
-                "gap:native-test-enumeration:env-x86-64-linux-gnu-baseline": 63,
-                "gap:native-test-enumeration:env-x86-64-windows-gnu-baseline": 63,
+                "gap:native-test-enumeration:env-aarch64-linux-gnu-baseline": 72,
+                "gap:native-test-enumeration:env-x86-64-linux-gnu-baseline": 75,
+                "gap:native-test-enumeration:env-x86-64-windows-gnu-baseline": 75,
             },
             pending_gaps,
         )
+        numerics_rows = [row for row in rows if row["root_id"] == "zig-root:numerics-contract-tests"]
+        local_numerics = [
+            row for row in numerics_rows
+            if row["environment_id"] == "env:aarch64-macos-baseline"
+        ]
+        self.assertEqual(3, len(local_numerics))
+        self.assertEqual({"mode:debug", "mode:safe", "mode:fast"}, {row["optimize_mode_id"] for row in local_numerics})
+        sets_by_id = {row["id"]: row for row in self.inventory["expected_test_sets"]}
+        for row in local_numerics:
+            self.assertEqual(CHECKER.FROZEN_STATE, row["expectation_state"])
+            expected_set = sets_by_id[row["expected_test_set_id"]]
+            self.assertEqual(208, expected_set["count"])
+            self.assertEqual(208, len(expected_set["tests"]))
+            self.assertEqual(CHECKER.ZIG_ENUMERATION_SOURCE, expected_set["enumeration_source"])
+        local_execution = [row for row in rows
+            if row["root_id"] == "zig-root:execution-contract-tests"
+            and row["environment_id"] == "env:aarch64-macos-baseline"]
+        self.assertEqual(3, len(local_execution))
+        for row in local_execution:
+            self.assertEqual(CHECKER.FROZEN_STATE, row["expectation_state"])
+            self.assertEqual(23, sets_by_id[row["expected_test_set_id"]]["count"])
+        foreign_numerics = [
+            row for row in numerics_rows
+            if row["environment_id"] != "env:aarch64-macos-baseline"
+        ]
+        self.assertEqual(9, len(foreign_numerics))
+        for row in foreign_numerics:
+            self.assertEqual(CHECKER.PENDING_STATE, row["expectation_state"])
+            self.assertIsNone(row["expected_test_set_id"])
         gemm = {
             row["optimize_mode_id"]: row["expected_test_set_id"]
             for row in rows
             if row["environment_id"] == "env:aarch64-macos-baseline"
             and row["root_id"] == "zig-root:gemm-registry-tests"
         }
-        self.assertEqual(gemm["mode:debug"], gemm["mode:safe"])
+        gemm_names = {}
+        for mode in ("mode:debug", "mode:safe", "mode:fast"):
+            expected = sets_by_id[gemm[mode]]
+            self.assertEqual(47, expected["count"])
+            gemm_names[mode] = [test["name"] for test in expected["tests"]]
+            self.assertEqual(47, len(gemm_names[mode]))
+            self.assertEqual(47, len(set(gemm_names[mode])))
+        self.assertEqual(set(gemm_names["mode:debug"]), set(gemm_names["mode:safe"]))
+        self.assertEqual(set(gemm_names["mode:safe"]), set(gemm_names["mode:fast"]))
+        # Preserve ordered compiler observations: two thread-pool bodies move
+        # across modes, so Debug has its own content-bound expected-set ID.
+        self.assertNotEqual(gemm_names["mode:debug"], gemm_names["mode:safe"])
+        self.assertEqual(gemm_names["mode:safe"], gemm_names["mode:fast"])
+        self.assertNotEqual(gemm["mode:debug"], gemm["mode:safe"])
         self.assertEqual(gemm["mode:safe"], gemm["mode:fast"])
         triangular_band = {
             row["optimize_mode_id"]: row["expected_test_set_id"]
@@ -829,7 +1789,10 @@ class TestInventoryTests(unittest.TestCase):
             if row["environment_id"] == "env:aarch64-macos-baseline"
             and row["root_id"] == "zig-root:triangular-band-solve-tests"
         }
-        self.assertNotEqual(triangular_band["mode:debug"], triangular_band["mode:safe"])
+        # Actual compiler captures now contain the same 32 ordered tests in
+        # all three modes; content deduplication must reuse their shared set.
+        self.assertEqual(32, sets_by_id[triangular_band["mode:debug"]]["count"])
+        self.assertEqual(triangular_band["mode:debug"], triangular_band["mode:safe"])
         self.assertEqual(triangular_band["mode:safe"], triangular_band["mode:fast"])
 
     def test_duplicate_json_key_and_unknown_key_fail(self) -> None:
@@ -845,6 +1808,26 @@ class TestInventoryTests(unittest.TestCase):
         self.assertIn("top-level keys", self._errors())
 
     def test_missing_duplicate_and_folded_logical_roots_fail(self) -> None:
+        for mutation in ("missing", "duplicate", "blas-objects", "missing-selector"):
+            with self.subTest(numerics_contract_root=mutation):
+                inventory = copy.deepcopy(self.inventory)
+                numerics_root = next(
+                    row for row in inventory["test_roots"]
+                    if row["id"] == "zig-root:numerics-contract-tests"
+                )
+                if mutation == "missing":
+                    inventory["test_roots"].remove(numerics_root)
+                elif mutation == "duplicate":
+                    inventory["test_roots"].append(copy.deepcopy(numerics_root))
+                elif mutation == "blas-objects":
+                    numerics_root["required_isolated_objects"] = copy.deepcopy(next(
+                        row["required_isolated_objects"] for row in inventory["test_roots"]
+                        if row.get("required_isolated_objects")
+                    ))
+                else:
+                    numerics_root["selector_step_observation_ids"] = []
+                self._write(inventory)
+                self.assertIn("test_roots", self._errors())
         for mutation in ("missing", "duplicate", "claims-native-evidence"):
             with self.subTest(correctness_only=mutation):
                 inventory = copy.deepcopy(self.inventory)
@@ -1029,13 +2012,41 @@ class TestInventoryTests(unittest.TestCase):
         self.assertIn("reaching declaration", self._errors())
 
     def test_python_unregistered_and_dynamic_discovery_fail(self) -> None:
+        sample = 'import unittest\nclass Base(unittest.TestCase):\n def test_a(self): pass\n def test_b(self): pass\nclass Other(unittest.TestCase):\n def test_c(self): pass\nclass Derived(Base):\n def test_b(self): pass\n def test_d(self): pass\nclass Mixed(Derived, Other):\n def test_e(self): pass\n'
+        class Base(unittest.TestCase):
+            def test_a(self): pass
+            def test_b(self): pass
+
+        class Other(unittest.TestCase):
+            def test_c(self): pass
+
+        class Derived(Base):
+            def test_b(self): pass
+            def test_d(self): pass
+
+        class Mixed(Derived, Other):
+            def test_e(self): pass
+
+        def actual_names(suite):
+            if isinstance(suite, unittest.TestCase):
+                return [type(suite).__name__ + "." + suite._testMethodName]
+            return [name for child in suite for name in actual_names(child)]
+        suite = unittest.TestSuite(
+            unittest.defaultTestLoader.loadTestsFromTestCase(case)
+            for case in (Base, Other, Derived, Mixed)
+        )
+        expected = set(actual_names(suite))
+        discovered = CHECKER._python_tests(sample, "source_local_census_sample.py")
+        self.assertEqual(11, len(expected))
+        self.assertEqual(expected, {row["name"] for row in discovered})
+        self.assertEqual(len(expected), len(discovered))
         added = self.root / "test/new/test_added.py"
         added.parent.mkdir(parents=True)
         added.write_text(
             "import unittest\nclass Added(unittest.TestCase):\n    def test_added(self): pass\n",
             encoding="utf-8",
         )
-        self.assertIn("24 Python test candidates", self._errors())
+        self.assertIn("expected exactly 42 Python test candidates, found 43", self._errors())
 
         added.unlink()
         source = self.root / "test/build/test_test_inventory.py"
@@ -1089,7 +2100,7 @@ class TestInventoryTests(unittest.TestCase):
         )
         admitted_sources = CHECKER._PYTHON_TOOLING_REVIEWED_SOURCE_SHA256
         self.assertIs(type(admitted_sources), tuple)
-        self.assertEqual(17, len(admitted_sources))
+        self.assertEqual(18, len(admitted_sources))
         self.assertEqual(
             tuple(tooling_root["module_paths"]),
             tuple(path for path, _ in admitted_sources),
@@ -1108,13 +2119,30 @@ class TestInventoryTests(unittest.TestCase):
         execution_instances = CHECKER._PYTHON_TOOLING_EXECUTION_MODULES
         self.assertIs(type(execution_sources), tuple)
         self.assertIs(type(execution_instances), tuple)
-        self.assertEqual((45, 47), (len(execution_sources), len(execution_instances)))
-        self.assertEqual(admitted_sources, execution_sources[:17])
+        self.assertEqual((47, 49), (len(execution_sources), len(execution_instances)))
+        new_test_path = "bench/tools/test_module_foundation.py"
+        self.assertEqual(
+            tuple(item for item in admitted_sources if item[0] != new_test_path),
+            execution_sources[:17],
+        )
+        self.assertEqual(
+            next(item for item in admitted_sources if item[0] == new_test_path),
+            execution_sources[45],
+        )
+        self.assertEqual(
+            (new_test_path, "bench/modules/run_foundation_comparison.py"),
+            tuple(path for path, _ in execution_sources[45:]),
+        )
+        self.assertEqual(
+            (("test_module_foundation", new_test_path),
+             ("module_controller", "bench/modules/run_foundation_comparison.py")),
+            execution_instances[47:],
+        )
         self.assertEqual(
             set(path for path, _ in execution_sources),
             set(path for _, path in execution_instances),
         )
-        self.assertEqual(47, len({name for name, _ in execution_instances}))
+        self.assertEqual(49, len({name for name, _ in execution_instances}))
         for path, digest in execution_sources:
             self.assertRegex(digest, r"\A[0-9a-f]{64}\Z")
             self.assertEqual(
@@ -1128,8 +2156,8 @@ class TestInventoryTests(unittest.TestCase):
         execution_closure = CHECKER._freeze_python_tooling_execution_closure(
             self.root, execution_context, tooling_root["module_paths"]
         )
-        self.assertEqual(45, len(execution_closure.sources))
-        self.assertEqual(47, len(execution_closure.module_paths))
+        self.assertEqual(47, len(execution_closure.sources))
+        self.assertEqual(49, len(execution_closure.module_paths))
         self.assertEqual(execution_context.root, execution_closure.root)
         for path, source in execution_closure.sources.items():
             expected_source_path = execution_context.root / path
@@ -1142,8 +2170,8 @@ class TestInventoryTests(unittest.TestCase):
             CHECKER._decode_python_tooling_execution_capsule(execution_capsule)
         )
         self.assertEqual(str(execution_closure.root), capsule_root)
-        self.assertEqual(45, len(capsule_sources))
-        self.assertEqual(47, len(capsule_modules))
+        self.assertEqual(47, len(capsule_sources))
+        self.assertEqual(49, len(capsule_modules))
         if os.name == "posix":
             capsule_probe = CHECKER._python_tooling_posix_capsule_probe(
                 execution_capsule
@@ -1169,7 +2197,22 @@ class TestInventoryTests(unittest.TestCase):
                 source_bytes=controller_bytes,
                 source_sha256=hashlib.sha256(controller_bytes).hexdigest(),
             )
+            def offline_capture_fixture():
+                return None
+
+            def offline_main_fixture():
+                return None
+
+            offline_controller = types.SimpleNamespace(
+                source=types.SimpleNamespace(
+                    inventory_path="bench/modules/run_foundation_comparison.py"
+                ),
+                module=types.SimpleNamespace(
+                    capture=offline_capture_fixture, main=offline_main_fixture
+                ),
+            )
             fake_closure = types.SimpleNamespace(
+                instances={"module_controller": offline_controller},
                 sources={frozen_source.inventory_path: frozen_source},
                 module_paths={
                     "run_level2_report": frozen_source.inventory_path,
@@ -1301,9 +2344,9 @@ class TestInventoryTests(unittest.TestCase):
                 unsupported_name.stop()
             trusted_run = CHECKER.subprocess.run
             benchmark_module = types.SimpleNamespace(_FROZEN_SOURCE_RESOLVER=None)
-            fake_closure.instances = {
-                "benchmark_artifacts": types.SimpleNamespace(module=benchmark_module)
-            }
+            fake_closure.instances["benchmark_artifacts"] = types.SimpleNamespace(
+                module=benchmark_module
+            )
 
             def rejected_install(resolver):
                 benchmark_module._FROZEN_SOURCE_RESOLVER = resolver
@@ -2201,7 +3244,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in self.inventory["expected_test_sets"]
             if row["root_id"] == CHECKER.PYTHON_TOOLING_ROOT_ID
         )
-        self.assertEqual(486, tooling_set["count"])
+        self.assertEqual(492, tooling_set["count"])
 
         fixture_paths = tuple(
             self.root / relative_path
@@ -4114,7 +5157,24 @@ class TestInventoryTests(unittest.TestCase):
                 "python-root:benchmark-tools-discovery",
                 "python-root:build-inventory-direct",
                 "python-root:build-profiles-direct",
+                "python-root:checked-cholesky-profile-direct",
+                "python-root:checked-sparse-profile-direct",
                 "python-root:darwin-archive-repack-direct",
+                "python-root:feast-profile-direct",
+                "python-root:contour-profile-direct",
+                "python-root:lapacke-posv-profile-direct",
+                "python-root:lapacke-trtrs-profile-direct",
+                "python-root:lapacke-trtri-profile-direct",
+                "python-root:lapacke-getri-profile-direct",
+                "python-root:lapacke-potri-profile-direct",
+                "python-root:lapacke-syev-profile-direct",
+                "python-root:lapacke-sygv-profile-direct",
+                "python-root:lapacke-controls-profile-direct",
+                "python-root:lapacke-evd-profile-direct",
+                "python-root:lapacke-gvd-profile-direct",
+                "python-root:lapacke-gels-profile-direct",
+                "python-root:lapacke-gelss-profile-direct",
+                "python-root:unified-blas-profile-direct",
                 "python-root:test-inventory-direct",
             },
             set(roots),
@@ -4143,12 +5203,49 @@ class TestInventoryTests(unittest.TestCase):
             commands["python-root:build-profiles-direct"],
         )
         self.assertEqual(
+            "python3 -B test/build/test_lapacke_trtrs_profile.py",
+            commands["python-root:lapacke-trtrs-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_trtri_profile.py",
+            commands["python-root:lapacke-trtri-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_getri_profile.py",
+            commands["python-root:lapacke-getri-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_potri_profile.py",
+            commands["python-root:lapacke-potri-profile-direct"],
+        )
+        self.assertEqual(
             'python3 -B -m unittest discover -s bench/tools -p "test_*.py"',
             commands["python-root:benchmark-tools-discovery"],
         )
         self.assertEqual(
             "python3 -B test/build/test_test_inventory.py",
             commands["python-root:test-inventory-direct"],
+        )
+
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_controls_profile.py",
+            commands["python-root:lapacke-controls-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_evd_profile.py",
+            commands["python-root:lapacke-evd-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_gvd_profile.py",
+            commands["python-root:lapacke-gvd-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_gels_profile.py",
+            commands["python-root:lapacke-gels-profile-direct"],
+        )
+        self.assertEqual(
+            "python3 -B test/build/test_lapacke_gelss_profile.py",
+            commands["python-root:lapacke-gelss-profile-direct"],
         )
 
         tooling_root = roots[CHECKER.PYTHON_TOOLING_ROOT_ID]
@@ -4166,7 +5263,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in source_current["python_test_modules"]
             if CHECKER.PYTHON_TOOLING_ROOT_ID in row["root_ids"]
         ]
-        self.assertEqual(17, len(tooling_modules))
+        self.assertEqual(18, len(tooling_modules))
         self.assertTrue(
             all(
                 row["launch_observation_ids"] == [CHECKER.PYTHON_TOOLING_LAUNCH_ID]
@@ -4183,7 +5280,7 @@ class TestInventoryTests(unittest.TestCase):
             for row in self.inventory["expected_test_sets"]
             if row["root_id"] == CHECKER.PYTHON_TOOLING_ROOT_ID
         )
-        self.assertEqual(486, tooling_set["count"])
+        self.assertEqual(492, tooling_set["count"])
         self.assertEqual(prior_tooling_set, tooling_set)
 
         real_wrapped_binding_counts: list[int] = []
@@ -4212,7 +5309,7 @@ class TestInventoryTests(unittest.TestCase):
         finally:
             for name in legacy_module_names:
                 sys.modules.pop(name, None)
-        self.assertEqual(486, len(legacy_runtime_ids))
+        self.assertEqual(492, len(legacy_runtime_ids))
 
         def execute_stub(
             suite: unittest.TestSuite,
@@ -4268,13 +5365,13 @@ class TestInventoryTests(unittest.TestCase):
             )
         stubbed_execution.assert_called_once()
         rejected_live_discovery.assert_not_called()
-        self.assertEqual(486, real_binding_summary.discovered)
-        self.assertEqual(486, real_binding_summary.outcome.executed)
+        self.assertEqual(492, real_binding_summary.discovered)
+        self.assertEqual(492, real_binding_summary.outcome.executed)
         self.assertEqual(1, len(real_wrapped_binding_counts))
         self.assertEqual(1, len(real_suites))
         self.assertEqual(1, len(real_suite_contracts))
         projected_runtime_ids = real_suite_contracts[0].runtime_order
-        self.assertEqual(486, len(projected_runtime_ids))
+        self.assertEqual(492, len(projected_runtime_ids))
         self.assertEqual(tuple(legacy_runtime_ids), projected_runtime_ids)
         self.assertEqual(
             projected_runtime_ids, tuple(flattened_runtime_ids(real_suites[0]))
@@ -4291,7 +5388,7 @@ class TestInventoryTests(unittest.TestCase):
             _referenced_set_count(source_current),
             len(source_current["expected_test_sets"]),
         )
-        self.assertEqual(336, len(source_current["test_mode_rows"]))
+        self.assertEqual(588, len(source_current["test_mode_rows"]))
         self.assertEqual(
             _frozen_zig_count(source_current),
             len(source_current["native_observation_bindings"]),
@@ -8213,7 +9310,7 @@ class TestInventoryTests(unittest.TestCase):
         self.assertEqual(
             CHECKER.NATIVE_PROJECTION_SCHEMA_VERSION, projection["schema_version"]
         )
-        self.assertEqual(246, len(projection["native_execution_rows"]))
+        self.assertEqual(294, len(projection["native_execution_rows"]))
         self.assertEqual(
             _frozen_zig_count(baseline),
             len(projection["native_observation_bindings"]),
@@ -8228,7 +9325,7 @@ class TestInventoryTests(unittest.TestCase):
 
         all_frozen = self._freeze_pending_native_rows(baseline)
         self.assertEqual(0, CHECKER._matrix_incomplete_count(all_frozen))
-        self.assertEqual(246, len(all_frozen["native_observation_bindings"]))
+        self.assertEqual(294, len(all_frozen["native_observation_bindings"]))
         all_frozen_digest = CHECKER._native_projection_digest(all_frozen)
         self.assertNotEqual(current_digest, all_frozen_digest)
         self._write(all_frozen)
@@ -8783,6 +9880,48 @@ class TestInventoryTests(unittest.TestCase):
 
     def test_factory_missing_duplicate_and_wrong_mapping_fail(self) -> None:
         build_path = self.root / "tools/build_inventory.json"
+
+        lifecycle_baseline = json.loads(build_path.read_text(encoding="utf-8"))
+        for mutation in ("missing-guard", "claims-native-evidence", "unconditional-aggregate", "controller-timeout"):
+            with self.subTest(runtime_lifecycle=mutation):
+                changed = copy.deepcopy(lifecycle_baseline)
+                build_rows = {row["id"]: row for row in changed["build_observations"]}
+                if mutation == "missing-guard":
+                    build_rows[CHECKER.BUILD_CHECKER.RUNTIME_LIFECYCLE_LAUNCH_ID]["guard_dependencies"].pop()
+                elif mutation == "claims-native-evidence":
+                    build_rows[CHECKER.BUILD_CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID]["native_inventory_evidence"] = True
+                elif mutation == "unconditional-aggregate":
+                    next(edge for edge in build_rows[CHECKER.AGGREGATE_STEP_ID]["direct_dependencies"]
+                         if edge["id"] == CHECKER.BUILD_CHECKER.RUNTIME_LIFECYCLE_STEP_ID)["condition"] = "always"
+                else:
+                    next(row for row in changed["python_launches"]
+                         if row["id"] == CHECKER.BUILD_CHECKER.RUNTIME_LIFECYCLE_PYTHON_LAUNCH_ID)["timeout_seconds"] = 30
+                build_path.write_text(json.dumps(changed, indent=2) + "\n", encoding="utf-8")
+                self.assertIn("runtime lifecycle", self._errors())
+        build_path.write_text(json.dumps(lifecycle_baseline, indent=2) + "\n", encoding="utf-8")
+
+        baseline_build_inventory = json.loads(build_path.read_text(encoding="utf-8"))
+        for mutation in ("missing-numerics-case", "duplicate-numerics-case"):
+            with self.subTest(factory_case=mutation):
+                build_inventory = copy.deepcopy(baseline_build_inventory)
+                factory = next(
+                    row for row in build_inventory["build_observations"]
+                    if row.get("artifact_role") == CHECKER.FACTORY_ROLE
+                )
+                numerics_case = next(
+                    row for row in factory["expansion_cases"]
+                    if row["root_id"] == "zig-root:numerics-contract-tests"
+                )
+                if mutation == "missing-numerics-case":
+                    factory["expansion_cases"].remove(numerics_case)
+                else:
+                    factory["expansion_cases"].append(copy.deepcopy(numerics_case))
+                factory["expansion_cases"].sort(key=lambda row: row["root_id"])
+                factory["expansion_case_count"] = len(factory["expansion_cases"])
+                factory["expansion_cases_digest"] = CHECKER._fact_digest(factory["expansion_cases"])
+                build_path.write_text(json.dumps(build_inventory, indent=2) + "\n", encoding="utf-8")
+                self.assertIn("map Zig roots exactly", self._errors())
+        build_path.write_text(json.dumps(baseline_build_inventory, indent=2) + "\n", encoding="utf-8")
 
         build_inventory = json.loads(build_path.read_text(encoding="utf-8"))
         factory = next(
@@ -9724,6 +10863,31 @@ class TestInventoryTests(unittest.TestCase):
         self.assertIn("maximum depth", output)
         self.assertNotIn("Traceback", output)
         self.assertEqual(depth_999_bytes, self.inventory_path.read_bytes())
+
+
+
+
+class OperatorPhaseSourceReachabilityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        NumericsResourcesReachabilityTests.setUpClass.__func__(cls)
+
+    def test_phase_source_closure_keeps_existing_roots_and_owner_bindings(self) -> None:
+        roots = [r for r in self.discovered["test_roots"] if r["language"] == "zig"]
+        self.assertEqual(25, len(roots))
+        expected = {"zig-root:blas-module-tests", "zig-root:blas-public-surface-contract-tests", "zig-root:cblas-tests", "zig-root:fortran-tests", "zig-root:lapack-tests", "zig-root:modern-tests", "zig-root:numerics-contract-tests", "zig-root:sparse-tests", "zig-root:zynum-public-surface-contract-tests"}
+        self.assertEqual(expected, {r["id"] for r in roots if "src/numerics/synchronization.zig" in r["source_reachability"]})
+        self.assertEqual({"zig-root:lapack-tests"}, {r["id"] for r in roots if "src/operator_phase_candidate_test.zig" in r["source_reachability"]})
+        lapack = next(r for r in roots if r["id"] == "zig-root:lapack-tests")
+        for path in ("src/numerics/synchronization.zig", "src/operator_phase_candidate_test.zig"):
+            sources = dict(self.zig_text)
+            del sources[path]
+            with self.subTest(missing=path), self.assertRaisesRegex(CHECKER.InventoryError, "Zig dependency source is missing"):
+                CHECKER._zig_source_closure(sources, self.context.public_files.path_set, lapack["source_entry_paths"], resource_root="lapack_tests", resource_graph=self.graph)
+        self.assertEqual({"zynum_core_test_mod"}, {r["module"] for r in lapack["named_dependency_sources"] if r["alias"] == "zynum-core"})
+        self.assertEqual([], CHECKER._zig_declarations(self.zig_text["src/operator_phase_candidate_test.zig"], "src/operator_phase_candidate_test.zig"))
+        declarations = next(r["declarations"] for r in self.discovered["zig_test_files"] if r["path"] == "test/lapack/general_operator_test.zig")
+        self.assertEqual(5, len([r for r in declarations if r["name"].startswith("Operator phase agreement")]))
 
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@
 //! explicit temporary storage for caller-approved aliasing.
 
 const aliasing = @import("aliasing.zig");
+const execution = @import("zynum-execution");
 const core = @import("../core/checked.zig");
 const std = @import("std");
 const views = @import("views.zig");
@@ -97,8 +98,8 @@ fn ensureVectorIntoAliases(comptime T: type, input_vector: anytype, result_vecto
     try aliasing.ensureNoVectorOverlap(T, input_vector, result_vector);
 }
 
-fn copyVectorIntoResult(comptime T: type, input_vector: anytype, result_vector: anytype) void {
-    core.copyVectorView(T, .{
+fn copyVectorIntoResult(comptime T: type, operation: *const execution.context.Operation, input_vector: anytype, result_vector: anytype) void {
+    core.copyVectorViewAdmitted(T, operation, .{
         .source = constVectorOperand(T, input_vector),
         .destination = .{ .values = result_vector.values.ptr, .length = input_vector.length, .stride = result_vector.stride },
     });
@@ -150,23 +151,23 @@ fn checkMatrixProductShapes(left_matrix: anytype, right_matrix: anytype, result_
     if (result_matrix.column_count != right_matrix.effectiveColumnCount()) return error.DimensionMismatch;
 }
 
-fn executeScaleVectorIntoNoAlias(comptime T: type, input_vector: anytype, result_vector: anytype, scale: T) void {
-    copyVectorIntoResult(T, input_vector, result_vector);
-    core.scaleVectorView(T, .{ .vector = vectorOperand(T, result_vector), .scale = scale });
+fn executeScaleVectorIntoNoAlias(comptime T: type, operation: *const execution.context.Operation, input_vector: anytype, result_vector: anytype, scale: T) void {
+    copyVectorIntoResult(T, operation, input_vector, result_vector);
+    core.scaleVectorViewAdmitted(T, operation, .{ .vector = vectorOperand(T, result_vector), .scale = scale });
 }
 
-fn executeAddScaledVectorIntoNoAlias(comptime T: type, source_vector: anytype, input_vector: anytype, result_vector: anytype, scale: T) void {
-    copyVectorIntoResult(T, input_vector, result_vector);
-    core.addScaledVectorView(T, .{
+fn executeAddScaledVectorIntoNoAlias(comptime T: type, operation: *const execution.context.Operation, source_vector: anytype, input_vector: anytype, result_vector: anytype, scale: T) void {
+    copyVectorIntoResult(T, operation, input_vector, result_vector);
+    core.addScaledVectorViewAdmitted(T, operation, .{
         .source = constVectorOperand(T, source_vector),
         .destination = vectorOperand(T, result_vector),
         .scale = scale,
     });
 }
 
-fn executeCombineVectorsIntoNoAlias(comptime T: type, source_vector: anytype, input_vector: anytype, result_vector: anytype, source_scale: T, input_scale: T) void {
-    copyVectorIntoResult(T, input_vector, result_vector);
-    core.combineVectorViews(T, .{
+fn executeCombineVectorsIntoNoAlias(comptime T: type, operation: *const execution.context.Operation, source_vector: anytype, input_vector: anytype, result_vector: anytype, source_scale: T, input_scale: T) void {
+    copyVectorIntoResult(T, operation, input_vector, result_vector);
+    core.combineVectorViewsAdmitted(T, operation, .{
         .source = constVectorOperand(T, source_vector),
         .destination = vectorOperand(T, result_vector),
         .source_scale = source_scale,
@@ -174,8 +175,8 @@ fn executeCombineVectorsIntoNoAlias(comptime T: type, source_vector: anytype, in
     });
 }
 
-fn executeMatrixVectorNoAlias(comptime T: type, input_matrix: anytype, input_vector: anytype, result_vector: anytype, product_scale: T, result_scale: T) void {
-    core.multiplyMatrixVector(T, .{
+fn executeMatrixVectorNoAlias(comptime T: type, operation: *const execution.context.Operation, input_matrix: anytype, input_vector: anytype, result_vector: anytype, product_scale: T, result_scale: T) void {
+    core.multiplyMatrixVectorAdmitted(T, operation, core.MatrixVectorProduct(T){
         .matrix = constMatrixOperand(T, input_matrix),
         .input = constVectorOperand(T, input_vector),
         .output = vectorOperand(T, result_vector),
@@ -184,47 +185,55 @@ fn executeMatrixVectorNoAlias(comptime T: type, input_matrix: anytype, input_vec
     });
 }
 
-fn executeMatrixVectorWithWorkspace(comptime T: type, input_matrix: anytype, input_vector: anytype, result_vector: anytype, workspace: []T, result_length: views.BlasInt, product_scale: T, result_scale: T) void {
+fn executeMatrixVectorWithWorkspace(comptime T: type, operation: *const execution.context.Operation, input_matrix: anytype, input_vector: anytype, result_vector: anytype, workspace: []T, result_length: views.BlasInt, product_scale: T, result_scale: T) void {
     const temp = workspaceVector(T, workspace, result_length);
     if (!core.isZero(T, result_scale)) {
-        core.copyVectorView(T, .{
+        core.copyVectorViewAdmitted(T, operation, .{
             .source = constVectorOperand(T, result_vector),
             .destination = temp,
         });
     }
-    core.multiplyMatrixVector(T, .{
+    core.multiplyMatrixVectorAdmitted(T, operation, core.MatrixVectorProduct(T){
         .matrix = constMatrixOperand(T, input_matrix),
         .input = constVectorOperand(T, input_vector),
         .output = temp,
         .product_scale = product_scale,
         .output_scale = result_scale,
     });
-    core.copyVectorView(T, .{
+    core.copyVectorViewAdmitted(T, operation, .{
         .source = temp.asConst(),
         .destination = .{ .values = result_vector.values.ptr, .length = result_length, .stride = result_vector.stride },
     });
 }
 
-fn executeMatrixProductNoAlias(comptime T: type, left_matrix: anytype, right_matrix: anytype, result_matrix: anytype, product_scale: T, result_scale: T) void {
-    core.multiplyMatrices(T, .{
+fn executeMatrixProductNoAlias(comptime T: type, operation: *const execution.context.Operation, left_matrix: anytype, right_matrix: anytype, result_matrix: anytype, product_scale: T, result_scale: T) void {
+    const operands: core.MatrixProduct(T) = .{
         .left = constMatrixOperand(T, left_matrix),
         .right = constMatrixOperand(T, right_matrix),
         .output = matrixOperand(T, result_matrix),
         .product_scale = product_scale,
         .output_scale = result_scale,
-    });
+    };
+    if (T == f32 or T == f64)
+        core.multiplyRealMatricesAdmitted(T, operation, operands)
+    else
+        core.multiplyComplexMatricesAdmitted(T, operation, operands);
 }
 
-fn executeMatrixProductWithWorkspace(comptime T: type, left_matrix: anytype, right_matrix: anytype, result_matrix: anytype, workspace: []T, product_scale: T, result_scale: T) void {
+fn executeMatrixProductWithWorkspace(comptime T: type, operation: *const execution.context.Operation, left_matrix: anytype, right_matrix: anytype, result_matrix: anytype, workspace: []T, product_scale: T, result_scale: T) void {
     if (!core.isZero(T, result_scale)) copyMatrixToWorkspace(T, result_matrix, workspace);
     const temp = workspaceMatrix(T, workspace, result_matrix.row_count, result_matrix.column_count);
-    core.multiplyMatrices(T, .{
+    const operands: core.MatrixProduct(T) = .{
         .left = constMatrixOperand(T, left_matrix),
         .right = constMatrixOperand(T, right_matrix),
         .output = temp,
         .product_scale = product_scale,
         .output_scale = result_scale,
-    });
+    };
+    if (T == f32 or T == f64)
+        core.multiplyRealMatricesAdmitted(T, operation, operands)
+    else
+        core.multiplyComplexMatricesAdmitted(T, operation, operands);
     copyWorkspaceToMatrix(T, workspace, result_matrix);
 }
 
@@ -242,6 +251,8 @@ pub fn matrixMultiplyWorkspaceLength(arguments: anytype) Error!usize {
 ///
 /// Exact self-swaps are allowed; partial overlap is rejected in checked builds.
 pub fn swapVectors(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.first_vector).Scalar;
     assertSameScalar(T, arguments.second_vector);
     var first_vector = arguments.first_vector;
@@ -250,7 +261,7 @@ pub fn swapVectors(arguments: anytype) Error!void {
     try second_vector.check();
     try aliasing.ensureNoPartialVectorOverlap(T, first_vector, second_vector);
     const shared_length = try checkedPairLength(first_vector.length, second_vector.length);
-    core.swapVectorViews(T, .{
+    core.swapVectorViewsAdmitted(T, &operation, .{
         .first = .{ .values = first_vector.values.ptr, .length = shared_length, .stride = first_vector.stride },
         .second = .{ .values = second_vector.values.ptr, .length = shared_length, .stride = second_vector.stride },
     });
@@ -260,6 +271,8 @@ pub fn swapVectors(arguments: anytype) Error!void {
 ///
 /// Exact self-copies are no-ops; partial overlap is rejected in checked builds.
 pub fn copyVector(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.destination_vector).Scalar;
     assertSameScalar(T, arguments.source_vector);
     const source_vector = arguments.source_vector;
@@ -269,7 +282,7 @@ pub fn copyVector(arguments: anytype) Error!void {
     if (aliasing.vectorsExactlyMatch(source_vector, destination_vector)) return;
     try aliasing.ensureNoPartialVectorOverlap(T, source_vector, destination_vector);
     const shared_length = try checkedPairLength(source_vector.length, destination_vector.length);
-    core.copyVectorView(T, .{
+    core.copyVectorViewAdmitted(T, &operation, .{
         .source = .{ .values = source_vector.values.ptr, .length = shared_length, .stride = source_vector.stride },
         .destination = .{ .values = destination_vector.values.ptr, .length = shared_length, .stride = destination_vector.stride },
     });
@@ -277,10 +290,18 @@ pub fn copyVector(arguments: anytype) Error!void {
 
 /// Scale `target_vector` in place by `scale`.
 pub fn scaleVector(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
+    return scaleVectorAdmitted(&operation, arguments);
+}
+
+// Internal composition borrows the live outer token; it never re-admits.
+fn scaleVectorAdmitted(operation: *const execution.context.Operation, arguments: anytype) Error!void {
+    _ = operation.borrowedContext();
     const T = @TypeOf(arguments.target_vector).Scalar;
     var target_vector = arguments.target_vector;
     try target_vector.check();
-    core.scaleVectorView(T, .{ .vector = vectorOperand(T, target_vector), .scale = arguments.scale });
+    core.scaleVectorViewAdmitted(T, operation, .{ .vector = vectorOperand(T, target_vector), .scale = arguments.scale });
 }
 
 /// Write `result_vector = scale * input_vector`.
@@ -288,6 +309,8 @@ pub fn scaleVector(arguments: anytype) Error!void {
 /// `input_vector` and `result_vector` must have equal lengths. Exact in-place
 /// use is allowed; other overlap is rejected in checked builds.
 pub fn scaleVectorInto(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_vector).Scalar;
     assertSameScalar(T, arguments.input_vector);
     const input_vector = arguments.input_vector;
@@ -296,11 +319,11 @@ pub fn scaleVectorInto(arguments: anytype) Error!void {
     try result_vector.check();
     try requireEqualLength(input_vector.length, result_vector.length);
     if (aliasing.vectorsExactlyMatch(input_vector, result_vector)) {
-        try scaleVector(.{ .target_vector = result_vector, .scale = arguments.scale });
+        try scaleVectorAdmitted(&operation, .{ .target_vector = result_vector, .scale = arguments.scale });
         return;
     }
     try ensureVectorIntoAliases(T, input_vector, result_vector);
-    executeScaleVectorIntoNoAlias(T, input_vector, result_vector, arguments.scale);
+    executeScaleVectorIntoNoAlias(T, &operation, input_vector, result_vector, arguments.scale);
 }
 
 /// Accumulate `destination_vector += scale * source_vector` over the shared
@@ -309,6 +332,14 @@ pub fn scaleVectorInto(arguments: anytype) Error!void {
 /// Exact source/destination aliasing is allowed; partial overlap is rejected in
 /// checked builds.
 pub fn addScaledVector(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
+    return addScaledVectorAdmitted(&operation, arguments);
+}
+
+// Internal composition borrows the live outer token; it never re-admits.
+fn addScaledVectorAdmitted(operation: *const execution.context.Operation, arguments: anytype) Error!void {
+    _ = operation.borrowedContext();
     const T = @TypeOf(arguments.destination_vector).Scalar;
     assertSameScalar(T, arguments.source_vector);
     const source_vector = arguments.source_vector;
@@ -317,7 +348,7 @@ pub fn addScaledVector(arguments: anytype) Error!void {
     try destination_vector.check();
     try aliasing.ensureNoPartialVectorOverlap(T, source_vector, destination_vector);
     const shared_length = try checkedPairLength(source_vector.length, destination_vector.length);
-    core.addScaledVectorView(T, .{
+    core.addScaledVectorViewAdmitted(T, operation, .{
         .source = .{ .values = source_vector.values.ptr, .length = shared_length, .stride = source_vector.stride },
         .destination = .{ .values = destination_vector.values.ptr, .length = shared_length, .stride = destination_vector.stride },
         .scale = arguments.scale,
@@ -330,6 +361,8 @@ pub fn addScaledVector(arguments: anytype) Error!void {
 /// `input_vector`; other result/input or result/source overlap is rejected in
 /// checked builds.
 pub fn addScaledVectorInto(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_vector).Scalar;
     assertSameScalar(T, arguments.source_vector);
     assertSameScalar(T, arguments.input_vector);
@@ -342,12 +375,12 @@ pub fn addScaledVectorInto(arguments: anytype) Error!void {
     try requireEqualLength(source_vector.length, input_vector.length);
     try requireEqualLength(input_vector.length, result_vector.length);
     if (aliasing.vectorsExactlyMatch(input_vector, result_vector)) {
-        try addScaledVector(.{ .source_vector = source_vector, .destination_vector = result_vector, .scale = arguments.scale });
+        try addScaledVectorAdmitted(&operation, .{ .source_vector = source_vector, .destination_vector = result_vector, .scale = arguments.scale });
         return;
     }
     try aliasing.ensureNoVectorOverlap(T, result_vector, input_vector);
     try aliasing.ensureNoVectorOverlap(T, result_vector, source_vector);
-    executeAddScaledVectorIntoNoAlias(T, source_vector, input_vector, result_vector, arguments.scale);
+    executeAddScaledVectorIntoNoAlias(T, &operation, source_vector, input_vector, result_vector, arguments.scale);
 }
 
 /// Accumulate `destination = source_scale * source + destination_scale * destination`.
@@ -355,6 +388,14 @@ pub fn addScaledVectorInto(arguments: anytype) Error!void {
 /// The operation runs over the source/destination shared length. Exact aliasing
 /// is allowed; partial overlap is rejected in checked builds.
 pub fn combineVectors(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
+    return combineVectorsAdmitted(&operation, arguments);
+}
+
+// Internal composition borrows the live outer token; it never re-admits.
+fn combineVectorsAdmitted(operation: *const execution.context.Operation, arguments: anytype) Error!void {
+    _ = operation.borrowedContext();
     const T = @TypeOf(arguments.destination_vector).Scalar;
     assertSameScalar(T, arguments.source_vector);
     const source_vector = arguments.source_vector;
@@ -363,7 +404,7 @@ pub fn combineVectors(arguments: anytype) Error!void {
     try destination_vector.check();
     try aliasing.ensureNoPartialVectorOverlap(T, source_vector, destination_vector);
     const shared_length = try checkedPairLength(source_vector.length, destination_vector.length);
-    core.combineVectorViews(T, .{
+    core.combineVectorViewsAdmitted(T, operation, .{
         .source = .{ .values = source_vector.values.ptr, .length = shared_length, .stride = source_vector.stride },
         .destination = .{ .values = destination_vector.values.ptr, .length = shared_length, .stride = destination_vector.stride },
         .source_scale = arguments.source_scale,
@@ -377,6 +418,8 @@ pub fn combineVectors(arguments: anytype) Error!void {
 /// `input_vector`; other result/input or result/source overlap is rejected in
 /// checked builds.
 pub fn combineVectorsInto(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_vector).Scalar;
     assertSameScalar(T, arguments.source_vector);
     assertSameScalar(T, arguments.input_vector);
@@ -389,7 +432,7 @@ pub fn combineVectorsInto(arguments: anytype) Error!void {
     try requireEqualLength(source_vector.length, input_vector.length);
     try requireEqualLength(input_vector.length, result_vector.length);
     if (aliasing.vectorsExactlyMatch(input_vector, result_vector)) {
-        try combineVectors(.{
+        try combineVectorsAdmitted(&operation, .{
             .source_vector = source_vector,
             .destination_vector = result_vector,
             .source_scale = arguments.source_scale,
@@ -399,11 +442,13 @@ pub fn combineVectorsInto(arguments: anytype) Error!void {
     }
     try aliasing.ensureNoVectorOverlap(T, result_vector, input_vector);
     try aliasing.ensureNoVectorOverlap(T, result_vector, source_vector);
-    executeCombineVectorsIntoNoAlias(T, source_vector, input_vector, result_vector, arguments.source_scale, arguments.input_scale);
+    executeCombineVectorsIntoNoAlias(T, &operation, source_vector, input_vector, result_vector, arguments.source_scale, arguments.input_scale);
 }
 
 /// Return the unconjugated dot product over the left/right shared length.
 pub fn dotProduct(arguments: anytype) Error!@TypeOf(arguments.left_vector).Scalar {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.left_vector).Scalar;
     assertSameScalar(T, arguments.right_vector);
     const left_vector = arguments.left_vector;
@@ -411,7 +456,7 @@ pub fn dotProduct(arguments: anytype) Error!@TypeOf(arguments.left_vector).Scala
     try left_vector.check();
     try right_vector.check();
     const shared_length = try checkedPairLength(left_vector.length, right_vector.length);
-    return core.dotProductView(T, .{
+    return core.dotProductViewAdmitted(T, &operation, .{
         .left = .{ .values = left_vector.values.ptr, .length = shared_length, .stride = left_vector.stride },
         .right = .{ .values = right_vector.values.ptr, .length = shared_length, .stride = right_vector.stride },
     });
@@ -419,6 +464,8 @@ pub fn dotProduct(arguments: anytype) Error!@TypeOf(arguments.left_vector).Scala
 
 /// Return the dot product with the left vector conjugated for complex scalars.
 pub fn conjugatedDotProduct(arguments: anytype) Error!@TypeOf(arguments.left_vector).Scalar {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.left_vector).Scalar;
     assertSameScalar(T, arguments.right_vector);
     const left_vector = arguments.left_vector;
@@ -426,7 +473,7 @@ pub fn conjugatedDotProduct(arguments: anytype) Error!@TypeOf(arguments.left_vec
     try left_vector.check();
     try right_vector.check();
     const shared_length = try checkedPairLength(left_vector.length, right_vector.length);
-    return core.dotProductView(T, .{
+    return core.dotProductViewAdmitted(T, &operation, .{
         .left = .{ .values = left_vector.values.ptr, .length = shared_length, .stride = left_vector.stride },
         .right = .{ .values = right_vector.values.ptr, .length = shared_length, .stride = right_vector.stride },
         .conjugate_left = true,
@@ -435,10 +482,12 @@ pub fn conjugatedDotProduct(arguments: anytype) Error!@TypeOf(arguments.left_vec
 
 /// Return the Euclidean norm of `input_vector`.
 pub fn euclideanNorm(arguments: anytype) Error!core.Real(@TypeOf(arguments.input_vector).Scalar) {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.input_vector).Scalar;
     const input_vector = arguments.input_vector;
     try input_vector.check();
-    return core.euclideanNormView(T, constVectorOperand(T, input_vector));
+    return core.euclideanNormViewAdmitted(T, &operation, constVectorOperand(T, input_vector));
 }
 
 /// Compute `result = product_scale * op(matrix) * input + result_scale * result`.
@@ -446,6 +495,8 @@ pub fn euclideanNorm(arguments: anytype) Error!core.Real(@TypeOf(arguments.input
 /// `product_scale` defaults to one and `result_scale` defaults to zero. The
 /// result vector must not overlap the input vector or matrix in checked builds.
 pub fn matrixVectorMultiply(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_vector).Scalar;
     assertSameScalar(T, arguments.matrix);
     assertSameScalar(T, arguments.input_vector);
@@ -465,7 +516,7 @@ pub fn matrixVectorMultiply(arguments: anytype) Error!void {
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
-    executeMatrixVectorNoAlias(T, input_matrix, input_vector, result_vector, product_scale, result_scale);
+    executeMatrixVectorNoAlias(T, &operation, input_matrix, input_vector, result_vector, product_scale, result_scale);
 }
 
 /// Workspace-backed matrix-vector multiply for caller-approved result/input or
@@ -474,6 +525,8 @@ pub fn matrixVectorMultiply(arguments: anytype) Error!void {
 /// `workspace` must contain at least `matrixVectorMultiplyWorkspaceLength`
 /// elements and must not overlap the matrix, input, or result in checked builds.
 pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_vector).Scalar;
     assertSameScalar(T, arguments.matrix);
     assertSameScalar(T, arguments.input_vector);
@@ -499,7 +552,7 @@ pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
-    executeMatrixVectorWithWorkspace(T, input_matrix, input_vector, result_vector, workspace[0..required_workspace], result_length, product_scale, result_scale);
+    executeMatrixVectorWithWorkspace(T, &operation, input_matrix, input_vector, result_vector, workspace[0..required_workspace], result_length, product_scale, result_scale);
 }
 
 /// Compute `result = product_scale * op(left) * op(right) + result_scale * result`.
@@ -507,6 +560,8 @@ pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
 /// `product_scale` defaults to one and `result_scale` defaults to zero. The
 /// result matrix must not overlap either input matrix in checked builds.
 pub fn matrixMultiply(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_matrix).Scalar;
     assertSameScalar(T, arguments.left_matrix);
     assertSameScalar(T, arguments.right_matrix);
@@ -526,7 +581,7 @@ pub fn matrixMultiply(arguments: anytype) Error!void {
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
-    executeMatrixProductNoAlias(T, left_matrix, right_matrix, result_matrix, product_scale, result_scale);
+    executeMatrixProductNoAlias(T, &operation, left_matrix, right_matrix, result_matrix, product_scale, result_scale);
 }
 
 /// Workspace-backed matrix multiply for caller-approved result/input-matrix
@@ -535,6 +590,8 @@ pub fn matrixMultiply(arguments: anytype) Error!void {
 /// `workspace` must contain at least `matrixMultiplyWorkspaceLength` elements
 /// and must not overlap either input matrix or the result in checked builds.
 pub fn matrixMultiplyWithWorkspace(arguments: anytype) Error!void {
+    var operation = execution.beginDefault();
+    defer operation.end();
     const T = @TypeOf(arguments.result_matrix).Scalar;
     assertSameScalar(T, arguments.left_matrix);
     assertSameScalar(T, arguments.right_matrix);
@@ -563,5 +620,15 @@ pub fn matrixMultiplyWithWorkspace(arguments: anytype) Error!void {
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
-    executeMatrixProductWithWorkspace(T, left_matrix, right_matrix, result_matrix, workspace[0..required_workspace], product_scale, result_scale);
+    executeMatrixProductWithWorkspace(T, &operation, left_matrix, right_matrix, result_matrix, workspace[0..required_workspace], product_scale, result_scale);
 }
+
+/// Internal test access to the same post-validation workspace body. This does
+/// not admit or validate views; it adds no production Context API.
+pub const testing = if (@import("builtin").is_test) struct {
+    pub const executeMatrixVectorWithWorkspaceAdmitted = executeMatrixVectorWithWorkspace;
+    // Only the real post-validation bodies; tests still exercise public validation separately.
+    pub const executeScaleVectorIntoAdmitted = executeScaleVectorIntoNoAlias;
+    pub const executeAddScaledVectorIntoAdmitted = executeAddScaledVectorIntoNoAlias;
+    pub const executeCombineVectorsIntoAdmitted = executeCombineVectorsIntoNoAlias;
+} else struct {};

@@ -1,0 +1,113 @@
+{
+  "schema": "zynum.symmetric-lapacke-owner-review/1",
+  "scope": "finite-callable-generation-only",
+  "reason": "Add typed/raw real-symmetric adapters and checked borrowed entry over the existing configured Core, ContextScratch and IEEE tridiagonal implementation. Existing numerical bodies and existing binding entry bodies remain unchanged.",
+  "records": [
+    {
+      "registry": "standard_abi_bindings.py",
+      "old_dependency_count": 201,
+      "new_dependency_count": 202,
+      "added": [
+        "src/interop/lapacke_symmetric.zig"
+      ],
+      "changed": [
+        {
+          "path": "src/interop/lapacke_binding.zig",
+          "before_sha256": "3efb63f6b971768da1defff2f83630992f218c8643d1d2bd991ba9314ccae2f3",
+          "after_sha256": "b403659cd2527bab7d67ba00c4b64f51e0201b58a4de6060ca8707d46c2f7a87"
+        },
+        {
+          "path": "src/interop/lapacke_common.zig",
+          "before_sha256": "afc3cabb4e5afc7c2c0568b0fad971dd7de884a1d234a63add4db70b2c3ec9d9",
+          "after_sha256": "9db4ba140647035fb5ec1f48a2e32a9a88dae0877fbb6c08cec8616782a52d67"
+        },
+        {
+          "path": "src/interop/lapacke_diagnostics.zig",
+          "before_sha256": "bc5f0d9db51f08f0628ec179a13114a58357721a04bbc5f0cfb10bc9795e720a",
+          "after_sha256": "17989ac425c061884d4acdbc2329191b86d3fb3c27f56be80362015a9e222023"
+        },
+        {
+          "path": "src/lapack/symmetric_eigen.zig",
+          "before_sha256": "11256c6ace0c5ad9b2f66256a10ea8f59d97144aba41270488acc6cba5b141f0",
+          "after_sha256": "c1cbb44a631c294704bf7792c0e6041a91294372f61191f75b95ee7107e22784"
+        },
+        {
+          "path": "src/zynum.zig",
+          "before_sha256": "59a2d87ddb64502bc5fb2acb55c5ad76b8222c93ce041c45b92f42525baa4e5a",
+          "after_sha256": "23c38652eddfc5a6a72022ce0a6f187471a5d5b5080495d26d58b3efbf2fb5a2"
+        }
+      ],
+      "new_source_envelope_sha256": "116003400337bb1289bbabe29730f0c0e9dd7f9a31d728f17a8c53017aacb238"
+    },
+    {
+      "registry": "standard_sparse_bindings.py",
+      "old_dependency_count": 173,
+      "new_dependency_count": 173,
+      "added": [],
+      "changed": [
+        {
+          "path": "src/lapack/symmetric_eigen.zig",
+          "before_sha256": "11256c6ace0c5ad9b2f66256a10ea8f59d97144aba41270488acc6cba5b141f0",
+          "after_sha256": "c1cbb44a631c294704bf7792c0e6041a91294372f61191f75b95ee7107e22784"
+        },
+        {
+          "path": "src/zynum.zig",
+          "before_sha256": "59a2d87ddb64502bc5fb2acb55c5ad76b8222c93ce041c45b92f42525baa4e5a",
+          "after_sha256": "23c38652eddfc5a6a72022ce0a6f187471a5d5b5080495d26d58b3efbf2fb5a2"
+        }
+      ],
+      "new_source_envelope_sha256": "f35c9debf472cb57ae7ed8ac7dd6f6b0867341e5350f390fa89a5dc0f31e0b55"
+    }
+  ],
+  "native_evidence": [
+    {
+      "mode": "Debug",
+      "test_bodies": 7,
+      "receipt": "/Users/kxhuang/Project/zynum-work/symmetric-lapacke-20261019/native-syev-adapter-v2-Debug-attempt1-completion.json",
+      "sha256": "42aa6093d16caac664f7309da745f480130a75d005cc8f43fa614f1e51aeed2a"
+    },
+    {
+      "mode": "ReleaseSafe",
+      "test_bodies": 7,
+      "receipt": "/Users/kxhuang/Project/zynum-work/symmetric-lapacke-20261019/native-syev-adapter-v2-ReleaseSafe-attempt1-completion.json",
+      "sha256": "c2eca10ff6cd67885520bf38aeb72b1fbd5ee05099048b21eb970dfb4cb641cf"
+    },
+    {
+      "mode": "ReleaseFast",
+      "test_bodies": 7,
+      "receipt": "/Users/kxhuang/Project/zynum-work/symmetric-lapacke-20261019/native-syev-adapter-v2-ReleaseFast-attempt1-completion.json",
+      "sha256": "8a11b01b5808e3fccbd13a8c5200d11041b73c39e9f22e4ca88d3c6ae6f90e2c"
+    }
+  ],
+  "declarations": {
+    "header_sha256": "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+    "declarations": {
+      "LAPACKE_ssyev": {
+        "line": 10568,
+        "declaration": "lapack_int LAPACKE_ssyev( int matrix_layout, char jobz, char uplo, lapack_int n, float* a, lapack_int lda, float* w );",
+        "sha256": "de567f3eb96051dd82b4d7ba39671c4a72ab8858a79980bb933846b968e99389"
+      },
+      "LAPACKE_ssyev_work": {
+        "line": 10572,
+        "declaration": "lapack_int LAPACKE_ssyev_work( int matrix_layout, char jobz, char uplo, lapack_int n, float* a, lapack_int lda, float* w, float* work, lapack_int lwork );",
+        "sha256": "219622ffb4fd4b899023614694f8bc2bfce81782638b42bc74272db24f3b6a51"
+      },
+      "LAPACKE_dsyev": {
+        "line": 7119,
+        "declaration": "lapack_int LAPACKE_dsyev( int matrix_layout, char jobz, char uplo, lapack_int n, double* a, lapack_int lda, double* w );",
+        "sha256": "c9f96070a7cfb4f0808c7090ac57a665970ffd3eebebd73fbd3ef6280dad9e0e"
+      },
+      "LAPACKE_dsyev_work": {
+        "line": 7123,
+        "declaration": "lapack_int LAPACKE_dsyev_work( int matrix_layout, char jobz, char uplo, lapack_int n, double* a, lapack_int lda, double* w, double* work, lapack_int lwork );",
+        "sha256": "1adc7f857318602f309cd3d2d84858c64fd17976ad0d4f6565ce92da4212040a"
+      }
+    }
+  },
+  "same_existing_numerical_bodies": true,
+  "same_existing_vendor_declarations_and_lowering": true,
+  "owner_or_allocator_instantiated_by_generator": false,
+  "runtime_C_ABI_qualified": false,
+  "full_profile_ready": false,
+  "full_goal_complete": false
+}

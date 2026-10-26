@@ -124,13 +124,13 @@ baseline matrix counts one row per logical Zig test root and optimization mode:
 
 | Target | Observed | Pending | Inapplicable | CI coverage |
 | --- | ---: | ---: | ---: | --- |
-| AArch64 macOS | 60 | 0 | 3 | Inventory-certified baseline correctness; native-feature correctness |
-| x86_64 Linux GNU | 0 | 63 | 0 | Baseline compile/link; separate native-feature correctness |
-| AArch64 Linux GNU | 0 | 60 | 3 | Baseline compile/link |
-| x86_64 Windows GNU | 0 | 63 | 0 | Compatibility compile/link; installed DLL smoke checks |
+| AArch64 macOS | 66 | 0 | 3 | Inventory-certified baseline correctness; native-feature correctness |
+| x86_64 Linux GNU | 0 | 69 | 0 | Baseline compile/link; separate native-feature correctness |
+| AArch64 Linux GNU | 0 | 66 | 3 | Baseline compile/link |
+| x86_64 Windows GNU | 0 | 69 | 0 | Compatibility compile/link; installed DLL smoke checks |
 
 The three inapplicable rows on each AArch64 target belong to the x86-only
-structured-object test root. There are 186 pending rows overall. Restoring
+structured-object test root. There are 204 pending rows overall. Restoring
 inventory certification requires reviewing native Zig 0.17 protocol logs;
 Zig 0.16 records cannot certify the new compiler. The Linux release artifact
 job retains its baseline native inventory gate, so its artifacts remain blocked
@@ -247,7 +247,7 @@ Use Zig's standard prefix option for another install location:
 zig build --prefix /tmp/zynum-install
 ```
 
-Compatibility headers, the Fortran module, ABI manifest, and `pkg-config` file
+BLAS compatibility headers, the Fortran module, ABI manifest, and `pkg-config` file
 are installed by default. Disable them when only Zig modules or libraries are
 needed:
 
@@ -261,12 +261,42 @@ Query installed C/Fortran flags with:
 PKG_CONFIG_PATH=zig-out/lib/pkgconfig pkg-config --cflags --libs zynum_blas
 ```
 
+## Checked LAPACK/Sparse C and Fortran Interface
+
+The experimental `zynum_checked` library exposes real Cholesky factor/solve and
+CSR SpMV through eight namespaced functions with checked descriptors. Install
+only this interface, or include it in the ordinary installation:
+
+```sh
+zig build install-checked-abi --release=fast
+zig build -Dchecked-abi=true --release=fast
+```
+
+Run its supplemental native consumers explicitly:
+
+```sh
+zig build test-checked-abi -Dcpu=baseline -Dtest-optimize=safe --release=safe
+zig build test-checked-fortran -Dcpu=baseline -Dtest-optimize=safe --release=safe
+```
+
+The Fortran step requires GNU Fortran; `-Dchecked-gfortran` selects an installed
+compiler. The [checked interface guide](interop/README.md) describes buffer
+ownership, numerical failures, installation layout and the eight-function
+scope. Its consumers are supplemental to the canonical Zig test inventory.
+
+The [module comparison tools](../bench/modules/README.md) measure real
+Cholesky/LU and CSR products in independent processes, including checked-entry
+cost and numerical checks. Build and measurement are separate commands;
+compilation alone provides no performance evidence.
+
 ## Package Imports
 
-Zynum exposes two Zig modules:
+Zynum exposes four Zig modules:
 
-- `zynum`: top-level facade for present and future numerical modules;
-- `zynum-blas`: BLAS-only submodule.
+- `zynum`: top-level facade with `blas`, `lapack`, and `sparse` namespaces;
+- `zynum-blas`: BLAS-only submodule;
+- `zynum-lapack`: [checked dense factorizations, solves and decompositions](lapack/README.md);
+- `zynum-sparse`: [checked sparse storage, conversion, products and solves](sparse/README.md).
 
 Prefer the explicit namespace from the facade:
 

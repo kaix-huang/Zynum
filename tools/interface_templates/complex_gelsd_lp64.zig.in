@@ -1,0 +1,34 @@
+// Generated representation adapter; all numerical state belongs to the binding.
+// Finite QR exhaustion returns unfinished edges; other numeric faults retain their own token.
+fn ComplexRankLeastSquares(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("complex GELSD generation acceptance is LP64 only");
+    const R = binding.Provider.Scalar.Real(T);
+    return struct {
+        fn invoke(layout: c_int, m: WireInt, n: WireInt, nrhs: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt, singular: ?[*]align(1) R, rcond: R, rank: ?[*]align(1) WireInt, work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) R, iwork: ?[*]align(1) WireInt) WireInt {
+            const result = binding.Shared.complexGelsdRawManagedWithDefaults(true, T, InternalInt, level, binding.Provider.Execution.getContext(), .{
+                .layout = layout,
+                .column = .{
+                    .m = @intCast(m), .n = @intCast(n), .nrhs = @intCast(nrhs),
+                    .a = a, .lda = @intCast(lda), .b = b, .ldb = @intCast(ldb),
+                    .singular = singular, .rcond = rcond,
+                    .rank = if (rank) |ptr| @as([*]align(1) InternalInt, @ptrCast(ptr)) else null,
+                    .work = work, .lwork = @intCast(lwork), .rwork = rwork,
+                    .iwork = if (iwork) |ptr| @as([*]align(1) InternalInt, @ptrCast(ptr)) else null,
+                },
+            }, profileDefaults()) catch |err| terminal(@errorName(err));
+            // Managed leases and the single admitted operation have ended.
+            return switch (result) {
+                .lapacke_info => |info| @intCast(info),
+                .admission_fault => |err| terminal(@errorName(err)),
+                .numerical_fault => |err| if (binding.complex_gelsd_policy.standardNumericalInfo(err)) |info| @intCast(info) else terminal(@errorName(err)),
+            };
+        }
+        fn high(layout: c_int, m: WireInt, n: WireInt, nrhs: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt, singular: ?[*]align(1) R, rcond: R, rank: ?[*]align(1) WireInt) callconv(.c) WireInt {
+            return invoke(layout, m, n, nrhs, a, lda, b, ldb, singular, rcond, rank, null, 0, null, null);
+        }
+        fn workEntry(layout: c_int, m: WireInt, n: WireInt, nrhs: WireInt, a: ?[*]align(1) T, lda: WireInt, b: ?[*]align(1) T, ldb: WireInt, singular: ?[*]align(1) R, rcond: R, rank: ?[*]align(1) WireInt, work: ?[*]align(1) T, lwork: WireInt, rwork: ?[*]align(1) R, iwork: ?[*]align(1) WireInt) callconv(.c) WireInt {
+            return invoke(layout, m, n, nrhs, a, lda, b, ldb, singular, rcond, rank, work, lwork, rwork, iwork);
+        }
+        pub const call = if (level == .high) high else workEntry;
+    };
+}

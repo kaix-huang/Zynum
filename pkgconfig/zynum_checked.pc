@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: zynum_checked
+Description: Zynum experimental checked real Cholesky and CSR SpMV ABI
+Version: 0.0.1-beta
+Libs: -L${libdir} -lzynum_checked
+Cflags: -I${includedir}

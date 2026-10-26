@@ -3,6 +3,8 @@
 
 //! Matrix-vector architecture kernel facade.
 
+const std = @import("std");
+
 const builtin = @import("builtin");
 
 const scalar = @import("../../core/shared/scalar.zig");
@@ -20,10 +22,11 @@ pub fn gemvTransUnitReal(
     lda: BlasInt,
     x: [*]const T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
-    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvTransUnitReal, T, .{ m, n, alpha, a, lda, x, y });
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvTransUnitReal, T, .{ m, n, alpha, a, lda, x, y, scratch_allocator });
     return switch (builtin.target.cpu.arch) {
-        .aarch64 => aarch64.gemvTransUnitReal(T, m, n, alpha, a, lda, x, y),
+        .aarch64 => aarch64.gemvTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator),
         .x86_64 => x86_64.gemvTransUnitReal(T, m, n, alpha, a, lda, x, y),
         else => false,
     };
@@ -39,10 +42,11 @@ pub fn gemvTransFullUnitReal(
     x: [*]const T,
     beta: T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
-    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvTransFullUnitReal, T, .{ m, n, alpha, a, lda, x, beta, y });
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvTransFullUnitReal, T, .{ m, n, alpha, a, lda, x, beta, y, scratch_allocator });
     return switch (builtin.target.cpu.arch) {
-        .aarch64 => aarch64.gemvTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y),
+        .aarch64 => aarch64.gemvTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y, scratch_allocator),
         .x86_64 => x86_64.gemvTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y),
         else => false,
     };
@@ -57,10 +61,11 @@ pub fn gemvTransAmxUnitReal(
     lda: BlasInt,
     x: [*]const T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
-    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvTransAmxUnitReal, T, .{ m, n, alpha, a, lda, x, y });
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvTransAmxUnitReal, T, .{ m, n, alpha, a, lda, x, y, scratch_allocator });
     return switch (builtin.target.cpu.arch) {
-        .aarch64 => aarch64.gemvTransAmxUnitReal(T, m, n, alpha, a, lda, x, y),
+        .aarch64 => aarch64.gemvTransAmxUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator),
         .x86_64 => false,
         else => false,
     };
@@ -75,10 +80,11 @@ pub fn gemvNoTransUnitReal(
     lda: BlasInt,
     x: [*]const T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
-    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvNoTransUnitReal, T, .{ m, n, alpha, a, lda, x, y });
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvNoTransUnitReal, T, .{ m, n, alpha, a, lda, x, y, scratch_allocator });
     return switch (builtin.target.cpu.arch) {
-        .aarch64 => aarch64.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y),
+        .aarch64 => aarch64.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y, scratch_allocator),
         .x86_64 => x86_64.gemvNoTransUnitReal(T, m, n, alpha, a, lda, x, y),
         else => false,
     };
@@ -347,10 +353,11 @@ pub fn gemvNoTransFullUnitReal(
     x: [*]const T,
     beta: T,
     y: [*]T,
+    scratch_allocator: ?std.mem.Allocator,
 ) bool {
-    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvNoTransFullUnitReal, T, .{ m, n, alpha, a, lda, x, beta, y });
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_vector_gemvNoTransFullUnitReal, T, .{ m, n, alpha, a, lda, x, beta, y, scratch_allocator });
     return switch (builtin.target.cpu.arch) {
-        .aarch64 => aarch64.gemvNoTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y),
+        .aarch64 => aarch64.gemvNoTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y, scratch_allocator),
         .x86_64 => x86_64.gemvNoTransFullUnitReal(T, m, n, alpha, a, lda, x, beta, y),
         else => false,
     };

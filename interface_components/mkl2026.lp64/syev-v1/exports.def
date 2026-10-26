@@ -1,0 +1,5 @@
+EXPORTS
+    LAPACKE_ssyev
+    LAPACKE_ssyev_work
+    LAPACKE_dsyev
+    LAPACKE_dsyev_work

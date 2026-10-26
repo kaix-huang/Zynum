@@ -32,6 +32,1474 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
+
+def _with_source_reviewed_execution_compile(inventory: dict[str, Any]) -> dict[str, Any]:
+    """Stage the exact new source-only row for old-ledger migration fixtures.
+
+    No test sets, observations of execution, pins or files are published here.
+    The real-source graph/factory tests separately bind this Compile identity.
+    """
+    identifier = "compile:build.zig:build:execution_contract_tests"
+    if not any(row["id"] == identifier for row in inventory["build_observations"]):
+        inventory["build_observations"].append({"id": identifier, **CHECKER._new_test_inventory_observation(identifier, inventory)})
+    return inventory
+
+
+def _build_body_insertion_offset(text: str, relative: str = "build.zig") -> int:
+    """Mutate the real construction body, before its reviewed final return."""
+    projected = CHECKER._reviewed_configure_projection(text)
+    build = CHECKER._zig_build_context(projected, relative)
+    if projected == text:
+        return build.body_end
+    match = CHECKER.re.search(r"\breturn\b", CHECKER._code_mask(text)[build.body_start:build.body_end])
+    assert match is not None
+    return build.body_start + match.start()
+
+
+def _prior_component_observation(test, row, width, count):
+    """Validate the new finite SYEV branch before checking the old packages."""
+    if width != "lp64":
+        test.assertNotIn("lapacke-syev=true", row["source_variants"])
+        return row
+    variants = row["source_variants"]
+    root = "src/lapacke_symmetric_composed.zig"
+    test.assertEqual(count + 2, len(variants))
+    test.assertEqual(root, variants["lapacke-syev=true"])
+    prior = {key.removeprefix("lapacke-syev=false,"): value
+             for key, value in variants.items() if key.startswith("lapacke-syev=false,")}
+    test.assertEqual(count + 1, len(prior))
+    test.assertEqual({"lapacke-syev=true"} | {"lapacke-syev=false," + key for key in prior}, set(variants))
+    test.assertEqual(set(prior.values()) | {root}, set(row["root_source"]))
+    return {**row, "source_variants": prior,
+            "root_source": [path for path in row["root_source"] if path != root]}
+
+
+class ConfigureSeamSourceContractTests(unittest.TestCase):
+    """Exact source composition, never a new native-execution observation."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+        cls.graph_type = "pub const ImplementationGraph = struct {\n" + "".join(
+            f"    {field}: *std.Build.Module,\n" for field in (
+                "core", "execution", "resources", "options", "lapacke_binding", "mkl_sparse_binding")
+        ) + "};"
+        cls.thin_build = "pub fn build(b: *std.Build) void {\n    _ = configure(b);\n}"
+        cls.config_header = "pub fn configure(b: *std.Build) ImplementationGraph {"
+        cls.return_block = "return .{\n" + "".join(
+            f"        .{field} = {owner},\n" for field, owner in (
+                ("core", "zynum_core_mod"), ("execution", "execution_mod"),
+                ("resources", "numerics_resources_mod"), ("options", "zynum_build_options_mod"),
+                ("lapacke_binding", "lapacke_binding_mod"), ("mkl_sparse_binding", "mkl_sparse_binding_mod"))
+        ) + "    };"
+        # Independent exact inverse of the reviewed seam, without a private
+        # baseline directory or any imported native/metadata observation.
+        cls.legacy = cls.source
+        for old, new in ((cls.graph_type, ""), (cls.thin_build, ""),
+                         (cls.config_header, "pub fn build(b: *std.Build) void {"),
+                         (cls.return_block, "")):
+            if cls.legacy.count(old) != 1:
+                raise AssertionError("reviewed configure fixture anchor changed: " + old[:65])
+            cls.legacy = cls.legacy.replace(old, new, 1)
+
+    def test_exact_seam_preserves_body_locations_and_complete_owner_graph(self) -> None:
+        projected = CHECKER._reviewed_configure_projection(self.source)
+        self.assertEqual(len(self.source), len(projected))
+        self.assertEqual([i for i, ch in enumerate(self.source) if ch == "\n"],
+                         [i for i, ch in enumerate(projected) if ch == "\n"])
+        start = self.source.index(self.config_header) + len(self.config_header)
+        end = self.source.index(self.return_block)
+        self.assertEqual(self.source[start:end], projected[start:end])
+        self.assertEqual(CHECKER._compact_zig_contract(self.legacy), CHECKER._compact_zig_contract(projected))
+        self.assertEqual(projected, CHECKER._reviewed_configure_projection(projected))
+        self.assertEqual(CHECKER._numerics_resources_build_contract(self.legacy),
+                         CHECKER._numerics_resources_build_contract(self.source))
+        self.assertEqual(CHECKER._runtime_lifecycle_build_span(self.source),
+                         CHECKER._runtime_lifecycle_build_span(projected))
+        context = CHECKER._zig_build_context(self.source, "build.zig")
+        self.assertEqual("b", context.receiver)
+        self.assertEqual(self.source.index(self.config_header) + len(self.config_header), context.body_start)
+        self.assertEqual(end, _build_body_insertion_offset(self.source))
+        self.assertEqual(CHECKER._zig_build_context(self.legacy, "build.zig").body_end,
+                         _build_body_insertion_offset(self.legacy))
+
+    def test_thin_build_rejects_extra_forwarded_conditional_or_missing_calls(self) -> None:
+        for body in ("", "_ = configure(b); _ = configure(b);", "if (true) { _ = configure(b); }",
+                     "const forward = configure; _ = forward(b);", "_ = another(b);",
+                     "_ = configure(b); b.installArtifact(unreviewed);", "return configure(b);",
+                     "_ = configure(other);"):
+            mutated = self.source.replace(self.thin_build, "pub fn build(b: *std.Build) void { " + body + " }")
+            with self.subTest(body=body), self.assertRaisesRegex(CHECKER.InventoryError, "reviewed configure seam changed"):
+                CHECKER._reviewed_configure_projection(mutated)
+        for suffix in ("\nconst escaped = configure;", "\nfn elsewhere(b: *std.Build) void { _ = configure(b); }",
+                       "\nfn recursion(b: *std.Build) void { build(b); }", "\n" + self.thin_build):
+            with self.subTest(suffix=suffix), self.assertRaisesRegex(CHECKER.InventoryError, "reviewed configure seam changed"):
+                CHECKER._reviewed_configure_projection(self.source + suffix)
+
+    def test_graph_type_signature_and_all_six_return_bindings_are_exact(self) -> None:
+        for old, new in (("resources: *std.Build.Module,", "resources: *const std.Build.Module,"),
+                         ("options: *std.Build.Module,", ""),
+                         (self.config_header, "fn configure(b: *std.Build) ImplementationGraph {"),
+                         (self.config_header, "pub fn configure(other: *std.Build) ImplementationGraph {"),
+                         (self.graph_type, self.graph_type + "\nconst GraphAlias = ImplementationGraph;")):
+            with self.subTest(mutation=old), self.assertRaisesRegex(CHECKER.InventoryError, "reviewed configure seam changed"):
+                CHECKER._reviewed_configure_projection(self.source.replace(old, new, 1))
+        for field, owner in CHECKER.CONFIGURE_MODULE_RETURNS:
+            for replacement in ("test_module", "b.createModule(.{})", "undefined", owner + ", .extra = " + owner):
+                with self.subTest(field=field, replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, "final return"):
+                    CHECKER._reviewed_configure_projection(self.source.replace(
+                        f".{field} = {owner},", f".{field} = {replacement},", 1))
+
+    def test_return_is_last_unconditional_and_each_owner_is_unshadowed_const(self) -> None:
+        for replacement in ("if (true) { " + self.return_block + " }", self.return_block + " b.installArtifact(extra);",
+                            self.return_block + "\n" + self.return_block, "return other;"):
+            with self.subTest(replacement=replacement[:70]), self.assertRaisesRegex(CHECKER.InventoryError, "reviewed configure seam changed"):
+                CHECKER._reviewed_configure_projection(self.source.replace(self.return_block, replacement, 1))
+        for _, owner in CHECKER.CONFIGURE_MODULE_RETURNS:
+            for old, new in ((f"const {owner} =", f"var {owner} ="),
+                             (self.return_block, f"{{ const {owner} = undefined; }}\n    " + self.return_block)):
+                with self.subTest(owner=owner, mutation=new[:65]), self.assertRaisesRegex(CHECKER.InventoryError, "production owner"):
+                    CHECKER._reviewed_configure_projection(self.source.replace(old, new, 1))
+
+    def test_same_source_owner_and_options_clones_hit_graph_guard(self) -> None:
+        for path in ("src/zynum.zig", "src/numerics/execution/default.zig", "src/numerics/resources.zig"):
+            statement = f'const extra = b.createModule(.{{ .root_source_file = b.path("{path}"), .target = target, .optimize = optimize }});\n    '
+            changed = self.source.replace(self.return_block, statement + self.return_block, 1)
+            with self.subTest(path=path), self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed same-source owner"):
+                CHECKER._numerics_resources_graph_facts(changed)
+        changed = self.source.replace(self.return_block, "const extra = zynum_build_options.createModule();\n    " + self.return_block, 1)
+        with self.assertRaisesRegex(CHECKER.InventoryError, "Options Module must have one owner"):
+            CHECKER._numerics_resources_graph_facts(changed)
+
+    def test_unprojected_body_keeps_receiver_and_owner_edge_rejections(self) -> None:
+        changed = self.source.replace(self.return_block, "forward(b);\n    " + self.return_block, 1)
+        with self.assertRaisesRegex(CHECKER.InventoryError, "escapes the analyzed build body"):
+            CHECKER._zig_build_context(changed, "build.zig")
+        edge = 'lapacke_binding_mod.addImport("zynum-core", zynum_core_mod);'
+        with self.assertRaisesRegex(CHECKER.InventoryError, "shared core provider changed"):
+            CHECKER._numerics_resources_graph_facts(self.source.replace(edge, edge.replace("zynum_core_mod", "zynum_core_test_mod"), 1))
+        guard = "!uses_facade_owner and official_tests != numerics_contract_tests"
+        self.assertIn(guard, self.source)
+        with self.assertRaisesRegex(CHECKER.InventoryError, "owner/source/target/attachment graph drifted"):
+            CHECKER._numerics_resources_build_contract(self.source.replace(guard, "true", 1))
+
+    def test_call_digest_binds_raw_source_including_wrapper_trivia(self) -> None:
+        # Use normal discovery on a finite source fixture to exercise raw-source
+        # hashing; this is parser coverage, not a production graph/readiness proof.
+        fields = CHECKER.CONFIGURE_MODULE_RETURNS
+        body = "\n".join(f"    const {owner} = b.createModule(.{{}});" for _, owner in fields)
+        source = self.graph_type + "\n" + self.thin_build + "\n" + self.config_header + "\n" + body + '\n    const gate = b.step("test", "fixture");\n    ' + self.return_block + "\n}\n"
+        with tempfile.TemporaryDirectory(prefix="configure-digest-") as directory:
+            root = Path(directory)
+            path = root / "build.zig"
+            path.write_text(source)
+            observed, = CHECKER._discover_build_root(root, "build.zig")
+            changed = source.replace("_ = configure(b);", "// reviewed trivia remains source-bound\n    _ = configure(b);")
+            path.write_text(changed)
+            updated, = CHECKER._discover_build_root(root, "build.zig")
+            self.assertEqual(observed["id"], updated["id"])
+            self.assertNotEqual(observed["source_digest"], updated["source_digest"])
+            # Hashing the projection instead would produce a different digest.
+            projected = CHECKER._reviewed_configure_projection(source)
+            context = CHECKER._zig_build_context(projected, "build.zig")
+            position, call = CHECKER._zig_member_calls(projected, context, "b", "step")[0]
+            expected = CHECKER._call_semantics(projected, position, call, "b.step", "gate", None,
+                                               build_context=context, source_text=source)
+            self.assertEqual(expected, observed["source_digest"])
+            self.assertNotEqual(expected, CHECKER._call_semantics(projected, position, call, "b.step", "gate", None, build_context=context))
+
+    def test_stage7_classification_adds_only_the_two_explicit_paths(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        new_paths = ('src/interop/lapacke_access.zig', 'test/lapack/interop/raw_access_test.zig')
+        inventory["repository_file_classifications"] = [
+            row for row in inventory["repository_file_classifications"] if row["path"] not in new_paths
+        ]
+        before = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        after = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        new = {"src/interop/lapacke_access.zig": "library-source", "test/lapack/interop/raw_access_test.zig": "test-infrastructure"}
+        self.assertEqual(set(new) - set(before), set(after) - set(before))
+        self.assertEqual(before, {path: after[path] for path in before})
+        for path, owner in new.items():
+            self.assertEqual({"path": path, "kind": "zig-source", "class": "non-generated-source", "owner": owner}, after[path])
+
+
+class PosvInventoryContractTests(unittest.TestCase):
+    def test_exact_finite_outputs_sources_and_default_off_selection(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        self.assertEqual(11, len(CHECKER.POSV_FINITE_SETS))
+        self.assertEqual(44, len(CHECKER.POSV_OUTPUTS))
+        self.assertEqual(51, len(CHECKER.POSV_CLASSIFICATIONS))
+        targets = {row["path"]: row for row in inventory["generator_targets"]}
+        classifications = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        for path in CHECKER.POSV_OUTPUTS:
+            self.assertEqual("tools/generate_checked_abi.py", targets[path]["anchor"]["file"])
+            self.assertEqual("subset_outputs", targets[path]["anchor"]["enclosing_function"])
+        for row in CHECKER.POSV_CLASSIFICATIONS:
+            self.assertEqual(row, classifications[row["path"]])
+        for path, expected in CHECKER.POSV_SOURCE_SHA256.items():
+            self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest())
+        self.assertEqual("false", CHECKER.POSV_OPTION_SURFACE["default"])
+        self.assertEqual("bool", CHECKER.POSV_OPTION_SURFACE["type"])
+        self.assertIsNone(CHECKER.NEXT_SOURCE_PROJECTION_SHA256)
+
+    def test_posv_root_borrows_existing_binding_and_selector_mutations_fail_closed(self) -> None:
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        facts = CHECKER._numerics_resources_build_contract(source)
+        self.assertEqual("test/lapack/interop/posv_adapter_test.zig", facts["root_sources"]["lapacke_posv_tests"])
+        self.assertEqual("lapacke_binding_test_mod", facts["imports"]["lapacke_posv_tests.root_module"]["numerical-owner"])
+        self.assertEqual(CHECKER.POSV_SELECTION_CONTRACT_SHA256, facts["posv_selection_contract_sha256"])
+        for changed in (
+            source.replace('"lapacke-posv", "Include generated four-scalar POSV high/work in finite LP64/ILP64 and unified LP64 packages") orelse false',
+                           '"lapacke-posv", "Include generated four-scalar POSV high/work in finite LP64/ILP64 and unified LP64 packages") orelse true', 1),
+            source.replace('"{s}-posv-ordinary-lp64-v1"', '"{s}-unreviewed-posv-ordinary-lp64-v1"', 1),
+        ):
+            self.assertNotEqual(source, changed)
+            with self.assertRaisesRegex(CHECKER.InventoryError, "selector|selection"):
+                CHECKER._numerics_resources_graph_facts(changed)
+
+
+class TrtrsInventoryContractTests(unittest.TestCase):
+    def test_closed_outputs_preserve_existing_roots_and_finite_runtime_scope(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        self.assertEqual(24, len(CHECKER.TRTRS_FINITE_SETS))
+        self.assertEqual(96, len(CHECKER.TRTRS_OUTPUTS))
+        self.assertEqual(102, len(CHECKER.TRTRS_CLASSIFICATIONS))
+        targets = {row["path"]: row for row in inventory["generator_targets"]}
+        classifications = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        for path in CHECKER.TRTRS_OUTPUTS:
+            self.assertEqual("tools/generate_checked_abi.py", targets[path]["anchor"]["file"])
+            self.assertEqual("subset_outputs", targets[path]["anchor"]["enclosing_function"])
+        for row in CHECKER.TRTRS_CLASSIFICATIONS:
+            self.assertEqual(row, classifications[row["path"]])
+        for path, expected in CHECKER.TRTRS_SOURCE_SHA256.items():
+            self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest())
+        self.assertEqual("false", CHECKER.TRTRS_OPTION_SURFACE["default"])
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        facts = CHECKER._numerics_resources_build_contract(source)
+        self.assertEqual("lapacke_binding_test_mod", facts["imports"]["lapack_tests.root_module"]["numerical-owner"])
+        self.assertEqual(128, len(facts["module_source_variants"]["lapacke_lp64_interface"]))
+        observations = {row["id"]: row for row in inventory["build_observations"]}
+        for width, count in (("lp64", 128), ("ilp64", 16)):
+            row = observations["compile:build.zig:build:lapacke_" + width + "_static"]
+            row = _prior_component_observation(self, row, width, count)
+            self.assertEqual(count + 1, len(row["source_variants"]))
+            self.assertEqual("src/lapacke_composed.zig", row["source_variants"]["lapacke-potri=true"])
+            base_variants = {key.removeprefix("lapacke-potri=false,"): value
+                             for key, value in row["source_variants"].items()
+                             if key.startswith("lapacke-potri=false,")}
+            self.assertEqual(count, len(base_variants))
+            row = {**row, "source_variants": base_variants,
+                   "root_source": [path for path in row["root_source"] if path != "src/lapacke_composed.zig"]}
+            self.assertEqual(sorted(row["root_source"]), sorted(row["source_variants"].values()))
+            self.assertTrue(all(",lapacke-trtrs=" in key for key in row["source_variants"]))
+        self.assertNotIn("lapacke_trtrs_tests", facts["root_owners"])
+        self.assertIsNone(CHECKER.NEXT_SOURCE_PROJECTION_SHA256)
+
+    def test_default_type_name_and_both_width_compositions_reject_mutation(self) -> None:
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        statement = '    const lapacke_trtrs = b.option(bool, "lapacke-trtrs", "Include generated four-scalar triangular solve high/work in finite LP64/ILP64 and unified LP64 packages") orelse false;'
+        self.assertEqual(1, source.count(statement))
+        changes = [source.replace(statement, statement.replace("orelse false", "orelse true"), 1),
+                   source.replace(statement, statement.replace("b.option(bool", "b.option(usize"), 1),
+                   source.replace(statement, statement.replace('"lapacke-trtrs"', '"unreviewed-trtrs"'), 1)]
+        for width in ("lp64", "ilp64"):
+            before = '"{s}-trtrs-ordinary-' + width + '-v1"'
+            self.assertEqual(1, source.count(before))
+            changes.append(source.replace(before, before.replace("-trtrs-", "-unreviewed-trtrs-"), 1))
+        for changed in changes:
+            self.assertNotEqual(source, changed)
+            with self.assertRaisesRegex(CHECKER.InventoryError, "selector|selection"):
+                CHECKER._numerics_resources_graph_facts(changed)
+
+
+class CheckedCholeskyInventoryContractTests(unittest.TestCase):
+    def test_only_thirteen_explicit_frontend_files_are_added(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        paths = {row["path"] for row in CHECKER.CHECKED_CHOLESKY_CLASSIFICATIONS}
+        self.assertEqual(13, len(paths))
+        inventory["repository_file_classifications"] = [row for row in inventory["repository_file_classifications"] if row["path"] not in paths]
+        before = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        after = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        self.assertEqual(paths, set(after) - set(before))
+        self.assertEqual(before, {path: after[path] for path in before})
+        for row in CHECKER.CHECKED_CHOLESKY_CLASSIFICATIONS:
+            self.assertEqual(row, after[row["path"]])
+
+    def test_generated_shared_wire_and_optional_install_contract_are_explicit(self) -> None:
+        outputs = CHECKER.CHECKED_CHOLESKY_OUTPUTS
+        self.assertEqual(5, len(outputs))
+        self.assertEqual(1, outputs.count("include/zynum/checked/complex.h"))
+        for path, expected in CHECKER.CHECKED_CHOLESKY_SOURCE_SHA256.items():
+            self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT/path).read_bytes()).hexdigest())
+        shared = next(row for row in CHECKER.CHECKED_CHOLESKY_DERIVED_CANDIDATES if row["path"].endswith("complex.h"))
+        self.assertIn("tools/generate_checked_sparse.py", shared["authoritative_inputs"])
+        self.assertIn("tools/checked_complex_wire.py", shared["authoritative_inputs"])
+        self.assertEqual("false", CHECKER.CHECKED_CHOLESKY_OPTION_SURFACE["default"])
+        self.assertEqual("bool", CHECKER.CHECKED_CHOLESKY_OPTION_SURFACE["type"])
+        self.assertIs(True, CHECKER.CHECKED_CHOLESKY_OBSERVATION_TEMPLATES["compile:build.zig:build:csp_static"]["bundle_compiler_rt"])
+        self.assertEqual(1, (REPOSITORY_ROOT/"build.zig").read_text().count("csp_static.bundle_compiler_rt = true;"))
+        for name in ("complex.h", "cholesky.h", "cholesky_manifest.json"):
+            row = CHECKER.CHECKED_CHOLESKY_OBSERVATION_TEMPLATES["install:build.zig:build:include/zynum/checked/"+name]
+            self.assertEqual(name != "complex.h", "checked-complex-cholesky=true" in row["condition"])
+
+    def test_pkgconfig_cholesky_marker_remains_source_bound(self) -> None:
+        source = (REPOSITORY_ROOT/"build.zig").read_text()
+        CHECKER._operator_phase_agreement_build_contract(source)
+        marker = 'if (checked_complex_cholesky) "checked_complex_cholesky=true\\n"'
+        self.assertIn(marker, source)
+        changed = source.replace(marker, 'if (true) "checked_complex_cholesky=true\\n"', 1)
+        with self.assertRaisesRegex(CHECKER.InventoryError, "package metadata selection changed"):
+            CHECKER._operator_phase_agreement_build_contract(changed)
+
+
+class NumericsResourcesSourceContractTests(unittest.TestCase):
+    """Bounded real-source graph checks; no compiler or inventory publication."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+        cls.resource = (REPOSITORY_ROOT / CHECKER.NUMERICS_RESOURCES_PATH).read_bytes()
+
+    def test_resources_bind_all_owners_host_and_canonical_roots(self) -> None:
+        facts = CHECKER._numerics_resources_build_contract(self.source)
+        self.assertEqual(11, len(facts["edges"]))
+        self.assertEqual(42, len(facts["core_edges"]))
+        self.assertEqual(129, len(facts["declarations"]))
+        self.assertEqual(28, len(facts["root_sources"]))
+        self.assertEqual("src/blas/triangular_band_solve_test.zig", facts["root_sources"]["triangular_band_solve_tests"])
+        host = next(edge for edge in facts["edges"] if edge["owner"] == "kernel_coverage_mod")
+        self.assertEqual("host_numerics_resources_mod", host["provider"])
+        self.assertTrue(all(edge["provider"] == "numerics_resources_mod" for edge in facts["edges"] if edge != host and edge["owner"] != "runtime_lifecycle_execution_mod"))
+        CHECKER._numerics_resources_build_contract(self.source.replace(
+            "const numerics_resources_mod", "// harmless trivia\n    const numerics_resources_mod", 1))
+
+    def test_lp64_gesvd_selector_preserves_eight_sources_and_one_owner(self) -> None:
+        facts = CHECKER._numerics_resources_build_contract(self.source)
+        prefix = "interface_subset/mkl2026.lp64/"
+        base = "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv"
+        qr = "-geqrf-ormqr-unmqr-orgqr-ungqr"
+        tail = "-ordinary-lp64-v1/exports.zig"
+        expected = {
+            "base": prefix + base + tail,
+            "qr": prefix + base + qr + tail,
+            "complex-gelsd-base": prefix + base + "-complex-gelsd" + tail,
+            "complex-gelsd-qr": prefix + base + qr + "-complex-gelsd" + tail,
+            "gesvd-base": prefix + base + "-gesvd" + tail,
+            "gesvd-qr": prefix + base + qr + "-gesvd" + tail,
+            "complex-gelsd-gesvd-base": prefix + base + "-complex-gelsd-gesvd" + tail,
+            "complex-gelsd-gesvd-qr": prefix + base + qr + "-complex-gelsd-gesvd" + tail,
+        }
+        expected.update({
+            key + "-posv": path.replace("-ordinary-lp64-v1/", "-posv-ordinary-lp64-v1/")
+            for key, path in tuple(expected.items())
+        })
+        self.assertEqual(16, len(expected))
+        expected.update({
+            key + "-trtrs": path.replace("-ordinary-lp64-v1/", "-trtrs-ordinary-lp64-v1/")
+            for key, path in tuple(expected.items())
+        })
+        self.assertEqual(32, len(expected))
+        expected.update({
+            key + "-trtri": path.replace("-ordinary-lp64-v1/", "-trtri-ordinary-lp64-v1/")
+            for key, path in tuple(expected.items())
+        })
+        self.assertEqual(64, len(expected))
+        expected.update({
+            key + "-getri": path.replace("-ordinary-lp64-v1/", "-getri-ordinary-lp64-v1/")
+            for key, path in tuple(expected.items())
+        })
+        self.assertEqual(128, len(expected))
+        for owner in ("lapacke_lp64_interface", "abplas_lp64_lapacke"):
+            self.assertEqual(expected, facts["module_source_variants"][owner])
+            self.assertEqual("lapacke_binding_mod", facts["imports"][owner]["lapacke-interface-owner"])
+        self.assertEqual(facts["module_source_variants"]["lapacke_lp64_interface"],
+                         facts["module_source_variants"]["abplas_lp64_lapacke"])
+
+    def test_lp64_optional_selector_mutations_fail_closed(self) -> None:
+        for symbol, flag in (("lapacke_qr", "lapacke-qr"),
+                             ("lapacke_complex_gelsd", "lapacke-complex-gelsd"),
+                             ("lapacke_svd", "lapacke-svd"),
+                             ("lapacke_posv", "lapacke-posv")):
+            start = self.source.index("const " + symbol + " =")
+            end = self.source.index(";", start) + 1
+            declaration = self.source[start:end]
+            self.assertIn("orelse false;", declaration)
+            self.assertIn('b.option(bool, "' + flag + '"', declaration)
+            mutations = (declaration.replace("orelse false;", "orelse true;"),
+                         declaration.replace("b.option(bool,", "b.option(u32,"),
+                         declaration.replace('"' + flag + '"', '"unreviewed-selector"'),
+                         declaration + "\n" + declaration,
+                         "")
+            for mutation in mutations:
+                with self.subTest(selector=symbol, mutation=mutation):
+                    with self.assertRaises(CHECKER.InventoryError):
+                        CHECKER._numerics_resources_build_contract(
+                            self.source[:start] + mutation + self.source[end:])
+        before = 'abplas_lp64_lapacke.addImport("lapacke-interface-owner", lapacke_binding_mod);'
+        self.assertEqual(1, self.source.count(before))
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._numerics_resources_build_contract(self.source.replace(
+                before, before.replace("lapacke_binding_mod", "lapacke_services_mod"), 1))
+        selected = "-complex-gelsd-gesvd-ordinary-lp64-v1"
+        self.assertIn(selected, self.source)
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._numerics_resources_build_contract(self.source.replace(
+                selected, "-complex-gelsd-ordinary-lp64-v1", 1))
+
+    def test_optional_operator_core_checked_owner_and_generated_source_fail_closed(self) -> None:
+        replacements = (
+            ('operator_exports_mod.addImport("zynum-core", zynum_core_mod)',
+             'operator_exports_mod.addImport("zynum-core", zynum_core_test_mod)'),
+            ('operator_combined_mod.addImport("checked-interface-owner", csp)',
+             'operator_combined_mod.addImport("checked-interface-owner", checked_abi_mod)'),
+            ('operator_generate.addOutputFileArg("operator_v1.zig")',
+             'operator_generate.addOutputFileArg("unreviewed.zig")'),
+        )
+        for before, after in replacements:
+            with self.subTest(mutation=before):
+                self.assertEqual(1, self.source.count(before))
+                with self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(before, after, 1))
+
+    def test_resources_missing_swapped_duplicate_and_extra_edges_fail(self) -> None:
+        for owner in CHECKER.NUMERICS_RESOURCES_OWNERS:
+            provider = {
+                "kernel_coverage_mod": "host_numerics_resources_mod",
+                "runtime_lifecycle_execution_mod": "runtime_lifecycle_resources_mod",
+            }.get(owner, "numerics_resources_mod")
+            edge = f'{owner}.addImport("zynum-numerics-resources", {provider});'
+            self.assertEqual(1, len(CHECKER.re.findall(r"(?<![A-Za-z0-9_])" + CHECKER.re.escape(edge), self.source)))
+            for change in ("", edge.replace(provider, "unreviewed_resource_mod"), edge + "\n" + edge):
+                with self.subTest(owner=owner, mutation=change):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "numerics resources"):
+                        CHECKER._numerics_resources_build_contract(self.source.replace(edge, change, 1))
+        for edge in (
+            'abplas_lp64_root.addImport("zynum-core", zynum_core_mod);',
+            'abplas_lp64_root.addImport("lapacke-interface-owner", lapacke_binding_mod);',
+            'abplas_lp64_root.addImport("zynum-lapacke-exports", abplas_lp64_lapacke_controls_selected);',
+            'abplas_lp64_root.addImport("zynum-checked-sparse-exports", csp);',
+            'abplas_lp64_lapacke.addImport("lapacke-interface-owner", lapacke_binding_mod);',
+        ):
+            self.assertEqual(1, self.source.count(edge))
+            for change in ("", edge + "\n" + edge, edge.replace(edge.split(", ")[1][:-2], "unreviewed_owner")):
+                with self.subTest(combined_edge=edge, mutation=change):
+                    with self.assertRaises(CHECKER.InventoryError):
+                        CHECKER._numerics_resources_build_contract(self.source.replace(edge, change, 1))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "numerics resources"):
+            CHECKER._numerics_resources_build_contract(self.source + '\nconst another = numerics_resources_mod;\n')
+
+    def test_resources_owner_source_target_scope_and_host_identity_fail(self) -> None:
+        substitutions = (
+            ('b.path("src/numerics/resources.zig")', 'b.path("src/numerics/storage.zig")'),
+            ('.target = b.graph.host,', '.target = target,'),
+            ('const host_numerics_resources_mod = if (resources_host_matches_target)', 'const host_numerics_resources_mod = if (true)'),
+            ('target.result.ofmt == b.graph.host.result.ofmt', 'true'),
+            ('target.result.dynamic_linker.eql(b.graph.host.result.dynamic_linker)', 'true'),
+            ('const official_tests = inventory_case.logical_tests orelse continue;', 'const official_tests = dynamic_tests;'),
+            ('zynum_core_test_mod.addImport("zynum-numerics-resources", numerics_resources_mod);', 'if (false) zynum_core_test_mod.addImport("zynum-numerics-resources", numerics_resources_mod);'),
+        )
+        for before, after in substitutions:
+            with self.subTest(mutation=before):
+                self.assertIn(before, self.source)
+                with self.assertRaisesRegex(CHECKER.InventoryError, "numerics resources"):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(before, after, 1))
+        for name in ("numerics_resources_mod", "zynum_test_mod", "kernel_coverage_mod", "triangular_band_solve_test_mod", "dynamic_tests"):
+            start = self.source.index(f"const {name} =")
+            tail = self.source[start:]
+            before = ".target = b.graph.host," if name == "kernel_coverage_mod" else ".target = target,"
+            self.assertIn(before, tail)
+            changed = self.source[:start] + tail.replace(before, ".target = unreviewed_target,", 1)
+            with self.subTest(target_owner=name):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "numerics resources"):
+                    CHECKER._numerics_resources_build_contract(changed)
+
+    def test_resources_frozen_bytes_missing_and_drift_fail(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="resources-source-contract-") as directory:
+            root = Path(directory)
+            (root / "build.zig").write_text("pub fn build() void {}\n")
+            source = root / CHECKER.NUMERICS_RESOURCES_PATH
+            source.parent.mkdir(parents=True)
+            source.write_bytes(self.resource)
+            for path in (*CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256):
+                destination = root / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes((REPOSITORY_ROOT / path).read_bytes())
+            context = CHECKER._make_discovery_context(root)
+            CHECKER._numerics_resources_source_contract(context)
+            source.write_bytes(self.resource + b"\n// drift\n")
+            CHECKER._numerics_resources_source_contract(context)
+            with self.assertRaisesRegex(CHECKER.InventoryError, "source bytes drifted"):
+                CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+            source.unlink()
+            with self.assertRaises((CHECKER.InventoryError, CHECKER.repository_snapshot.RepositorySnapshotError)):
+                CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+
+    def test_resources_classification_uses_reviewed_source_migration(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        row = next(x for x in inventory["repository_file_classifications"] if x["path"] == CHECKER.NUMERICS_RESOURCES_PATH)
+        self.assertEqual({"path": CHECKER.NUMERICS_RESOURCES_PATH, "kind": "zig-source",
+                          "class": "non-generated-source", "owner": "library-source"}, row)
+
+    def test_resources_attachment_keeps_existing_blas_object_exclusions(self) -> None:
+        observations = CHECKER._discover_build_root(REPOSITORY_ROOT, "build.zig")
+        CHECKER._annotate_test_inventory_factory(self.source, copy.deepcopy(observations))
+        changes = (
+            ("!uses_facade_owner and official_tests != numerics_contract_tests", "true"),
+            ("if (compact_triangular_isolated_test_library) |library| official_tests.root_module.addObject(library);", ""),
+            ('official_tests.root_module.addImport("zynum-numerics-resources", numerics_resources_mod);', ""),
+        )
+        for before, after in changes:
+            with self.subTest(mutation=before):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "BLAS object attachments"):
+                    CHECKER._annotate_test_inventory_factory(self.source.replace(before, after, 1), copy.deepcopy(observations))
+
+
+class SharedFacadeSourceContractTests(unittest.TestCase):
+    """Exact module owners, not a generic Build.Module resolver."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+        cls.graph = CHECKER._numerics_resources_build_contract(cls.source)
+
+    def test_production_test_core_and_all_facades_are_distinct_owned_nodes(self) -> None:
+        self.assertEqual("src/zynum.zig", self.graph["module_sources"]["zynum_core_mod"])
+        self.assertEqual("src/zynum.zig", self.graph["module_sources"]["zynum_core_test_mod"])
+        for owner, provider in CHECKER.SHARED_FACADE_OWNERS.items():
+            self.assertEqual({"zynum-core": provider}, self.graph["imports"][owner])
+        root = self.graph["root_owners"]["modern_tests"]
+        self.assertEqual({"zynum": "zynum_test_mod", "zynum-blas": "zynum_blas_test_mod",
+                          "zynum-lapack": "zynum_lapack_test_mod", "zynum-sparse": "zynum_sparse_test_mod",
+                          "zynum-numerics-resources": "numerics_resources_mod"}, self.graph["imports"][root])
+        self.assertNotIn("zynum-build-options", self.graph["generated_imports"].get(root, ()))
+
+    def test_potri_components_borrow_width_correct_bases_and_existing_core(self) -> None:
+        choices = self.graph["module_borrow_variants"]
+        self.assertEqual({"lapacke_lp64_selected", "lapacke_ilp64_selected", "abplas_lp64_lapacke_selected",
+                          "lapacke_lp64_before_syev", "lapacke_lp64_syev_selected",
+                          "abplas_lp64_lapacke_before_syev", "abplas_lp64_lapacke_syev_selected",
+                          "operator_binding_owner.?"}, set(choices))
+        self.assertEqual({"contour-interface=zynum_v1": "operator_binding_mod"}, choices["operator_binding_owner.?"])
+        for prefix, previous in (("lapacke_lp64", "lapacke_lp64_selected"), ("abplas_lp64_lapacke", "abplas_lp64_lapacke_selected")):
+            self.assertEqual({"post-POTRI": previous}, choices[prefix + "_before_syev"])
+            self.assertEqual({"lapacke-syev=false": prefix + "_before_syev", "lapacke-syev=true": prefix + "_syev_composed_root"}, choices[prefix + "_syev_selected"])
+            self.assertEqual("src/lapacke_symmetric_composed.zig", self.graph["module_sources"][prefix + "_syev_composed_root"])
+            self.assertEqual("zynum_core_mod", self.graph["imports"][prefix + "_syev_composed_root"]["zynum-core"])
+            self.assertEqual({"lapacke-interface-owner": "lapacke_binding_mod"}, self.graph["imports"][prefix + "_syev_component"])
+        for selected, base, composed, component, width in (
+            ("lapacke_lp64_selected", "lapacke_lp64_interface", "lapacke_lp64_composed_root", "lapacke_lp64_potri_component", "lp64"),
+            ("lapacke_ilp64_selected", "lapacke_ilp64_interface", "lapacke_ilp64_composed_root", "lapacke_ilp64_potri_component", "ilp64"),
+            ("abplas_lp64_lapacke_selected", "abplas_lp64_lapacke", "abplas_lapacke_composed_root", "abplas_lapacke_potri_component", "lp64"),
+        ):
+            with self.subTest(selected=selected):
+                self.assertEqual({"lapacke-potri=false": base, "lapacke-potri=true": composed}, choices[selected])
+                self.assertEqual("src/lapacke_composed.zig", self.graph["module_sources"][composed])
+                self.assertEqual(f"interface_components/mkl2026.{width}/potri-v1/exports.zig", self.graph["module_sources"][component])
+                self.assertEqual({"zynum-core": "zynum_core_mod", "lapacke-interface-owner": "lapacke_binding_mod",
+                                  "zynum-lapacke-base-exports": base, "zynum-lapacke-component-exports": component}, self.graph["imports"][composed])
+                self.assertEqual({"lapacke-interface-owner": "lapacke_binding_mod"}, self.graph["imports"][component])
+        self.assertEqual(16, len(self.graph["module_source_variants"]["lapacke_ilp64_interface"]))
+        self.assertEqual(15, len(self.graph["module_borrow_edges"]))
+        self.assertNotIn("lapacke_lp64_composed_root", self.graph["root_owners"].values())
+
+    def test_potri_default_core_binding_and_borrow_consumers_fail_closed(self) -> None:
+        mutations = (
+            ('"Compose generated four-scalar Cholesky inverse high/work over the same LAPACKE owner") orelse false',
+             '"Compose generated four-scalar Cholesky inverse high/work over the same LAPACKE owner") orelse true'),
+            ('lapacke_lp64_composed_root.addImport("zynum-core", zynum_core_mod);',
+             'lapacke_lp64_composed_root.addImport("zynum-core", zynum_core_test_mod);'),
+            ('lapacke_ilp64_composed_root.addImport("lapacke-interface-owner", lapacke_binding_mod);',
+             'lapacke_ilp64_composed_root.addImport("lapacke-interface-owner", lapacke_binding_test_mod);'),
+            ('abplas_lp64_lapacke_selected = abplas_lapacke_composed_root;',
+             'abplas_lp64_lapacke_selected = lapacke_lp64_composed_root;'),
+            ('lapacke_lp64_selected = lapacke_lp64_composed_root;',
+             'lapacke_lp64_selected = lapacke_ilp64_composed_root;'),
+            ('.name = "zynum_lapacke_ilp64", .linkage = .static, .root_module = lapacke_ilp64_selected',
+             '.name = "zynum_lapacke_ilp64", .linkage = .static, .root_module = lapacke_lp64_selected'),
+        )
+        for before, after in mutations:
+            with self.subTest(mutation=before):
+                self.assertEqual(1, self.source.count(before))
+                with self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(before, after, 1))
+        for escaped in ("lapacke_lp64_selected", "lapacke_ilp64_selected", "abplas_lp64_lapacke_selected"):
+            with self.subTest(escaped=escaped), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source + "\nconst escaped_potri_owner = " + escaped + ";\n")
+
+    def test_potri_borrow_metadata_cannot_authorize_wrong_existing_modules(self) -> None:
+        for selected in CHECKER.POTRI_MODULE_BORROWS:
+            bad = copy.deepcopy(CHECKER.POTRI_MODULE_BORROWS)
+            bad[selected]["lapacke-potri=true"] = "zynum_core_mod"
+            with self.subTest(selected=selected), mock.patch.object(CHECKER, "POTRI_MODULE_BORROWS", bad):
+                with self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(self.source)
+
+    def test_missing_swapped_duplicate_and_extra_core_edges_fail(self) -> None:
+        for owner, provider in CHECKER.SHARED_FACADE_OWNERS.items():
+            edge = f'{owner}.addImport("zynum-core", {provider});'
+            wrong = "zynum_core_mod" if provider.endswith("_test_mod") else "zynum_core_test_mod"
+            for replacement in ("", edge.replace(provider, wrong), edge + "\n" + edge):
+                with self.subTest(owner=owner, replacement=replacement):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "numerics resources"):
+                        CHECKER._numerics_resources_build_contract(self.source.replace(edge, replacement, 1))
+        for extra in ('const copied_core = zynum_core_mod;', 'unreviewed.addImport("zynum-core", zynum_core_test_mod);'):
+            with self.subTest(extra=extra), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source + "\n" + extra)
+
+    def test_core_mode_target_and_facade_options_objects_are_bound(self) -> None:
+        for name in ("zynum_core_mod", "zynum_core_test_mod"):
+            offset = self.source.index(f"const {name} =")
+            for old, new in ((".target = target", ".target = b.graph.host"),
+                             (".optimize = " + ("test_optimize" if "test" in name else "optimize"), ".optimize = .Debug")):
+                text = self.source[:offset] + self.source[offset:].replace(old, new, 1)
+                with self.subTest(owner=name, mutation=old), self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(text)
+        for extra in ('zynum_test_mod.addOptions("zynum-build-options", zynum_build_options);',
+                      'zynum_mod.addObject(library);', 'zynum_core_test_mod.addObject(library);'):
+            with self.subTest(extra=extra), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source + "\n" + extra)
+
+    def test_modern_inline_dependency_and_official_option_exclusion_are_bound(self) -> None:
+        changes = (
+            ('.{ .name = "zynum-sparse", .module = zynum_sparse_test_mod },', ''),
+            ('.{ .name = "zynum-lapack", .module = zynum_lapack_test_mod },', '.{ .name = "zynum-lapack", .module = zynum_lapack_mod },'),
+            ('if (official_tests != modern_tests and official_tests != execution_contract_tests)', 'if (true)'),
+            ('official_tests == fortran_tests or', ''),
+        )
+        for old, new in changes:
+            self.assertIn(old, self.source)
+            with self.subTest(mutation=old), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source.replace(old, new, 1))
+
+    def test_facade_source_bytes_and_classification_are_explicit(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        rows = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        with tempfile.TemporaryDirectory(prefix="shared-facade-source-") as directory:
+            root = Path(directory)
+            (root / "build.zig").write_text("pub fn build() void {}\n")
+            for path in (CHECKER.NUMERICS_RESOURCES_PATH, *CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256):
+                dst = root / path
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes((REPOSITORY_ROOT / path).read_bytes())
+            CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+            for path in CHECKER.SHARED_FACADE_SOURCE_SHA256:
+                self.assertEqual({"path": path, "kind": "zig-source", "class": "non-generated-source", "owner": "library-source"}, rows[path])
+                original = (root / path).read_bytes()
+                for replacement in (None, original + b"\nvar extra_state: u8 = 0;\n"):
+                    if replacement is None:
+                        (root / path).unlink()
+                    else:
+                        (root / path).write_bytes(replacement)
+                    with self.subTest(path=path, missing=replacement is None), self.assertRaises((CHECKER.InventoryError, CHECKER.repository_snapshot.RepositorySnapshotError)):
+                        CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+                (root / path).write_bytes(original)
+
+    def _with_module_statement(self, statement: str) -> str:
+        # Insert into the real receiver's lexical scope, not an invalid global
+        # expression. The official receiver exists only in its canonical loop.
+        if "official_tests.root_module" in statement:
+            marker = "const official_tests = inventory_case.logical_tests orelse continue;"
+            self.assertEqual(3, self.source.count(marker))
+            # The first binding is the canonical attachment loop; the other two
+            # belong to the enumerator and native-feature launch loops.
+            return self.source.replace(marker, marker + "\n        " + statement, 1)
+        body_end = _build_body_insertion_offset(self.source)
+        return self.source[:body_end] + "    " + statement + "\n" + self.source[body_end:]
+
+    def test_canonical_named_import_overwrite_is_rejected(self) -> None:
+        for statement in ('modern_tests.root_module.addImport("zynum", zynum_mod);',
+                          'lapack_tests.root_module.addImport("zynum-lapack", zynum_lapack_mod);',
+                          'official_tests.root_module.addImport("zynum", zynum_mod);'):
+            with self.subTest(statement=statement), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self._with_module_statement(statement))
+
+    def test_canonical_module_property_table_and_alias_escape_are_rejected(self) -> None:
+        statements = (
+            'modern_tests.root_module.root_source_file = b.path("src/zynum.zig");',
+            'modern_tests.root_module.import_table.put(b.allocator, "zynum", zynum_mod) catch unreachable;',
+            'const borrowed_root = modern_tests.root_module; borrowed_root.addImport("zynum", zynum_mod);',
+            'const borrowed_internal = triangular_band_solve_test_mod; _ = borrowed_internal;',
+            'const borrowed_official = official_tests.root_module; borrowed_official.addImport("zynum", zynum_mod);',
+            'header_smoke_mod.root_source_file = b.path("src/zynum.zig");',
+            'zynum_test_mod.import_table.put(b.allocator, "zynum-core", unreviewed_mod) catch unreachable;',
+            'zynum_mod.root_source_file = b.path("src/zynum.zig");',
+            'const borrowed_facade = zynum_blas_mod; borrowed_facade.root_source_file = b.path("src/zynum.zig");',
+        )
+        for statement in statements:
+            with self.subTest(statement=statement), self.assertRaisesRegex(CHECKER.InventoryError, "canonical module receiver escapes"):
+                CHECKER._numerics_resources_build_contract(self._with_module_statement(statement))
+
+    def test_new_link_templates_bind_core_owner_and_mode(self) -> None:
+        for owner, providers in (("zynum_core_mod", CHECKER.SHARED_CORE_PROVIDERS),
+                                  ("zynum_core_test_mod", CHECKER.SHARED_CORE_TEST_PROVIDERS)):
+            for provider in providers:
+                row = CHECKER._new_test_inventory_observation(f"link:build.zig:build:{owner}<-{provider}", {})
+                self.assertEqual(owner, row["consumer"])
+                self.assertEqual(provider, row["provider"])
+                self.assertIn("dynamic_dispatch" if provider.startswith("kernel_") else "x86_64", row["condition"])
+        for owner in CHECKER.SHARED_FACADE_OWNERS:
+            with self.subTest(owner=owner), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._new_test_inventory_observation(f"link:build.zig:build:{owner}<-kernel_libraries", {})
+
+
+class CommonCoreContextSourceContractTests(unittest.TestCase):
+    """411 source-only owner graph; no profile branch or native execution claims."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+        cls.graph = CHECKER._numerics_resources_build_contract(cls.source)
+
+    def reject(self, old: str, new: str, message: str = "(numerics resources|common Core|shared execution)") -> None:
+        self.assertIn(old, self.source)
+        self.assertNotEqual(old, new)
+        with self.assertRaisesRegex(CHECKER.InventoryError, message):
+            CHECKER._numerics_resources_build_contract(self.source.replace(old, new, 1))
+
+    def test_core_abi_checked_context_and_combined_owners_are_exact(self) -> None:
+        for owner, core in CHECKER.SHARED_ADAPTER_CORE_OWNERS.items():
+            self.assertEqual(core, self.graph["imports"][owner]["zynum-core"])
+        for owner, bindings in CHECKER.SHARED_ADAPTER_IMPORTS.items():
+            for alias, provider in bindings.items():
+                self.assertEqual(provider, self.graph["imports"][owner][alias])
+        for owner, core in (("checked_abi_mod", "zynum_core_mod"), ("checked_abi_test_mod", "zynum_core_test_mod")):
+            for alias in ("zynum-execution", "zynum-numerics-resources"):
+                self.assertEqual(self.graph["imports"][core][alias], self.graph["imports"][owner][alias])
+        self.assertEqual({"zynum-numerics-resources": "numerics_resources_mod"},
+                         self.graph["imports"]["execution_contract_tests.root_module"])
+        self.assertEqual(6, len(self.graph["module_source_variants"]["blas_compat_mod"]))
+        self.assertNotIn("blas_compat_mod", self.graph["module_sources"])
+        self.assertEqual(69, len(self.graph["adapter_edges"]))
+
+    def test_adapter_edges_reject_missing_duplicate_and_wrong_owner(self) -> None:
+        # These finite boundaries validate their complete installation/import
+        # contract before the common graph walk. Each wrong edge must still
+        # raise its exact earlier diagnostic; unrelated errors cannot pass.
+        earlier_contract = {'lapacke_lp64_interface': 'finite LAPACKE installation/owner/default-handler contract drifted',
+ 'lapacke_ilp64_interface': 'finite LAPACKE installation/owner/default-handler contract drifted',
+ 'sparse_lp64_interface': 'finite Sparse installation/shared-owner contract drifted',
+ 'sparse_ilp64_interface': 'finite Sparse installation/shared-owner contract drifted',
+ 'operator_exports_mod': 'Contour build/owner contract changed: package',
+ 'operator_combined_mod': 'Contour build/owner contract changed: package',
+ 'abplas_standard_sparse_exports': 'Contour build/owner contract changed: package',
+ 'sparse_combined_mod': 'Contour build/owner contract changed: package',
+ 'blas_combined_mod': 'Contour build/owner contract changed: package',
+ 'abplas_lapacke_composed_root': 'POTRI unified LAPACKE owner/binding selection changed',
+ 'abplas_lapacke_potri_component': 'POTRI unified LAPACKE owner/binding selection changed',
+ 'abplas_lp64_lapacke': 'POTRI unified LAPACKE owner/binding selection changed',
+ 'fftw_f32_composed_root': 'FFTW f32 generator/Core/binding/installation composition changed',
+ 'fftw_f32_exports_mod': 'FFTW f32 generator/Core/binding/installation composition changed',
+ 'lapacke_ilp64_composed_root': 'finite LAPACKE installation/owner/default-handler contract drifted',
+ 'lapacke_ilp64_potri_component': 'finite LAPACKE installation/owner/default-handler contract drifted',
+ 'lapacke_lp64_composed_root': 'finite LAPACKE installation/owner/default-handler contract drifted',
+ 'lapacke_lp64_potri_component': 'finite LAPACKE installation/owner/default-handler contract drifted'}
+        earlier_edge_contract = {('abplas_lp64_root', 'lapacke-interface-owner'): 'POTRI unified LAPACKE owner/binding selection changed',
+ ('abplas_lp64_root', 'zynum-lapacke-exports'): 'POTRI unified LAPACKE owner/binding selection changed',
+ ('abplas_lp64_root', 'zynum-checked-sparse-exports'): 'POTRI unified LAPACKE owner/binding selection '
+                                                       'changed'}
+        earlier_contract.update({
+            "feast_exports_mod": "FEAST generator/Core/binding/installation composition changed",
+            "feast_combined_mod": "FEAST generator/Core/binding/installation composition changed",
+            "contour_exports_mod": "Contour build/owner contract changed: package",
+            "contour_combined_mod": "Contour build/owner contract changed: package",
+            "lapacke_lp64_syev_component": "finite LAPACKE installation/owner/default-handler contract drifted",
+            "lapacke_lp64_syev_composed_root": "finite LAPACKE installation/owner/default-handler contract drifted",
+            "abplas_lp64_lapacke_syev_component": "POTRI unified LAPACKE owner/binding selection changed",
+            "abplas_lp64_lapacke_syev_composed_root": "POTRI unified LAPACKE owner/binding selection changed",
+        })
+        for owner, bindings in CHECKER.SHARED_ADAPTER_IMPORTS.items():
+            for alias, provider in bindings.items():
+                edge = f'{owner}.addImport("{alias}", {provider});'
+                for replacement in ("", edge + "\n" + edge, edge.replace(provider, "zynum_core_mod")):
+                    with self.subTest(owner=owner, alias=alias, replacement=replacement):
+                        self.reject(edge, replacement, earlier_edge_contract.get((owner, alias), earlier_contract.get(owner, "common Core adapter")))
+
+    def test_checked_dependencies_cannot_split_from_their_core(self) -> None:
+        for owner in ("checked_abi_mod", "checked_abi_test_mod"):
+            core = "zynum_core_mod" if owner == "checked_abi_mod" else "zynum_core_test_mod"
+            execution = "execution_mod" if owner == "checked_abi_mod" else "execution_test_mod"
+            for alias, provider, wrong in (("zynum-core", core, "zynum_core_test_mod" if core == "zynum_core_mod" else "zynum_core_mod"),
+                    ("zynum-execution", execution, "execution_test_mod" if execution == "execution_mod" else "execution_mod"),
+                    ("zynum-numerics-resources", "numerics_resources_mod", "host_numerics_resources_mod"),
+                    ("zynum-build-options", "zynum_build_options_mod", "runtime_lifecycle_options_mod")):
+                edge = f'{owner}.addImport("{alias}", {provider});'
+                with self.subTest(owner=owner, alias=alias):
+                    self.reject(edge, edge.replace(provider, wrong))
+        self.reject('checked_abi_mod.addImport("zynum-build-options", zynum_build_options_mod);',
+                    'checked_abi_mod.addImport("zynum-build-options", zynum_build_options.createModule());')
+
+    def test_context_four_resource_edges_reject_missing_duplicate_and_cross_target(self) -> None:
+        for owner, provider in (("execution_mod", "numerics_resources_mod"), ("execution_test_mod", "numerics_resources_mod"),
+                ("execution_contract_tests.root_module", "numerics_resources_mod"), ("runtime_lifecycle_execution_mod", "runtime_lifecycle_resources_mod")):
+            edge = f'{owner}.addImport("zynum-numerics-resources", {provider});'
+            for replacement in ("", edge + "\n" + edge, edge.replace(provider, "host_numerics_resources_mod")):
+                with self.subTest(owner=owner, replacement=replacement):
+                    self.reject(edge, replacement, "numerics resources")
+
+    def test_lifecycle_full_target_and_adapter_target_declarations_are_bound(self) -> None:
+        for name in ("blas_abi_mod", "blas_abi_test_mod", "checked_abi_mod", "checked_abi_test_mod", "combined_interfaces_mod"):
+            start = self.source.index(f"const {name} =")
+            changed = self.source[:start] + self.source[start:].replace(".target = target,", ".target = b.graph.host,", 1)
+            with self.subTest(owner=name), self.assertRaisesRegex(CHECKER.InventoryError, "owner/source/target/attachment graph drifted"):
+                CHECKER._numerics_resources_build_contract(changed)
+        for part in ("runtime_lifecycle_target.result.ofmt == target.result.ofmt",
+                     "runtime_lifecycle_target.result.dynamic_linker.eql(target.result.dynamic_linker)",
+                     "runtime_lifecycle_target.result.ofmt == b.graph.host.result.ofmt",
+                     "runtime_lifecycle_target.result.dynamic_linker.eql(b.graph.host.result.dynamic_linker)"):
+            self.reject(part, "true")
+        self.reject("std.Target.Query.fromTarget(&runtime_lifecycle_target.result)", "std.Target.Query.fromTarget(&target.result)")
+        self.reject(".target = runtime_lifecycle_target,\n        });\n    runtime_lifecycle_execution_mod.addImport", ".target = target,\n        });\n    runtime_lifecycle_execution_mod.addImport")
+
+    def test_six_profile_variants_bind_predicate_paths_and_cardinality(self) -> None:
+        for old, new in (("b.path(switch (selected_profile)", "b.path(switch (different_profile)"),
+                ('.default => "src/blas/compat.zig",', '.unknown => "src/blas/compat.zig",'),
+                ('.default => "src/blas/compat.zig",', '.default => "src/blas/compat.zig",\n .seventh => "src/blas/new.zig",'),
+                ('"src/blas/compat_level1_fixed_candidates.zig"', '"src/blas/wrong.zig"'),
+                ('"src/blas/compat_level1_fixed_candidates.zig"', '"src/blas/compat_level1_sve_candidates.zig"')):
+            with self.subTest(mutation=old):
+                self.reject(old, new)
+
+    def test_adapter_receivers_cannot_escape_mutate_or_gain_direct_objects(self) -> None:
+        for extra in ('const escaped = blas_abi_mod;', 'checked_abi_test_mod.root_source_file = b.path("src/zynum.zig");',
+                'blas_abi_test_mod.import_table.put(b.allocator, "zynum-core", zynum_core_mod) catch unreachable;',
+                'combined_interfaces_mod.addImport("zynum-checked-exports", checked_abi_test_mod);',
+                'cblas_compat_test_mod.addObject(stride2_isolated_test_library.?);'):
+            with self.subTest(extra=extra), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source + "\n" + extra)
+
+    def test_combined_product_is_optional_uninstalled_and_keeps_original_barriers(self) -> None:
+        step = CHECKER.CHECKED_ABI_OBSERVATION_TEMPLATES["step:build.zig:build:build-combined-interfaces"]
+        artifact = CHECKER.CHECKED_ABI_OBSERVATION_TEMPLATES["compile:build.zig:build:combined_interfaces_lib"]
+        self.assertEqual([], artifact["install_destinations"])
+        self.assertEqual("not-member", step["aggregate_test_membership"])
+        self.assertEqual([{"id": "compile:build.zig:build:combined_interfaces_lib", "condition": "always"}], step["direct_dependencies"])
+        request = "_ = combined_interfaces_lib.getEmittedBin();"
+        self.assertEqual(1, self.source.count(request))
+        facts = CHECKER._numerics_resources_build_contract(self.source)
+        self.assertEqual([{"owner": "combined_interfaces_lib", "source": "combined_interfaces_lib.getEmittedBin()", "context": ["pubfnbuild(b:*std.Build)void{", "_="]}],
+                         [row for row in facts["owner_calls"] if row["owner"] == "combined_interfaces_lib"])
+        CHECKER._checked_abi_build_span(self.source)
+        for label, replacement in (("missing", ""), ("duplicate", request + "\n    " + request),
+                                   ("wrong Compile", "_ = checked_dynamic_lib.getEmittedBin();")):
+            changed = self.source.replace(request, replacement, 1)
+            with self.subTest(output_request=label, contract="material"), self.assertRaisesRegex(CHECKER.InventoryError, "checked ABI material build contract drifted"):
+                CHECKER._checked_abi_build_span(changed)
+            with self.subTest(output_request=label, contract="owner graph"), self.assertRaisesRegex(CHECKER.InventoryError, "numerics resources owner/source/target/attachment graph drifted"):
+                CHECKER._numerics_resources_build_contract(changed)
+        for old, new in (("build_combined_interfaces_step.dependOn(&combined_interfaces_lib.step);", ""),
+                ('combined_interfaces_mod.addImport("zynum-checked-exports", checked_abi_mod);', 'combined_interfaces_mod.addImport("zynum-checked-exports", checked_abi_test_mod);'),
+                ('const combined_interfaces_lib = b.addLibrary(.{', 'const combined_interfaces_lib = b.addLibrary(.{ .use_llvm = false,')):
+            with self.subTest(change=old), self.assertRaisesRegex(CHECKER.InventoryError, "checked ABI material build contract"):
+                CHECKER._checked_abi_build_span(self.source.replace(old, new, 1))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "binding escapes reviewed block"):
+            CHECKER._checked_abi_build_span(self.source + "\nb.installArtifact(combined_interfaces_lib);\n")
+
+    def test_new_common_owner_bytes_are_part_of_frozen_source_contract(self) -> None:
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        original = CHECKER._frozen_regular_bytes
+        CHECKER._numerics_resources_source_contract(context)
+        for path in ("src/blas/abi/root.zig", "src/interfaces.zig", "src/numerics/execution/context.zig", "src/numerics/execution/context_scratch_test.zig", "src/sparse/core/product.zig", "src/numerics/dense.zig", "src/sparse/operations.zig"):
+            def read(active: Any, candidate: str, purpose: str) -> bytes:
+                data = original(active, candidate, purpose)
+                return data + b"\n// drift\n" if candidate == path else data
+            with self.subTest(path=path), mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=read):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "shared facade source bytes drifted"):
+                    CHECKER._numerics_resources_source_contract(context)
+
+
+class ManagedLapackeSourceContractTests(unittest.TestCase):
+    """Typed internal adapters borrow exact Core owners; no standard ABI claim."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+        cls.graph = CHECKER._numerics_resources_build_contract(cls.source)
+
+    def _inside_build(self, statement: str) -> str:
+        body_end = _build_body_insertion_offset(self.source)
+        return self.source[:body_end] + "    " + statement + "\n" + self.source[body_end:]
+
+    def test_binding_owners_borrow_corresponding_core_and_only_lapack_gains_imports(self) -> None:
+        for owner, core, optimize in (("lapacke_binding_mod", "zynum_core_mod", "optimize"),
+                                     ("lapacke_binding_test_mod", "zynum_core_test_mod", "test_optimize")):
+            self.assertEqual("src/interop/lapacke_binding.zig", self.graph["module_sources"][owner])
+            self.assertEqual({"zynum-core": core}, self.graph["imports"][owner])
+            declaration, = self.graph["declarations"][owner]
+            self.assertEqual(f'const{owner}=b.createModule(.{{.root_source_file=b.path("src/interop/lapacke_binding.zig"),.target=target,.optimize={optimize},.link_libc=true,}});', declaration["source"])
+            self.assertNotIn(owner, self.graph["generated_imports"])
+            self.assertNotIn("numerical-owner", self.graph["imports"][core])
+        self.assertEqual({"general-operator-tests": "general_operator_test_mod", "fftw-interface-owner": "fftw_binding_test_mod",
+                          "zynum-lapack": "zynum_lapack_test_mod", "numerical-owner": "lapacke_binding_test_mod",
+                          "zynum-core": "zynum_core_test_mod", "zynum-execution": "execution_test_mod",
+                          "zynum-numerics-resources": "numerics_resources_mod"},
+                         self.graph["imports"][self.graph["root_owners"]["lapack_tests"]])
+        self.assertEqual({"zynum-execution": "execution_test_mod", "zynum-numerics-resources": "numerics_resources_mod"},
+                         self.graph["imports"][self.graph["root_owners"]["numerics_contract_tests"]])
+        binding_consumers = {owner for owner, imports in self.graph["imports"].items()
+                             if "lapacke_binding_test_mod" in imports.values()}
+        self.assertEqual({"lapack_tests.root_module", "lapacke_posv_tests.root_module", "general_operator_test_mod"}, binding_consumers)
+
+    def test_binding_core_edges_reject_missing_duplicate_and_cross_mode_provider(self) -> None:
+        for owner, provider, wrong in (("lapacke_binding_mod", "zynum_core_mod", "zynum_core_test_mod"),
+                                      ("lapacke_binding_test_mod", "zynum_core_test_mod", "zynum_core_mod")):
+            edge = f'{owner}.addImport("zynum-core", {provider});'
+            self.assertEqual(1, self.source.count(edge))
+            for replacement, message in (("", "shared facade import changed"),
+                    (edge + "\n" + edge, "shared facade import changed"),
+                    (edge.replace(provider, wrong), "shared core provider changed")):
+                with self.subTest(owner=owner, replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, message):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(edge, replacement, 1))
+
+    def test_binding_declaration_source_target_and_mode_are_exact(self) -> None:
+        for owner in ("lapacke_binding_mod", "lapacke_binding_test_mod"):
+            start = self.source.index(f"const {owner} =")
+            end = self.source.index("});", start) + 3
+            block = self.source[start:end]
+            for old, new in ((".target = target,", ".target = b.graph.host,"),
+                    (".optimize = " + ("test_optimize" if owner.endswith("_test_mod") else "optimize") + ",", ".optimize = .Debug,"),
+                    ('b.path("src/interop/lapacke_binding.zig")', 'b.path("src/zynum.zig")')):
+                self.assertIn(old, block)
+                changed = self.source[:start] + block.replace(old, new, 1) + self.source[end:]
+                message = "interface binding/configuration root ownership changed" if old.startswith("b.path") else "owner/source/target/attachment graph drifted"
+                with self.subTest(owner=owner, mutation=old), self.assertRaisesRegex(CHECKER.InventoryError, message):
+                    CHECKER._numerics_resources_build_contract(changed)
+
+    def test_lapack_inline_binding_edges_reject_missing_wrong_and_duplicate(self) -> None:
+        start = self.source.index("const lapack_tests =")
+        end = self.source.index("const run_lapack_tests", start)
+        block = self.source[start:end]
+        for alias, provider, wrong in (("numerical-owner", "lapacke_binding_test_mod", "lapacke_binding_mod"),
+                ("zynum-core", "zynum_core_test_mod", "zynum_core_mod"),
+                ("zynum-execution", "execution_test_mod", "execution_mod")):
+            entry = f'.{{ .name = "{alias}", .module = {provider} }},'
+            self.assertEqual(1, block.count(entry))
+            for replacement, message in (("", "owner/source/target/attachment graph drifted"),
+                    (entry.replace(provider, wrong), "owner/source/target/attachment graph drifted"),
+                    (entry + "\n" + entry, "duplicate named dependency")):
+                changed = self.source[:start] + block.replace(entry, replacement, 1) + self.source[end:]
+                with self.subTest(alias=alias, replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, message):
+                    CHECKER._numerics_resources_build_contract(changed)
+
+    def test_binding_receivers_cannot_escape_split_state_or_reverse_core_dependency(self) -> None:
+        statements = (
+            ('const escaped_binding = lapacke_binding_mod;', "canonical module receiver escapes"),
+            ('lapacke_binding_test_mod.root_source_file = b.path("src/zynum.zig");', "canonical module receiver escapes"),
+            ('lapacke_binding_test_mod.import_table.put(b.allocator, "zynum-core", zynum_lapack_test_mod) catch unreachable;', "canonical module receiver escapes"),
+            ('lapacke_binding_mod.addObject(library);', "owner/source/target/attachment graph drifted"),
+            ('lapacke_binding_test_mod.addOptions("zynum-build-options", zynum_build_options);', "owner/source/target/attachment graph drifted"),
+            ('lapacke_binding_mod.addImport("zynum-numerics-resources", numerics_resources_mod);', "has an unreviewed import owner"),
+            ('lapacke_binding_mod.addImport("zynum-execution", execution_mod);', "shared execution has an unreviewed import owner"),
+            ('lapack_tests.root_module.addImport("numerical-owner", lapacke_binding_mod);', "^common Core adapter has an unreviewed import owner: numerical-owner$"),
+            ('zynum_core_mod.addImport("numerical-owner", lapacke_binding_mod);', "^common Core adapter has an unreviewed import owner: numerical-owner$"),
+        )
+        for statement, message in statements:
+            with self.subTest(statement=statement), self.assertRaisesRegex(CHECKER.InventoryError, message):
+                CHECKER._numerics_resources_build_contract(self._inside_build(statement))
+
+    def test_managed_binding_core_primitive_and_test_bytes_are_bound(self) -> None:
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        original = CHECKER._frozen_regular_bytes
+        CHECKER._numerics_resources_source_contract(context)
+        for path in CHECKER.MANAGED_LAPACKE_SOURCE_SHA256:
+            # Includes the seven Core aliases and all adapter-owned numerical
+            # dependencies; a reverse Core import cannot silently enter closure.
+            suffix = b'\nconst wrong = @import("interop/lapacke_binding.zig");\n' if path == "src/zynum.zig" else b"\n// source drift\n"
+            def read(active: Any, candidate: str, purpose: str) -> bytes:
+                data = original(active, candidate, purpose)
+                return data + suffix if candidate == path else data
+            with self.subTest(path=path), mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=read):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "shared facade source bytes drifted: " + CHECKER.re.escape(path)):
+                    CHECKER._numerics_resources_source_contract(context)
+
+    def test_exact_new_source_classifications_preserve_all_existing_owners(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        before = {row["path"]: copy.deepcopy(row) for row in inventory["repository_file_classifications"]}
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        after = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        expected = {
+            "src/interop/lapacke_access.zig": "library-source",
+            "src/interop/lapacke_getrf.zig": "library-source",
+            "test/lapack/interop/getrf_adapter_test.zig": "test-infrastructure",
+            "src/interop/lapacke_getrs.zig": "library-source",
+            "test/lapack/interop/getrs_adapter_test.zig": "test-infrastructure",
+            "test/lapack/interop/raw_access_test.zig": "test-infrastructure",
+            "src/interop/lapacke_binding.zig": "library-source",
+            "src/interop/lapacke_common.zig": "library-source",
+            "src/interop/lapacke_services.zig": "library-source",
+            "test/lapack/interop/shared_services_test.zig": "test-infrastructure",
+            "src/interop/lapacke_potrf.zig": "library-source",
+            "src/interop/lapacke_potrs.zig": "library-source",
+            "src/lapack/core/triangular_substitute.zig": "library-source",
+            "test/lapack/interop/managed_adapter_test.zig": "test-infrastructure",
+            "test/lapack/interop/managed_support.zig": "test-infrastructure",
+            "test/lapack/interop/potrf_adapter_test.zig": "test-infrastructure",
+            "test/lapack/interop/potrs_adapter_test.zig": "test-infrastructure",
+            "test/lapack/interop/potrs_support.zig": "test-infrastructure",
+        }
+        expected["src/interop/lapacke_diagnostics.zig"] = "library-source"
+        expected["src/interop/lapacke_gesv.zig"] = "library-source"
+        expected["test/lapack/interop/gesv_adapter_test.zig"] = "test-infrastructure"
+        expected["src/interop/lapacke_default_errors.c"] = "library-source"
+        expected.update({"src/interop/lapacke_stev.zig": "library-source", "src/lapack/core/tridiagonal_eigen.zig": "library-source", "test/lapack/interop/stev_adapter_test.zig": "test-infrastructure", "test/lapack/tridiagonal_eigen_test.zig": "test-infrastructure", "tools/link_darwin_interface.py": "build-composition"})
+        expected.update({
+            "src/interop/lapacke_gelsd.zig": "library-source",
+            "src/interop/lapacke_gelsd_column.zig": "library-source",
+            "src/interop/lapacke_gelsd_policy.zig": "library-source",
+            "src/interop/lapacke_gelsd_query.zig": "library-source",
+            "src/interop/lapacke_gelsd_workspace.zig": "library-source",
+            "src/lapack/core/bidiagonal.zig": "library-source",
+            "src/lapack/core/bidiagonal_svd.zig": "library-source",
+            "src/lapack/core/minimum_norm.zig": "library-source",
+            "src/lapack/core/rank_least_squares.zig": "library-source",
+            "src/lapack/core/svd.zig": "library-source",
+            "test/lapack/bidiagonal_test.zig": "test-infrastructure",
+            "test/lapack/interop/gelsd_policy_test.zig": "test-infrastructure",
+            "src/abplas_lp64.zig": "library-source",
+            "src/lapack/core/complex_svd.zig": "library-source",
+            "src/lapack/core/complex_minimum_norm.zig": "library-source",
+            "src/lapack/core/complex_rank_least_squares.zig": "library-source",
+            "test/lapack/complex_svd_test.zig": "test-infrastructure",
+            "test/lapack/complex_rank_least_squares_test.zig": "test-infrastructure",
+            "test/lapack/complex_svd_facade_test.zig": "test-infrastructure",
+            "src/interop/lapacke_complex_gelsd.zig": "library-source",
+            "src/interop/lapacke_complex_gelsd_column.zig": "library-source",
+            "src/interop/lapacke_complex_gelsd_policy.zig": "library-source",
+            "src/interop/lapacke_complex_gelsd_query.zig": "library-source",
+            "src/interop/lapacke_complex_gelsd_workspace.zig": "library-source",
+            "test/lapack/interop/complex_gelsd_workspace_test.zig": "test-infrastructure",
+            "test/lapack/interop/complex_gelsd_query_test.zig": "test-infrastructure",
+            "test/lapack/interop/complex_gelsd_column_test.zig": "test-infrastructure",
+            "test/lapack/interop/complex_gelsd_adapter_test.zig": "test-infrastructure",
+            "test/lapack/interop/complex_gelsd_shared_projection_test.zig": "test-infrastructure",
+            "tools/interface_templates/complex_gelsd_lp64.zig.in": "developer-tooling",
+        })
+        for width in ("lp64", "ilp64"):
+            for stem in ("potrf-potrs-getrf-getrs-ordinary-", "potrf-potrs-getrf-getrs-gesv-ordinary-", "potrf-potrs-getrf-getrs-gesv-stev-ordinary-", "potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-"):
+                prefix = f"interface_subset/mkl2026.{width}/{stem}{width}-v1/"
+                for name in ("subset.h", "exports.zig", "abi_manifest.json", "exports.def"):
+                    expected[prefix + name] = "abi-compatibility"
+        for subset in (
+            "complex-gelsd-ordinary-lp64-v1",
+            "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-ordinary-lp64-v1",
+            "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-ordinary-lp64-v1",
+        ):
+            for name in ("subset.h", "exports.zig", "abi_manifest.json", "exports.def"):
+                expected[f"interface_subset/mkl2026.lp64/{subset}/{name}"] = "abi-compatibility"
+        expected.update({
+            "src/lapack/core/orthonormal_completion.zig": "library-source",
+            "src/interop/lapacke_gesvd.zig": "library-source",
+            "src/interop/lapacke_gesvd_policy.zig": "library-source",
+            "test/lapack/orthonormal_completion_test.zig": "test-infrastructure",
+            "test/lapack/interop/gesvd_adapter_test.zig": "test-infrastructure",
+            "test/lapack/interop/gesvd_raw_boundary_test.zig": "test-infrastructure",
+            "tools/interface_templates/gesvd_lp64.zig.in": "developer-tooling",
+        })
+        svd_sets = ["gesvd-ordinary-lp64-v1"]
+        for qr in (False, True):
+            for complex_gelsd in (False, True):
+                svd_sets.append("potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv"
+                    + ("-geqrf-ormqr-unmqr-orgqr-ungqr" if qr else "")
+                    + ("-complex-gelsd" if complex_gelsd else "")
+                    + "-gesvd-ordinary-lp64-v1")
+        self.assertEqual(5, len(svd_sets))
+        for subset in svd_sets:
+            for name in ("subset.h", "exports.zig", "abi_manifest.json", "exports.def"):
+                expected[f"interface_subset/mkl2026.lp64/{subset}/{name}"] = "abi-compatibility"
+        self.assertEqual(set(expected), {row["path"] for row in CHECKER.MANAGED_LAPACKE_CLASSIFICATIONS})
+        sparse_paths = {row["path"] for row in CHECKER.MANAGED_SPARSE_CLASSIFICATIONS}
+        self.assertEqual((set(expected) | sparse_paths | {"tools/standard_abi_bindings.py"}) - before.keys(), after.keys() - before.keys())
+        self.assertEqual(before, {path: after[path] for path in before})
+        for path, owner in expected.items():
+            generated = path.startswith("interface_subset/")
+            kind = ("python-source" if path.endswith(".py") else "json-data" if path.endswith(".json") else
+                    "other-public-file" if path.endswith((".def", ".in")) else
+                    "foreign-language-source" if path.endswith((".c", ".h")) else "zig-source")
+            classification = "designated-reproducible-contract-reference" if generated else "non-generated-source"
+            self.assertEqual({"path": path, "kind": kind, "class": classification, "owner": owner}, after[path])
+
+
+class ManagedSparseSourceContractTests(unittest.TestCase):
+    """Typed controls retain the existing Core, Context and object ownership."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+        cls.graph = CHECKER._numerics_resources_build_contract(cls.source)
+
+    def test_sparse_direct_imports_converge_with_facade_and_core_resources(self) -> None:
+        owner = self.graph["root_owners"]["sparse_tests"]
+        self.assertEqual("sparse_tests.root_module", owner)
+        self.assertEqual({"checked-sparse-tests": "checked_sparse_test_mod", "zynum-sparse": "zynum_sparse_test_mod", "sparse-interface-owner": "mkl_sparse_binding_test_mod", "zynum-core": "zynum_core_test_mod",
+                          "zynum-execution": "execution_test_mod", "zynum-numerics-resources": "numerics_resources_mod"},
+                         self.graph["imports"][owner])
+        self.assertEqual({"zynum-core": "zynum_core_test_mod"}, self.graph["imports"]["zynum_sparse_test_mod"])
+        self.assertEqual("execution_test_mod", self.graph["imports"]["zynum_core_test_mod"]["zynum-execution"])
+        for resource_owner in (owner, "zynum_core_test_mod", "execution_test_mod"):
+            self.assertEqual("numerics_resources_mod", self.graph["imports"][resource_owner]["zynum-numerics-resources"])
+        self.assertEqual("src/facades/sparse.zig", self.graph["module_sources"]["zynum_sparse_test_mod"])
+        self.assertNotIn("numerical-owner", self.graph["imports"][owner])
+        self.assertEqual({"zynum-core": "zynum_core_mod"}, self.graph["imports"]["lapacke_binding_mod"])
+        self.assertEqual({"zynum-core": "zynum_core_test_mod"}, self.graph["imports"]["lapacke_binding_test_mod"])
+
+    def test_sparse_inline_core_and_execution_missing_wrong_or_duplicate_are_rejected(self) -> None:
+        start = self.source.index("const sparse_tests =")
+        end = self.source.index("const run_sparse_tests", start)
+        block = self.source[start:end]
+        for alias, provider, wrong in (("zynum-core", "zynum_core_test_mod", "zynum_core_mod"),
+                                      ("zynum-execution", "execution_test_mod", "execution_mod")):
+            entry = f'.{{ .name = "{alias}", .module = {provider} }},'
+            self.assertEqual(1, block.count(entry))
+            for replacement, message in (("", "owner/source/target/attachment graph drifted"),
+                    (entry.replace(provider, wrong), "owner/source/target/attachment graph drifted"),
+                    (entry + "\n" + entry, "duplicate named dependency")):
+                changed = self.source[:start] + block.replace(entry, replacement, 1) + self.source[end:]
+                with self.subTest(alias=alias, replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, message):
+                    CHECKER._numerics_resources_build_contract(changed)
+
+    def test_sparse_owner_rebinding_resource_split_and_object_attachments_are_rejected(self) -> None:
+        body_end = _build_body_insertion_offset(self.source)
+        for statement in (
+            'sparse_tests.root_module.addImport("zynum-core", zynum_core_mod);',
+            'sparse_tests.root_module.addImport("zynum-execution", execution_mod);',
+            'sparse_tests.root_module.addImport("zynum-numerics-resources", host_numerics_resources_mod);',
+            'sparse_tests.root_module.addObject(library);',
+            'zynum_sparse_test_mod.addObject(library);',
+        ):
+            changed = self.source[:body_end] + "    " + statement + "\n" + self.source[body_end:]
+            with self.subTest(statement=statement), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(changed)
+
+    def test_sparse_source_pins_agree_with_all_shared_core_maps_and_reject_drift(self) -> None:
+        maps = (CHECKER.SHARED_FACADE_SOURCE_SHA256, CHECKER.EXECUTION_SOURCE_SHA256,
+                CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, CHECKER.COMMON_CORE_SOURCE_SHA256,
+                CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, CHECKER.MANAGED_SPARSE_SOURCE_SHA256)
+        seen = {}
+        for mapping in maps:
+            for path, digest in mapping.items():
+                if path in seen:
+                    self.assertEqual(seen[path], digest, path)
+                seen[path] = digest
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        original = CHECKER._frozen_regular_bytes
+        CHECKER._numerics_resources_source_contract(context)
+        self.assertEqual({"src/sparse/object.zig", "src/zynum.zig", "test/sparse/object_test.zig",
+                          "test/sparse/context_object_test.zig", "test/sparse/sparse_test.zig",
+                          "src/interop/mkl_sparse.zig", "src/interop/mkl_sparse_binding.zig", "src/interop/sparse_handle.zig",
+                          "test/sparse/interop/handle_test.zig", "test/sparse/interop/mkl_sparse_adapter_test.zig",
+                          "src/interop/mkl_sparse_access.zig", "src/interop/mkl_sparse_raw.zig",
+                          "test/sparse/interop/raw_lifecycle_test.zig", "test/sparse/interop/mkl_sparse_mv_test.zig",
+                          "test/sparse/interop/mkl_sparse_mm_test.zig",
+                          "src/interop/mkl_sparse_solve.zig", "src/interop/mkl_sparse_solve_raw.zig",
+                          "src/sparse/core/triangular_complex.zig"},
+                         set(CHECKER.MANAGED_SPARSE_SOURCE_SHA256))
+        for path in CHECKER.MANAGED_SPARSE_SOURCE_SHA256:
+            def read(active: Any, candidate: str, purpose: str) -> bytes:
+                data = original(active, candidate, purpose)
+                return data + b"\n// source drift\n" if candidate == path else data
+            with self.subTest(path=path), mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=read):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "shared facade source bytes drifted: " + CHECKER.re.escape(path)):
+                    CHECKER._numerics_resources_source_contract(context)
+
+    def test_sparse_classifications_preserve_existing_and_lapacke_rows(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        new_paths = ('src/interop/mkl_sparse_access.zig', 'src/interop/mkl_sparse_raw.zig', 'test/sparse/interop/raw_lifecycle_test.zig', 'test/sparse/interop/mkl_sparse_mv_test.zig', 'test/sparse/interop/mkl_sparse_mm_test.zig')
+        inventory["repository_file_classifications"] = [
+            row for row in inventory["repository_file_classifications"] if row["path"] not in new_paths
+        ]
+        before = {row["path"]: copy.deepcopy(row) for row in inventory["repository_file_classifications"]}
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        after = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        expected = {"src/interop/mkl_sparse_access.zig": "library-source", "src/interop/mkl_sparse_raw.zig": "library-source",
+                    "test/sparse/interop/raw_lifecycle_test.zig": "test-infrastructure",
+                    "test/sparse/interop/mkl_sparse_mv_test.zig": "test-infrastructure",
+                    "test/sparse/interop/mkl_sparse_mm_test.zig": "test-infrastructure",
+                    "src/interop/mkl_sparse.zig": "library-source", "src/interop/mkl_sparse_binding.zig": "library-source",
+                    "src/interop/sparse_handle.zig": "library-source", "test/sparse/interop/handle_test.zig": "test-infrastructure",
+                    "test/sparse/interop/mkl_sparse_adapter_test.zig": "test-infrastructure", "src/sparse/object.zig": "library-source", "test/sparse/object_test.zig": "test-infrastructure",
+                    "test/sparse/context_object_test.zig": "test-infrastructure"}
+        self.assertEqual(set(expected), {row["path"] for row in CHECKER.MANAGED_SPARSE_CLASSIFICATIONS})
+        lapacke = {row["path"]: row for row in CHECKER.MANAGED_LAPACKE_CLASSIFICATIONS}
+        self.assertEqual((set(expected) | lapacke.keys() | {"tools/standard_abi_bindings.py"}) - before.keys(), after.keys() - before.keys())
+        self.assertEqual(before, {path: after[path] for path in before})
+        self.assertEqual(lapacke, {path: after[path] for path in lapacke})
+        for path, owner in expected.items():
+            self.assertEqual({"path": path, "kind": "zig-source", "class": "non-generated-source", "owner": owner}, after[path])
+
+
+class InterfaceServicesSourceContractTests(unittest.TestCase):
+    """Bounded typed-owner contracts; no C exports or native evidence inferred."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+        cls.graph = CHECKER._numerics_resources_build_contract(cls.source)
+
+    def inside_build(self, statement: str) -> str:
+        body_end = _build_body_insertion_offset(self.source)
+        return self.source[:body_end] + statement + "\n" + self.source[body_end:]
+
+    def test_sparse_binding_owners_borrow_core_and_inherit_common_services(self) -> None:
+        for owner, core, execution, mode in (("mkl_sparse_binding_mod", "zynum_core_mod", "execution_mod", "optimize"),
+                ("mkl_sparse_binding_test_mod", "zynum_core_test_mod", "execution_test_mod", "test_optimize")):
+            self.assertEqual({"zynum-core": core}, self.graph["imports"][owner])
+            self.assertEqual("src/interop/mkl_sparse_binding.zig", self.graph["module_sources"][owner])
+            self.assertEqual(execution, self.graph["imports"][core]["zynum-execution"])
+            self.assertEqual("numerics_resources_mod", self.graph["imports"][core]["zynum-numerics-resources"])
+            self.assertEqual("numerics_resources_mod", self.graph["imports"][execution]["zynum-numerics-resources"])
+            self.assertNotIn(owner, self.graph["generated_imports"])
+            self.assertEqual(f'const{owner}=b.createModule(.{{.root_source_file=b.path("src/interop/mkl_sparse_binding.zig"),.target=target,.optimize={mode},.link_libc=true,}});',
+                             self.graph["declarations"][owner][0]["source"])
+        consumers = {owner for owner, imports in self.graph["imports"].items() if "mkl_sparse_binding_test_mod" in imports.values()}
+        self.assertEqual({"sparse_tests.root_module"}, consumers)
+        self.assertEqual("mkl_sparse_binding_test_mod", self.graph["imports"]["sparse_tests.root_module"]["sparse-interface-owner"])
+
+    def test_sparse_binding_missing_duplicate_or_cross_mode_edges_fail(self) -> None:
+        for owner, core, wrong in (("mkl_sparse_binding_mod", "zynum_core_mod", "zynum_core_test_mod"),
+                ("mkl_sparse_binding_test_mod", "zynum_core_test_mod", "zynum_core_mod")):
+            edge = f'{owner}.addImport("zynum-core", {core});'
+            for replacement in ("", edge + "\n" + edge, edge.replace(core, wrong)):
+                with self.subTest(owner=owner, mutation=replacement), self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(edge, replacement, 1))
+        entry = '.{ .name = "sparse-interface-owner", .module = mkl_sparse_binding_test_mod },'
+        self.assertEqual(1, self.source.count(entry))
+        for replacement in ("", entry + "\n" + entry, entry.replace("mkl_sparse_binding_test_mod", "mkl_sparse_binding_mod")):
+            with self.subTest(entry=replacement), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source.replace(entry, replacement, 1))
+
+    def test_sparse_binding_source_target_mode_and_extra_state_edges_fail(self) -> None:
+        for owner in ("mkl_sparse_binding_mod", "mkl_sparse_binding_test_mod"):
+            start = self.source.index("const " + owner + " =")
+            mode = "test_optimize" if "test" in owner else "optimize"
+            for old, new in (('.root_source_file = b.path("src/interop/mkl_sparse_binding.zig")', '.root_source_file = b.path("src/zynum.zig")'),
+                    (".target = target", ".target = b.graph.host"), (".optimize = " + mode, ".optimize = .debug")):
+                changed = self.source[:start] + self.source[start:].replace(old, new, 1)
+                with self.subTest(owner=owner, mutation=old), self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(changed)
+            for suffix in ('addImport("zynum-numerics-resources", numerics_resources_mod);',
+                    'addImport("zynum-execution", execution_mod);', 'addOptions("zynum-build-options", zynum_build_options);',
+                    'addObject(library);'):
+                with self.subTest(owner=owner, extra=suffix), self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(self.inside_build(owner + "." + suffix))
+        for statement in ('const escaped_sparse_binding = mkl_sparse_binding_mod;',
+                'zynum_core_test_mod.addImport("sparse-interface-owner", mkl_sparse_binding_test_mod);',
+                'lapack_tests.root_module.addImport("sparse-interface-owner", mkl_sparse_binding_test_mod);',
+                'mkl_sparse_binding_test_mod.import_table.put(b.allocator, "zynum-core", zynum_core_mod) catch unreachable;'):
+            with self.subTest(statement=statement), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.inside_build(statement))
+
+    def test_disconnected_binding_and_configuration_roots_are_rejected(self) -> None:
+        for path in CHECKER.INTERFACE_BINDING_ROOT_COUNTS:
+            statement = f'const another_owner = b.createModule(.{{ .root_source_file = b.path("{path}"), .target = target, .optimize = test_optimize }});'
+            with self.subTest(path=path), self.assertRaisesRegex(CHECKER.InventoryError, "interface binding/configuration root ownership changed"):
+                CHECKER._numerics_resources_build_contract(self.inside_build(statement))
+
+    def test_relative_imports_cannot_copy_configuration_shell_or_reverse_core(self) -> None:
+        for target, owner in CHECKER.INTERFACE_PRIVATE_IMPORT_OWNERS.items():
+            CHECKER._interface_private_source_imports(owner, f'const ok = @import("{Path(target).name}");')
+            for source in ("test/lapack/other.zig", "src/blas/unpinned.zig", "src/interop/another.zig"):
+                relative = os.path.relpath(target, Path(source).parent)
+                with self.subTest(source=source, target=target), self.assertRaisesRegex(CHECKER.InventoryError, "interface private source has another owner"):
+                    CHECKER._interface_private_source_imports(source, f'const wrong = @import("{relative}");')
+                CHECKER._interface_private_source_imports(source, f'// @import("{relative}")\nconst string = "@import(ignored)";')
+        for source in ("src/zynum.zig", "src/blas.zig", "src/lapack.zig", "src/sparse.zig", "src/lapack/unchanged.zig", "src/sparse/unchanged.zig", "src/numerics/unchanged.zig", "src/blas/unchanged.zig"):
+            for target in ("src/interop/lapacke_common.zig", "src/interop/mkl_sparse_binding.zig"):
+                relative = os.path.relpath(target, Path(source).parent)
+                with self.subTest(source=source, target=target), self.assertRaisesRegex(CHECKER.InventoryError, "common numerical source imports interface layer"):
+                    CHECKER._interface_private_source_imports(source, f'const wrong = @import("{relative}");')
+
+    def test_source_gate_applies_inward_import_policy_beyond_pinned_files(self) -> None:
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        original = CHECKER._frozen_regular_bytes
+        CHECKER._numerics_resources_source_contract(context)
+        for path in ("src/blas/types.zig", "src/blas.zig", "src/lapack.zig", "src/sparse.zig"):
+            self.assertIn(path, context.public_files.path_set)
+            for target, message in (("src/interop/lapacke_services.zig", "interface private source has another owner"),
+                                    ("src/interop/lapacke_common.zig", "common numerical source imports interface layer"),
+                                    ("src/interop/mkl_sparse_binding.zig", "common numerical source imports interface layer")):
+                relative = os.path.relpath(target, Path(path).parent)
+                def read(active: Any, candidate: str, purpose: str) -> bytes:
+                    data = original(active, candidate, purpose)
+                    return data + f'\nconst forbidden = @import("{relative}");\n'.encode() if candidate == path else data
+                with self.subTest(path=path, target=target), mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=read):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, message):
+                        CHECKER._numerics_resources_source_contract(context)
+
+
+class SharedExecutionSourceContractTests(unittest.TestCase):
+    """Source-only identity and fail-closed owner graph; no native evidence."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+        cls.graph = CHECKER._numerics_resources_build_contract(cls.source)
+
+    def test_execution_owner_options_and_canonical_isolation_are_exact(self) -> None:
+        self.assertEqual(12, len(self.graph["execution_edges"]))
+        self.assertEqual(14, len(self.graph["option_edges"]))
+        self.assertEqual(25, len(CHECKER.REQUIRED_TEST_INVENTORY_FACTORY_CASES))
+        self.assertEqual("src/numerics/execution/default.zig", self.graph["module_sources"]["execution_mod"])
+        self.assertEqual("src/numerics/execution/default.zig", self.graph["module_sources"]["execution_test_mod"])
+        self.assertIn("if(optimize==test_optimize)execution_modelse", self.graph["declarations"]["execution_test_mod"][0]["source"])
+        owner = self.graph["root_owners"]["execution_contract_tests"]
+        self.assertEqual("src/numerics/execution/owner.zig", self.graph["root_sources"]["execution_contract_tests"])
+        self.assertEqual({"zynum-numerics-resources": "numerics_resources_mod"}, self.graph["imports"].get(owner, {}))
+        self.assertEqual([], self.graph["generated_imports"].get(owner, []))
+        for root in CHECKER.EXECUTION_DIRECT_TEST_ROOTS:
+            receiver = self.graph["root_owners"][root]
+            self.assertEqual("execution_test_mod", self.graph["imports"][receiver][CHECKER.EXECUTION_ALIAS])
+        self.assertEqual("execution_test_mod", self.graph["imports"][self.graph["root_owners"]["blas_module_tests"]][CHECKER.EXECUTION_ALIAS])
+        self.assertEqual("runtime_lifecycle_execution_mod", self.graph["imports"]["runtime_lifecycle_probe.root_module"][CHECKER.EXECUTION_ALIAS])
+        for root, alias, compat in (
+            ("fortran_tests", "zynum_blas_fortran_compat", "fortran_compat_test_mod"),
+            ("cblas_tests", "zynum_blas_cblas_compat", "cblas_compat_test_mod"),
+        ):
+            with self.subTest(root=root):
+                owner = self.graph["root_owners"][root]
+                self.assertEqual(root + ".root_module", owner)
+                self.assertEqual("execution_test_mod", CHECKER.EXECUTION_IMPORT_OWNERS[owner])
+                self.assertEqual("execution_test_mod", self.graph["imports"][owner][CHECKER.EXECUTION_ALIAS])
+                self.assertEqual(compat, self.graph["imports"][owner][alias])
+                self.assertEqual("blas_abi_test_mod", self.graph["imports"][compat]["zynum-blas-abi"])
+                self.assertEqual("zynum_core_test_mod", self.graph["imports"]["blas_abi_test_mod"]["zynum-core"])
+                self.assertEqual(self.graph["imports"][owner][CHECKER.EXECUTION_ALIAS],
+                                 self.graph["imports"]["zynum_core_test_mod"][CHECKER.EXECUTION_ALIAS])
+
+    def test_execution_edges_missing_swapped_duplicate_and_extra_are_rejected(self) -> None:
+        for owner, provider in CHECKER.EXECUTION_IMPORT_OWNERS.items():
+            edge = f'{owner}.addImport("zynum-execution", {provider});'
+            self.assertEqual(1, len(CHECKER.re.findall(r"(?<![A-Za-z0-9_])" + CHECKER.re.escape(edge), self.source)))
+            wrong = "execution_mod" if provider != "execution_mod" else "execution_test_mod"
+            for replacement in ("", edge.replace(provider, wrong), edge + "\n" + edge):
+                with self.subTest(owner=owner, replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, "shared execution"):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(edge, replacement, 1))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "unreviewed import owner"):
+            CHECKER._numerics_resources_build_contract(self.source + '\nunknown.addImport("zynum-execution", execution_test_mod);\n')
+
+    def test_execution_mode_options_instance_and_owner_exclusions_are_bound(self) -> None:
+        replacements = (
+            ('if (optimize == test_optimize) execution_mod else', 'if (true) execution_mod else'),
+            ('const zynum_build_options_mod = zynum_build_options.createModule();', 'const zynum_build_options_mod = other_options.createModule();'),
+            ('execution_mod.addImport("zynum-build-options", zynum_build_options_mod);', 'execution_mod.addImport("zynum-build-options", zynum_build_options.createModule());'),
+            ('execution_test_mod.addImport("zynum-build-options", zynum_build_options_mod);', 'execution_test_mod.addOptions("zynum-build-options", zynum_build_options);'),
+            ('official_tests != modern_tests and official_tests != execution_contract_tests', 'official_tests != modern_tests'),
+            ('if (official_tests != execution_contract_tests) official_tests.root_module.addImport', 'official_tests.root_module.addImport'),
+            (' and official_tests != execution_contract_tests) {\n            for (kernel_test_libraries)', ') {\n            for (kernel_test_libraries)'),
+            ('official_tests == packed_parallel_tests or', ''),
+            ('.{ .name = "zynum-execution", .module = execution_test_mod },', '.{ .name = "zynum-execution", .module = execution_mod },'),
+        )
+        for old, new in replacements:
+            self.assertIn(old, self.source)
+            with self.subTest(change=old), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(self.source.replace(old, new, 1))
+        for owner in ("execution_mod", "execution_test_mod", "runtime_lifecycle_execution_mod", "execution_contract_tests"):
+            start = self.source.index(f"const {owner} =")
+            before = ".target = runtime_lifecycle_target" if owner.startswith("runtime_") else ".target = target"
+            for old, new in ((before, ".target = b.graph.host"), (".link_libc = true", ".link_libc = false")):
+                changed = self.source[:start] + self.source[start:].replace(old, new, 1)
+                self.assertNotEqual(self.source, changed)
+                with self.subTest(owner=owner, change=old), self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(changed)
+
+    def test_execution_receivers_cannot_escape_or_overwrite(self) -> None:
+        statements = (
+            'const copied_execution = execution_test_mod; copied_execution.root_source_file = b.path("src/zynum.zig");',
+            'execution_test_mod.import_table.put(b.allocator, "zynum-build-options", other_options) catch unreachable;',
+            'execution_mod.root_source_file = b.path("src/zynum.zig");',
+            'const copied_compat = blas_compat_mod; copied_compat.addImport("zynum-execution", execution_test_mod);',
+            'cblas_compat_mod.import_table.put(b.allocator, "zynum-execution", execution_test_mod) catch unreachable;',
+            'execution_test_mod.addImport("zynum-build-options", zynum_build_options_mod);',
+            'execution_contract_tests.root_module.addImport("zynum-execution", execution_test_mod);',
+            'execution_contract_tests.root_module.addImport("zynum-numerics-resources", numerics_resources_mod);',
+            'execution_contract_tests.root_module.addOptions("zynum-build-options", zynum_build_options);',
+            'execution_contract_tests.root_module.addObject(stride2_isolated_test_library.?);',
+            'const copied_compile = execution_contract_tests; copied_compile.root_module.addImport("zynum-execution", execution_test_mod);',
+            'const copied_blas_compile = blas_module_tests; copied_blas_compile.root_module.root_source_file = b.path("src/zynum.zig");',
+            'blas_module_tests.root_module.addImport("zynum-execution", execution_mod);',
+        )
+        body_end = _build_body_insertion_offset(self.source)
+        for statement in statements:
+            text = self.source[:body_end] + statement + "\n" + self.source[body_end:]
+            with self.subTest(statement=statement), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_build_contract(text)
+
+    def test_execution_auxiliary_objects_bind_exact_consumers_and_target(self) -> None:
+        self.assertEqual(set(CHECKER.EXECUTION_OBJECT_CONSUMERS), set(self.graph['linked_module_entries']))
+        for root, receiver in CHECKER.EXECUTION_OBJECT_CONSUMERS.items():
+            row, = self.graph['linked_module_entries'][root]
+            self.assertEqual('task_runtime_host_test_library.root_module', row['module'])
+            self.assertEqual('src/blas/task_runtime_host_object_root.zig', row['path'])
+            self.assertEqual(['pubfnbuild(b:*std.Build)void{', 'if(target.result.cpu.arch==.x86_64){'], row['context'])
+            edge = f'{receiver}.addObject(task_runtime_host_test_library);'
+            self.assertEqual(1, self.source.count(edge))
+            for replacement in ('', edge.replace('task_runtime_host_test_library', 'stride2_isolated_test_library.?')):
+                with self.subTest(root=root, replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, 'shared execution auxiliary object attachment'):
+                    CHECKER._numerics_resources_build_contract(self.source.replace(edge, replacement, 1))
+        edge = 'task_runtime_host_test_library.root_module.addImport("zynum-execution", execution_test_mod);'
+        for replacement in ('', edge.replace('execution_test_mod', 'execution_mod')):
+            with self.subTest(import_change=replacement), self.assertRaisesRegex(CHECKER.InventoryError, 'shared execution'):
+                CHECKER._numerics_resources_build_contract(self.source.replace(edge, replacement, 1))
+
+    def test_execution_source_bytes_and_classification_are_explicit(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        previous_rows = copy.deepcopy(inventory["repository_file_classifications"])
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
+        rows = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        for previous in previous_rows:
+            self.assertEqual(previous, rows[previous["path"]])
+        paths = (CHECKER.NUMERICS_RESOURCES_PATH, *CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256)
+        with tempfile.TemporaryDirectory(prefix="shared-execution-source-") as directory:
+            root = Path(directory)
+            (root / "build.zig").write_text("pub fn build() void {}\n")
+            for path in paths:
+                dst = root / path
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes((REPOSITORY_ROOT / path).read_bytes())
+            CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+            for path in CHECKER.EXECUTION_SOURCE_SHA256:
+                expected_owner = "public-api" if path == "src/blas/runtime.zig" else "library-source"
+                self.assertEqual(expected_owner, rows[path]["owner"])
+                data = (root / path).read_bytes()
+                for replacement in (None, data + b"\n// source drift\n"):
+                    if replacement is None:
+                        (root / path).unlink()
+                    else:
+                        (root / path).write_bytes(replacement)
+                    with self.subTest(path=path, missing=replacement is None), self.assertRaises((CHECKER.InventoryError, CHECKER.repository_snapshot.RepositorySnapshotError)):
+                        CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+                (root / path).write_bytes(data)
+
+    def test_execution_launch_barriers_dynamic_guards_and_aggregates_are_bound(self) -> None:
+        observed = CHECKER._discover_build_root(REPOSITORY_ROOT, "build.zig")
+        factory = next(row for row in observed if row["id"] == CHECKER.TEST_INVENTORY_FACTORY_COMPILE_ID)
+        self.assertEqual(25, factory["expansion_case_count"])
+        self.assertIn({"root_id": "zig-root:execution-contract-tests", "logical_compile_observation_id": "compile:build.zig:build:execution_contract_tests", "predicate_id": "predicate:always"}, factory["expansion_cases"])
+        for old in ('run_execution_contract_tests.step.dependOn(test_inventory_step);',):
+            with self.assertRaisesRegex(CHECKER.InventoryError, "body launch barrier"):
+                CHECKER._annotate_test_inventory_factory(self.source.replace(old, '', 1), copy.deepcopy(observed))
+        for old in ('run_dynamic_execution_contract_tests.step.dependOn(test_dynamic_step);',
+                    'run_dynamic_execution_contract_tests.step.dependOn(&test_inventory_structure_check.step);',
+                    'run_dynamic_execution_contract_tests.step.dependOn(&native_execution_check.step);',
+                    'test_step.dependOn(&run_dynamic_execution_contract_tests.step);',
+                    '        test_step.dependOn(&run_execution_contract_tests.step);'):
+            with self.subTest(missing=old), self.assertRaisesRegex(CHECKER.InventoryError, '(dynamic correctness|default correctness aggregate)'):
+                CHECKER._annotate_multiversion_contract(self.source.replace(old, '', 1), copy.deepcopy(observed))
+        for edge in ('execution_contract_test_step.dependOn(&run_execution_contract_tests.step);',
+                     'lapack_test_step.dependOn(execution_contract_test_step);',
+                     'sparse_test_step.dependOn(execution_contract_test_step);'):
+            with self.subTest(missing_focused_edge=edge), self.assertRaisesRegex(CHECKER.InventoryError, 'shared execution focused step'):
+                CHECKER._numerics_resources_build_contract(self.source.replace(edge, '', 1))
+        compile_row = CHECKER._new_test_inventory_observation('compile:build.zig:build:execution_contract_tests', {})
+        self.assertEqual(['src/numerics/execution/owner.zig'], compile_row['root_source'])
+        self.assertEqual('test-optimize', compile_row['optimize_source'])
+        for module in ('lapack', 'sparse'):
+            row = CHECKER._reviewed_observation_refresh_fields(f'step:build.zig:build:test-{module}')
+            self.assertIn({'id': 'step:build.zig:build:test-execution-contract', 'condition': 'always'}, row['direct_dependencies'])
+
+
 class WindowsBenchmarkPolicyTests(unittest.TestCase):
     """Pure policy checks; these do not claim POSIX inventory validation."""
 
@@ -73,6 +1541,632 @@ class WindowsBenchmarkPolicyTests(unittest.TestCase):
         self.assertTrue(any(identifier in error and "condition" in error for error in errors))
 
 
+
+
+class RuntimeLifecycleSourceContractTests(unittest.TestCase):
+    """Bounded source/metadata checks; never execute the signal-owning worker."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+        cls.support = {path: (REPOSITORY_ROOT / path).read_bytes()
+                       for path in CHECKER.RUNTIME_LIFECYCLE_SOURCE_SHA256}
+
+    def _projection(self) -> dict[str, Any]:
+        build = [{"id": identifier, **copy.deepcopy(template)}
+                 for identifier, template in CHECKER.RUNTIME_LIFECYCLE_OBSERVATION_TEMPLATES.items()]
+        build.append({"id": CHECKER.TEST_INVENTORY_AGGREGATE_STEP_ID,
+                      "direct_dependencies": [{"id": CHECKER.RUNTIME_LIFECYCLE_STEP_ID,
+                                               "condition": CHECKER.RUNTIME_LIFECYCLE_CONDITION}]})
+        return {"build_observations": build,
+                "python_launches": [{"id": CHECKER.RUNTIME_LIFECYCLE_PYTHON_LAUNCH_ID,
+                                     "anchor": {"file": "test/runtime/run_blas_io_lifecycle.py"},
+                                     **copy.deepcopy(CHECKER.RUNTIME_LIFECYCLE_PYTHON_TEMPLATE)}]}
+
+    def test_runtime_lifecycle_exact_source_and_graph_contract(self) -> None:
+        start, end = CHECKER._runtime_lifecycle_build_span(self.source)
+        self.assertIn('b.path("test/runtime/blas_io_lifecycle.c")', self.source[start:end])
+        CHECKER._runtime_lifecycle_build_span(self.source[:start] + "// harmless comment\n" + self.source[start:])
+        with mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=lambda active, path, subject: self.support[path]):
+            CHECKER._runtime_lifecycle_source_contract(None)
+        errors: list[str] = []
+        CHECKER._validate_runtime_lifecycle_contract(self._projection(), errors)
+        self.assertEqual([], errors)
+        controller = self.support["test/runtime/run_blas_io_lifecycle.py"].decode()
+        CHECKER._runtime_lifecycle_python_tree_contract(CHECKER.ast.parse(controller))
+        controller_mutations = (
+            ("ordinary-persistent", "-c"),
+            ('CASES = (', 'CASES = ("-c",'),
+            ("for case in CASES:", "for case in sys.argv[2:]:"),
+            ("[str(probe), case]", "[case, str(probe)]"),
+            ("Path(sys.argv[1])", "Path(os.environ[\"PROBE\"])"),
+            ("    env = dict(os.environ", "    subprocess.run([str(probe), '-c'])\n    env = dict(os.environ"),
+        )
+        for before, after in controller_mutations:
+            with self.subTest(controller_ast_mutation=before):
+                self.assertIn(before, controller)
+                with self.assertRaisesRegex(CHECKER.InventoryError, "complete controller AST"):
+                    CHECKER._runtime_lifecycle_python_tree_contract(CHECKER.ast.parse(controller.replace(before, after, 1)))
+        for path in self.support:
+            self.assertTrue(CHECKER._requires_cached_bytes(path, None))
+        for identifier in CHECKER.RUNTIME_LIFECYCLE_OBSERVATION_TEMPLATES:
+            self.assertEqual(CHECKER.RUNTIME_LIFECYCLE_OBSERVATION_TEMPLATES[identifier],
+                             CHECKER._new_test_inventory_observation(identifier, {}))
+        self.assertEqual(CHECKER.RUNTIME_LIFECYCLE_PYTHON_TEMPLATE,
+                         CHECKER._new_test_inventory_python_launch(CHECKER.RUNTIME_LIFECYCLE_PYTHON_LAUNCH_ID))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "no reviewed template"):
+            CHECKER._new_test_inventory_python_launch(CHECKER.RUNTIME_LIFECYCLE_PYTHON_LAUNCH_ID.replace(":1", ":2"))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "no reviewed template"):
+            CHECKER._new_test_inventory_observation(CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID + "_other", {})
+        migrated = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text(encoding="utf-8"))
+        projection = self._projection()
+        for section in ("build_observations", "python_launches"):
+            existing_ids = {row["id"] for row in migrated[section]}
+            migrated[section].extend(row for row in projection[section] if row["id"] not in existing_ids)
+        for section in ("build_observations", "python_launches"):
+            for row in migrated[section]:
+                row.update(CHECKER._reviewed_observation_refresh_fields(row["id"]))
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(migrated))
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(migrated))
+        migration_errors: list[str] = []
+        CHECKER._validate_runtime_lifecycle_contract(migrated, migration_errors)
+        self.assertEqual([], migration_errors)
+        self.assertEqual(25, len(CHECKER.REQUIRED_TEST_INVENTORY_FACTORY_CASES))
+        self.assertNotIn(CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID,
+                         {row[1] for row in CHECKER.REQUIRED_TEST_INVENTORY_FACTORY_CASES})
+
+    def test_runtime_lifecycle_material_build_mutations_fail_closed(self) -> None:
+        start, end = CHECKER._runtime_lifecycle_build_span(self.source)
+        block = self.source[start:end]
+        mutations = (
+            ('.cpu_arch = .aarch64', '.cpu_arch = .x86_64'),
+            ('.os_tag = .macos', '.os_tag = .linux'),
+            ('.abi = .none', '.abi = .gnu'),
+            ('.cpu_model = .baseline', '.cpu_model = .native'),
+            ('.optimize = test_optimize', '.optimize = optimize'),
+            ('.link_libc = true', '.link_libc = false'),
+            ('"dynamic_dispatch", false', '"dynamic_dispatch", true'),
+            ('"thread_limit", 2', '"thread_limit", 3'),
+            ('b.path("src/blas/runtime_lifecycle_probe.zig")', 'b.path("src/zynum.zig")'),
+            ('b.path("test/runtime/blas_io_lifecycle.c")', 'b.path("test/runtime/other.c")'),
+            ('"-Werror"', '"-Wno-error"'),
+            ('runtime_lifecycle_options_mod);', 'zynum_build_options_mod);'),
+            ('runtime_lifecycle_probe.getEmittedBin()', 'lib.getEmittedBin()'),
+            ('b.graph.host.result.os.tag == .macos', 'true'),
+            ('target.result.ofmt == .macho', 'true'),
+            ('&native_execution_check.step', '&test_inventory_structure_check.step'),
+            ('&test_inventory_structure_check.step', '&native_execution_check.step'),
+            ('test_runtime_lifecycle_step.dependOn(&unsupported_runtime_lifecycle.step);', ''),
+            ('b.addFail("test-runtime-lifecycle requires', 'b.addFail("unsupported lifecycle'),
+        )
+        for before, after in mutations:
+            with self.subTest(build_mutation=before):
+                expected_count = 2 if before in {".optimize = test_optimize", ".link_libc = true", "runtime_lifecycle_options_mod);"} else 1
+                self.assertEqual(expected_count, block.count(before))
+                positions = [match.start() for match in CHECKER.re.finditer(CHECKER.re.escape(before), block)]
+                for position in positions:
+                    changed_block = block[:position] + after + block[position + len(before):]
+                    changed = self.source[:start] + changed_block + self.source[end:]
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "runtime lifecycle"):
+                        CHECKER._runtime_lifecycle_build_span(changed)
+        aggregate = 'if (runtime_lifecycle_native_supported) test_step.dependOn(test_runtime_lifecycle_step);'
+        for changed in (
+            self.source.replace(aggregate, 'test_step.dependOn(test_runtime_lifecycle_step);'),
+            self.source.replace(aggregate, aggregate + '\n' + aggregate),
+            self.source + '\nruntime_lifecycle_probe.root_module.addObject(lib);\n',
+            self.source + '\nb.installArtifact(runtime_lifecycle_probe);\n',
+            self.source + '\nrun_runtime_lifecycle_tests.setCwd(b.path("elsewhere"));\n',
+        ):
+            with self.subTest(extra_binding=changed[-100:]):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "runtime lifecycle"):
+                    CHECKER._runtime_lifecycle_build_span(changed)
+
+    def test_runtime_lifecycle_unsupported_failure_is_named_step_guard(self) -> None:
+        value = self._projection()
+        rows = {row["id"]: row for row in value["build_observations"]}
+        failure = rows[CHECKER.RUNTIME_LIFECYCLE_FAILURE_ID]
+        self.assertEqual("conditional-named-step-guard", failure["aggregate_test_membership"])
+        self.assertEqual("not(runtime_lifecycle_native_supported)", failure["aggregate_condition"])
+        self.assertEqual(
+            "fail-closed dependency for explicit test-runtime-lifecycle requests on unsupported targets",
+            failure["orphan_reason"],
+        )
+        self.assertFalse(failure["intentional_orphan"])
+        self.assertFalse(failure["native_inventory_evidence"])
+        self.assertEqual([], failure["direct_dependencies"])
+        self.assertEqual(
+            [{"id": CHECKER.RUNTIME_LIFECYCLE_STEP_ID,
+              "condition": "runtime_lifecycle_native_supported"}],
+            rows[CHECKER.TEST_INVENTORY_AGGREGATE_STEP_ID]["direct_dependencies"],
+        )
+        self.assertIn(
+            {"id": CHECKER.RUNTIME_LIFECYCLE_FAILURE_ID,
+             "condition": "not (runtime_lifecycle_native_supported)"},
+            rows[CHECKER.RUNTIME_LIFECYCLE_STEP_ID]["direct_dependencies"],
+        )
+        for changes in (
+            {"aggregate_test_membership": "conditional-member"},
+            {"aggregate_condition": "runtime_lifecycle_native_supported"},
+            {"aggregate_test_membership": "conditional-member",
+             "aggregate_condition": "runtime_lifecycle_native_supported"},
+        ):
+            with self.subTest(unsupported_failure_drift=changes):
+                changed = copy.deepcopy(value)
+                next(row for row in changed["build_observations"]
+                     if row["id"] == CHECKER.RUNTIME_LIFECYCLE_FAILURE_ID).update(changes)
+                errors: list[str] = []
+                CHECKER._validate_runtime_lifecycle_contract(changed, errors)
+                self.assertEqual(
+                    {f"{CHECKER.RUNTIME_LIFECYCLE_FAILURE_ID}: runtime lifecycle {field} changed"
+                     for field in changes},
+                    set(errors),
+                )
+
+    def test_runtime_lifecycle_support_and_projection_mutations_fail_closed(self) -> None:
+        script = "test/runtime/run_blas_io_lifecycle.py"
+        source_mutations = (
+            (script, b'timeout=15', b'timeout=30'),
+            (script, b'for case in CASES:', b'for case in CASES[:1]:'),
+            (script, b'ZYNUM_MAXIMUM_THREADS="2"', b'ZYNUM_MAXIMUM_THREADS="3"'),
+            (script, b'result.stdout != expected or result.stderr', b'False'),
+            (script, b'[str(probe), case]', b'["other", case]'),
+            (script, b'platform.machine() != "arm64"', b'False'),
+            (script, b'"ordinary-persistent",', b'"other",'),
+            ("test/runtime/blas_io_lifecycle.c", b'a->sa_flags != b->sa_flags', b'0'),
+            ("test/runtime/blas_io_lifecycle.c", b'if (work)', b'if (0)'),
+            ("src/blas/runtime_lifecycle_probe.zig", b'if (!accepted) return 2;', b''),
+            ("src/blas/runtime_lifecycle_probe.zig", b'if (!work.helper_observed.load(.acquire)) return 4;', b''),
+        )
+        for path, before, after in source_mutations:
+            with self.subTest(support_mutation=(path, before)):
+                self.assertIn(before, self.support[path])
+                changed = {**self.support, path: self.support[path].replace(before, after, 1)}
+                with mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=lambda active, rel, subject: changed[rel]):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "runtime lifecycle support"):
+                        CHECKER._runtime_lifecycle_source_contract(None)
+        for mutation in ("missing-compile", "duplicate-child", "timeout", "guards", "kernel-objects", "native-evidence", "aggregate"):
+            with self.subTest(projection_mutation=mutation):
+                value = self._projection()
+                rows = {row["id"]: row for row in value["build_observations"]}
+                if mutation == "missing-compile":
+                    value["build_observations"].remove(rows[CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID])
+                elif mutation == "duplicate-child":
+                    value["python_launches"].append(copy.deepcopy(value["python_launches"][0]))
+                elif mutation == "timeout":
+                    value["python_launches"][0]["timeout_seconds"] = None
+                elif mutation == "guards":
+                    rows[CHECKER.RUNTIME_LIFECYCLE_LAUNCH_ID]["guard_dependencies"].pop()
+                elif mutation == "kernel-objects":
+                    rows[CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID]["kernel_objects"] = ["kernel_test_libraries"]
+                elif mutation == "native-evidence":
+                    rows[CHECKER.RUNTIME_LIFECYCLE_COMPILE_ID]["native_inventory_evidence"] = True
+                else:
+                    rows[CHECKER.TEST_INVENTORY_AGGREGATE_STEP_ID]["direct_dependencies"][0]["condition"] = "always"
+                errors: list[str] = []
+                CHECKER._validate_runtime_lifecycle_contract(value, errors)
+                self.assertTrue(errors)
+                self.assertTrue(all("runtime lifecycle" in error for error in errors))
+
+
+class CheckedAbiSourceContractTests(unittest.TestCase):
+    """The real checked graph has one closed, narrowly reviewed source contract."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+
+    def test_checked_exact_graph_and_run_receiver_projection(self) -> None:
+        start, end = CHECKER._checked_abi_build_span(self.source)
+        self.assertIn("const install_checked_abi", self.source[start:end])
+        self.assertEqual(1, len(CHECKER._checked_abi_receiver_uses(self.source)))
+        CHECKER._zig_build_context(self.source, "build.zig")
+        decorated = self.source[:start] + "// harmless graph comment\n" + self.source[start:]
+        CHECKER._checked_abi_build_span(decorated)
+
+    def test_checked_material_build_mutations_fail_closed(self) -> None:
+        mutations = (
+            ('"checked-abi", "Include', '"checked-api", "Include'),
+            ('"checked-abi", "Include the experimental checked ABI in default installation") orelse false', '"checked-abi", "Include the experimental checked ABI in default installation") orelse true'),
+            ('checked_dynamic_lib.dll_export_fns = false', 'checked_dynamic_lib.dll_export_fns = true'),
+            ('checked_test_lib.dll_export_fns = false', 'checked_test_lib.dll_export_fns = true'),
+            ('b.path("src/checked/exports.def")', 'b.path("src/blas/exports.def")'),
+            ('b.path("src/checked.zig")', 'b.path("src/zynum.zig")'),
+            ('.root_module = checked_abi_mod', '.root_module = zynum_mod'),
+            ('.root_module = checked_abi_test_mod', '.root_module = checked_abi_mod'),
+            ('const checked_abi_test_mod = b.createModule(.{\n        .root_source_file = b.path("src/checked.zig"),\n        .target = target,\n        .optimize = test_optimize', 'const checked_abi_test_mod = b.createModule(.{\n        .root_source_file = b.path("src/checked.zig"),\n        .target = target,\n        .optimize = optimize'),
+            ('"-std=c11", "-Wall", "-Wextra", "-Werror", "-pedantic"', '"-std=c11", "-Wall", "-Wextra", "-pedantic"'),
+            ('"-std=c++20"', '"-std=c++17"'),
+            ('b.path("test/headers/checked_c_smoke.c")', 'b.path("test/headers/other.c")'),
+            ('if (install_checked_abi) b.getInstallStep().dependOn(install_checked_abi_step);', 'b.getInstallStep().dependOn(install_checked_abi_step);'),
+            ('.custom = "lib/static"', '.custom = "lib"'),
+            ('check_checked_abi_step.dependOn(&check_checked_abi_generated.step);', ''),
+            ('check_checked_abi_step.dependOn(&checked_abi_exports.step);', ''),
+            ('checked_abi_exports.addArg("--static");', 'checked_abi_exports.addArg("--skip-static");'),
+            ('run_checked_c_smoke.step.dependOn(checked_native_guard);', ''),
+            ('run_checked_cpp_smoke.setCwd(checked_test_lib.getEmittedBinDirectory());', ''),
+            ('checked_c_smoke.root_module.addRPath(checked_test_lib.getEmittedBinDirectory());', ''),
+            ('checked_required_cpu_features.removeFeature(@backingInt(std.Target.aarch64.Feature.store_pair_suppress));', 'checked_required_cpu_features.removeFeature(@backingInt(std.Target.aarch64.Feature.sve));'),
+            ('else\n        &native_execution_check.step;\n    const run_checked_c_smoke', 'else\n        &check_checked_abi_generated.step;\n    const run_checked_c_smoke'),
+            ('"-fcheck=all"', '"-fcheck=none"'),
+            ('build_checked_fortran_smoke.step.dependOn(checked_native_guard);', ''),
+            ('target.result.os.version_range.semver.min', 'b.graph.host.result.os.version_range.semver.min'),
+            ('addOutputDirectoryArg2("checked-fortran-modules", .{ .prefix = "-J" })', 'addOutputDirectoryArg2("checked-fortran-modules", .{ .prefix = "-I" })'),
+            ('.prefix = "-Wl,-rpath,", .make_absolute = true', '.prefix = "-Wl,-rpath,", .make_absolute = false'),
+            ('run_checked_fortran_smoke.addFileArg(checked_fortran_exe);', 'run_checked_fortran_smoke.addArg("unreviewed-executable");'),
+            ('std.Build.Step.Run.create(b, "run checked Fortran consumer")', 'std.Build.Step.Run.create(b, "different consumer")'),
+        )
+        start, end = CHECKER._checked_abi_build_span(self.source)
+        block = self.source[start:end]
+        for before, after in mutations:
+            with self.subTest(before=before):
+                self.assertIn(before, block)
+                changed = self.source[:start] + block.replace(before, after, 1) + self.source[end:]
+                with self.assertRaisesRegex(CHECKER.InventoryError, "checked ABI"):
+                    CHECKER._checked_abi_build_span(changed)
+
+    def test_checked_owned_binding_and_extra_run_create_rejected(self) -> None:
+        _, end = CHECKER._checked_abi_build_span(self.source)
+        escaped = self.source[:end] + "\nconst escaped = checked_abi_mod;\n" + self.source[end:]
+        with self.assertRaisesRegex(CHECKER.InventoryError, "binding escapes"):
+            CHECKER._checked_abi_build_span(escaped)
+        extra = self.source[:end] + '\nconst another = std.Build.Step.Run.create(b, "extra");\n' + self.source[end:]
+        with self.assertRaisesRegex(CHECKER.InventoryError, "exactly one"):
+            CHECKER._checked_abi_receiver_uses(extra)
+
+    def test_checked_generator_schema_and_single_owner_sources_are_frozen(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="checked-abi-closure-") as temporary:
+            root = Path(temporary)
+            for path in ("build.zig", "build.zig.zon", *CHECKER.CHECKED_ABI_SOURCE_SHA256):
+                destination = root / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(REPOSITORY_ROOT / path, destination)
+            CHECKER._checked_abi_source_contract(CHECKER._make_discovery_context(root))
+            for path in CHECKER.CHECKED_ABI_SOURCE_SHA256:
+                destination = root / path
+                before = destination.read_bytes()
+                destination.write_bytes(before + b"\n// changed ownership or schema\n")
+                with self.subTest(path=path), self.assertRaisesRegex(CHECKER.InventoryError, "checked ABI source/ownership/schema"):
+                    CHECKER._checked_abi_source_contract(CHECKER._make_discovery_context(root))
+                destination.write_bytes(before)
+
+    def test_checked_formatter_and_selection_source_mutations_fail_closed(self) -> None:
+        support = {path: (REPOSITORY_ROOT / path).read_bytes()
+                   for path in CHECKER.CHECKED_ABI_SOURCE_SHA256}
+        path = "tools/generate_checked_abi.py"
+        mutations = (
+            (b'[zig, "fmt", "--stdin"]', b'[zig, "--stdin", "fmt"]'),
+            (b'[zig, "fmt", "--stdin"]', b'[zig, "run", "--stdin"]'),
+            (b'selected = select_profile(profile)', b'selected = select_profile()'),
+            (b'outputs(args.zig, args.profile)', b'outputs(args.zig)'),
+            (b"[zig, 'fmt', '--stdin']", b"[zig, 'run', '--stdin']"),
+            (b'plan = select_binding_set(profile, binding_set, target_contract)',
+             b'plan = select_binding_set(profile, binding_set, "unreviewed-target")'),
+            (b'    plan = select_binding_set(profile, binding_set, target_contract)',
+             b'    subprocess.run([zig, "version"])\n    plan = select_binding_set(profile, binding_set, target_contract)'),
+            (b'    selected = select_profile(profile)',
+             b'    subprocess.run([zig, "version"])\n    selected = select_profile(profile)'),
+        )
+        for before, after in mutations:
+            with self.subTest(mutation=before):
+                self.assertIn(before, support[path])
+                changed = {**support, path: support[path].replace(before, after, 1)}
+                with mock.patch.object(CHECKER, "_frozen_regular_bytes",
+                                       side_effect=lambda active, rel, subject: changed[rel]):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "checked ABI source/ownership/schema"):
+                        CHECKER._checked_abi_source_contract(None)
+        standard_path = "tools/standard_abi_bindings.py"
+        changed = {**support, standard_path: support[standard_path].replace(
+            b"GENERATION_ACCEPTANCES = MappingProxyType({",
+            b"GENERATION_ACCEPTANCES = MappingProxyType({'unreviewed': {}, ", 1)}
+        self.assertNotEqual(support[standard_path], changed[standard_path])
+        with mock.patch.object(CHECKER, "_frozen_regular_bytes",
+                               side_effect=lambda active, rel, subject: changed[rel]):
+            with self.assertRaisesRegex(CHECKER.InventoryError, "checked ABI source/ownership/schema"):
+                CHECKER._checked_abi_source_contract(None)
+        identifier = "python-launch:tools/generate_checked_abi.py:_render_subset:subprocess.run:1"
+        self.assertEqual({"owner": "abi-compatibility",
+                          "argv_shape": ["<explicit Zig formatter>", "fmt", "--stdin"],
+                          "launch_class": "finite-standard-abi-generated-source-formatter",
+                          "detail_status": "process-lifecycle-out-of-scope",
+                          "compile_for": "host", "execute_on": "host", "cwd_shape": "repository-root"},
+                         CHECKER._new_test_inventory_python_launch(identifier))
+        for unknown in (identifier.replace(":1", ":2"), identifier.replace(":_render_subset:", ":unreviewed_outputs:")):
+            with self.subTest(unknown_formatter=unknown), self.assertRaisesRegex(CHECKER.InventoryError, "no reviewed"):
+                CHECKER._new_test_inventory_python_launch(unknown)
+
+    def test_checked_exact_classification_and_output_sets(self) -> None:
+        paths = [row["path"] for row in CHECKER.CHECKED_ABI_CLASSIFICATIONS]
+        self.assertEqual(32, len(paths))
+        self.assertEqual(32, len(set(paths)))
+        self.assertEqual({"class": "non-generated-source", "kind": "python-source",
+                          "owner": "developer-tooling", "path": "tools/standard_abi_bindings.py"},
+                         next(row for row in CHECKER.CHECKED_ABI_CLASSIFICATIONS
+                              if row["path"] == "tools/standard_abi_bindings.py"))
+        self.assertIn("tools/standard_abi_bindings.py", CHECKER.CHECKED_ABI_SOURCE_SHA256)
+        self.assertTrue(CHECKER._requires_cached_bytes("tools/standard_abi_bindings.py", None))
+        self.assertEqual(6, len(CHECKER.CHECKED_ABI_OUTPUTS))
+        generated = {row["path"] for row in CHECKER.CHECKED_ABI_CLASSIFICATIONS if row["class"] == "designated-reproducible-contract-reference"}
+        # This historical checked-classification registry includes the two
+        # Sparse product sets. The later triangular solves have their own
+        # classifications; they are not additional checked-ABI outputs.
+        sparse_products = {
+            f"interface_subset/mkl2026.{width}/sparse-csr-csc-mv-mm-ordinary-{width}-v1/{name}"
+            for width in ("lp64", "ilp64")
+            for name in ("subset.h", "exports.zig", "abi_manifest.json", "exports.def")
+        }
+        self.assertEqual(8, len(sparse_products))
+        self.assertLessEqual(sparse_products, {row["path"] for row in CHECKER.FINITE_SPARSE_DERIVED_CANDIDATES})
+        self.assertEqual(set(CHECKER.CHECKED_ABI_OUTPUTS) | sparse_products, generated)
+        self.assertEqual(set(CHECKER.CHECKED_ABI_OUTPUTS), {row["path"] for row in CHECKER.CHECKED_ABI_DERIVED_CANDIDATES})
+        expected_inputs = ["tools/numerical_operation_schema.py", "tools/checked_abi_profile.py",
+                           "tools/checked_abi_schema.py", "tools/generate_checked_abi.py",
+                           "src/checked/implementation.zig", "build.zig.zon"]
+        for row in CHECKER.CHECKED_ABI_DERIVED_CANDIDATES:
+            self.assertEqual(expected_inputs, row["authoritative_inputs"])
+        for path in expected_inputs[:-1]:
+            self.assertIn(path, CHECKER.CHECKED_ABI_SOURCE_SHA256)
+            self.assertTrue(CHECKER._requires_cached_bytes(path, None))
+        migrated = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(migrated))
+        self.assertEqual(CHECKER.REQUIRED_SECTION_FACT_DIGESTS["derived_candidates"],
+                         CHECKER._json_fact_digest(migrated["derived_candidates"]))
+        for row in migrated["derived_candidates"]:
+            if row["path"] not in CHECKER.CHECKED_ABI_OUTPUTS:
+                continue
+            for missing in expected_inputs:
+                with self.subTest(output=row["path"], missing_input=missing):
+                    changed = copy.deepcopy(migrated["derived_candidates"])
+                    target = next(item for item in changed if item["id"] == row["id"])
+                    target["authoritative_inputs"].remove(missing)
+                    self.assertNotEqual(CHECKER.REQUIRED_SECTION_FACT_DIGESTS["derived_candidates"],
+                                        CHECKER._json_fact_digest(changed))
+        self.assertIn("src/checked.zig", paths)
+        package = CHECKER.CHECKED_ABI_PACKAGE_CANDIDATE
+        self.assertEqual("pkgconfig/zynum_checked.pc", package["path"])
+        self.assertEqual("non-generated-source", package["class"])
+        self.assertNotIn(package["path"], generated)
+        self.assertIn("checked-abi is true", package["install_disposition"])
+
+    def test_checked_workflow_projection_binds_material_changes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="checked-workflow-closure-") as temporary:
+            root = Path(temporary)
+            paths = ("build.zig", "build.zig.zon", ".github/workflows/ci.yml", ".github/workflows/release.yml")
+            for path in paths:
+                destination = root / path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(REPOSITORY_ROOT / path, destination)
+            observed = CHECKER._discover_workflow_launches(root)
+            by_id = {row["id"]: row for row in observed}
+            prefix = "workflow-launch:.github/workflows/ci.yml:target-tests:"
+            self.assertEqual("runner.os != 'Windows'", by_id[prefix + "run-checked-c-and-c-consumers"]["condition"])
+            self.assertEqual("matrix.full_smoke", by_id[prefix + "run-checked-fortran-consumer"]["condition"])
+            self.assertFalse(by_id[prefix + "run-checked-fortran-consumer"]["native_inventory_evidence"])
+            drift = by_id["workflow-launch:.github/workflows/ci.yml:source-checks:check-generated-files-are-up-to-date"]
+            self.assertIn("src/checked/exports.def", drift["argv_shape"][0])
+            baseline = {row["id"]: row["source_digest"] for row in observed}
+            ci = root / ".github/workflows/ci.yml"
+            before = ci.read_text()
+            start = before.index("      - name: Run checked C and C++ consumers")
+            end = before.index("      - name: Check ABI symbols", start)
+            block = before[start:end]
+            mutations = (
+                ("if: runner.os != 'Windows'", "if: always()"),
+                ("if: matrix.full_smoke", "if: always()"),
+                ("GITHUB_ENV=/dev/null", "GITHUB_ENV=/tmp/unchecked"),
+                ("PATH: ${{ steps.trusted-posix-tools.outputs.path }}", "PATH: /tmp/unchecked"),
+                ("-Dtest-optimize=safe", "-Dtest-optimize=fast"),
+                ('-Dchecked-gfortran="${{ steps.trusted-posix-tools.outputs.gfortran }}"', '-Dchecked-gfortran="gfortran"'),
+            )
+            for original, replacement in mutations:
+                with self.subTest(original=original):
+                    self.assertIn(original, block)
+                    ci.write_text(before[:start] + block.replace(original, replacement, 1) + before[end:])
+                    changed = {row["id"]: row["source_digest"] for row in CHECKER._discover_workflow_launches(root)}
+                    self.assertNotEqual(baseline, changed)
+            ci.write_text(before)
+            release = root / ".github/workflows/release.yml"
+            release_before = release.read_text()
+            for original, replacement in (("-Dchecked-abi=true", "-Dchecked-abi=false"), ("zig build check-checked-abi", "zig build build-checked-abi")):
+                with self.subTest(original=original):
+                    self.assertIn(original, release_before)
+                    release.write_text(release_before.replace(original, replacement, 1))
+                    changed = {row["id"]: row["source_digest"] for row in CHECKER._discover_workflow_launches(root)}
+                    self.assertNotEqual(baseline, changed)
+            release.write_text(release_before)
+
+    def test_checked_native_projection_preserves_existing_guard_rejection(self) -> None:
+        start, end = CHECKER._checked_abi_build_span(self.source)
+        native = self.source[:start] + self.source[end:]
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        CHECKER._annotate_native_feature_test_contract(native, copy.deepcopy(inventory["build_observations"]))
+        mutations = (
+            ('else if (!b.graph.host.result.cpu.features.isSuperSetOf(target.result.cpu.features))', 'else if (false)'),
+            ('native_execution_check.addThirdPartyEnabledArgQemu(.{ .enabled = "--native-executor=qemu" });', ''),
+            ('target.result.abi == b.graph.host.result.abi and', 'true and'),
+        )
+        for before, after in mutations:
+            self.assertIn(before, native)
+            with self.subTest(before=before), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._annotate_native_feature_test_contract(native.replace(before, after, 1), copy.deepcopy(inventory["build_observations"]))
+
+class CheckedAbiProfileGenerationTests(unittest.TestCase):
+    """Exercise checked input selection without compiler or native ABI claims."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        # The normal generator uses sibling imports. Keep that search-path change
+        # local to this import, with no private fixture or generated baseline.
+        with mock.patch.object(sys, "path", [str(REPOSITORY_ROOT / "tools"), *sys.path]), \
+             mock.patch.object(sys, "dont_write_bytecode", True):
+            import checked_abi_schema
+            import generate_checked_abi
+            import numerical_operation_schema
+        cls.schema = checked_abi_schema
+        cls.generator = generate_checked_abi
+        cls.core = numerical_operation_schema
+
+    def test_default_and_explicit_checked_inputs_preserve_consumer_contract(self):
+        selected = self.schema.select_profile()
+        self.assertEqual(self.schema.select_profile("checked-v1"), selected)
+        for name in self.schema.LEGACY_FIELDS:
+            self.assertEqual(getattr(self.schema, name), selected[name])
+            self.assertIs(type(getattr(self.schema, name)), type(selected[name]))
+        self.assertEqual(8, len(selected["FUNCTIONS"]))
+        self.assertEqual(self.schema.CHECKED_V1_CONTRACT_SHA256,
+                         hashlib.sha256(json.dumps(selected, separators=(",", ":")).encode()).hexdigest())
+        # A formatter-shaped mock checks its argv only; it is not a Zig build,
+        # formatter execution, or native symbol/layout observation.
+        with mock.patch.object(self.generator.subprocess, "run") as formatter:
+            formatter.side_effect = lambda *args, **kwargs: mock.Mock(stdout=kwargs["input"])
+            default = self.generator.outputs("formatter-must-not-run")
+            explicit = self.generator.outputs("formatter-must-not-run", "checked-v1")
+            self.assertEqual(default, explicit)
+            self.assertEqual(set(CHECKER.CHECKED_ABI_OUTPUTS), set(default))
+            self.assertEqual(4, formatter.call_count)  # Two Zig files per selection.
+            for call in formatter.call_args_list:
+                self.assertEqual((["formatter-must-not-run", "fmt", "--stdin"],), call.args)
+                self.assertEqual({"input", "text", "capture_output", "check"}, set(call.kwargs))
+                self.assertIsInstance(call.kwargs["input"], str)
+                for flag in ("text", "capture_output", "check"):
+                    self.assertIs(True, call.kwargs[flag])
+        for path, text in default.items():
+            if not path.endswith(".zig"):
+                self.assertEqual((REPOSITORY_ROOT / path).read_text(), text)
+
+    def assert_early_rejection(self, profile_id='checked-v1', profile=None, message=None):
+        registry = dict(self.schema.PROFILES)
+        if profile is not None:
+            registry[profile_id] = profile
+        with mock.patch.object(self.schema, 'PROFILES', registry), \
+             mock.patch.object(self.generator.subprocess, 'run') as formatter, \
+             mock.patch.object(Path, 'write_text') as write, \
+             mock.patch.object(Path, 'mkdir') as mkdir:
+            with self.assertRaises(self.schema.ProfileError) as error:
+                self.generator.outputs('formatter-must-not-run', profile_id)
+            if message:
+                self.assertIn(message, str(error.exception))
+            formatter.assert_not_called()
+            write.assert_not_called()
+            mkdir.assert_not_called()
+            with mock.patch.object(sys, 'argv', ['generator', '--profile', str(profile_id), '--root', 'must-not-exist']), \
+                 contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as exit:
+                    self.generator.main()
+                self.assertEqual(2, exit.exception.code)
+            formatter.assert_not_called()
+            write.assert_not_called()
+            mkdir.assert_not_called()
+
+    def test_common_math_and_checked_wire_inputs_are_separate_and_consumed(self):
+        self.assertEqual({'cholesky.factor', 'cholesky.solve', 'lu.factor', 'lu.solve', 'lu.driver',
+                          'tridiagonal.eigen', 'least_squares.rank_revealing', 'hermitian.eigen',
+                          'hermitian.generalized_eigen', 'symmetric.eigen', 'symmetric.generalized_eigen', 'sparse.mv', 'sparse.mm',
+                          'qr.factor', 'qr.apply_real', 'qr.apply_complex',
+                          'qr.generate_real', 'qr.generate_complex',
+                          'least_squares.rank_revealing_complex', 'svd.decompose',
+                          'cholesky.driver', 'triangular.solve', 'triangular.inverse', 'lu.inverse', 'cholesky.inverse',
+                          'sparse.trsv', 'sparse.trsm'}, set(self.core.OPERATIONS))
+        self.assertTrue(all(set(op) == {'scalar_types', 'index_types', 'operand_roles', 'contract'} for op in self.core.OPERATIONS.values()))
+        changed = copy.deepcopy(self.core.OPERATIONS)
+        changed['cholesky.factor']['scalar_types'] = ('f64',)
+        with mock.patch.object(self.schema, 'OPERATIONS', changed):
+            self.assert_early_rejection(message='Unsupported scalar binding')
+        changed = copy.deepcopy(self.core.OPERATIONS)
+        changed['cholesky.factor']['operand_roles'] = ('triangle', 'matrix')
+        with mock.patch.object(self.schema, 'OPERATIONS', changed):
+            self.assert_early_rejection(message='operand roles mismatch')
+
+    def test_unknown_and_unready_profiles_reject_before_formatter_or_writes(self):
+        for name in ('unknown-vendor', 'mkl2026.lp64', 'mkl2026.ilp64'):
+            with self.subTest(profile=name):
+                self.assert_early_rejection(name)
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        profile['generation_ready'] = False
+        self.assert_early_rejection(profile=profile, message='not ready')
+        profile['generation_ready'] = True
+        profile['unresolved_generation_inputs'] = ('missing reviewed layout',)
+        self.assert_early_rejection(profile=profile, message='not ready')
+
+    def test_profile_identity_and_incomplete_input_are_not_fallbacks(self):
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        profile['id'] = 'other-profile'
+        self.assert_early_rejection(profile=profile, message='selection/identity mismatch')
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        del profile['STATUS']
+        self.assert_early_rejection(profile=profile, message='incomplete')
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        profile['renderer'] = 'lapack-standard'
+        self.assert_early_rejection(profile=profile, message='No reviewed renderer')
+
+    def test_binding_ids_are_opaque_profile_field_controls_membership(self):
+        expected = self.schema.select_profile()
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        for i, binding in enumerate(profile['bindings']):
+            binding['id'] = 'mkl2026.lp64:misleading-' + str(i)
+        with mock.patch.dict(self.schema.PROFILES, {'checked-v1': profile}):
+            self.assertEqual(expected, self.schema.select_profile())
+        profile['bindings'][0]['id'] = 'checked-v1:apparently-selected'
+        profile['bindings'][0]['profile'] = 'mkl2026.lp64'
+        self.assert_early_rejection(profile=profile, message='different selected profile')
+
+    def test_operation_adapter_scalar_index_and_symbol_mismatches_reject(self):
+        changes = ((0, 'operation', 'cholesky.solve'), (0, 'operation', 'unimplemented.operation'),
+                   (0, 'adapter', 'solve'), (0, 'scalar', 'complex_f32'),
+                   (2, 'index', 'i32'), (2, 'symbol', 'csr_spmv_f64_u32'))
+        for offset, field, value in changes:
+            with self.subTest(field=field, value=value):
+                profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+                profile['bindings'][offset][field] = value
+                self.assert_early_rejection(profile=profile)
+
+    def test_status_layout_and_call_argument_drift_reject_before_formatter(self):
+        for mutation in ('status', 'layout', 'role', 'call-name', 'type-order', 'wire-name'):
+            with self.subTest(mutation=mutation):
+                profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+                if mutation == 'status':
+                    profile['STATUS']['NUMERICAL_FAILURE'] = 99
+                elif mutation == 'layout':
+                    profile['STRUCTS']['result'][2] = ('info', 'i32')
+                elif mutation == 'role':
+                    profile['adapters']['factor']['arguments'] = (('triangle', 'i32', 'triangle'), ('a', 'dense', 'matrix'))
+                elif mutation == 'call-name':
+                    profile['adapters']['factor']['arguments'] = (('a', 'dense', 'matrix'), ('wrong', 'i32', 'triangle'))
+                elif mutation == 'type-order':
+                    profile['adapters']['spmv']['type_arguments'] = ('index', 'scalar')
+                else:
+                    profile['adapters']['factor']['arguments'] = (('a', 'const_dense', 'matrix'), ('triangle', 'i32', 'triangle'))
+                self.assert_early_rejection(profile=profile)
+
+    def test_duplicate_or_missing_bindings_never_shrink_or_expand_exports(self):
+        for mutation in ('duplicate-id', 'duplicate-symbol', 'remove', 'add'):
+            with self.subTest(mutation=mutation):
+                profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+                if mutation == 'duplicate-id':
+                    profile['bindings'][1]['id'] = profile['bindings'][0]['id']
+                elif mutation == 'duplicate-symbol':
+                    profile['bindings'][1] = {**profile['bindings'][0], 'id': 'another-id'}
+                elif mutation == 'remove':
+                    profile['bindings'].pop()
+                else:
+                    profile['bindings'].append(copy.deepcopy(profile['bindings'][0]))
+                self.assert_early_rejection(profile=profile)
+
+    def test_adapter_entry_hash_is_a_binding_guard_not_a_runtime_claim(self):
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        profile['adapter_source']['sha256'] = '0' * 64
+        self.assert_early_rejection(profile=profile, message='source binding')
+        with mock.patch.object(Path, 'read_bytes', return_value=b'changed checked adapter'):
+            self.assert_early_rejection(message='entry source drift')
+
+    def test_ready_bit_cannot_turn_checked_profile_into_standard_exports(self):
+        profile = copy.deepcopy(self.schema.PROFILES['checked-v1'])
+        profile['id'] = 'mkl2026.lp64'
+        for binding in profile['bindings']:
+            binding['profile'] = 'mkl2026.lp64'
+        self.assert_early_rejection('mkl2026.lp64', profile, 'No reviewed renderer')
+        self.assertEqual({'checked-v1'}, {name for name, p in self.schema.PROFILES.items() if p['generation_ready']})
+
+
 class BuildInventoryTests(unittest.TestCase):
     maxDiff = 2000
 
@@ -88,6 +2182,56 @@ class BuildInventoryTests(unittest.TestCase):
             "tools/repository_snapshot.py",
             "test/headers/compat_headers.h",
         })
+        files.update(row["path"] for row in CHECKER.CHECKED_ABI_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.ADDITIVE_SPARSE_CLASSIFICATIONS)
+        files.update(CHECKER.ADDITIVE_SPARSE_GENERATOR_PINS)
+        files.update(row["path"] for row in CHECKER.CHECKED_CHOLESKY_CLASSIFICATIONS)
+        files.update(CHECKER.CHECKED_CHOLESKY_SOURCE_SHA256)
+        files.update(CHECKER.OPERATOR_PHASE_SOURCE_SHA256)
+        files.update(CHECKER.FFTW_F32_SOURCE_SHA256)
+        files.update(CHECKER.FEAST_SOURCE_SHA256)
+        files.update(CHECKER.CONTOUR_SOURCE_SHA256)
+        files.update(CHECKER.SYEV_SOURCE_SHA256)
+        files.update(CHECKER.SYGV_SOURCE_SHA256)
+        files.update(CHECKER.CONTROLS_SOURCE_SHA256)
+        files.update(CHECKER.EVD_SOURCE_SHA256)
+        files.update(CHECKER.GVD_SOURCE_SHA256)
+        files.update(CHECKER.GELS_SOURCE_SHA256)
+        files.update(CHECKER.GELSS_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.CONTROLS_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.EVD_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.GVD_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.GELS_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.GELSS_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.SYGV_COMPONENT_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.SYEV_COMPONENT_CLASSIFICATIONS)
+        files.update(CHECKER.POSV_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.POSV_CLASSIFICATIONS)
+        files.update(CHECKER.TRTRS_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.TRTRS_CLASSIFICATIONS)
+        files.update(CHECKER.TRTRI_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.TRTRI_CLASSIFICATIONS)
+        files.update(CHECKER.GETRI_SOURCE_SHA256)
+        files.update(row["path"] for row in CHECKER.GETRI_CLASSIFICATIONS)
+        files.update(row["path"] for row in CHECKER.POTRI_COMPONENT_CLASSIFICATIONS)
+        files.update(CHECKER.UNIFIED_BLAS_SOURCE_SHA256)
+        files.update(CHECKER.RUNTIME_LIFECYCLE_SOURCE_SHA256)
+        files.add(CHECKER.NUMERICS_RESOURCES_PATH)
+        files.update(CHECKER.SHARED_FACADE_SOURCE_SHA256)
+        files.update(CHECKER.EXECUTION_SOURCE_SHA256)
+        files.update(CHECKER.COMMON_CORE_SOURCE_SHA256)
+        files.update(CHECKER.MANAGED_LAPACKE_SOURCE_SHA256)
+        files.update(CHECKER.MANAGED_SPARSE_SOURCE_SHA256)
+        files.update(CHECKER.EXECUTION_OBJECT_SOURCE_SHA256)
+        files.update({
+            "src/abplas_operator_lp64.zig",
+            "src/abplas_sparse_lp64.zig",
+            "src/interop/operator_binding.zig",
+            "tools/fftw_profile.json",
+            "tools/generate_operator_interface.py",
+            "tools/interface_templates/fftw_exports.zig.in",
+        })
+        files.add("src/lapack/core/cholesky_contract.zig")
         files.add(CHECKER.DEPENDABOT_CONFIG_PATH)
         files.add(CHECKER.LEVEL2_WIDTH_STUB_ROOT_PATH)
         files.update(item["path"] for item in cls.inventory.get("build_manifests", []))
@@ -146,10 +2290,7 @@ class BuildInventoryTests(unittest.TestCase):
     def _append_to_build(self, statement: str, relative: str = "build.zig") -> None:
         path = self.root / relative
         text = path.read_text(encoding="utf-8")
-        masked = CHECKER._code_mask(text)
-        declaration = masked.index("pub fn build(")
-        body_start = masked.index("{", CHECKER._matching_paren(text, masked.index("(", declaration)))
-        body_end = CHECKER._matching_brace(masked, body_start)
+        body_end = _build_body_insertion_offset(text, relative)
         path.write_text(text[:body_end] + f"    {statement}\n" + text[body_end:], encoding="utf-8")
 
     def _assert_error_contains(self, expected: str) -> None:
@@ -379,7 +2520,7 @@ class BuildInventoryTests(unittest.TestCase):
         path.write_text(original, encoding="utf-8")
         self._append_to_build("zynum_mod.linkLibrary(structured_isolated_library.?);")
         self._assert_error_contains(
-            "link:build.zig:build:zynum_mod<-structured_isolated_library"
+            "numerics resources owner/source/target/attachment graph drifted"
         )
 
     def test_unlisted_build_launch_fails_closed(self) -> None:
@@ -422,14 +2563,34 @@ class BuildInventoryTests(unittest.TestCase):
                 "logical compile observations must be unique",
             ),
             (
-                "const inventory_cases = [21]InventoryCase{",
+                "const inventory_cases = [25]InventoryCase{",
                 "const inventory_cases = [20]InventoryCase{",
-                "must declare exactly 21 expansion cases",
+                "must declare exactly 25 expansion cases",
             ),
             (
                 "const structured_object_tests = if (target.result.cpu.arch == .x86_64)",
                 "const structured_object_tests = if (target.result.cpu.arch == .aarch64)",
                 "cannot normalize predicate for structured_object_tests",
+            ),
+            (
+                "if (!uses_facade_owner and official_tests != numerics_contract_tests and official_tests != execution_contract_tests)",
+                "if (official_tests != lapack_tests)",
+                "BLAS object attachments must preserve shared facade inheritance and numerical root exclusion",
+            ),
+            (
+                "if (!uses_facade_owner and official_tests != numerics_contract_tests and official_tests != execution_contract_tests)",
+                "if (official_tests != sparse_tests)",
+                "BLAS object attachments must preserve shared facade inheritance and numerical root exclusion",
+            ),
+            (
+                "if (!uses_facade_owner and official_tests != numerics_contract_tests and official_tests != execution_contract_tests)",
+                "if (official_tests != lapack_tests and official_tests != sparse_tests)",
+                "BLAS object attachments must preserve shared facade inheritance and numerical root exclusion",
+            ),
+            (
+                "if (!uses_facade_owner and official_tests != numerics_contract_tests and official_tests != execution_contract_tests)",
+                "if (true)",
+                "BLAS object attachments must preserve shared facade inheritance and numerical root exclusion",
             ),
         )
         baseline_build = (self.root / "build.zig").read_text(encoding="utf-8")
@@ -3181,7 +5342,7 @@ class BuildInventoryTests(unittest.TestCase):
             for item in inventory["build_observations"]
             if item["id"] == CHECKER.TEST_INVENTORY_FACTORY_COMPILE_ID
         )
-        self.assertEqual(21, factory["expansion_case_count"])
+        self.assertEqual(25, factory["expansion_case_count"])
         self.assertEqual(
             [
                 logical_id
@@ -3234,7 +5395,40 @@ class BuildInventoryTests(unittest.TestCase):
         }
         runner_paths = set(runner_functions)
         inventory_launches = self.inventory["python_launches"]
-        self.assertEqual(79, len(inventory_launches))
+        self.assertEqual(114, len(inventory_launches))
+        self.assertEqual(
+            {"python-launch:tools/generate_fftw_f32.py:render:subprocess.run:1":
+                "fftw-f32-generated-source-formatter"},
+            {item["id"]: item["launch_class"] for item in inventory_launches
+             if item["anchor"]["file"] == "tools/generate_fftw_f32.py"},
+        )
+        expected_module_launches = {
+            "python-launch:bench/modules/build.py:run:subprocess.run:1":
+                "benchmark-source-bound-host-build-and-provenance",
+            "python-launch:bench/modules/run_foundation_comparison.py:capture:subprocess.run:1":
+                "benchmark-host-and-repository-provenance",
+            "python-launch:bench/modules/run_foundation_comparison.py:main:subprocess.run:1":
+                "benchmark-source-bound-worker-transport",
+            "python-launch:tools/check_checked_abi.py:run:subprocess.run:1":
+                "checked-abi-artifact-inspection",
+            "python-launch:tools/generate_checked_abi.py:outputs:subprocess.run:1":
+                "checked-abi-generated-source-formatter",
+            "python-launch:tools/generate_checked_abi.py:_render_subset:subprocess.run:1":
+                "finite-standard-abi-generated-source-formatter",
+        }
+        self.assertEqual(
+            expected_module_launches,
+            {
+                item["id"]: item["launch_class"]
+                for item in inventory_launches
+                if item["anchor"]["file"] in {
+                    "bench/modules/build.py",
+                    "bench/modules/run_foundation_comparison.py",
+                    "tools/check_checked_abi.py",
+                    "tools/generate_checked_abi.py",
+                }
+            },
+        )
         self.assertEqual(
             {
                 "python-launch:tools/generate_multiversion.py:formatted:subprocess.run:1",
@@ -4288,7 +6482,17 @@ class BuildInventoryTests(unittest.TestCase):
         discovered_workflow_ids = {
             item["id"] for item in CHECKER._discover_workflow_launches(self.root)
         }
-        self.assertEqual(60, len(discovered_workflow_ids - {launch_id}))
+        self.assertEqual(62, len(discovered_workflow_ids - {launch_id}))
+        self.assertEqual(
+            {
+                "workflow-launch:.github/workflows/ci.yml:target-tests:run-checked-c-and-c-consumers",
+                "workflow-launch:.github/workflows/ci.yml:target-tests:run-checked-fortran-consumer",
+            },
+            {
+                identifier for identifier in discovered_workflow_ids
+                if ":run-checked-" in identifier
+            },
+        )
         expected_binding_ids = {
             "workflow-launch:.github/workflows/ci.yml:source-checks:bind-trusted-posix-toolchain-paths",
             "workflow-launch:.github/workflows/ci.yml:target-tests:bind-trusted-windows-toolchain-paths",
@@ -4644,6 +6848,8 @@ class BuildInventoryTests(unittest.TestCase):
                         "Link test inventory for ReleaseSafe target (POSIX structure-gated)",
                         "Link test inventory for ReleaseFast target (POSIX structure-gated)",
                         "Build install artifacts",
+                        "Run checked C and C++ consumers",
+                        "Run checked Fortran consumer",
                         "Check ABI symbols",
                         "Check install metadata",
                         "Run Zig example",
@@ -4700,7 +6906,7 @@ class BuildInventoryTests(unittest.TestCase):
                 ),
             )
             self.assertEqual(
-                43, sum(len(names) for _, _, names in protected_posix_jobs)
+                45, sum(len(names) for _, _, names in protected_posix_jobs)
             )
             for gate, binding_name, names in protected_posix_jobs:
                 self.assertEqual(
@@ -4783,7 +6989,7 @@ class BuildInventoryTests(unittest.TestCase):
 
             expected_channel_counts = (
                 (ci_jobs["source-checks"], 7),
-                (target_gate, 23),
+                (target_gate, 25),
                 (ci_jobs["capability-builds"], 2),
                 (release_jobs["build-inventory-security"], 3),
                 (release_jobs["test-inventory-security"], 2),
@@ -4868,7 +7074,7 @@ class BuildInventoryTests(unittest.TestCase):
 
         assert_terminal_singletons(ci_source)
         self.assertEqual(
-            46,
+            48,
             ci_source.count(f"        shell: {trusted_posix_shell}\n")
             + release_source.count(f"        shell: {trusted_posix_shell}\n"),
         )
@@ -8944,7 +11150,7 @@ class BuildInventoryTests(unittest.TestCase):
     def test_multiline_workflow_command_drift_fails(self) -> None:
         path = self.root / ".github/workflows/ci.yml"
         text = path.read_text(encoding="utf-8")
-        original = 'status="$(git status --porcelain --untracked-files=all -- include/zynum/blas docs/kernel_coverage.json)"'
+        original = 'status="$(git status --porcelain --untracked-files=all -- include/zynum/blas include/zynum/checked src/checked/abi_types.zig src/checked/exports.zig src/checked/exports.def docs/kernel_coverage.json)"'
         self.assertIn(original, text)
         path.write_text(text.replace(original, 'status=""', 1), encoding="utf-8")
         self._assert_error_contains(
@@ -9055,7 +11261,7 @@ class BuildInventoryTests(unittest.TestCase):
         self._write_inventory(inventory)
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
         self.assertIn(
-            "build.zig option surfaces must contain exactly 23 standard/project surfaces",
+            "build.zig option surfaces must contain exactly 43 standard/project surfaces",
             errors,
         )
         self.assertIn("default does not match source", errors)
@@ -9366,18 +11572,42 @@ class BuildInventoryTests(unittest.TestCase):
 
     def test_zig_comments_and_strings_do_not_create_calls(self) -> None:
         inventory = self._inventory()
-        baseline_ids = {
-            item["id"]
+        baseline_observations = {
+            item["id"]: item
             for item in CHECKER.discover(self.root, inventory)["build_observations"]
         }
+        checked_fortran_id = "launch:build.zig:build:run_checked_fortran_smoke"
+        checked_fortran = baseline_observations[checked_fortran_id]
+        self.assertEqual("std.Build.Step.Run.create", checked_fortran["call"])
+        self.assertEqual(
+            CHECKER.CHECKED_ABI_BUILD_CONTRACT_SHA256,
+            checked_fortran["source_digest"],
+        )
+        self.assertFalse(checked_fortran["native_inventory_evidence"])
+        checked_fortran_contract = next(
+            item for item in inventory["build_observations"]
+            if item["id"] == checked_fortran_id
+        )
+        self.assertEqual("generated-executable", checked_fortran_contract["command_shape"])
+        self.assertEqual(
+            ["<generated checked Fortran executable>"],
+            checked_fortran_contract["argv_shape"],
+        )
+        self.assertEqual(
+            "supplemental-foreign-language-consumer",
+            checked_fortran_contract["launch_class"],
+        )
         self._append_to_build(
             'const harmless = "b.option(bool, \\"not-an-option\\", \\"fixture\\")"; // b.step("not-a-step", "fixture")'
         )
-        observed_ids = {
-            item["id"]
+        observed = {
+            item["id"]: item
             for item in CHECKER.discover(self.root, inventory)["build_observations"]
         }
-        self.assertEqual(baseline_ids, observed_ids)
+        self.assertEqual(set(baseline_observations), set(observed))
+        # Run.create is bound to the exact checked block. Appending text outside
+        # that block preserves this launch while the full build-file pin rejects.
+        self.assertEqual(checked_fortran, observed[checked_fortran_id])
         errors = CHECKER.validate(self.root, self.inventory_path)
         expected_digest_errors = {
             "build_root_digests: full source changed for build.zig",
@@ -9389,6 +11619,7 @@ class BuildInventoryTests(unittest.TestCase):
                 and item["anchor"]["enclosing_function"] == "build"
                 and "source_digest" in item
                 and item["call"] != "implicit"
+                and item["id"] != checked_fortran_id
             ),
         }
         self.assertEqual(
@@ -9653,13 +11884,21 @@ class BuildInventoryTests(unittest.TestCase):
         original = path.read_text(encoding="utf-8")
         for before, after in (
             ("libraries[index].lto = .none", "libraries[index].lto = .full"),
-            ('options.addOption(bool, "dynamic_dispatch", false)', 'options.addOption(bool, "dynamic_dispatch", true)'),
+            ('\n        options.addOption(bool, "dynamic_dispatch", false);', '\n        options.addOption(bool, "dynamic_dispatch", true);'),
         ):
             with self.subTest(multiversion_factory=before):
-                self.assertIn(before, original)
+                self.assertEqual(1, original.count(before))
                 path.write_text(original.replace(before, after, 1), encoding="utf-8")
                 self._assert_error_contains("multiversion build factory target/options/non-LTO contract drifted")
                 path.write_text(original, encoding="utf-8")
+        for module in ("lapack", "sparse"):
+            for dependency in ("test_dynamic_step", "&test_inventory_structure_check.step", "&native_execution_check.step"):
+                before = f"run_dynamic_{module}_tests.step.dependOn({dependency});"
+                with self.subTest(dynamic_foundation_guard=before):
+                    self.assertIn(before, original)
+                    path.write_text(original.replace(before, "", 1), encoding="utf-8")
+                    self._assert_error_contains("dynamic correctness two-process/generator/native guard contract drifted")
+                    path.write_text(original, encoding="utf-8")
         self._append_to_build("register(b);")
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
         self.assertIn("source discovery failed closed", errors)
@@ -9736,7 +11975,7 @@ class BuildInventoryTests(unittest.TestCase):
         ).hexdigest()
         self._write_inventory(inventory)
         self._assert_error_contains(
-            "conditional_link_guard_digests must exactly match every conditional link edge"
+            "numerics resources owner/source/target/attachment graph drifted"
         )
 
     def test_nested_link_guard_mutation_survives_rehashed_root_digest(self) -> None:
@@ -9758,15 +11997,15 @@ class BuildInventoryTests(unittest.TestCase):
         ).hexdigest()
         self._write_inventory(inventory)
         self._assert_error_contains(
-            "conditional_link_guard_digests must exactly match every conditional link edge"
+            "numerics resources owner/source/target/attachment graph drifted"
         )
 
     def test_inline_link_guard_mutation_survives_rehashed_root_digest(self) -> None:
         path = self.root / "build.zig"
         text = path.read_text(encoding="utf-8")
-        original = "        zynum_test_mod.addObject(library);"
+        original = "        zynum_core_mod.addObject(library);"
         replacement = (
-            "        if (host_tool_smoke) zynum_test_mod.addObject(library);"
+            "        if (host_tool_smoke) zynum_core_mod.addObject(library);"
         )
         self.assertIn(original, text)
         path.write_text(text.replace(original, replacement, 1), encoding="utf-8")
@@ -9776,13 +12015,13 @@ class BuildInventoryTests(unittest.TestCase):
         ).hexdigest()
         self._write_inventory(inventory)
         self._assert_error_contains(
-            "conditional_link_guard_digests must exactly match every conditional link edge"
+            "numerics resources owner/source/target/attachment graph drifted"
         )
 
     def test_conditional_link_guard_digest_cannot_be_deleted(self) -> None:
         inventory = self._inventory()
         inventory["conditional_link_guard_digests"].pop(
-            "link:build.zig:build:zynum_mod<-stride2_isolated_library"
+            "link:build.zig:build:zynum_core_mod<-stride2_isolated_library"
         )
         self._write_inventory(inventory)
         self._assert_error_contains(
@@ -9859,7 +12098,30 @@ class BuildInventoryTests(unittest.TestCase):
         }
         root_dependencies = steps["step:build.zig:build:install"]["direct_dependencies"]
         root_ids = {item["id"] for item in root_dependencies}
-        self.assertEqual(13, len(root_ids))
+        self.assertEqual(14, len(root_ids))
+        checked_step_id = "step:build.zig:build:install-checked-abi"
+        self.assertEqual(
+            [{"id": checked_step_id, "condition": "checked-abi is true"}],
+            [item for item in root_dependencies if item["id"] == checked_step_id],
+        )
+        checked_step = steps[checked_step_id]
+        self.assertEqual("packaging", checked_step["step_role"])
+        self.assertEqual("not-member", checked_step["aggregate_test_membership"])
+        checked_dependencies = checked_step["direct_dependencies"]
+        self.assertEqual(7, len(checked_dependencies))
+        self.assertEqual(
+            {
+                "install:build.zig:build:checked_dynamic_install": "always",
+                "install:build.zig:build:lib/static": "target.result.ofmt != .macho",
+                "install:build.zig:build:libzynum_checked.a": "target.result.ofmt == .macho",
+                "install:build.zig:build:include/zynum/checked/checked.h": "always",
+                "install:build.zig:build:include/zynum/checked/checked.f90": "always",
+                "install:build.zig:build:include/zynum/checked/abi_manifest.json": "always",
+                "install:build.zig:build:pkgconfig/zynum_checked.pc": "always",
+            },
+            {item["id"]: item["condition"] for item in checked_dependencies},
+        )
+        self.assertTrue(root_ids.isdisjoint(item["id"] for item in checked_dependencies))
         self.assertNotIn("install:build.zig:build:install_rank_k_probe", root_ids)
         self.assertEqual(
             [{"id": "install:examples/zig/build.zig:build:exe", "condition": "always"}],
@@ -9902,8 +12164,21 @@ class BuildInventoryTests(unittest.TestCase):
             static["install_destinations_by_target"]["windows"]["primary"],
         )
         objects = [item for item in inventory["build_observations"] if item.get("artifact_kind") == "object"]
-        self.assertEqual(9, len(objects))
+        self.assertEqual(13, len(objects))
         self.assertEqual(8, sum(bool(item.get("isolated_library")) for item in objects))
+        self.assertEqual(
+            {"compile:build.zig:build:task_runtime_host_test_library", "compile:build.zig:buildKernelTiers:libraries",
+             "compile:build.zig:build:lapacke_lp64_defaults", "compile:build.zig:build:lapacke_ilp64_defaults",
+             "compile:build.zig:build:abplas_lp64_defaults"},
+            {item["id"] for item in objects if not item.get("isolated_library")},
+        )
+        defaults = [item for item in objects if item["id"] in {
+            "compile:build.zig:build:lapacke_lp64_defaults", "compile:build.zig:build:lapacke_ilp64_defaults",
+            "compile:build.zig:build:abplas_lp64_defaults"}]
+        self.assertEqual(3, len(defaults))
+        for item in defaults:
+            self.assertEqual(["src/interop/lapacke_default_errors.c"], item["root_source"])
+            self.assertEqual([], item["install_destinations"])
         for item in objects:
             self.assertEqual("b.addObject", item["call"])
             if item.get("isolated_library"):
@@ -10059,7 +12334,7 @@ class BuildInventoryTests(unittest.TestCase):
         )
         self._write_inventory(inventory)
         self._assert_error_contains(
-            "current gap ids must match the complete reviewed set"
+            "current_gaps reviewed fact set changed"
         )
 
     def test_abi_parity_aggregate_coverage_truth_is_mandatory(self) -> None:
@@ -14359,6 +16634,9 @@ class BuildInventoryTests(unittest.TestCase):
             "test/build/level2_width_default_artifact_probe.zig": "zig-source",
             "test/build/level2_width_enabled_artifact_probe.zig": "zig-source",
             "test/build/test_build_profiles.py": "python-source",
+            "src/blas/runtime_lifecycle_probe.zig": "zig-source",
+            "test/runtime/blas_io_lifecycle.c": "foreign-language-source",
+            "test/runtime/run_blas_io_lifecycle.py": "python-source",
             "test/build/test_test_inventory.py": "python-source",
             "test/build/windows_python_tooling_probe_fixture.zig": "zig-source",
             "tools/check_test_inventory.py": "python-source",
@@ -14371,6 +16649,36 @@ class BuildInventoryTests(unittest.TestCase):
                 self.assertEqual(kind, rows[path]["kind"])
                 self.assertEqual("non-generated-source", rows[path]["class"])
                 self.assertEqual("test-infrastructure", rows[path]["owner"])
+        for path in (
+            "src/lapack/core/complex_cholesky.zig",
+            "src/numerics/complex.zig",
+            "src/numerics/pivot.zig",
+            "src/lapack/core/lu.zig",
+            "src/lapack/complex_cholesky.zig",
+            "src/lapack/complex_lu.zig",
+            "src/lapack/complex_support.zig",
+            "src/lapack/factorization.zig",
+            "src/lapack/least_squares.zig",
+            "src/lapack/svd.zig",
+            "src/lapack/symmetric_eigen.zig",
+            "src/sparse/cg.zig",
+            "src/sparse/scalar.zig",
+            "src/sparse/triangular.zig",
+            "test/lapack/complex_test.zig",
+            "test/lapack/least_squares_test.zig",
+            "test/lapack/svd_test.zig",
+            "test/lapack/symmetric_eigen_test.zig",
+            "test/sparse/cg_test.zig",
+            "test/sparse/complex_test.zig",
+            "test/sparse/triangular_test.zig",
+        ):
+            with self.subTest(path=path):
+                self.assertEqual("zig-source", rows[path]["kind"])
+                self.assertEqual("non-generated-source", rows[path]["class"])
+                self.assertEqual(
+                    "test-infrastructure" if path.startswith("test/") else "library-source",
+                    rows[path]["owner"],
+                )
         self.assertNotIn("COPYING.LESSER", rows)
         for path in ("COPYING", "LICENSE"):
             with self.subTest(path=path):
@@ -14512,6 +16820,1062 @@ class BuildInventoryTests(unittest.TestCase):
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
         self.assertIn("must bind the exact reviewed controller/payload set", errors)
         self.assertIn("does not match the mechanical controller/payload counts", errors)
+
+
+class FiniteStandardBindingGenerationTests(unittest.TestCase):
+    """Finite source contracts; synthetic local acceptance is never ABI evidence."""
+
+    PROFILE = 'mkl2026.lp64'
+    SET = 'potrf-potrs-ordinary-lp64-v1'
+    LU_SET = 'potrf-potrs-getrf-getrs-ordinary-lp64-v1'
+    TARGET = 'apple-arm64-default-c-v1'
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        with mock.patch.object(sys, 'path', [str(REPOSITORY_ROOT / 'tools'), *sys.path]), \
+             mock.patch.object(sys, 'dont_write_bytecode', True):
+            import checked_abi_schema
+            import generate_checked_abi
+            import standard_abi_bindings
+        cls.schema = checked_abi_schema
+        cls.generator = generate_checked_abi
+        cls.standard = standard_abi_bindings
+        cls.production_acceptances = dict(standard_abi_bindings.GENERATION_ACCEPTANCES)
+        for module in (cls.schema, cls.generator, cls.standard):
+            if Path(module.__file__).resolve().parent != (REPOSITORY_ROOT / 'tools').resolve():
+                raise AssertionError('finite tests must import this repository tooling')
+
+    @contextlib.contextmanager
+    def fixture(self, profile=PROFILE, set_id=SET):
+        """Two independent synthetic source files, exact in-memory test acceptance.
+
+        No historical workspace, production pin rewrite or approval loader is
+        used. The temporary source projection deliberately is not library code.
+        Every patch and directory is reverted when this context exits.
+        """
+        self.assertEqual(self.production_acceptances, dict(self.standard.GENERATION_ACCEPTANCES))
+        with tempfile.TemporaryDirectory() as directory, contextlib.ExitStack() as stack:
+            root = Path(directory)
+            sources = {'src/fixture_factor.zig': b'// test fixture factor source\n',
+                       'src/fixture_services.zig': b'// test fixture services source\n'}
+            for relative, content in sources.items():
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(content)
+            relative, digest = self.standard.RESERVED_BLAS_MANIFEST
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes((REPOSITORY_ROOT / relative).read_bytes())
+            self.assertEqual(digest, hashlib.sha256(destination.read_bytes()).hexdigest())
+            dependencies = tuple(sorted((path, hashlib.sha256(data).hexdigest()) for path, data in sources.items()))
+            envelope = hashlib.sha256(json.dumps(dependencies, separators=(',', ':')).encode()).hexdigest()
+            stack.enter_context(mock.patch.object(self.schema, '_binding_source_root', return_value=root))
+            stack.enter_context(mock.patch.object(self.standard, 'SOURCE_DEPENDENCIES', dependencies))
+            stack.enter_context(mock.patch.object(self.standard, 'SOURCE_ENVELOPE_SHA256', envelope))
+            stack.enter_context(mock.patch.object(self.standard, 'SOURCE_SNAPSHOT_SHA256', envelope))
+            plan = self.schema._binding_candidate(profile, set_id, self.TARGET)
+            record = {'id': 'unit-test-only-local-source-acceptance', 'profile': profile, 'set': set_id,
+                      'target': self.TARGET, 'scope': 'finite-callable-generation-only',
+                      'plan_sha256': self.schema._binding_digest(plan), 'source_envelope_sha256': envelope,
+                      'review_sha256': hashlib.sha256(b'unit fixture; no native or review evidence').hexdigest()}
+            stack.enter_context(mock.patch.object(self.standard, 'GENERATION_ACCEPTANCES',
+                                                  {(profile, set_id, self.TARGET): record}))
+            yield root, record
+        self.assertEqual(self.production_acceptances, dict(self.standard.GENERATION_ACCEPTANCES))
+
+    @contextlib.contextmanager
+    def changed_binding(self, index=0, set_id=SET, **updates):
+        bindings = dict(self.standard.BINDINGS)
+        identity = self.standard.SETS[set_id]['bindings'][index]
+        bindings[identity] = {**bindings[identity], **updates}
+        with mock.patch.object(self.standard, 'BINDINGS', bindings):
+            yield
+
+    def select(self, profile=PROFILE, set_id=SET, target=TARGET):
+        return self.schema.select_binding_set(profile, set_id, target)
+
+    def cli(self, arguments):
+        with mock.patch.object(sys, 'argv', ['generate_checked_abi.py', *arguments]):
+            self.generator.main()
+
+    def fake_formatter(self, argv, **kwargs):
+        self.assertEqual(['fixture-formatter', 'fmt', '--stdin'], argv)
+        self.assertEqual({'input', 'text', 'capture_output', 'check'}, set(kwargs))
+        self.assertIs(kwargs['text'], True)
+        self.assertIs(kwargs['capture_output'], True)
+        self.assertIs(kwargs['check'], True)
+        return mock.Mock(stdout=kwargs['input'])
+
+    def test_production_acceptance_is_exact_finite_sets_with_shared_diagnostic_sources(self):
+        expected = {('mkl2026.' + width,
+                     stem + width + '-v1', self.TARGET)
+                    for stem in ('potrf-potrs-getrf-getrs-ordinary-',
+                                 'potrf-potrs-getrf-getrs-gesv-ordinary-',
+                                 'potrf-potrs-getrf-getrs-gesv-stev-ordinary-',
+                                 'potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-')
+                    for width in ('lp64', 'ilp64')}
+        expected |= {
+            ('mkl2026.lp64', 'hermitian-eigen-ordinary-lp64-v1', self.TARGET),
+            ('mkl2026.lp64', 'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-ordinary-lp64-v1', self.TARGET),
+        }
+        expected.update({("mkl2026.lp64", name, self.TARGET) for name in (
+            "geqrf-ormqr-unmqr-ordinary-lp64-v1",
+            "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-ordinary-lp64-v1",
+            "orgqr-ungqr-ordinary-lp64-v1",
+            "geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1",
+            "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1",
+            'gesvd-ordinary-lp64-v1',
+            'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-ordinary-lp64-v1',
+            'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-ordinary-lp64-v1',
+            'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-ordinary-lp64-v1',
+            'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-ordinary-lp64-v1',
+            "complex-gelsd-ordinary-lp64-v1",
+            "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-ordinary-lp64-v1",
+            "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-ordinary-lp64-v1",
+        )})
+        def original_symbol_count(set_id):
+            count = 8 if set_id == 'hermitian-eigen-ordinary-lp64-v1' else 56 if '-heev-hegv-' in set_id else 48 if '-gelsd-' in set_id else 44 if '-stev-' in set_id else 40 if '-gesv-' in set_id else 32
+            count = {
+                "geqrf-ormqr-unmqr-ordinary-lp64-v1": 16,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-ordinary-lp64-v1": 72,
+                "orgqr-ungqr-ordinary-lp64-v1": 8,
+                "geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1": 24,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1": 80,
+                'gesvd-ordinary-lp64-v1': 8,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-ordinary-lp64-v1': 64,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-ordinary-lp64-v1': 68,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-ordinary-lp64-v1': 88,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-ordinary-lp64-v1': 92,
+                "complex-gelsd-ordinary-lp64-v1": 4,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-ordinary-lp64-v1": 60,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-ordinary-lp64-v1": 84,
+            }.get(set_id, count)
+            return count
+
+        # These independently stated install combinations extend the original
+        # 23 sets. Never derive the expected whitelist from production SETS or
+        # GENERATION_ACCEPTANCES: an unexpected extra acceptance must fail.
+        install_bases = {
+            ('mkl2026.lp64', 'potrf-potrs-ordinary-lp64-v1'): 16,
+            ('mkl2026.ilp64', 'potrf-potrs-ordinary-ilp64-v1'): 16,
+            ('mkl2026.ilp64', 'potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-ilp64-v1'): 48,
+        }
+        for qr in (False, True):
+            for complex_gelsd in (False, True):
+                for svd in (False, True):
+                    name = ('potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv'
+                            + ('-geqrf-ormqr-unmqr-orgqr-ungqr' if qr else '')
+                            + ('-complex-gelsd' if complex_gelsd else '')
+                            + ('-gesvd' if svd else '') + '-ordinary-lp64-v1')
+                    install_bases[('mkl2026.lp64', name)] = 56 + 24 * qr + 4 * complex_gelsd + 8 * svd
+        self.assertEqual(11, len(install_bases))
+        extra_counts = {}
+        for (profile, name), count in install_bases.items():
+            extra_counts[(profile, name.replace('-ordinary-', '-posv-ordinary-'), self.TARGET)] = count + 8
+        self.assertEqual(11, len(extra_counts))
+        expected.update(extra_counts)
+        self.assertEqual(34, len(expected))
+        solve_bases = {**{(profile, name, self.TARGET): count
+                          for (profile, name), count in install_bases.items()}, **extra_counts}
+        solve_counts = {(profile, name.replace('-ordinary-', '-trtrs-ordinary-'), target): count + 8
+                        for (profile, name, target), count in solve_bases.items()}
+        solve_counts.update({('mkl2026.' + width, 'trtrs-ordinary-' + width + '-v1', self.TARGET): 8
+                             for width in ('lp64', 'ilp64')})
+        self.assertEqual(24, len(solve_counts))
+        extra_counts.update(solve_counts)
+        expected.update(solve_counts)
+        self.assertEqual(58, len(expected))
+        inverse_base = set(expected)
+        inverse_sources = {}
+        # Reuse the original independent symbol-count fixture, never a plan's
+        # actual count, for every original base plus its eight inverse symbols.
+        for profile, name, target in sorted(inverse_base):
+            old_count = extra_counts.get((profile, name, target))
+            if old_count is None:
+                old_count = original_symbol_count(name)
+            inverse_sources[(profile, name, target)] = old_count
+        inverse_counts = {(profile, name.replace('-ordinary-', '-trtri-ordinary-'), target): count + 8
+                          for (profile, name, target), count in inverse_sources.items()}
+        inverse_counts.update({('mkl2026.' + width, 'trtri-ordinary-' + width + '-v1', self.TARGET): 8
+                               for width in ('lp64', 'ilp64')})
+        self.assertEqual(60, len(inverse_counts))
+        extra_counts.update(inverse_counts)
+        expected.update(inverse_counts)
+        self.assertEqual(118, len(expected))
+        lu_inverse_sources = {(profile, name, target): extra_counts.get(
+            (profile, name, target), original_symbol_count(name))
+            for profile, name, target in expected}
+        lu_inverse_counts = {(profile, name.replace('-ordinary-', '-getri-ordinary-'), target): count + 8
+                             for (profile, name, target), count in lu_inverse_sources.items()}
+        lu_inverse_counts.update({('mkl2026.' + width, 'getri-ordinary-' + width + '-v1', self.TARGET): 8
+                                  for width in ('lp64', 'ilp64')})
+        self.assertEqual(120, len(lu_inverse_counts))
+        extra_counts.update(lu_inverse_counts)
+        expected.update(lu_inverse_counts)
+        self.assertEqual(238, len(expected))
+        self.assertEqual(expected, set(self.standard.GENERATION_ACCEPTANCES))
+        for profile, set_id, target in sorted(expected):
+            plan = self.select(profile, set_id, target)
+            count = 8 if set_id == 'hermitian-eigen-ordinary-lp64-v1' else 56 if '-heev-hegv-' in set_id else 48 if '-gelsd-' in set_id else 44 if '-stev-' in set_id else 40 if '-gesv-' in set_id else 32
+            count = {
+                "geqrf-ormqr-unmqr-ordinary-lp64-v1": 16,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-ordinary-lp64-v1": 72,
+                "orgqr-ungqr-ordinary-lp64-v1": 8,
+                "geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1": 24,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1": 80,
+                'gesvd-ordinary-lp64-v1': 8,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-gesvd-ordinary-lp64-v1': 64,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-gesvd-ordinary-lp64-v1': 68,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-gesvd-ordinary-lp64-v1': 88,
+                'potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-gesvd-ordinary-lp64-v1': 92,
+                "complex-gelsd-ordinary-lp64-v1": 4,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-complex-gelsd-ordinary-lp64-v1": 60,
+                "potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-complex-gelsd-ordinary-lp64-v1": 84,
+            }.get(set_id, count)
+            count = extra_counts.get((profile, set_id, target), count)
+            self.assertEqual(count, len(plan['symbols']))
+            if '-getri-ordinary-' in set_id:
+                records = [b for b in plan['bindings'] if b['operation'] == 'lu.inverse']
+                self.assertEqual(8, len(records))
+                self.assertEqual({(s, level) for s in ('f32', 'f64', 'complex_f32', 'complex_f64')
+                                  for level in ('high', 'work')}, {(b['scalar'], b['level']) for b in records})
+                integer = 'int' if profile == 'mkl2026.lp64' else 'long long int'
+                for binding in records:
+                    names = ['matrix_layout', 'n', 'a', 'lda', 'ipiv']
+                    if binding['level'] == 'work':
+                        names.extend(['work', 'lwork'])
+                    params = binding['wire_parameters']
+                    self.assertEqual(names, [p['name'] for p in params])
+                    self.assertFalse(params[2]['pointee_const'])
+                    self.assertTrue(params[4]['pointee_const'])
+                    self.assertEqual(integer, params[4]['c_type'])
+                    self.assertEqual(integer, binding['wire_return']['c_type'])
+                    self.assertEqual('raw_getri_profile_defaults', binding['recipe'])
+                    if binding['level'] == 'work':
+                        self.assertFalse(params[5]['pointee_const'])
+                        self.assertEqual(params[2]['c_type'], params[5]['c_type'])
+                        self.assertEqual(integer, params[6]['c_type'])
+            if set_id == 'hermitian-eigen-ordinary-lp64-v1' or '-heev-hegv-' in set_id:
+                records = [b for b in plan['bindings'] if b['operation'].startswith('hermitian.')]
+                self.assertEqual(8, len(records))
+                self.assertEqual({'complex_f32', 'complex_f64'}, {b['scalar'] for b in records})
+                self.assertEqual({'hermitian.eigen', 'hermitian.generalized_eigen'}, {b['operation'] for b in records})
+                self.assertEqual({'high', 'work'}, {b['level'] for b in records})
+            if '-gelsd-' in set_id and not set_id.startswith('complex-gelsd-'):
+                records = [b for b in plan['bindings'] if b['operation'] == 'least_squares.rank_revealing']
+                self.assertEqual(4, len(records))
+                for row in records:
+                    names = ['matrix_layout', 'm', 'n', 'nrhs', 'a', 'lda', 'b', 'ldb', 's', 'rcond', 'rank']
+                    if row['level'] == 'work':
+                        names.extend(['work', 'lwork', 'iwork'])
+                    self.assertEqual(names, [p['name'] for p in row['wire_parameters']])
+                    self.assertIn(row['scalar'], ('f32', 'f64'))
+            if '-stev-' in set_id:
+                records = [b for b in plan['bindings'] if b['operation'] == 'tridiagonal.eigen']
+                self.assertEqual(4, len(records))
+                for row in records:
+                    names = ['matrix_layout', 'jobz', 'n', 'd', 'e', 'z', 'ldz']
+                    if row['level'] == 'work':
+                        names.append('work')
+                    self.assertEqual(names, [p['name'] for p in row['wire_parameters']])
+                    self.assertIn(row['scalar'], ('f32', 'f64'))
+            self.assertFalse(plan['full_profile_ready'])
+            self.assertEqual('finite-callable-generation-only', plan['generation_acceptance']['scope'])
+            dependencies = dict(plan['source_dependencies'])
+            for path in ('src/interop/lapacke_services.zig', 'src/interop/lapacke_diagnostics.zig',
+                         'src/interop/lapacke_default_errors.c'):
+                self.assertEqual(hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest(), dependencies[path])
+            self.assertIn('per-call-profile-default-diagnostics-v1', plan['semantic_contracts'])
+            with self.assertRaisesRegex(self.schema.ProfileError, 'not ready'):
+                self.schema.select_profile(profile)
+        with self.assertRaisesRegex(self.schema.ProfileError, 'No callable generation acceptance'):
+            self.select(self.PROFILE, self.SET)
+
+    def test_complex_gelsd_component_types_and_three_query_destinations(self):
+        plan = self.select(self.PROFILE, 'complex-gelsd-ordinary-lp64-v1')
+        self.assertEqual(['LAPACKE_cgelsd', 'LAPACKE_cgelsd_work', 'LAPACKE_zgelsd', 'LAPACKE_zgelsd_work'], list(plan['symbols']))
+        for record in plan['bindings']:
+            real = 'float' if record['scalar'] == 'complex_f32' else 'double'
+            complex_type = 'MKL_Complex8' if record['scalar'] == 'complex_f32' else 'MKL_Complex16'
+            fields = {p['name']: p for p in record['wire_parameters']}
+            self.assertEqual(real, fields['s']['c_type'])
+            self.assertEqual(real, fields['rcond']['c_type'])
+            self.assertEqual(complex_type, fields['a']['c_type'])
+            self.assertEqual(complex_type, fields['b']['c_type'])
+            self.assertEqual('int', fields['rank']['c_type'])
+            if record['level'] == 'work':
+                self.assertEqual(['work', 'lwork', 'rwork', 'iwork'], [p['name'] for p in record['wire_parameters']][-4:])
+                self.assertEqual(real, fields['rwork']['c_type'])
+                self.assertEqual(complex_type, fields['work']['c_type'])
+                self.assertEqual('int', fields['iwork']['c_type'])
+            self.assertTrue(all(not p['pointee_const'] for p in record['wire_parameters']))
+        self.assertFalse(plan['full_profile_ready'])
+
+    def test_complex_gelsd_type_or_workspace_reordering_fails_before_render(self):
+        selected = 'complex-gelsd-ordinary-lp64-v1'
+        identity = self.standard.SETS[selected]['bindings'][1]
+        original = self.standard.BINDINGS[identity]
+        for field in ('s', 'rcond', 'rwork', 'work', 'iwork'):
+            parameters = tuple((name, 'scalar' if typ != 'scalar' else 'real', role, depth, const) if name == field else (name, typ, role, depth, const)
+                               for name, typ, role, depth, const in original['parameters'])
+            with self.subTest(field=field), self.changed_binding(index=1, set_id=selected, parameters=parameters), \
+                 mock.patch.object(self.generator.subprocess, 'run') as formatter:
+                with self.assertRaisesRegex(self.schema.ProfileError, 'Parameter order/role/type/pointer/const mismatch'):
+                    self.generator.subset_outputs(self.PROFILE, selected, self.TARGET, 'fixture-formatter')
+                formatter.assert_not_called()
+        parameters = (*original['parameters'][:-2], original['parameters'][-1], original['parameters'][-2])
+        with self.changed_binding(index=1, set_id=selected, parameters=parameters), \
+             mock.patch.object(self.generator.subprocess, 'run') as formatter:
+            with self.assertRaises(self.schema.ProfileError):
+                self.generator.subset_outputs(self.PROFILE, selected, self.TARGET, 'fixture-formatter')
+            formatter.assert_not_called()
+
+    def test_gesv_signature_preserves_mutable_factor_and_pivots_without_transpose(self):
+        for width in ('lp64', 'ilp64'):
+            records = [self.standard.BINDINGS['gesv-' + width + '-' + str(i)] for i in range(8)]
+            self.assertEqual({'LAPACKE_' + scalar + 'gesv' + suffix
+                              for scalar in 'sdcz' for suffix in ('', '_work')},
+                             {record['symbol'] for record in records})
+            for record in records:
+                self.assertEqual(['matrix_layout', 'n', 'nrhs', 'a', 'lda', 'ipiv', 'b', 'ldb'],
+                                 [parameter[0] for parameter in record['parameters']])
+                for parameter in record['parameters']:
+                    if parameter[0] in ('a', 'ipiv', 'b'):
+                        self.assertEqual((1, False), parameter[3:])
+            registry = {key: dict(value) for key, value in self.standard.BINDINGS.items()}
+            key = 'gesv-' + width + '-0'
+            parameters = list(registry[key]['parameters'])
+            parameters[5] = (*parameters[5][:4], True)
+            registry[key]['parameters'] = tuple(parameters)
+            with mock.patch.object(self.standard, 'BINDINGS', registry), \
+                 mock.patch.object(self.generator.subprocess, 'run') as formatter:
+                with self.assertRaises(self.schema.ProfileError):
+                    self.generator.subset_outputs('mkl2026.' + width,
+                        'potrf-potrs-getrf-getrs-gesv-ordinary-' + width + '-v1',
+                        self.TARGET, 'fixture-formatter')
+                formatter.assert_not_called()
+
+    def test_empty_acceptance_rejects_all_standard_generation_before_side_effects(self):
+        self.assertEqual(self.production_acceptances, dict(self.standard.GENERATION_ACCEPTANCES))
+        with mock.patch.object(self.standard, 'GENERATION_ACCEPTANCES', {}), \
+             mock.patch.object(self.generator.subprocess, 'run', side_effect=AssertionError('formatter reached')) as formatter, \
+             mock.patch.object(Path, 'mkdir', side_effect=AssertionError('mkdir reached')) as mkdir, \
+             mock.patch.object(Path, 'write_text', side_effect=AssertionError('write reached')) as write_text, \
+             mock.patch.object(Path, 'write_bytes', side_effect=AssertionError('write reached')) as write_bytes, \
+             mock.patch.dict(os.environ, {'ZYNUM_ACCEPT_BINDINGS': '*', 'ZYNUM_FORCE_ABI': '1'}):
+            for profile, set_id in ((self.PROFILE, self.SET), ('mkl2026.ilp64', 'potrf-potrs-ordinary-ilp64-v1'),
+                                    (self.PROFILE, self.LU_SET), ('mkl2026.ilp64', 'potrf-potrs-getrf-getrs-ordinary-ilp64-v1'),
+                                    (self.PROFILE, 'potrf-potrs-getrf-getrs-gesv-ordinary-lp64-v1'),
+                                    ('mkl2026.ilp64', 'potrf-potrs-getrf-getrs-gesv-ordinary-ilp64-v1')):
+                with self.subTest(profile=profile):
+                    with self.assertRaisesRegex(self.schema.ProfileError, 'No callable generation acceptance'):
+                        self.generator.subset_outputs(profile, set_id, self.TARGET, 'fixture-formatter')
+                    for check in ([], ['--check']):
+                        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit) as error:
+                            self.cli(['--profile', profile, '--binding-set', set_id, '--target-contract', self.TARGET, *check])
+                        self.assertEqual(2, error.exception.code)
+                    with self.assertRaisesRegex(self.schema.ProfileError, 'not ready'):
+                        self.schema.select_profile(profile)
+            for observer in (formatter, mkdir, write_text, write_bytes):
+                observer.assert_not_called()
+
+    def test_cli_closed_selection_and_checked_dispatch_preserved(self):
+        cases = [(['--binding-set', self.SET], 'both --binding-set and --target-contract'),
+                 (['--target-contract', self.TARGET], 'both --binding-set and --target-contract'),
+                 (['--force'], 'unrecognized arguments'),
+                 (['--profile', self.PROFILE], 'not ready'),
+                 (['--profile', self.PROFILE, '--binding-set', self.SET, '--target-contract', 'unreviewed'], 'Unreviewed target')]
+        for arguments, message in cases:
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()) as error_text, \
+                 mock.patch.object(self.generator.subprocess, 'run', side_effect=AssertionError('formatter reached')) as formatter, \
+                 self.assertRaises(SystemExit) as error:
+                self.cli(arguments)
+            self.assertEqual(2, error.exception.code)
+            self.assertIn(message, error_text.getvalue())
+            formatter.assert_not_called()
+        for arguments in ([], ['--profile', 'checked-v1']):
+            with mock.patch.object(self.generator, 'outputs', return_value={}) as checked, \
+                 mock.patch.object(self.generator, 'subset_outputs', side_effect=AssertionError('wrong branch')) as finite, \
+                 contextlib.redirect_stdout(io.StringIO()) as output:
+                self.cli(arguments)
+            checked.assert_called_once_with('zig', 'checked-v1')
+            finite.assert_not_called()
+            self.assertEqual('Generated 6 checked ABI outputs, 8 functions\n', output.getvalue())
+
+    def test_local_exact_plan_is_immutable_with_independent_width_and_const_roles(self):
+        for profile, set_id, integer, wire, internal in (
+                (self.PROFILE, self.SET, 'int', 'c_int', 'i32'),
+                ('mkl2026.ilp64', 'potrf-potrs-ordinary-ilp64-v1', 'long long int', 'c_longlong', 'i64')):
+            with self.subTest(profile=profile), self.fixture(profile, set_id):
+                plan = self.select(profile, set_id)
+                self.assertEqual(16, len(plan['bindings']))
+                self.assertEqual({'c_type': integer, 'zig_type': wire, 'internal_type': internal}, plan['bindings'][0]['wire_return'])
+                self.assertFalse(plan['full_profile_ready'])
+                self.assertEqual('pending', plan['runtime_abi_status'])
+                self.assertEqual('pending', plan['build_owner_identity_status'])
+                for binding in plan['bindings']:
+                    parameters = binding['wire_parameters']
+                    self.assertEqual(('int', 'c_int', 'i32'), tuple(parameters[0][k] for k in ('c_type', 'zig_type', 'internal_type')))
+                    self.assertEqual('char', parameters[1]['c_type'])
+                    if binding['operation'] == 'cholesky.solve':
+                        self.assertEqual(('matrix_layout', 'uplo', 'n', 'nrhs', 'a', 'lda', 'b', 'ldb'), tuple(p['name'] for p in parameters))
+                        self.assertIs(parameters[4]['pointee_const'], True)
+                        self.assertIs(parameters[6]['pointee_const'], False)
+                with self.assertRaises(TypeError):
+                    plan['profile'] = 'other'
+                with self.assertRaises(TypeError):
+                    plan['bindings'][0]['wire_parameters'][0]['c_type'] = 'long long int'
+                with self.assertRaises(TypeError):
+                    plan['owner_imports'][0]['instantiate'] = True
+
+    def test_membership_opaque_ids_duplicates_and_symbol_collisions_rejected(self):
+        for args, message in (((self.PROFILE, 'missing', self.TARGET), 'Unknown binding set'),
+                              (('checked-v1', self.SET, self.TARGET), 'Unknown standard profile'),
+                              (('mkl2026.ilp64', self.SET, self.TARGET), 'different profile')):
+            with self.subTest(args=args), self.assertRaisesRegex(self.schema.ProfileError, message):
+                self.select(*args)
+        identities = self.standard.SETS[self.SET]['bindings']
+        for values, message in (((), 'Empty'), (('missing', *identities[1:]), 'Unknown/empty'),
+                                ((identities[0], *identities[:-1]), 'Duplicate')):
+            sets = {**self.standard.SETS, self.SET: {**self.standard.SETS[self.SET], 'bindings': values}}
+            with mock.patch.object(self.standard, 'SETS', sets), self.assertRaisesRegex(self.schema.ProfileError, message):
+                self.select()
+        with self.changed_binding(1, symbol=self.standard.BINDINGS[identities[0]]['symbol']), \
+             self.assertRaisesRegex(self.schema.ProfileError, 'Symbol collision'):
+            self.select()
+        with self.changed_binding(symbol=self.schema.PREFIX + self.schema.FUNCTIONS[0][0]), \
+             self.assertRaisesRegex(self.schema.ProfileError, 'existing API/support'):
+            self.select()
+        renamed = 'opaque-id-without-width'
+        bindings = dict(self.standard.BINDINGS)
+        bindings[renamed] = {**bindings.pop(identities[0]), 'id': renamed}
+        sets = {**self.standard.SETS, self.SET: {**self.standard.SETS[self.SET], 'bindings': (renamed, *identities[1:])}}
+        with mock.patch.object(self.standard, 'BINDINGS', bindings), mock.patch.object(self.standard, 'SETS', sets):
+            with self.assertRaisesRegex(self.schema.ProfileError, 'No callable generation acceptance'):
+                self.select()
+            with self.fixture():
+                self.assertEqual(self.PROFILE, self.select()['bindings'][0]['profile'])
+
+    def test_parameters_owner_target_and_self_authorization_mutations_rejected(self):
+        original = self.standard.BINDINGS[self.standard.SETS[self.SET]['bindings'][2]]['parameters']
+        variants = (original[::-1],
+                    tuple((n, t, r, d, False) if n == 'a' else (n, t, r, d, c) for n, t, r, d, c in original),
+                    tuple((n, t, r, 2, c) if n == 'a' else (n, t, r, d, c) for n, t, r, d, c in original),
+                    tuple((n, t, 'matrix', d, c) if n == 'a' else (n, t, r, d, c) for n, t, r, d, c in original),
+                    tuple((n, t, r, True, c) if n == 'a' else (n, t, r, d, c) for n, t, r, d, c in original))
+        for parameters in variants:
+            with self.subTest(parameters=parameters), self.changed_binding(2, parameters=parameters), \
+                 self.assertRaisesRegex(self.schema.ProfileError, 'Parameter order/role/type/pointer/const'):
+                self.select()
+        for updates, message in (({'owner': '../new-owner.zig'}, 'call recipe'),
+                                 ({'recipe': 'arbitrary_source()'}, 'call recipe'),
+                                 ({'integer_family': 'explicit64'}, 'Explicit64'),
+                                 ({'declaration': ('invented.h',)}, 'Declaration'),
+                                 ({'semantic_contracts': ()}, 'Semantic/raw-fault/hook'),
+                                 ({'generation_acceptance': True}, 'self-authorize')):
+            with self.subTest(updates=updates), self.changed_binding(**updates), \
+                 self.assertRaisesRegex(self.schema.ProfileError, message):
+                self.select()
+        with mock.patch.object(self.standard, 'TARGET', {**self.standard.TARGET, 'arch': 'x86_64'}), \
+             self.assertRaisesRegex(self.schema.ProfileError, 'representation or visibility'):
+            self.select()
+        with mock.patch.object(self.standard, 'OWNER', {**self.standard.OWNER, 'instantiate': True}), \
+             self.assertRaisesRegex(self.schema.ProfileError, 'Owner recipe drift'):
+            self.select()
+        profiles = {**self.schema.PROFILES, self.PROFILE: {**self.schema.PROFILES[self.PROFILE], 'generation_ready': True}}
+        with mock.patch.object(self.schema, 'PROFILES', profiles), self.assertRaisesRegex(self.schema.ProfileError, 'must not enable'):
+            self.select()
+
+    def test_acceptance_and_source_changes_fail_closed_and_fixture_is_restored(self):
+        with self.fixture() as (root, accepted):
+            key = (self.PROFILE, self.SET, self.TARGET)
+            for update, message in (({'profile': 'mkl2026.ilp64'}, 'selection mismatch'),
+                                    ({'scope': 'full-profile-ready'}, 'scope'),
+                                    ({'plan_sha256': '0' * 64}, 'complete selected plan'),
+                                    ({'source_envelope_sha256': '0' * 64}, 'complete selected plan'),
+                                    ({'review_sha256': ''}, 'review digest'), ({'id': '*'}, 'identity')):
+                with self.subTest(update=update), mock.patch.object(self.standard, 'GENERATION_ACCEPTANCES', {key: {**accepted, **update}}), \
+                     self.assertRaisesRegex(self.schema.ProfileError, message):
+                    self.select()
+            with mock.patch.object(self.standard, 'SOURCE_DEPENDENCIES', self.standard.SOURCE_DEPENDENCIES[:-1]), \
+                 self.assertRaisesRegex(self.schema.ProfileError, 'Source envelope changed'):
+                self.select()
+            with mock.patch.object(self.standard, 'EXTERNAL_MODULE_CONTRACTS', (('root', 'replacement-owner'),)), \
+                 self.assertRaisesRegex(self.schema.ProfileError, 'complete selected plan'):
+                self.select()
+            victim = root / 'src/fixture_factor.zig'
+            victim.write_bytes(b'intentional local fixture drift')
+            with self.assertRaisesRegex(self.schema.ProfileError, 'dependency missing or changed'):
+                self.select()
+            victim.unlink()
+            with self.assertRaisesRegex(self.schema.ProfileError, 'dependency missing or changed'):
+                self.select()
+        with self.assertRaisesRegex(RuntimeError, 'fixture unwinding'):
+            with self.fixture():
+                raise RuntimeError('fixture unwinding')
+        self.assertEqual(self.production_acceptances, dict(self.standard.GENERATION_ACCEPTANCES))
+
+    def test_renderer_two_widths_have_exact_declarations_exports_and_limits(self):
+        scalars = (('s', 'float'), ('d', 'double'), ('c', 'lapack_complex_float'), ('z', 'lapack_complex_double'))
+        for profile, set_id, integer in ((self.PROFILE, self.SET, 'int'),
+                ('mkl2026.ilp64', 'potrf-potrs-ordinary-ilp64-v1', 'long long int')):
+            with self.subTest(profile=profile), self.fixture(profile, set_id), \
+                 mock.patch.object(self.generator.subprocess, 'run', side_effect=self.fake_formatter) as formatter:
+                result = self.generator.subset_outputs(profile, set_id, self.TARGET, 'fixture-formatter')
+            formatter.assert_called_once()
+            prefix = f'interface_subset/{profile}/{set_id}/'
+            self.assertEqual({prefix + name for name in ('subset.h', 'exports.zig', 'abi_manifest.json', 'exports.def')}, set(result))
+            header = result[prefix + 'subset.h']
+            expected = []
+            for letter, c_type in scalars:
+                for suffix in ('', '_work'):
+                    expected.append(f'{integer} LAPACKE_{letter}potrf{suffix}(int matrix_layout, char uplo, {integer} n, {c_type}* a, {integer} lda);')
+                    expected.append(f'{integer} LAPACKE_{letter}potrs{suffix}(int matrix_layout, char uplo, {integer} n, {integer} nrhs, const {c_type}* a, {integer} lda, {c_type}* b, {integer} ldb);')
+            self.assertEqual(sorted(expected), sorted(line for line in header.splitlines() if ' LAPACKE_' in line))
+            names = {line.split(' LAPACKE_', 1)[1].split('(', 1)[0] for line in expected}
+            source = result[prefix + 'exports.zig']
+            self.assertEqual(16, source.count('@export('))
+            for name in names:
+                self.assertIn('.name = "LAPACKE_' + name + '"', source)
+            self.assertIn('@import("lapacke-interface-owner")', source)
+            self.assertNotIn('wire-faults', source)
+            manifest = json.loads(result[prefix + 'abi_manifest.json'])
+            for flag in ('public_api_ready', 'full_vendor_profile_ready', 'standard_xerbla_compatibility'):
+                self.assertIs(manifest[flag], False)
+            self.assertEqual('pending', manifest['this_generated_artifact_runtime_status'])
+            self.assertEqual('mkl_types.h', manifest['type_declaration_reference']['path'])
+            self.assertEqual({'LAPACKE_' + name for name in names},
+                             {line.strip() for line in result[prefix + 'exports.def'].splitlines() if line.startswith('    LAPACKE_')})
+
+    def test_renderer_bad_plan_and_formatter_failure_leave_no_output(self):
+        with self.fixture(), self.changed_binding(recipe='arbitrary_source()'), \
+             mock.patch.object(self.generator.subprocess, 'run', side_effect=AssertionError('formatter reached')) as formatter, \
+             self.assertRaisesRegex(self.schema.ProfileError, 'call recipe'):
+            self.generator.subset_outputs(self.PROFILE, self.SET, self.TARGET, 'fixture-formatter')
+        formatter.assert_not_called()
+        with self.fixture() as (root, _), \
+             mock.patch.object(self.generator.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, ['fixture-formatter'])):
+            output = root / 'must-not-exist'
+            with self.assertRaises(subprocess.CalledProcessError):
+                self.cli(['--profile', self.PROFILE, '--binding-set', self.SET, '--target-contract', self.TARGET,
+                          '--zig', 'fixture-formatter', '--root', str(output)])
+            self.assertFalse(output.exists())
+
+    def test_local_cli_writes_four_files_and_readonly_check_detects_drift(self):
+        with self.fixture() as (root, _), mock.patch.object(self.generator.subprocess, 'run', side_effect=self.fake_formatter), \
+             contextlib.redirect_stdout(io.StringIO()):
+            output = root / 'outputs'
+            arguments = ['--profile', self.PROFILE, '--binding-set', self.SET, '--target-contract', self.TARGET,
+                         '--zig', 'fixture-formatter', '--root', str(output)]
+            self.cli(arguments)
+            files = sorted(p for p in output.rglob('*') if p.is_file())
+            self.assertEqual(4, len(files))
+            before = {str(p): p.read_bytes() for p in files}
+            self.cli([*arguments, '--check'])
+            self.assertEqual(before, {str(p): p.read_bytes() for p in files})
+            header = next(p for p in files if p.name == 'subset.h')
+            header.write_text('intentional fixture output drift')
+            with self.assertRaisesRegex(SystemExit, 'Generated drift'):
+                self.cli([*arguments, '--check'])
+            self.assertEqual('intentional fixture output drift', header.read_text())
+        self.assertEqual(self.production_acceptances, dict(self.standard.GENERATION_ACCEPTANCES))
+
+    def test_lu_combined_sets_preserve_old_members_and_exact_integer_pointer_roles(self):
+        for width, integer, wire, internal in (('lp64', 'int', 'c_int', 'i32'),
+                                              ('ilp64', 'long long int', 'c_longlong', 'i64')):
+            profile = 'mkl2026.' + width
+            old = 'potrf-potrs-ordinary-' + width + '-v1'
+            new = 'potrf-potrs-getrf-getrs-ordinary-' + width + '-v1'
+            self.assertEqual(self.standard.SETS[old]['bindings'], self.standard.SETS[new]['bindings'][:16])
+            with self.fixture(profile, new):
+                plan = self.select(profile, new)
+            self.assertEqual(32, len(plan['bindings']))
+            self.assertEqual(32, len(set(plan['symbols'])))
+            self.assertEqual({'lu.factor', 'lu.solve'}, {r['operation'] for r in plan['bindings'][16:]})
+            self.assertFalse(plan['full_profile_ready'])
+            self.assertEqual('pending', plan['runtime_abi_status'])
+            for row in plan['bindings'][16:]:
+                parameters = {p['name']: p for p in row['wire_parameters']}
+                solve = row['operation'] == 'lu.solve'
+                names = ('matrix_layout', 'trans', 'n', 'nrhs', 'a', 'lda', 'ipiv', 'b', 'ldb') if solve else (
+                    'matrix_layout', 'm', 'n', 'a', 'lda', 'ipiv')
+                self.assertEqual(names, tuple(parameters))
+                self.assertEqual('raw_getrs_profile_defaults' if solve else 'raw_getrf_profile_defaults', row['recipe'])
+                self.assertEqual((integer, wire, internal), tuple(row['wire_return'].values()))
+                self.assertEqual(('int', 'c_int', 'i32'), tuple(parameters['matrix_layout'][k] for k in ('c_type', 'zig_type', 'internal_type')))
+                for name in ('ipiv', 'n', 'lda'):
+                    self.assertEqual((integer, wire, internal), tuple(parameters[name][k] for k in ('c_type', 'zig_type', 'internal_type')))
+                self.assertEqual(1, parameters['ipiv']['pointer_depth'])
+                self.assertIs(parameters['ipiv']['pointee_const'], solve)
+                self.assertIs(parameters['a']['pointee_const'], solve)
+                if solve:
+                    self.assertEqual(('char', 'i8', 'u8-bitcast'), tuple(parameters['trans'][k] for k in ('c_type', 'zig_type', 'internal_type')))
+                    self.assertIs(parameters['b']['pointee_const'], False)
+
+    def test_lu_parameter_recipe_and_explicit64_mutations_fail_before_formatter(self):
+        # GETRF high is member16; GETRS high is member18 in the closed append-only set.
+        for index in (16, 18):
+            row = self.standard.BINDINGS[self.standard.SETS[self.LU_SET]['bindings'][index]]
+            parameters = row['parameters']
+            mutations = [parameters[::-1]]
+            for name, field, value in (('ipiv', 1, 'c_int'), ('ipiv', 3, 0), ('ipiv', 3, True),
+                                       ('ipiv', 4, not (index == 18)), ('ipiv', 2, 'matrix'),
+                                       ('matrix_layout', 1, 'lapack_int')):
+                mutations.append(tuple(tuple(value if n == name and i == field else part for i, part in enumerate(p))
+                                       for p in parameters for n in (p[0],)))
+            if index == 18:
+                mutations.append(tuple((n, 'lapack_int', r, d, c) if n == 'trans' else (n, t, r, d, c)
+                                       for n, t, r, d, c in parameters))
+            cases = [({'parameters': variant}, 'Parameter order/role/type/pointer/const') for variant in mutations]
+            cases += [({'recipe': 'raw_factor_profile_defaults' if index == 16 else 'raw_solve_profile_defaults'}, 'call recipe'),
+                      ({'recipe': 'raw_getrs_profile_defaults' if index == 16 else 'raw_getrf_profile_defaults'}, 'call recipe'),
+                      ({'integer_family': 'explicit64'}, 'Explicit64'),
+                      ({'owner': '../second-owner.zig'}, 'call recipe'),
+                      ({'semantic_contracts': self.standard.SEMANTIC_CONTRACTS}, 'Semantic/raw-fault/hook'),
+                      ({'operands': row['operands'][:-1]}, 'operand coverage'),
+                      ({'declaration': self.standard.BINDINGS[self.standard.SETS[self.SET]['bindings'][0]]['declaration']}, 'Declaration')]
+            for update, message in cases:
+                with self.subTest(index=index, update=update), self.fixture(self.PROFILE, self.LU_SET) as (root, _), \
+                     self.changed_binding(index, set_id=self.LU_SET, **update), \
+                     mock.patch.object(self.generator.subprocess, 'run', side_effect=AssertionError('formatter reached')) as formatter:
+                    destination = root / 'must-not-exist'
+                    with contextlib.redirect_stderr(io.StringIO()) as errors, self.assertRaises(SystemExit) as result:
+                        self.cli(['--profile', self.PROFILE, '--binding-set', self.LU_SET,
+                                  '--target-contract', self.TARGET, '--root', str(destination)])
+                    self.assertEqual(2, result.exception.code)
+                    self.assertIn(message, errors.getvalue())
+                    formatter.assert_not_called()
+                    self.assertFalse(destination.exists())
+        for operation in ('lu.factor', 'lu.solve'):
+            changed = {**self.schema.OPERATIONS, operation: {**self.schema.OPERATIONS[operation], 'index_types': ()}}
+            with self.fixture(self.PROFILE, self.LU_SET), mock.patch.object(self.schema, 'OPERATIONS', changed), \
+                 mock.patch.object(self.generator.subprocess, 'run', side_effect=AssertionError('formatter reached')) as formatter, \
+                 self.assertRaisesRegex(self.schema.ProfileError, 'Unsupported pivot index binding'):
+                self.generator.subset_outputs(self.PROFILE, self.LU_SET, self.TARGET, 'fixture-formatter')
+            formatter.assert_not_called()
+
+    def test_lu_membership_and_opaque_id_cannot_hide_missing_or_cross_width_bindings(self):
+        ids = self.standard.SETS[self.LU_SET]['bindings']
+        other = self.standard.SETS['potrf-potrs-getrf-getrs-ordinary-ilp64-v1']['bindings']
+        for values, message in ((ids[:-1], 'exact ordinary binding count'),
+                                ((*ids[:16], *ids[18:20], *ids[16:18], *ids[20:]), 'reordered finite'),
+                                ((*ids[:16], *other[16:]), 'different selected profile'),
+                                ((*ids, *other), 'Symbol collision')):
+            changed = {**self.standard.SETS, self.LU_SET: {**self.standard.SETS[self.LU_SET], 'bindings': values}}
+            with mock.patch.object(self.standard, 'SETS', changed), self.assertRaisesRegex(self.schema.ProfileError, message):
+                self.select(self.PROFILE, self.LU_SET)
+        renamed = 'opaque-lu-record-not-a-profile'
+        bindings = dict(self.standard.BINDINGS)
+        bindings[renamed] = {**bindings.pop(ids[18]), 'id': renamed}
+        sets = {**self.standard.SETS, self.LU_SET: {**self.standard.SETS[self.LU_SET],
+                                                'bindings': (*ids[:18], renamed, *ids[19:])}}
+        with mock.patch.object(self.standard, 'BINDINGS', bindings), mock.patch.object(self.standard, 'SETS', sets):
+            with self.assertRaisesRegex(self.schema.ProfileError, 'Acceptance does not bind'):
+                self.select(self.PROFILE, self.LU_SET)
+            with self.fixture(self.PROFILE, self.LU_SET):
+                self.assertEqual(self.PROFILE, self.select(self.PROFILE, self.LU_SET)['bindings'][18]['profile'])
+            bindings[renamed] = {**bindings[renamed], 'profile': 'mkl2026.ilp64'}
+            with self.assertRaisesRegex(self.schema.ProfileError, 'different selected profile'):
+                self.select(self.PROFILE, self.LU_SET)
+
+    def test_lu_renderer_exact_official_parameter_shapes_and_same_owner_templates(self):
+        import re
+        for width, integer in (('lp64', 'int'), ('ilp64', 'long long int')):
+            profile, set_id = 'mkl2026.' + width, 'potrf-potrs-getrf-getrs-ordinary-' + width + '-v1'
+            with self.fixture(profile, set_id), mock.patch.object(self.generator.subprocess, 'run', side_effect=self.fake_formatter) as formatter:
+                result = self.generator.subset_outputs(profile, set_id, self.TARGET, 'fixture-formatter')
+            formatter.assert_called_once()
+            prefix = f'interface_subset/{profile}/{set_id}/'
+            header, source = result[prefix + 'subset.h'], result[prefix + 'exports.zig']
+            expected = []
+            # Independent official C signature shapes; no schema parameter-table reuse.
+            for letter, scalar in (('s', 'float'), ('d', 'double'), ('c', 'lapack_complex_float'), ('z', 'lapack_complex_double')):
+                for suffix in ('', '_work'):
+                    expected += [f'{integer} LAPACKE_{letter}getrf{suffix}(int matrix_layout, {integer} m, {integer} n, {scalar}* a, {integer} lda, {integer}* ipiv);',
+                                 f'{integer} LAPACKE_{letter}getrs{suffix}(int matrix_layout, char trans, {integer} n, {integer} nrhs, const {scalar}* a, {integer} lda, const {integer}* ipiv, {scalar}* b, {integer} ldb);']
+            actual = [line for line in header.splitlines() if re.search(r'LAPACKE_[sdcz]getr[fs]', line)]
+            self.assertEqual(sorted(expected), sorted(actual))
+            self.assertEqual(32, source.count('@export('))
+            self.assertEqual(1, source.count('@import("lapacke-interface-owner")'))
+            self.assertEqual(1, source.count('binding.Shared.getrfRawManagedWithDefaults(true, T, InternalInt, level,'))
+            self.assertEqual(1, source.count('binding.Shared.getrsRawManagedWithDefaults(true, T, InternalInt, level,'))
+            for forbidden in ('@alignCast', 'Context.init', 'context.begin', 'setCallbacks(', '@import("../', 'pub fn main'):
+                self.assertNotIn(forbidden, source)
+            template = self.generator._LU_ZIG_TEMPLATE
+            factor = template[template.index('fn LuFactor('):template.index('fn LuSolve(')]
+            solve = template[template.index('fn LuSolve('):]
+            common = ['.layout = @as(c_int, @intCast(normalized_layout)),',
+                      '.n = @as(InternalInt, @intCast(n)),', '.lda = @as(InternalInt, @intCast(lda)),']
+            args = lambda body: [line.strip() for line in body.splitlines() if line.strip().startswith('.')]
+            self.assertEqual([common[0], '.m = @as(InternalInt, @intCast(m)),', common[1], '.values = a,', common[2],
+                              '.pivots = if (ipiv) |pointer| @as([*]align(1) InternalInt, @ptrCast(pointer)) else null,'], args(factor))
+            self.assertEqual([common[0], '.trans = @bitCast(trans),', common[1], '.nrhs = @as(InternalInt, @intCast(nrhs)),',
+                              '.a = a,', common[2], '.pivots = if (ipiv) |pointer| @as([*]align(1) const InternalInt, @ptrCast(pointer)) else null,',
+                              '.b = b,', '.ldb = @as(InternalInt, @intCast(ldb)),'], args(solve))
+            for body in (factor, solve):
+                self.assertIn('}, profileDefaults()) catch |err| terminal(@errorName(err));\n            return finish(result);', body)
+                self.assertNotIn('for (', body)
+                self.assertNotIn('while (', body)
+            self.assertIn('ipiv: ?[*]align(1) WireInt', factor)
+            self.assertIn('ipiv: ?[*]align(1) const WireInt', solve)
+            self.assertIn('@alignOf(WireInt) != @alignOf(InternalInt)', template)
+            manifest = json.loads(result[prefix + 'abi_manifest.json'])
+            self.assertEqual(integer, manifest['integer_model']['pivot_element_c_type'])
+            self.assertEqual('char', manifest['integer_model']['transpose_c_type'])
+            self.assertFalse(manifest['full_vendor_profile_ready'])
+            self.assertFalse(manifest['standard_xerbla_compatibility'])
+            self.assertEqual('pending', manifest['this_generated_artifact_runtime_status'])
+
+    def test_lu_cli_counts_and_failed_formatter_do_not_publish_partial_outputs(self):
+        with self.fixture(self.PROFILE, self.LU_SET) as (root, _):
+            destination = root / 'outputs'
+            arguments = ['--profile', self.PROFILE, '--binding-set', self.LU_SET, '--target-contract', self.TARGET,
+                         '--root', str(destination), '--zig', 'fixture-formatter']
+            with mock.patch.object(self.generator.subprocess, 'run', side_effect=subprocess.CalledProcessError(1, ['fixture-formatter'])), \
+                 self.assertRaises(subprocess.CalledProcessError):
+                self.cli(arguments)
+            self.assertFalse(destination.exists())
+            with mock.patch.object(self.generator.subprocess, 'run', side_effect=self.fake_formatter) as formatter, \
+                 contextlib.redirect_stdout(io.StringIO()) as output:
+                self.cli(arguments)
+                self.cli([*arguments, '--check'])
+            self.assertEqual(2, formatter.call_count)
+            self.assertEqual(['Generated 4 finite interface outputs, 32 functions; full profile not ready',
+                              'Checked 4 finite interface outputs, 32 functions; full profile not ready'], output.getvalue().splitlines())
+            self.assertEqual(4, sum(path.is_file() for path in destination.rglob('*')))
+
+    def test_lu_source_dependencies_include_both_engines_and_actual_shared_owner_bytes(self):
+        # Source identity only: this is neither compiler closure nor ABI evidence.
+        dependencies = dict(self.standard.SOURCE_DEPENDENCIES)
+        for path in ('src/interop/lapacke_getrf.zig', 'src/interop/lapacke_getrs.zig',
+                     'src/interop/lapacke_binding.zig', 'src/interop/lapacke_services.zig',
+                     'src/lapack/core/lu.zig', 'src/numerics/pivot.zig', 'src/zynum.zig',
+                     'src/numerics/execution/default.zig', 'src/numerics/execution/context.zig',
+                     'src/numerics/resources.zig', 'src/sparse/core/product.zig'):
+            self.assertIn(path, dependencies)
+        for path, expected in dependencies.items():
+            self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest(), path)
+        self.assertEqual(self.production_acceptances, dict(self.standard.GENERATION_ACCEPTANCES))
+        for profile in ('mkl2026.lp64', 'mkl2026.ilp64'):
+            self.assertIs(self.schema.PROFILES[profile]['generation_ready'], False)
+
+    def test_checked_six_frozen_files_and_shared_cleanup_template_contract(self):
+        expected = {
+            'include/zynum/checked/checked.h': '6d6ca6c9259d3b56612c1ed741c1b9deab3d3881f4f7147c1675107cc1a94c54',
+            'include/zynum/checked/checked.f90': '3c5dd455a1f748556c31c7cc380ee0d43f2af6bd4b7fa80977a0055b4734c7c5',
+            'include/zynum/checked/abi_manifest.json': '96355c7acf43925023771e33c20af42838a6d9b7662556f8dd1b333a69104755',
+            'src/checked/abi_types.zig': 'd80b207134bc498e83f8bafa35b3024d810a81c07e46897a1218fa6e2b7adec7',
+            'src/checked/exports.zig': '4e3ec3065541011d925088cd86be0ba9e1448756eba407aec361fd5e765d48b3',
+            'src/checked/exports.def': '90a5a4f2d7fb60c4999fc5e259698b754aaece465040152f1c17e934d68fb1a3',
+        }
+        self.assertEqual(set(CHECKER.CHECKED_ABI_OUTPUTS), set(expected))
+        for relative, digest in expected.items():
+            self.assertEqual(digest, hashlib.sha256((REPOSITORY_ROOT / relative).read_bytes()).hexdigest(), relative)
+        selected = self.schema.select_profile()
+        self.assertEqual(selected, self.schema.select_profile('checked-v1'))
+        for name in self.schema.LEGACY_FIELDS:
+            self.assertEqual(selected[name], getattr(self.schema, name))
+        template = self.generator._SUBSET_ZIG_TEMPLATE
+        terminal = template[template.index('fn terminal('):template.index('fn finish(')]
+        self.assertIn('std.c.abort();', terminal)
+        self.assertNotIn('observeReturned', terminal)
+        self.assertEqual(3, template.count('binding.Provider.Execution.getContext()'))
+        self.assertNotIn('Context.init', template)
+        self.assertNotIn('setCallbacks(', template)
+        self.assertEqual(2, template.count('}, profileDefaults()) catch'))
+        self.assertNotIn('allocator', template)
+        self.assertIn('scratch defers and Operation.end have already completed', terminal)
+
+
+
+class SparseInterfaceGenerationTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        with mock.patch.object(sys, 'path', [str(REPOSITORY_ROOT / 'tools'), *sys.path]), mock.patch.object(sys, 'dont_write_bytecode', True):
+            import checked_abi_schema
+            import standard_sparse_bindings
+            import standard_abi_bindings
+            import generate_sparse_abi
+            import generate_checked_abi
+        cls.schema = checked_abi_schema
+        cls.sparse = standard_sparse_bindings
+        cls.generator = generate_checked_abi
+        cls.variants = tuple((width, solved, 'sparse-csr-csc-mv-mm-' + ('trsv-trsm-' if solved else '') + 'ordinary-' + width + '-v1') for width in ('lp64', 'ilp64') for solved in (False, True))
+
+    def test_exact_acceptances_remain_finite(self):
+        self.assertEqual({('mkl2026.' + width, selected, self.sparse.TARGET_ID) for width, _, selected in self.variants}, set(self.sparse.GENERATION_ACCEPTANCES))
+        for width, solved, selected in self.variants:
+            plan = self.schema.select_binding_set('mkl2026.' + width, selected, self.sparse.TARGET_ID)
+            self.assertEqual(33 if solved else 25, len(plan['symbols']))
+            self.assertEqual('finite-callable-generation-only', plan['generation_acceptance']['scope'])
+            self.assertFalse(plan['full_profile_ready'])
+
+    def test_changed_acceptance_plan_is_rejected(self):
+        key = ('mkl2026.lp64', 'sparse-csr-csc-mv-mm-ordinary-lp64-v1', self.sparse.TARGET_ID)
+        for width, _, selected in self.variants:
+            key = ('mkl2026.' + width, selected, self.sparse.TARGET_ID)
+            records = dict(self.sparse.GENERATION_ACCEPTANCES)
+            records[key] = {**records[key], 'plan_sha256': '0' * 64}
+            with mock.patch.object(self.sparse, 'GENERATION_ACCEPTANCES', records):
+                with self.assertRaisesRegex(self.schema.ProfileError, 'complete selected plan'):
+                    self.schema.select_binding_set(*key)
+
+    def test_exact_both_widths_and_shared_owner(self):
+        expected = {'mkl_sparse_destroy'} | {'mkl_sparse_' + scalar + '_' + operation
+            for scalar in 'sdcz' for operation in ('create_csr', 'create_csc', 'export_csr', 'export_csc', 'mv', 'mm')}
+        for width, solved, selected in self.variants:
+            plan = self.schema._binding_candidate('mkl2026.' + width, selected, self.sparse.TARGET_ID)
+            solve_symbols = {'mkl_sparse_' + scalar + '_' + operation for scalar in 'sdcz' for operation in ('trsv', 'trsm')} if solved else set()
+            self.assertEqual(expected | solve_symbols, set(plan['symbols']))
+            self.assertEqual(4 if width == 'lp64' else 8, plan['integer_model'][3])
+            if solved:
+                self.assertIn('ordinary-' + width + '-csr-csc-triangular-diagonal-vector-panel-solve-v1', plan['semantic_contracts'])
+            self.assertFalse(plan['full_profile_ready'])
+            self.assertEqual('mkl_sparse_binding_mod', plan['owner_imports'][0]['module_local'])
+            self.assertFalse(plan['owner_imports'][0]['instantiate'])
+
+    def test_no_generation_or_formatter_before_acceptance(self):
+        with mock.patch.object(self.sparse, 'GENERATION_ACCEPTANCES', {}), mock.patch.object(self.generator.subprocess, 'run', side_effect=AssertionError('unexpected formatter')) as run:
+            for width, _, selected in self.variants:
+                with self.assertRaisesRegex(self.schema.ProfileError, 'No callable generation acceptance'):
+                    self.generator.subset_outputs('mkl2026.' + width, selected, self.sparse.TARGET_ID)
+            run.assert_not_called()
+
+    def test_wrong_profile_target_and_unknown_set_are_rejected(self):
+        for profile, selected, target in [('mkl2026.ilp64', 'sparse-csr-csc-mv-mm-ordinary-lp64-v1', self.sparse.TARGET_ID),
+                ('mkl2026.lp64', 'sparse-unknown', self.sparse.TARGET_ID),
+                ('mkl2026.lp64', 'sparse-csr-csc-mv-mm-ordinary-lp64-v1', 'unknown-target')]:
+            with self.assertRaises(self.schema.ProfileError):
+                self.schema._binding_candidate(profile, selected, target)
+
+    def test_changed_owner_or_source_envelope_is_rejected(self):
+        args = ('mkl2026.lp64', 'sparse-csr-csc-mv-mm-ordinary-lp64-v1', self.sparse.TARGET_ID)
+        with mock.patch.object(self.sparse, 'OWNER', {**self.sparse.OWNER, 'instantiate': True}):
+            with self.assertRaisesRegex(self.schema.ProfileError, 'drift'):
+                self.schema._binding_candidate(*args)
+        with mock.patch.object(self.sparse, 'SOURCE_DEPENDENCIES', self.sparse.SOURCE_DEPENDENCIES[:-1]):
+            with self.assertRaisesRegex(self.schema.ProfileError, 'source envelope drift'):
+                self.schema._binding_candidate(*args)
+
+        changed = copy.deepcopy(self.schema.OPERATIONS)
+        changed['sparse.mm']['operand_roles'] = ('matrix',)
+        with mock.patch.object(self.schema, 'OPERATIONS', changed):
+            with self.assertRaisesRegex(self.schema.ProfileError, 'operation domain mismatch'):
+                self.schema._binding_candidate(*args)
+
+    def test_existing_lapack_selections_remain_accepted(self):
+        for width in ('lp64', 'ilp64'):
+            plan = self.schema.select_binding_set('mkl2026.' + width,
+                'potrf-potrs-getrf-getrs-ordinary-' + width + '-v1', self.sparse.TARGET_ID)
+            self.assertEqual(32, len(plan['symbols']))
+
+
+
+
+class OperatorPhaseInventorySourceContractTests(unittest.TestCase):
+    def test_optional_phase_selector_guard_generator_and_metadata_are_exact(self) -> None:
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        CHECKER._numerics_resources_build_contract(source)
+        replacements = (
+            ('const operator_phase_agreement = b.option(bool,', 'const operator_phase_agreement = b.option(u32,'),
+            ('"operator-phase-agreement", "Include additional generated synchronous distributed phase agreement entries") orelse false;', '"operator-phase-agreement", "Include additional generated synchronous distributed phase agreement entries") orelse true;'),
+            ('if (operator_phase_agreement and operator_interface == .none)', 'if (operator_phase_agreement and operator_interface == .zynum_v1)'),
+            ('if (operator_phase_agreement and operator_interface == .none) {\n        std.log.err("operator-phase-agreement requires -Doperator-interface=zynum_v1", .{});\n        b.invalid_user_input = true;\n    }', 'if (operator_phase_agreement and operator_interface == .none) {\n        std.log.err("operator-phase-agreement requires -Doperator-interface=zynum_v1", .{});\n        b.invalid_user_input = false;\n    }'),
+            ('operator_generate.addArg("--with-phase-agreement");', ''),
+            ('operator_generate.addFileInput(b.path("src/numerics/synchronization.zig"));', ''),
+            ('if (operator_phase_agreement) "operator_phase_agreement=true\\n" else ""', '"operator_phase_agreement=true\\n"'),
+        )
+        for before, after in replacements:
+            with self.subTest(mutation=before):
+                self.assertEqual(1, source.count(before))
+                with self.assertRaises(CHECKER.InventoryError):
+                    CHECKER._numerics_resources_build_contract(source.replace(before, after, 1))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "phase selector escapes"):
+            CHECKER._numerics_resources_build_contract(source + "\nconst borrowed_phase = operator_phase_agreement;\n")
+
+    def test_phase_sources_and_finite_manifests_remain_frozen_and_classified(self) -> None:
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        CHECKER._numerics_resources_source_contract(context)
+        original = CHECKER._frozen_regular_bytes
+        self.assertEqual(27, len([p for p in CHECKER.OPERATOR_PHASE_SOURCE_SHA256 if p.startswith("interface_subset/")]))
+        for path in CHECKER.OPERATOR_PHASE_SOURCE_SHA256:
+            self.assertEqual(CHECKER.OPERATOR_PHASE_SOURCE_SHA256[path], hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest())
+            def drift(active: Any, rel: str, description: str, changed: str = path) -> bytes:
+                value = original(active, rel, description)
+                return value + b"\n" if rel == changed else value
+            with self.subTest(path=path), mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=drift):
+                with self.assertRaisesRegex(CHECKER.InventoryError, "source bytes drifted"):
+                    CHECKER._numerics_resources_source_contract(context)
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        CHECKER._apply_reviewed_build_inventory_migrations(inventory)
+        classifications = {r["path"]: r for r in inventory["repository_file_classifications"]}
+        for path, owner in (("src/numerics/synchronization.zig", "library-source"), ("src/operator_phase_candidate_test.zig", "test-infrastructure")):
+            self.assertEqual({"path": path, "kind": "zig-source", "owner": owner, "class": "non-generated-source"}, classifications[path])
+
+
+class TrtriInventoryContractTests(unittest.TestCase):
+    def test_closed_outputs_preserve_existing_roots_and_finite_runtime_scope(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        self.assertEqual(60, len(CHECKER.TRTRI_FINITE_SETS))
+        self.assertEqual(240, len(CHECKER.TRTRI_OUTPUTS))
+        self.assertEqual(247, len(CHECKER.TRTRI_CLASSIFICATIONS))
+        targets = {row["path"]: row for row in inventory["generator_targets"]}
+        classifications = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        for path in CHECKER.TRTRI_OUTPUTS:
+            self.assertEqual("tools/generate_checked_abi.py", targets[path]["anchor"]["file"])
+            self.assertEqual("subset_outputs", targets[path]["anchor"]["enclosing_function"])
+        for row in CHECKER.TRTRI_CLASSIFICATIONS:
+            self.assertEqual(row, classifications[row["path"]])
+        for path, expected in CHECKER.TRTRI_SOURCE_SHA256.items():
+            self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest())
+        self.assertEqual("false", CHECKER.TRTRI_OPTION_SURFACE["default"])
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        facts = CHECKER._numerics_resources_build_contract(source)
+        self.assertEqual("lapacke_binding_test_mod", facts["imports"]["lapack_tests.root_module"]["numerical-owner"])
+        self.assertEqual(128, len(facts["module_source_variants"]["lapacke_lp64_interface"]))
+        observations = {row["id"]: row for row in inventory["build_observations"]}
+        for width, count in (("lp64", 128), ("ilp64", 16)):
+            row = observations["compile:build.zig:build:lapacke_" + width + "_static"]
+            row = _prior_component_observation(self, row, width, count)
+            self.assertEqual(count + 1, len(row["source_variants"]))
+            self.assertEqual("src/lapacke_composed.zig", row["source_variants"]["lapacke-potri=true"])
+            base_variants = {key.removeprefix("lapacke-potri=false,"): value
+                             for key, value in row["source_variants"].items()
+                             if key.startswith("lapacke-potri=false,")}
+            self.assertEqual(count, len(base_variants))
+            row = {**row, "source_variants": base_variants,
+                   "root_source": [path for path in row["root_source"] if path != "src/lapacke_composed.zig"]}
+            self.assertEqual(sorted(row["root_source"]), sorted(row["source_variants"].values()))
+            self.assertTrue(all(",lapacke-trtri=" in key for key in row["source_variants"]))
+        self.assertNotIn("lapacke_trtri_tests", facts["root_owners"])
+        self.assertIsNone(CHECKER.NEXT_SOURCE_PROJECTION_SHA256)
+
+    def test_default_type_name_and_both_width_compositions_reject_mutation(self) -> None:
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        statement = '    const lapacke_trtri = b.option(bool, "lapacke-trtri", "Include generated four-scalar triangular inverse high/work in finite LP64/ILP64 and unified LP64 packages") orelse false;'
+        self.assertEqual(1, source.count(statement))
+        changes = [source.replace(statement, statement.replace("orelse false", "orelse true"), 1),
+                   source.replace(statement, statement.replace("b.option(bool", "b.option(usize"), 1),
+                   source.replace(statement, statement.replace('"lapacke-trtri"', '"unreviewed-trtri"'), 1)]
+        for width in ("lp64", "ilp64"):
+            before = '"{s}-trtri-ordinary-' + width + '-v1"'
+            self.assertEqual(1, source.count(before))
+            changes.append(source.replace(before, before.replace("-trtri-", "-unreviewed-trtri-"), 1))
+        for changed in changes:
+            self.assertNotEqual(source, changed)
+            with self.assertRaisesRegex(CHECKER.InventoryError, "selector|selection"):
+                CHECKER._numerics_resources_graph_facts(changed)
+
+
+class GetriInventoryContractTests(unittest.TestCase):
+    def test_closed_outputs_preserve_existing_roots_and_finite_runtime_scope(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        self.assertEqual(120, len(CHECKER.GETRI_FINITE_SETS))
+        self.assertEqual(480, len(CHECKER.GETRI_OUTPUTS))
+        self.assertEqual(487, len(CHECKER.GETRI_CLASSIFICATIONS))
+        targets = {row["path"]: row for row in inventory["generator_targets"]}
+        classifications = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        for path in CHECKER.GETRI_OUTPUTS:
+            self.assertEqual("tools/generate_checked_abi.py", targets[path]["anchor"]["file"])
+            self.assertEqual("subset_outputs", targets[path]["anchor"]["enclosing_function"])
+        for row in CHECKER.GETRI_CLASSIFICATIONS:
+            self.assertEqual(row, classifications[row["path"]])
+        for path, expected in CHECKER.GETRI_SOURCE_SHA256.items():
+            self.assertEqual(expected, hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest())
+        self.assertEqual("false", CHECKER.GETRI_OPTION_SURFACE["default"])
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        facts = CHECKER._numerics_resources_build_contract(source)
+        self.assertEqual("lapacke_binding_test_mod", facts["imports"]["lapack_tests.root_module"]["numerical-owner"])
+        self.assertEqual(128, len(facts["module_source_variants"]["lapacke_lp64_interface"]))
+        observations = {row["id"]: row for row in inventory["build_observations"]}
+        for width, count in (("lp64", 128), ("ilp64", 16)):
+            row = observations["compile:build.zig:build:lapacke_" + width + "_static"]
+            row = _prior_component_observation(self, row, width, count)
+            self.assertEqual(count + 1, len(row["source_variants"]))
+            self.assertEqual("src/lapacke_composed.zig", row["source_variants"]["lapacke-potri=true"])
+            base_variants = {key.removeprefix("lapacke-potri=false,"): value
+                             for key, value in row["source_variants"].items()
+                             if key.startswith("lapacke-potri=false,")}
+            self.assertEqual(count, len(base_variants))
+            row = {**row, "source_variants": base_variants,
+                   "root_source": [path for path in row["root_source"] if path != "src/lapacke_composed.zig"]}
+            self.assertEqual(sorted(row["root_source"]), sorted(row["source_variants"].values()))
+            self.assertTrue(all(key.startswith("lapacke-getri=") for key in row["source_variants"]))
+        self.assertNotIn("lapacke_getri_tests", facts["root_owners"])
+        self.assertIsNone(CHECKER.NEXT_SOURCE_PROJECTION_SHA256)
+
+    def test_default_type_name_and_both_width_compositions_reject_mutation(self) -> None:
+        source = (REPOSITORY_ROOT / "build.zig").read_text()
+        statement = '    const lapacke_getri = b.option(bool, "lapacke-getri", "Include generated four-scalar LU inverse high/work/query in finite LP64/ILP64 and unified LP64 packages") orelse false;'
+        self.assertEqual(1, source.count(statement))
+        changes = [source.replace(statement, statement.replace("orelse false", "orelse true"), 1),
+                   source.replace(statement, statement.replace("b.option(bool", "b.option(usize"), 1),
+                   source.replace(statement, statement.replace('"lapacke-getri"', '"unreviewed-getri"'), 1)]
+        for width in ("lp64", "ilp64"):
+            before = '"{s}-getri-ordinary-' + width + '-v1"'
+            self.assertEqual(1, source.count(before))
+            changes.append(source.replace(before, before.replace("-getri-", "-unreviewed-getri-"), 1))
+        for changed in changes:
+            self.assertNotEqual(source, changed)
+            with self.assertRaisesRegex(CHECKER.InventoryError, "selector|selection"):
+                CHECKER._numerics_resources_graph_facts(changed)
+
+
+class PotriComponentInventoryContractTests(unittest.TestCase):
+    def test_exact_component_outputs_are_owned_and_route_to_component_generator(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        expected = {f"interface_components/mkl2026.{width}/potri-v1/{name}"
+                    for width in ("lp64", "ilp64")
+                    for name in ("lapacke.h", "lapacke_potri.h", "exports.zig", "exports.def", "abi_manifest.json")}
+        self.assertEqual(expected, set(CHECKER.POTRI_COMPONENT_OUTPUTS))
+        self.assertEqual(20, len(CHECKER.POTRI_COMPONENT_CLASSIFICATIONS))
+        targets = {row["path"]: row for row in inventory["generator_targets"]}
+        candidates = {row["id"]: row for row in inventory["derived_candidates"]}
+        classifications = {row["path"]: row for row in inventory["repository_file_classifications"]}
+        for row in CHECKER.POTRI_COMPONENT_CLASSIFICATIONS:
+            self.assertEqual(row, classifications[row["path"]])
+        for row in CHECKER.POTRI_COMPONENT_DERIVED_CANDIDATES:
+            self.assertEqual(row, candidates[row["id"]])
+            self.assertIn("tools/generate_lapacke_component.py", row["authoritative_inputs"])
+            self.assertEqual("tools/generate_lapacke_component.py", targets[row["path"]]["anchor"]["file"])
+            self.assertEqual("outputs", targets[row["path"]]["anchor"]["enclosing_function"])
+        self.assertEqual("false", CHECKER.POTRI_COMPONENT_OPTION_SURFACE["default"])
+        self.assertIsNone(CHECKER.NEXT_SOURCE_PROJECTION_SHA256)
+
+    def test_component_selection_preserves_every_prior_base_and_replaces_only_outer_root(self) -> None:
+        inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
+        rows = {row["id"]: row for row in inventory["build_observations"]}
+        graph = CHECKER._numerics_resources_build_contract((REPOSITORY_ROOT / "build.zig").read_text())
+        for width, count in (("lp64", 128), ("ilp64", 16)):
+            identifier = "compile:build.zig:build:lapacke_" + width + "_static"
+            prior = graph["module_source_variants"]["lapacke_" + width + "_interface"]
+            self.assertEqual(count, len(prior))
+            self.assertEqual(count, len(set(prior.values())))
+            observation = _prior_component_observation(self, rows[identifier], width, count)
+            variants = observation["source_variants"]
+            false_variants = {key.removeprefix("lapacke-potri=false,"): value
+                              for key, value in variants.items()
+                              if key.startswith("lapacke-potri=false,")}
+            self.assertEqual(count, len(false_variants))
+            self.assertEqual(set(prior.values()), set(false_variants.values()))
+            axes = ("lapacke-getri", "lapacke-trtri", "lapacke-trtrs", "lapacke-posv")
+            if width == "lp64":
+                axes += ("lapacke-svd", "lapacke-complex-gelsd", "lapacke-qr")
+            combinations = set()
+            for key in false_variants:
+                parts = key.split(",")
+                choices = dict(part.split("=") for part in parts)
+                self.assertEqual(len(axes), len(parts))
+                self.assertEqual(set(axes), set(choices))
+                self.assertTrue(all(value in ("false", "true") for value in choices.values()))
+                combinations.add(tuple(choices[axis] for axis in axes))
+            self.assertEqual(2 ** len(axes), len(combinations))
+            self.assertEqual(count + 1, len(variants))
+            self.assertEqual("src/lapacke_composed.zig", variants["lapacke-potri=true"])
+            self.assertEqual(sorted(set(variants.values())), observation["root_source"])
+        self.assertEqual(8, len(graph["module_borrow_variants"]))
+        self.assertEqual(CHECKER.POTRI_MODULE_BORROWS,
+                         {key: graph["module_borrow_variants"][key] for key in CHECKER.POTRI_MODULE_BORROWS})
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
-//! Declarative baseline for the reachable public Zig BLAS surface.
+//! Declarative baseline for the reachable public Zig module surface.
 //!
 //! Source paths are repository-relative declaration owners. A namespace is
 //! listed once per import surface even when several surfaces reach the same
@@ -17,6 +17,8 @@ pub const Surface = enum {
 
 pub const NamespaceRole = enum {
     root,
+    lapack,
+    sparse,
     types,
     runtime,
     api,
@@ -27,6 +29,8 @@ pub const NamespaceRole = enum {
 
 pub const NamespaceId = enum {
     zynum,
+    zynum_lapack,
+    zynum_sparse,
     zynum_types,
     zynum_runtime,
     zynum_api,
@@ -187,6 +191,8 @@ pub const root_declarations: []const []const u8 = &.{
 
 pub const zynum_root_declarations: []const []const u8 = &.{
     "blas",
+    "lapack",
+    "sparse",
     "types",
     "runtime",
     "api",
@@ -222,6 +228,84 @@ pub const zynum_root_declarations: []const []const u8 = &.{
     "matrixMultiplyWorkspaceLength",
     "matrixMultiply",
     "matrixMultiplyWithWorkspace",
+};
+
+pub const lapack_declarations: []const []const u8 = &.{
+    "ComplexF32",
+    "ComplexF64",
+    "complexF32",
+    "complexF64",
+    "Matrix",
+    "ConstMatrix",
+    "matrix",
+    "constMatrix",
+    "PivotInt",
+    "Error",
+    "Triangle",
+    "QOperation",
+    "QSide",
+    "choleskyFactorize",
+    "choleskySolve",
+    "luFactorize",
+    "luSolve",
+    "qrFactorize",
+    "qrApplyQ",
+    "qrApplyQSide",
+    "qrGenerateQ",
+    "qrLeastSquaresSolve",
+    "SymmetricEigenOptions",
+    "SymmetricEigenStatus",
+    "SymmetricEigenResult",
+    "symmetricEigenDecompose",
+    "SvdOptions",
+    "SvdStatus",
+    "SvdResult",
+    "SvdWorkspaceScalar",
+    "svdWorkspaceLength",
+    "svdDecompose",
+    "svdRectangularWorkspaceLength",
+    "svdRectangularScratchLength",
+    "svdDecomposeRectangular",
+};
+
+pub const sparse_declarations: []const []const u8 = &.{
+    "ComplexF32",
+    "ComplexF64",
+    "complexF32",
+    "complexF64",
+    "Error",
+    "MatrixTransform",
+    "ConstCsrMatrix",
+    "constCsrMatrix",
+    "ConstCsrMatrixWithIndexTypes",
+    "constCsrMatrixWithIndexTypes",
+    "ConstCscMatrix",
+    "constCscMatrix",
+    "ConstCooMatrix",
+    "constCooMatrix",
+    "ConversionRequirements",
+    "cscToCsrRequirements",
+    "cooToCsrRequirements",
+    "cscToCsr",
+    "cooToCsr",
+    "ConstMatrix",
+    "Matrix",
+    "constMatrix",
+    "matrix",
+    "matrixVectorMultiply",
+    "matrixMultiply",
+    "Triangle",
+    "Diagonal",
+    "TriangularSolveFailure",
+    "TriangularSolveResult",
+    "triangularSolveWorkspaceLength",
+    "triangularSolveInPlace",
+    "InitialGuess",
+    "ConjugateGradientStatus",
+    "ConjugateGradientAccumulator",
+    "ConjugateGradientResult",
+    "conjugateGradientWorkspaceLength",
+    "conjugateGradient",
 };
 
 pub const zynum_blas_root_declarations: []const []const u8 = &.{
@@ -429,22 +513,30 @@ pub const operations_declarations: []const []const u8 = &.{
     "matrixMultiplyWithWorkspace",
 };
 
+// The implementation exposes diagnostic hooks only while compiling tests.
+const operation_namespace_declarations = if (@import("builtin").is_test)
+    operations_declarations ++ &[_][]const u8{"testing"}
+else
+    operations_declarations;
+
 pub const namespaces = [_]Namespace{
-    namespace(.zynum, .zynum, .root, "zynum", "zynum", "src/zynum.zig", "zynum -> zynum.blas", .compatibility_facade, zynum_root_declarations),
+    namespace(.zynum_lapack, .zynum, .lapack, "zynum.lapack", "lapack", "src/lapack.zig", "zynum.lapack -> src/lapack.zig", .direct_namespace_import, lapack_declarations),
+    namespace(.zynum_sparse, .zynum, .sparse, "zynum.sparse", "sparse", "src/sparse.zig", "zynum.sparse -> src/sparse.zig", .direct_namespace_import, sparse_declarations),
+    namespace(.zynum, .zynum, .root, "zynum", "zynum", "src/facades/zynum.zig", "zynum -> zynum.blas", .compatibility_facade, zynum_root_declarations),
     namespace(.zynum_types, .zynum, .types, "zynum.types", "blas.types", "src/blas/types.zig", "zynum.types -> zynum.blas.types", .namespace_alias, types_declarations),
     namespace(.zynum_runtime, .zynum, .runtime, "zynum.runtime", "blas.runtime", "src/blas/runtime.zig", "zynum.runtime -> zynum.blas.runtime", .namespace_alias, runtime_declarations),
     namespace(.zynum_api, .zynum, .api, "zynum.api", "blas.api", "src/blas/api.zig", "zynum.api -> zynum.blas.api", .namespace_alias, api_declarations),
     namespace(.zynum_api_views, .zynum, .api_views, "zynum.api.views", "blas.api.views", "src/blas/api/views.zig", "zynum.api.views -> zynum.blas.api.views", .transitive_namespace_alias, views_declarations),
     namespace(.zynum_api_aliasing, .zynum, .api_aliasing, "zynum.api.aliasing", "blas.api.aliasing", "src/blas/api/aliasing.zig", "zynum.api.aliasing -> zynum.blas.api.aliasing", .transitive_namespace_alias, aliasing_declarations),
-    namespace(.zynum_api_operations, .zynum, .api_operations, "zynum.api.operations", "blas.api.operations", "src/blas/api/operations.zig", "zynum.api.operations -> zynum.blas.api.operations", .transitive_namespace_alias, operations_declarations),
+    namespace(.zynum_api_operations, .zynum, .api_operations, "zynum.api.operations", "blas.api.operations", "src/blas/api/operations.zig", "zynum.api.operations -> zynum.blas.api.operations", .transitive_namespace_alias, operation_namespace_declarations),
 
-    namespace(.zynum_blas, .zynum_blas, .root, "zynum-blas", "blas", "src/blas.zig", "zynum-blas -> types + runtime + api", .module_facade, zynum_blas_root_declarations),
+    namespace(.zynum_blas, .zynum_blas, .root, "zynum-blas", "blas", "src/facades/blas.zig", "zynum-blas -> types + runtime + api", .module_facade, zynum_blas_root_declarations),
     namespace(.zynum_blas_types, .zynum_blas, .types, "zynum-blas.types", "blas.types", "src/blas/types.zig", "zynum-blas.types -> src/blas/types.zig", .direct_namespace_import, types_declarations),
     namespace(.zynum_blas_runtime, .zynum_blas, .runtime, "zynum-blas.runtime", "blas.runtime", "src/blas/runtime.zig", "zynum-blas.runtime -> src/blas/runtime.zig", .direct_namespace_import, runtime_declarations),
     namespace(.zynum_blas_api, .zynum_blas, .api, "zynum-blas.api", "blas.api", "src/blas/api.zig", "zynum-blas.api -> src/blas/api.zig", .api_facade, api_declarations),
     namespace(.zynum_blas_api_views, .zynum_blas, .api_views, "zynum-blas.api.views", "blas.api.views", "src/blas/api/views.zig", "zynum-blas.api.views -> src/blas/api/views.zig", .direct_namespace_import, views_declarations),
     namespace(.zynum_blas_api_aliasing, .zynum_blas, .api_aliasing, "zynum-blas.api.aliasing", "blas.api.aliasing", "src/blas/api/aliasing.zig", "zynum-blas.api.aliasing -> src/blas/api/aliasing.zig", .direct_namespace_import, aliasing_declarations),
-    namespace(.zynum_blas_api_operations, .zynum_blas, .api_operations, "zynum-blas.api.operations", "blas.api.operations", "src/blas/api/operations.zig", "zynum-blas.api.operations -> src/blas/api/operations.zig", .direct_namespace_import, operations_declarations),
+    namespace(.zynum_blas_api_operations, .zynum_blas, .api_operations, "zynum-blas.api.operations", "blas.api.operations", "src/blas/api/operations.zig", "zynum-blas.api.operations -> src/blas/api/operations.zig", .direct_namespace_import, operation_namespace_declarations),
 
     namespace(.zynum_dot_blas, .zynum_dot_blas, .root, "zynum.blas", "blas", "src/blas.zig", "zynum.blas -> types + runtime + api", .module_facade, zynum_dot_blas_root_declarations),
     namespace(.zynum_dot_blas_types, .zynum_dot_blas, .types, "zynum.blas.types", "blas.types", "src/blas/types.zig", "zynum.blas.types -> src/blas/types.zig", .direct_namespace_import, types_declarations),
@@ -452,7 +544,7 @@ pub const namespaces = [_]Namespace{
     namespace(.zynum_dot_blas_api, .zynum_dot_blas, .api, "zynum.blas.api", "blas.api", "src/blas/api.zig", "zynum.blas.api -> src/blas/api.zig", .api_facade, api_declarations),
     namespace(.zynum_dot_blas_api_views, .zynum_dot_blas, .api_views, "zynum.blas.api.views", "blas.api.views", "src/blas/api/views.zig", "zynum.blas.api.views -> src/blas/api/views.zig", .direct_namespace_import, views_declarations),
     namespace(.zynum_dot_blas_api_aliasing, .zynum_dot_blas, .api_aliasing, "zynum.blas.api.aliasing", "blas.api.aliasing", "src/blas/api/aliasing.zig", "zynum.blas.api.aliasing -> src/blas/api/aliasing.zig", .direct_namespace_import, aliasing_declarations),
-    namespace(.zynum_dot_blas_api_operations, .zynum_dot_blas, .api_operations, "zynum.blas.api.operations", "blas.api.operations", "src/blas/api/operations.zig", "zynum.blas.api.operations -> src/blas/api/operations.zig", .direct_namespace_import, operations_declarations),
+    namespace(.zynum_dot_blas_api_operations, .zynum_dot_blas, .api_operations, "zynum.blas.api.operations", "blas.api.operations", "src/blas/api/operations.zig", "zynum.blas.api.operations -> src/blas/api/operations.zig", .direct_namespace_import, operation_namespace_declarations),
 };
 
 pub const signature_closure = [_]SignatureClosure{
@@ -643,6 +735,8 @@ fn canonicalOwner(comptime namespace_path: []const u8, comptime name: []const u8
             return "blas.api";
     } else {
         if (std.mem.eql(u8, name, "blas")) return "blas";
+        if (std.mem.eql(u8, name, "lapack")) return "lapack";
+        if (std.mem.eql(u8, name, "sparse")) return "sparse";
         if (std.mem.eql(u8, name, "types")) return "blas.types";
         if (std.mem.eql(u8, name, "runtime")) return "blas.runtime";
         if (std.mem.eql(u8, name, "api")) return "blas.api";
@@ -655,6 +749,8 @@ fn canonicalOwner(comptime namespace_path: []const u8, comptime name: []const u8
 
 fn forwardingClass(comptime name: []const u8) FacadeForwardingClass {
     if (std.mem.eql(u8, name, "blas") or
+        std.mem.eql(u8, name, "lapack") or
+        std.mem.eql(u8, name, "sparse") or
         std.mem.eql(u8, name, "types") or
         std.mem.eql(u8, name, "runtime") or
         std.mem.eql(u8, name, "api") or

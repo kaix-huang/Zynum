@@ -322,8 +322,9 @@ fn noTransRealWithPack(comptime T: type, comptime cfg: Config, comptime direct_s
 fn withPackedA(comptime T: type, comptime cfg: Config, comptime direct_store: bool, task: gemm_task.Task(T), b_pack: []T) bool {
     const mr = cfg.lane_count * cfg.row_groups;
     const blocks = @divCeil(task.m, mr);
-    const a_pack = std.heap.c_allocator.alloc(T, blocks * mr * task.k) catch return false;
-    defer std.heap.c_allocator.free(a_pack);
+    const allocator = task.scratch_allocator orelse std.heap.c_allocator;
+    const a_pack = allocator.alloc(T, blocks * mr * task.k) catch return false;
+    defer allocator.free(a_pack);
     for (0..blocks) |block| {
         const row = block * mr;
         const count = @min(mr, task.m - row);
@@ -378,11 +379,12 @@ fn noTransRealWithPackSelected(comptime T: type, comptime cfg: Config, task: gem
 }
 
 fn noTransRealWithHeapPack(comptime T: type, comptime cfg: Config, task: gemm_task.Task(T), pack_elems: usize) void {
-    const b_pack = std.heap.c_allocator.alloc(T, pack_elems) catch {
+    const allocator = task.scratch_allocator orelse std.heap.c_allocator;
+    const b_pack = allocator.alloc(T, pack_elems) catch {
         fallbackReal(T, task);
         return;
     };
-    defer std.heap.c_allocator.free(b_pack);
+    defer allocator.free(b_pack);
     noTransRealWithPackSelected(T, cfg, task, b_pack);
 }
 

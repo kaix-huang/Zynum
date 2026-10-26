@@ -4,10 +4,20 @@
 [![status: beta](https://img.shields.io/badge/status-beta-orange)](#stability)
 [![license: LGPL-3.0-or-later](https://img.shields.io/badge/license-LGPL--3.0--or--later-blue.svg)](LICENSE)
 
-Zynum is a Zig-native BLAS library with **Level 1–3 routines**, typed vector
-and matrix views, and standard **CBLAS and Fortran ABI** entry points. It
-supports real and complex arithmetic, portable fallbacks, and architecture-aware
-kernels for AArch64 and x86_64.
+Zynum is a Zig-native scientific numerical library. Its BLAS module provides **Level 1–3
+routines**, typed vector and matrix views, and standard **CBLAS and Fortran ABI**
+entry points. LAPACK and Sparse foundations add checked dense factorizations,
+least squares, real eigen/SVD routines, CSR products and solves, and CSC/COO
+conversion. Cholesky/LU and sparse products support real and complex values.
+BLAS supports real and complex arithmetic,
+portable fallbacks, and architecture-aware kernels for AArch64 and x86_64.
+
+The `scientific` branch collects shared LAPACK, complex/mixed-index Sparse,
+FFTW-compatible FFT and operator algorithms over the same internal resource
+and execution owners. Start with the [capability and ownership map](docs/scientific.md)
+for implemented scope, finite interfaces and application validation boundaries.
+The [validation record](docs/scientific_validation.md) separates current checks
+from earlier SDK and ABPLaS evidence.
 
 ## Quick start
 
@@ -32,14 +42,21 @@ cc examples/cblas/dgemm.c -I zig-out/include -L zig-out/lib -lzynum_blas \
 ./zig-out/dgemm
 ```
 
-Zig consumers import `zynum` or `zynum-blas`. The typed API exposes operations
+Zig consumers import `zynum`, `zynum-blas`, `zynum-lapack`, or `zynum-sparse`.
+The typed BLAS API exposes operations
 such as `matrixMultiply`, `matrixVectorMultiply`, and `addScaledVector`.
+
+The optional [checked C/Fortran interface](docs/interop/README.md) exposes real
+Cholesky factor/solve and CSR SpMV through the separate `zynum_checked` library.
+Install it with `zig build install-checked-abi --release=fast`.
 
 See the [build and API guide](docs/development_and_usage.md),
 [C/Fortran compatibility guide](docs/fortran_compatibility.md), and
 [runnable examples](examples/README.md) for integration details.
 
 ## Performance
+
+The following charts measure the BLAS module.
 
 Measured on **2026-10-10** at source [`4ef1065`](https://github.com/kaix-huang/Zynum/commit/4ef1065691d80439e9286f2f4d5ff758f0818e05),
 using **Zig 0.17.0**, Apple M5, and macOS 27.0.1. The baseline-CPU,
@@ -72,6 +89,7 @@ for the complete scope and measurement limitations.
 | Topic | Guide |
 | --- | --- |
 | Build, install, and APIs | [User guide](docs/users/README.md) |
+| Scientific modules and interfaces | [Capability map](docs/scientific.md) · [LAPACK](docs/lapack/README.md) · [Sparse](docs/sparse/README.md) · [Generated interfaces](docs/interop/README.md) |
 | Design and runtime dispatch | [Architecture](docs/architecture.md) |
 | Tests and contribution checks | [Contributor guide](docs/contributors/README.md) |
 | Benchmarking and kernel design | [Performance guide](docs/performance/README.md) |
@@ -81,7 +99,11 @@ for the complete scope and measurement limitations.
 
 Zynum is **0.0.1-beta**. The BLAS module is available for evaluation and
 integration; Zig API names, dispatch policy, and internal layout may change.
-Other numerical modules are [planned](docs/roadmap.md).
+Initial [LAPACK](docs/lapack/README.md) and [Sparse](docs/sparse/README.md)
+modules expose portable checked Zig APIs. [Comparison tools](bench/modules/README.md)
+cover real Cholesky/LU and CSR products; broader operation and platform coverage
+remain [in progress](docs/roadmap.md). The separate checked C/Fortran ABI is
+experimental revision 1.
 
 ## License
 

@@ -18,11 +18,18 @@ pub const Side = scalar.Side;
 
 pub const gemmNoTransReal = gemm_impl.gemmNoTransReal;
 pub const gemm = gemm_impl.gemm;
+pub const gemmRealAdmitted = gemm_impl.gemmRealAdmitted;
+pub const gemmComplexAdmitted = gemm_impl.gemmComplexAdmitted;
 pub const symm = symmetric.symm;
+pub const symmAdmitted = symmetric.symmAdmitted;
 pub const syrk = symmetric.syrk;
+pub const syrkAdmitted = symmetric.syrkAdmitted;
 pub const syr2k = symmetric.syr2k;
+pub const syr2kAdmitted = symmetric.syr2kAdmitted;
 pub const trmm = triangular.trmm;
+pub const trmmAdmitted = triangular.trmmAdmitted;
 pub const trsm = triangular.trsm;
+pub const trsmAdmitted = triangular.trsmAdmitted;
 
 pub fn freeCurrentThreadCaches() void {
     gemm_impl.freeCurrentThreadCaches();

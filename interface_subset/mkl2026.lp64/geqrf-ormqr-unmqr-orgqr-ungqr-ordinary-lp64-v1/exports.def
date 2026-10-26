@@ -1,0 +1,29 @@
+; Copyright (C) 2026 Zynum contributors
+; SPDX-License-Identifier: LGPL-3.0-or-later
+
+LIBRARY zynum_lapacke_subset_lp64
+EXPORTS
+    LAPACKE_sgeqrf
+    LAPACKE_sgeqrf_work
+    LAPACKE_sormqr
+    LAPACKE_sormqr_work
+    LAPACKE_dgeqrf
+    LAPACKE_dgeqrf_work
+    LAPACKE_dormqr
+    LAPACKE_dormqr_work
+    LAPACKE_cgeqrf
+    LAPACKE_cgeqrf_work
+    LAPACKE_cunmqr
+    LAPACKE_cunmqr_work
+    LAPACKE_zgeqrf
+    LAPACKE_zgeqrf_work
+    LAPACKE_zunmqr
+    LAPACKE_zunmqr_work
+    LAPACKE_sorgqr
+    LAPACKE_sorgqr_work
+    LAPACKE_dorgqr
+    LAPACKE_dorgqr_work
+    LAPACKE_cungqr
+    LAPACKE_cungqr_work
+    LAPACKE_zungqr
+    LAPACKE_zungqr_work

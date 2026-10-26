@@ -6,6 +6,7 @@
 const abi = @import("x86_64_structured_abi.zig");
 const gemm_impl = @import("../../core/matrix_matrix/gemm.zig");
 const scalar = @import("../../core/shared/scalar.zig");
+const CallResources = @import("../../core/execution/thread_pool.zig").CallResources;
 
 fn realValue(comptime T: type, bits: u64) T {
     if (T == f32) return @bitCast(@as(u32, @truncate(bits)));
@@ -27,12 +28,13 @@ fn order(raw: u8) scalar.Order {
     };
 }
 
-fn run(comptime T: type, request: *abi.GemmRequest) void {
+fn run(comptime T: type, resources: CallResources, request: *abi.GemmRequest) void {
     const a: [*]const T = @ptrCast(@alignCast(request.a));
     const b: [*]const T = @ptrCast(@alignCast(request.b));
     const c: [*]T = @ptrCast(@alignCast(request.c));
-    gemm_impl.gemm(
+    gemm_impl.gemmWithResources(
         T,
+        resources,
         order(request.transa),
         order(request.transb),
         request.m,
@@ -49,16 +51,12 @@ fn run(comptime T: type, request: *abi.GemmRequest) void {
     );
 }
 
-fn execute(request: *abi.GemmRequest) callconv(.c) void {
+pub fn execute(resources: CallResources, request: *abi.GemmRequest) void {
     const scalar_tag: abi.Scalar = @fromBackingInt(@intCast(request.scalar));
     switch (scalar_tag) {
-        .f32 => run(f32, request),
-        .f64 => run(f64, request),
-        .complex_f32 => run(scalar.ComplexF32, request),
-        .complex_f64 => run(scalar.ComplexF64, request),
+        .f32 => run(f32, resources, request),
+        .f64 => run(f64, resources, request),
+        .complex_f32 => run(scalar.ComplexF32, resources, request),
+        .complex_f64 => run(scalar.ComplexF64, resources, request),
     }
-}
-
-comptime {
-    @export(&execute, .{ .name = "zynum_internal_structured_gemm_execute", .visibility = .hidden });
 }

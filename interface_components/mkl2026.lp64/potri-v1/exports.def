@@ -1,0 +1,9 @@
+EXPORTS
+    LAPACKE_spotri
+    LAPACKE_spotri_work
+    LAPACKE_dpotri
+    LAPACKE_dpotri_work
+    LAPACKE_cpotri
+    LAPACKE_cpotri_work
+    LAPACKE_zpotri
+    LAPACKE_zpotri_work

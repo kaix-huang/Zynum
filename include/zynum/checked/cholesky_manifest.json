@@ -1,0 +1,128 @@
+{
+  "schema": "zynum-checked-cholesky-v1",
+  "profile": "checked-cholesky-v1",
+  "target": "apple-arm64-default-c-v1",
+  "pointer_bits": 64,
+  "shared_abi": "checked-v1",
+  "complex_layouts": {
+    "complex_f32": {
+      "component": "float",
+      "size": 8,
+      "alignment": 4,
+      "offsets": {
+        "re": 0,
+        "im": 4
+      }
+    },
+    "complex_f64": {
+      "component": "double",
+      "size": 16,
+      "alignment": 8,
+      "offsets": {
+        "re": 0,
+        "im": 8
+      }
+    }
+  },
+  "status_extensions": {
+    "INVALID_HERMITIAN_DIAGONAL": 15
+  },
+  "bindings": [
+    {
+      "symbol": "zynum_checked_cholesky_factor_complex_f32",
+      "operation": "cholesky.factor",
+      "adapter": "factor",
+      "scalar": "complex_f32",
+      "parameters": [
+        [
+          "a",
+          "dense",
+          "matrix"
+        ],
+        [
+          "triangle",
+          "i32",
+          "triangle"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "symbol": "zynum_checked_cholesky_solve_complex_f32",
+      "operation": "cholesky.solve",
+      "adapter": "solve",
+      "scalar": "complex_f32",
+      "parameters": [
+        [
+          "a",
+          "const_dense",
+          "factor"
+        ],
+        [
+          "b",
+          "dense",
+          "rhs"
+        ],
+        [
+          "triangle",
+          "i32",
+          "triangle"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "symbol": "zynum_checked_cholesky_factor_complex_f64",
+      "operation": "cholesky.factor",
+      "adapter": "factor",
+      "scalar": "complex_f64",
+      "parameters": [
+        [
+          "a",
+          "dense",
+          "matrix"
+        ],
+        [
+          "triangle",
+          "i32",
+          "triangle"
+        ]
+      ],
+      "result": "result"
+    },
+    {
+      "symbol": "zynum_checked_cholesky_solve_complex_f64",
+      "operation": "cholesky.solve",
+      "adapter": "solve",
+      "scalar": "complex_f64",
+      "parameters": [
+        [
+          "a",
+          "const_dense",
+          "factor"
+        ],
+        [
+          "b",
+          "dense",
+          "rhs"
+        ],
+        [
+          "triangle",
+          "i32",
+          "triangle"
+        ]
+      ],
+      "result": "result"
+    }
+  ],
+  "symbols": [
+    "zynum_checked_cholesky_factor_complex_f32",
+    "zynum_checked_cholesky_solve_complex_f32",
+    "zynum_checked_cholesky_factor_complex_f64",
+    "zynum_checked_cholesky_solve_complex_f64"
+  ],
+  "matrix_layout": "column-major",
+  "buffer_length_unit": "scalar-elements",
+  "ownership": "caller-owned-factor-and-rhs; shared-default-Context-per-call",
+  "qualification": "declarations-only; numerical and runtime ABI evidence is separate"
+}

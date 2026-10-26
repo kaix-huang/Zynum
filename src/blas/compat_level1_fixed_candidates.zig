@@ -9,8 +9,8 @@
 
 pub const zynum_level1_fixed_candidates = true;
 
-const fortran = @import("abi/fortran.zig");
-const cblas = @import("abi/cblas.zig");
+const fortran = @import("zynum-blas-abi").fortran;
+const cblas = @import("zynum-blas-abi").cblas;
 
 comptime {
     _ = fortran;

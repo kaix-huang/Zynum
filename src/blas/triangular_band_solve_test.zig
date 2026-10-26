@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const resources = @import("zynum-numerics-resources");
 const builtin = @import("builtin");
 
 const matrix_vector = @import("core/matrix_vector.zig");
@@ -628,4 +629,155 @@ test "finite TBSV reconstructs early signs when the first zero accumulator is la
             }
         }
     }
+}
+
+test "TBSV scratch lease exact budget preserves numerical results and padded layouts" {
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    inline for (.{ f32, f64 }) |T| {
+        var a: [19 * 129]T = undefined;
+        var x: [260]T = undefined;
+        var solution: [129]T = undefined;
+        var rhs: [129]T = undefined;
+        for ([_]usize{ 128, 129 }) |n| {
+            for (0..n) |i| solution[i] = solutionValue(T, i);
+            for ([_]usize{ 1, 4, 16 }) |k| {
+                const lda = k + 3;
+                for ([_]Uplo{ .upper, .lower }) |uplo| {
+                    for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                        for ([_]Diag{ .unit, .non_unit }) |diag| {
+                            fillBandMatrix(T, &a, uplo, diag, n, k, lda);
+                            const matrix_before = a;
+                            buildReferenceRhs(T, uplo, trans, diag, n, k, &a, lda, solution[0..n], rhs[0..n]);
+                            for ([_]i32{ 1, 2, -1, -2 }) |inc| {
+                                const stride: usize = @intCast(if (inc < 0) -inc else inc);
+                                @memset(&x, -123);
+                                for (0..n) |i| x[1 + (if (inc > 0) i else n - 1 - i) * stride] = rhs[i];
+                                var tracked = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+                                try std.testing.expect(entry.testing.forceTbsv(T, .compact_triangular_band_finite, tracked.allocator(), n * @sizeOf(T), uplo, trans, diag, @intCast(n), @intCast(k), &a, @intCast(lda), x[1..].ptr, inc));
+                                try std.testing.expectEqual(@as(usize, 1), tracked.allocations);
+                                try std.testing.expectEqual(@as(usize, 1), tracked.deallocations);
+                                try std.testing.expectEqual(n * @sizeOf(T), tracked.allocated_bytes);
+                                try std.testing.expectEqual(tracked.allocated_bytes, tracked.freed_bytes);
+                                for (0..n) |i| try expectApprox(T, solution[i], x[1 + (if (inc > 0) i else n - 1 - i) * stride]);
+                                for (x, 0..) |v, physical| {
+                                    const logical = physical >= 1 and physical <= 1 + (n - 1) * stride and (physical - 1) % stride == 0;
+                                    if (!logical) try std.testing.expectEqual(@as(T, -123), v);
+                                }
+                                try expectBytesEqual(T, &matrix_before, &a);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+test "TBSV scratch lease refusals precede allocation and allocation failure preserves input" {
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    inline for (.{ f32, f64 }) |T| {
+        var a: [384]T = @splat(0);
+        var x: [258]T = @splat(1);
+        for (0..128) |i| a[i * 3] = 2;
+        const matrix_before = a;
+        const vector_before = x;
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+        const budget = 128 * @sizeOf(T);
+        try std.testing.expect(!entry.testing.forceTbsv(T, .compact_triangular_band_finite, failing.allocator(), budget - 1, .lower, .no_trans, .non_unit, 128, 1, &a, 3, x[1..].ptr, 2));
+        try std.testing.expect(!failing.has_induced_failure);
+        try std.testing.expect(!entry.testing.forceTbsv(T, .compact_triangular_band_finite, failing.allocator(), budget, .lower, .no_trans, .non_unit, 127, 1, &a, 3, x[1..].ptr, 2));
+        try std.testing.expect(!failing.has_induced_failure);
+        try std.testing.expect(!entry.testing.forceTbsv(T, .compact_triangular_band_finite, failing.allocator(), budget, .lower, .no_trans, .non_unit, 128, 1, &a, 3, &a, 1));
+        try std.testing.expect(!failing.has_induced_failure);
+        try std.testing.expect(!entry.testing.forceTbsv(T, .compact_triangular_band_finite, failing.allocator(), budget, .lower, .no_trans, .non_unit, 128, 1, &a, 3, x[1..].ptr, 2));
+        try std.testing.expect(failing.has_induced_failure);
+        try std.testing.expectEqual(@as(usize, 0), failing.allocations);
+        try std.testing.expectEqual(@as(usize, 0), failing.deallocations);
+        try expectBytesEqual(T, &matrix_before, &a);
+        try expectBytesEqual(T, &vector_before, &x);
+        // Existing unit identity admission still succeeds with no allocation.
+        try std.testing.expect(entry.testing.forceTbsv(T, .compact_triangular_band_finite, failing.allocator(), budget, .lower, .no_trans, .unit, 128, 0, &a, 3, x[1..].ptr, 2));
+        try std.testing.expectEqual(@as(usize, 0), failing.allocations);
+        try std.testing.expectEqual(@as(usize, 0), failing.deallocations);
+        try expectBytesEqual(T, &vector_before, &x);
+    }
+}
+
+test "TBSV scratch lease releases once after a late numerical refusal" {
+    if (builtin.target.cpu.arch != .aarch64 or builtin.target.os.tag != .macos) return;
+    const entry = @import("core/matrix_vector/compact_triangular_entry.zig");
+    inline for (.{ f32, f64 }) |T| {
+        var a: [384]T = undefined;
+        var x: [258]T = undefined;
+        for ([_]Uplo{ .upper, .lower }) |uplo| {
+            for ([_]Order{ .no_trans, .trans, .conj_trans }) |trans| {
+                fillBandMatrix(T, &a, uplo, .non_unit, 128, 1, 3);
+                const matrix_before = a;
+                const upper = (trans == .no_trans and uplo == .upper) or (trans != .no_trans and uplo == .lower);
+                const last_row: usize = if (upper) 0 else 127;
+                for ([_]i32{ 2, -2 }) |inc| {
+                    @memset(&x, 1);
+                    x[1 + (if (inc > 0) last_row else 127 - last_row) * 2] = std.math.inf(T);
+                    const vector_before = x;
+                    var tracked = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+                    try std.testing.expect(!entry.testing.forceTbsv(T, .compact_triangular_band_finite, tracked.allocator(), 128 * @sizeOf(T), uplo, trans, .non_unit, 128, 1, &a, 3, x[1..].ptr, inc));
+                    try std.testing.expectEqual(@as(usize, 1), tracked.allocations);
+                    try std.testing.expectEqual(@as(usize, 1), tracked.deallocations);
+                    try std.testing.expectEqual(@as(usize, 128 * @sizeOf(T)), tracked.allocated_bytes);
+                    try std.testing.expectEqual(tracked.allocated_bytes, tracked.freed_bytes);
+                    try expectBytesEqual(T, &matrix_before, &a);
+                    try expectBytesEqual(T, &vector_before, &x);
+                }
+            }
+        }
+    }
+}
+
+test "scratch leases retain independent originating allocators" {
+    var first = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var second = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var provider = first.allocator();
+    var a = try resources.ScratchLease(f64).acquire(provider, 7);
+    var a_live = true;
+    defer if (a_live) a.deinit();
+    @memset(a.values, 3);
+    provider = second.allocator();
+    var b = try resources.ScratchLease(f64).acquire(provider, 11);
+    defer b.deinit();
+    @memset(b.values, 5);
+    try std.testing.expect(a.values.ptr != b.values.ptr);
+    try std.testing.expectEqual(@as(usize, 7 * @sizeOf(f64)), first.allocated_bytes);
+    try std.testing.expectEqual(@as(usize, 11 * @sizeOf(f64)), second.allocated_bytes);
+    for (a.values) |v| try std.testing.expectEqual(@as(f64, 3), v);
+    a.deinit();
+    a_live = false;
+    try std.testing.expectEqual(@as(usize, 1), first.deallocations);
+    try std.testing.expectEqual(first.allocated_bytes, first.freed_bytes);
+    try std.testing.expectEqual(@as(usize, 0), second.deallocations);
+    for (b.values) |v| try std.testing.expectEqual(@as(f64, 5), v);
+}
+
+test "scratch lease allocation failure and byte overflow do not create ownership" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    try std.testing.expectError(error.OutOfMemory, resources.ScratchLease(f64).acquire(failing.allocator(), 9));
+    try std.testing.expect(failing.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), failing.allocations);
+    try std.testing.expectEqual(@as(usize, 0), failing.deallocations);
+    var overflow = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    try std.testing.expectError(error.OutOfMemory, resources.ScratchLease(f64).acquire(overflow.allocator(), std.math.maxInt(usize)));
+    try std.testing.expect(!overflow.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), overflow.allocations);
+    try std.testing.expectEqual(@as(usize, 0), overflow.deallocations);
+}
+
+test "empty scratch lease does not ask the allocator for storage" {
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    var lease = try resources.ScratchLease(f64).acquire(failing.allocator(), 0);
+    try std.testing.expectEqual(@as(usize, 0), lease.values.len);
+    lease.deinit();
+    try std.testing.expect(!failing.has_induced_failure);
+    try std.testing.expectEqual(@as(usize, 0), failing.allocations);
+    try std.testing.expectEqual(@as(usize, 0), failing.deallocations);
 }

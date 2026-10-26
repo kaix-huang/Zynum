@@ -1,0 +1,105 @@
+{
+  "schema": "zynum-scientific-consolidation-source-review-v1",
+  "scope": "finite-callable-generation-only",
+  "formatting": [
+    {
+      "path": "src/interop/lapacke_complex_gelsd.zig",
+      "old_sha256": "2835051f75c2f1848ed221f5c3ee2bade8177550a3cde8d3c702825e46dbb142",
+      "new_sha256": "eefc1b37d5292c91aa14e03074682536468aa2b9fd6f910e253e5ca7f8c5128d",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "src/fft/core.zig",
+      "old_sha256": "9f107da7ee39d3ed0adf11a082895e085967615c13d9608e1747e351235693a8",
+      "new_sha256": "d19ebc4d54a291ff090330dcd05b2e005c02bff491f9146f96b2eac1cbff49b7",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "src/fft/managed.zig",
+      "old_sha256": "11620b541f519603698cbb0bf5edf49b48d6ffae892e15a103db4360c708b408",
+      "new_sha256": "0c1dd153c5b5fc581337a2deee7b171e18a21f53e08e583bf799e83b059f1ec7",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "src/checked/mixed_adapter_test.zig",
+      "old_sha256": "b5a2f418393f139273a4a571510fe3a8360a3b060849f32bb4348f1220d5224e",
+      "new_sha256": "bf8c1070daad185ebf27d0fe7f5409bde66df840d3422fc74f59ba28b87c3117",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/lapack/interop/complex_gelsd_column_test.zig",
+      "old_sha256": "e0bb5a5f1028201cb543611bd5e0017d7858b3efa4610e4dacddcc6a205d9709",
+      "new_sha256": "71fd05ae2d728c33d15d868f963c31ff135d15d333b3ef0787b9a17efd4c7a0f",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/lapack/interop/fft_managed_test.zig",
+      "old_sha256": "89979edb00d1a751f1ef5b2ab2f1ff161bb671f774fd37e6e01c5e0d44249646",
+      "new_sha256": "71e6a6b86e3f59d7b44930870dd5a7eeedf2770f99e7363fc85663a7b0e6fe77",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/lapack/interop/fftw_binding_test.zig",
+      "old_sha256": "30a9f4464c01cc5a1639e964121121971b21b8db05e72b7b1ca6b69756b70521",
+      "new_sha256": "3a790682c84ae1284ef72f182ed32938ca1513297698c510da93f7ac1225697a",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/lapack/interop/complex_gelsd_query_test.zig",
+      "old_sha256": "edbff78fbee5794e537eb33ce6efbbfe42405665939099a74c11e2ae2e176a53",
+      "new_sha256": "4e01b05f012042b86571196630baa64ea2a2fe427c5eb6b8a1f936c35a953978",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/sparse/mixed_index_test.zig",
+      "old_sha256": "d7dd59b8555c3838187a7ce16468df8daf34e051ccd8fa313bcd1b85ddc92ef8",
+      "new_sha256": "18bc4957a66c3d9ab73227406a9ff8c175a0fd8c51661466baeb632f54590f5e",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/sparse/triangular_test.zig",
+      "old_sha256": "8e2d132686090822f4120d29bf080c2e4d30a92e872a43c4fd16290d00447397",
+      "new_sha256": "5811da71bd0650fe3a3e5cf7426fd06a44578a750e30a2ea9b0874ee8320deaf",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    },
+    {
+      "path": "test/sparse/checked_adapter_test.zig",
+      "old_sha256": "e7d10fdd4db4bb2650d98ee2298b1995fc00b363a936a90a9a73dcf48ab8080d",
+      "new_sha256": "626aa1d01f07cc2756bfaf40b46598cd769f7bd0adcd47f44b0b5d821628380a",
+      "formatter_output_exact": true,
+      "tokens_equal_except_optional_trailing_commas": true
+    }
+  ],
+  "source_envelopes": {
+    "standard_abi_bindings": {
+      "changed": [
+        "src/fft/core.zig",
+        "src/fft/managed.zig",
+        "src/interop/lapacke_complex_gelsd.zig"
+      ],
+      "sha256": "afbbadadfde822dda2f597bb69b92c5b7855cefdd8ded7ff9b44d8f662a8842d"
+    },
+    "standard_sparse_bindings": {
+      "changed": [
+        "src/fft/core.zig",
+        "src/fft/managed.zig"
+      ],
+      "sha256": "4bca6aac240a73770fab64424ae97f5f996178d4bdaf283540b2c70b923d8c80"
+    }
+  },
+  "plans": 242,
+  "wire_contracts_and_semantic_plan_fields_unchanged": true,
+  "numerical_revalidation": "separate from generation",
+  "new_context_allocator_executor_or_handle": 0,
+  "full_vendor_profile_ready": false
+}

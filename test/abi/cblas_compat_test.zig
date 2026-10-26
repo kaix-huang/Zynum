@@ -1121,3 +1121,668 @@ test "cblas real rank updates conjugate transpose independent reference" {
         }
     }
 }
+
+// The build injects the existing Core's exact test Execution Module.
+const admission_execution = @import("zynum-execution");
+
+const CblasAdmissionObservation = struct {
+    var entries: usize = 0;
+    var finishes: usize = 0;
+    var checked_calls: usize = 0;
+    var actual: []const u8 = &.{};
+    var expected: []const u8 = &.{};
+
+    fn reset() void {
+        entries = 0;
+        finishes = 0;
+        checked_calls = 0;
+        actual = &.{};
+        expected = &.{};
+    }
+    fn watch(comptime T: type, values: []const T, wanted: []const T) void {
+        actual = std.mem.sliceAsBytes(values);
+        expected = std.mem.sliceAsBytes(wanted);
+    }
+    fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
+        if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+            @panic("CBLAS ABI used a different default owner");
+        if (ctx.snapshot().active_operations != 1) @panic("CBLAS ABI did not retain one operation");
+        switch (event) {
+            .admitted => entries += 1,
+            .finishing => {
+                if (!std.mem.eql(u8, actual, expected)) @panic("CBLAS operation ended before complete output or damaged padding");
+                finishes += 1;
+            },
+        }
+    }
+    fn checkNext() !void {
+        checked_calls += 1;
+        try std.testing.expectEqual(checked_calls, entries);
+        try std.testing.expectEqual(checked_calls, finishes);
+        const state = admission_execution.getContext().snapshot();
+        try std.testing.expectEqual(@as(usize, 0), state.active_operations);
+        try std.testing.expectEqual(@as(usize, 0), state.resource_pins);
+    }
+};
+
+test "CBLAS Fortran delegation borrows one operation through stores and returns" {
+    const Observe = CblasAdmissionObservation;
+    Observe.reset();
+    admission_execution.context.Context.testing.configure(admission_execution.getContext(), 1, Observe.call);
+    defer admission_execution.context.Context.testing.configure(admission_execution.getContext(), std.math.maxInt(usize), null);
+    try std.testing.expectEqual(admission_execution.context.RequestResult.immortal, admission_execution.getContext().requestClose());
+
+    // Same independently known matrix product in both layouts. Every padding
+    // element is visible to finishing, not merely checked after the C call.
+    for ([_]bool{ false, true }) |row_major| {
+        const layout: c_int = if (row_major) cblas.CblasRowMajor else cblas.CblasColMajor;
+        const a: [6]f64 = if (row_major) .{ 1, 2, 71, 3, 4, 72 } else .{ 1, 3, 71, 2, 4, 72 };
+        const b: [6]f64 = if (row_major) .{ 5, 6, 73, 7, 8, 74 } else .{ 5, 7, 73, 6, 8, 74 };
+        var c = [_]f64{ 0, 0, 81, 0, 0, 82 };
+        const wanted: [6]f64 = if (row_major) .{ 19, 22, 81, 43, 50, 82 } else .{ 19, 43, 81, 22, 50, 82 };
+        Observe.watch(f64, &c, &wanted);
+        cblas.cblas_dgemm(layout, cblas.CblasNoTrans, cblas.CblasNoTrans, 2, 2, 2, 1, &a, 3, &b, 3, 0, &c, 3);
+        try Observe.checkNext();
+    }
+    const C = cblas.ComplexF64;
+    const x = [_]C{ .{ .re = 1, .im = 2 }, .{ .re = 3, .im = -1 } };
+    const y = [_]C{ .{ .re = 2, .im = -1 }, .{ .re = -1, .im = 2 } };
+    var dot = [_]C{ .{ .re = 0, .im = 0 }, .{ .re = 91, .im = 17 } };
+    Observe.watch(C, &dot, &.{ .{ .re = 3, .im = 10 }, .{ .re = 91, .im = 17 } });
+    cblas.cblas_zdotu_sub(2, &x, 1, &y, 1, &dot[0]);
+    try Observe.checkNext();
+    Observe.watch(C, &dot, &.{ .{ .re = -5, .im = 0 }, .{ .re = 91, .im = 17 } });
+    cblas.cblas_zdotc_sub(2, &x, 1, &y, 1, &dot[0]);
+    try Observe.checkNext();
+    // The returned index is assigned after finishing; its conversion still
+    // occurs under the outer CBLAS token. Fortran returns 2, CBLAS returns 1.
+    Observe.watch(f64, &.{}, &.{});
+    try std.testing.expectEqual(@as(c_int, 1), cblas.cblas_izamax(2, &x, 1));
+    try Observe.checkNext();
+    const real_x = [_]f64{ 1, 2 };
+    const real_y = [_]f64{ 3, 4 };
+    try std.testing.expectEqual(@as(f64, 11), cblas.cblas_ddot(2, &real_x, 1, &real_y, 1));
+    try Observe.checkNext();
+}
+
+test "CBLAS row major complex local bodies remain inside one operation" {
+    const Observe = CblasAdmissionObservation;
+    Observe.reset();
+    admission_execution.context.Context.testing.configure(admission_execution.getContext(), 1, Observe.call);
+    defer admission_execution.context.Context.testing.configure(admission_execution.getContext(), std.math.maxInt(usize), null);
+    const C = cblas.ComplexF64;
+    const one = C{ .re = 1, .im = 0 };
+    const zero = C{ .re = 0, .im = 0 };
+    const pad = C{ .re = 91, .im = 19 };
+    // A = [[1+i,2-i],[3+2i,4+i]], logical x = [1+i,2-i].
+    // A^H x = [6-7i,8-3i]; input memory is reversed for incx=-1.
+    const x = [_]C{ .{ .re = 2, .im = -1 }, .{ .re = 1, .im = 1 }, pad };
+    const dense = [_]C{ .{ .re = 1, .im = 1 }, .{ .re = 2, .im = -1 }, pad, .{ .re = 3, .im = 2 }, .{ .re = 4, .im = 1 }, pad };
+    const band = [_]C{ pad, .{ .re = 1, .im = 1 }, .{ .re = 2, .im = -1 }, pad, .{ .re = 3, .im = 2 }, .{ .re = 4, .im = 1 }, pad, pad };
+    for ([_]bool{ false, true }) |banded| {
+        var output = [_]C{ zero, pad, zero, pad };
+        Observe.watch(C, &output, &.{ .{ .re = 6, .im = -7 }, pad, .{ .re = 8, .im = -3 }, pad });
+        if (banded)
+            cblas.cblas_zgbmv(cblas.CblasRowMajor, cblas.CblasConjTrans, 2, 2, 1, 1, &one, &band, 4, &x, -1, &zero, &output, 2)
+        else
+            cblas.cblas_zgemv(cblas.CblasRowMajor, cblas.CblasConjTrans, 2, 2, &one, &dense, 3, &x, -1, &zero, &output, 2);
+        try Observe.checkNext();
+    }
+
+    // Unit diagonal is deliberately stored as a very different finite value.
+    // T=[[1,2+i],[0,1]], T^H*[1+i,2-i]=[1+i,5]. These literals supply both
+    // multiply and solve oracles, not a call through another product routine.
+    const wrong_diagonal = C{ .re = 51, .im = 53 };
+    const off_diagonal = C{ .re = 2, .im = 1 };
+    const triangle = [_]C{ wrong_diagonal, off_diagonal, pad, pad, wrong_diagonal, pad };
+    const triangle_band = [_]C{ wrong_diagonal, off_diagonal, pad, wrong_diagonal, pad, pad };
+    const triangle_packed = [_]C{ wrong_diagonal, off_diagonal, wrong_diagonal, pad };
+    const Path = enum { trmv, trsv, tbmv, tbsv, tpmv, tpsv };
+    for ([_]Path{ .trmv, .trsv, .tbmv, .tbsv, .tpmv, .tpsv }) |path| {
+        const solve = path == .trsv or path == .tbsv or path == .tpsv;
+        var output: [4]C = if (solve) .{ .{ .re = 1, .im = 1 }, pad, .{ .re = 5, .im = 0 }, pad } else .{ .{ .re = 1, .im = 1 }, pad, .{ .re = 2, .im = -1 }, pad };
+        const wanted: [4]C = if (solve) .{ .{ .re = 1, .im = 1 }, pad, .{ .re = 2, .im = -1 }, pad } else .{ .{ .re = 1, .im = 1 }, pad, .{ .re = 5, .im = 0 }, pad };
+        Observe.watch(C, &output, &wanted);
+        switch (path) {
+            .trmv => cblas.cblas_ztrmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, 2, &triangle, 3, &output, 2),
+            .trsv => cblas.cblas_ztrsv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, 2, &triangle, 3, &output, 2),
+            .tbmv => cblas.cblas_ztbmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, 2, 1, &triangle_band, 3, &output, 2),
+            .tbsv => cblas.cblas_ztbsv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, 2, 1, &triangle_band, 3, &output, 2),
+            .tpmv => cblas.cblas_ztpmv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, 2, &triangle_packed, &output, 2),
+            .tpsv => cblas.cblas_ztpsv(cblas.CblasRowMajor, cblas.CblasUpper, cblas.CblasConjTrans, cblas.CblasUnit, 2, &triangle_packed, &output, 2),
+        }
+        try Observe.checkNext();
+    }
+    const gx = [_]C{ .{ .re = 1, .im = 1 }, .{ .re = 2, .im = -1 } };
+    const gy = [_]C{ .{ .re = 2, .im = 1 }, .{ .re = -1, .im = 2 } };
+    var update = [_]C{ zero, zero, pad, zero, zero, pad };
+    Observe.watch(C, &update, &.{ .{ .re = 3, .im = 1 }, .{ .re = 1, .im = -3 }, pad, .{ .re = 3, .im = -4 }, .{ .re = -4, .im = -3 }, pad });
+    cblas.cblas_zgerc(cblas.CblasRowMajor, 2, 2, &one, &gx, 1, &gy, 1, &update, 3);
+    try Observe.checkNext();
+}
+
+test "CBLAS invalid empty and local early returns retain one operation without stores" {
+    const Observe = CblasAdmissionObservation;
+    Observe.reset();
+    admission_execution.context.Context.testing.configure(admission_execution.getContext(), 1, Observe.call);
+    defer admission_execution.context.Context.testing.configure(admission_execution.getContext(), std.math.maxInt(usize), null);
+    const a = [_]f64{ 1, 3, 2, 4 };
+    var output = [_]f64{ 11, 13, 17, 19, 97 };
+    Observe.watch(f64, &output, &.{ 11, 13, 17, 19, 97 });
+    const Case = struct { layout: c_int, trans: c_int, m: c_int, lda: c_int };
+    for ([_]Case{
+        .{ .layout = -1, .trans = -1, .m = -1, .lda = 0 },
+        .{ .layout = cblas.CblasColMajor, .trans = -1, .m = -1, .lda = 0 },
+        .{ .layout = cblas.CblasColMajor, .trans = cblas.CblasNoTrans, .m = -1, .lda = 0 },
+        .{ .layout = cblas.CblasColMajor, .trans = cblas.CblasNoTrans, .m = 2, .lda = 0 },
+        .{ .layout = cblas.CblasColMajor, .trans = cblas.CblasNoTrans, .m = 0, .lda = 1 },
+    }) |case| {
+        cblas.cblas_dgemm(case.layout, case.trans, cblas.CblasNoTrans, case.m, 2, 2, 1, &a, case.lda, &a, 2, 0, &output, 2);
+        try Observe.checkNext();
+    }
+    cblas.cblas_dscal(0, 3, &output, 1);
+    try Observe.checkNext();
+    const C = cblas.ComplexF64;
+    const one = C{ .re = 1, .im = 0 };
+    const zero = C{ .re = 0, .im = 0 };
+    const safe_matrix = [_]C{ one, zero, zero, one };
+    const input = [_]C{ one, one };
+    var result = [_]C{ .{ .re = 7, .im = 2 }, .{ .re = 11, .im = 3 }, .{ .re = 97, .im = 19 } };
+    Observe.watch(C, &result, &.{ .{ .re = 7, .im = 2 }, .{ .re = 11, .im = 3 }, .{ .re = 97, .im = 19 } });
+    cblas.cblas_zgemv(cblas.CblasRowMajor, cblas.CblasConjTrans, 2, 2, &one, &safe_matrix, 2, &input, 0, &zero, &result, 1);
+    try Observe.checkNext();
+}
+
+test "CBLAS scaling retains one operation through real busy executor fallback" {
+    const shared = admission_execution.get();
+    const policy = admission_execution.policy;
+    const before = policy.maxThreadsOverride();
+    defer {
+        shared.drainAndReset();
+        policy.setMaxThreads(before);
+    }
+    policy.setMaxThreads(2);
+    if (policy.maxThreads() < 2) return error.SkipZigTest;
+    const Work = struct {
+        entered: std.atomic.Value(bool) = .init(false),
+        release: std.atomic.Value(bool) = .init(false),
+        finished: std.atomic.Value(bool) = .init(false),
+        visits: [2]std.atomic.Value(u32) = @splat(.init(0)),
+        accepted: bool = false,
+        fn call(raw: *const anyopaque, index: usize) void {
+            const self: *@This() = @ptrCast(@alignCast(@constCast(raw)));
+            _ = self.visits[index].fetchAdd(1, .monotonic);
+            if (index == 0) {
+                self.entered.store(true, .release);
+                while (!self.release.load(.acquire)) std.Thread.yield() catch {};
+            }
+        }
+        fn run(self: *@This()) void {
+            defer self.finished.store(true, .release);
+            self.accepted = admission_execution.get().runLowLatency(.{ .task_fn = call, .tasks = self, .count = 2 });
+        }
+    };
+    var active: Work = .{};
+    const caller = try std.Thread.spawn(.{}, Work.run, .{&active});
+    var joined = false;
+    defer {
+        active.release.store(true, .release);
+        if (!joined) caller.join();
+    }
+    while (!active.entered.load(.acquire) and !active.finished.load(.acquire)) std.Thread.yield() catch {};
+    try std.testing.expect(active.entered.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 1), shared.io_busy.load(.acquire));
+
+    // Match the actual E4 fallback regression's size and original f64 scal path.
+    // The occupier is a real Executor batch, not a fake numerical callback.
+    const n = 2 * 1024 * 1024;
+    const values = try std.testing.allocator.alloc(f64, n + 8);
+    defer std.testing.allocator.free(values);
+    @memset(values, 19);
+    for (values[0..n], 0..) |*value, i| value.* = @as(f64, @floatFromInt(i % 17)) - 8;
+    const Observe = struct {
+        var entries: usize = 0;
+        var finishes: usize = 0;
+        var observed_values: []const f64 = &.{};
+        fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
+            if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+                @panic("legacy fallback used a different default owner");
+            if (ctx.snapshot().active_operations != 1 or ctx.executor.io_busy.load(.acquire) != 1)
+                @panic("legacy fallback escaped its operation or busy batch");
+            switch (event) {
+                .admitted => entries += 1,
+                .finishing => {
+                    // Check every real result and trailing sentinel before end.
+                    const logical_count = observed_values.len - 8;
+                    for (observed_values[0..logical_count], 0..) |value, i|
+                        if (value != (@as(f64, @floatFromInt(i % 17)) - 8) * -3)
+                            @panic("fallback ended before the original scal body completed");
+                    for (observed_values[logical_count..]) |value|
+                        if (value != 19) @panic("fallback damaged trailing storage");
+                    finishes += 1;
+                },
+            }
+        }
+    };
+    Observe.entries = 0;
+    Observe.finishes = 0;
+    Observe.observed_values = values;
+    admission_execution.context.Context.testing.configure(admission_execution.getContext(), 1, Observe.call);
+    defer admission_execution.context.Context.testing.configure(admission_execution.getContext(), std.math.maxInt(usize), null);
+    cblas.cblas_dscal(n, -3, values.ptr, 1);
+    try std.testing.expectEqual(@as(usize, 1), Observe.entries);
+    try std.testing.expectEqual(@as(usize, 1), Observe.finishes);
+    try std.testing.expectEqual(@as(usize, 0), admission_execution.getContext().snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), admission_execution.getContext().snapshot().resource_pins);
+    for (values[0..n], 0..) |value, i|
+        try std.testing.expectEqual((@as(f64, @floatFromInt(i % 17)) - 8) * -3, value);
+    for (values[n..]) |value| try std.testing.expectEqual(@as(f64, 19), value);
+    try std.testing.expect(!active.finished.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 1), shared.io_busy.load(.acquire));
+    try std.testing.expect(shared.persistent_task_fn == Work.call);
+    try std.testing.expect(shared.persistent_tasks == @as(*const anyopaque, @ptrCast(&active)));
+    active.release.store(true, .release);
+    caller.join();
+    joined = true;
+    try std.testing.expect(active.accepted);
+    for (&active.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
+}
+
+test "two actual CBLAS callers hold separate operations on the same default" {
+    const Observe = struct {
+        var entries: std.atomic.Value(usize) = .init(0);
+        var finishes: std.atomic.Value(usize) = .init(0);
+        var release: [2]std.atomic.Value(bool) = .{ .init(false), .init(false) };
+        fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
+            if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+                @panic("concurrent CBLAS call used a different default owner");
+            const active = ctx.snapshot().active_operations;
+            if (active == 0 or active > 2) @panic("invalid concurrent CBLAS operation count");
+            switch (event) {
+                .admitted => {
+                    const ticket = entries.fetchAdd(1, .acq_rel);
+                    if (ticket >= release.len) @panic("nested CBLAS Fortran admission");
+                    while (!release[ticket].load(.acquire)) std.Thread.yield() catch {};
+                },
+                .finishing => _ = finishes.fetchAdd(1, .acq_rel),
+            }
+        }
+    };
+    Observe.entries.store(0, .release);
+    Observe.finishes.store(0, .release);
+    for (&Observe.release) |*slot| slot.store(false, .release);
+    admission_execution.context.Context.testing.configure(admission_execution.getContext(), 2, Observe.call);
+    defer admission_execution.context.Context.testing.configure(admission_execution.getContext(), std.math.maxInt(usize), null);
+
+    const Work = struct {
+        input: [2]f64 = .{ 4, 5 },
+        output: [3]f64,
+        scale: bool,
+        finished: std.atomic.Value(bool) = .init(false),
+        fn call(self: *@This()) void {
+            defer self.finished.store(true, .release);
+            if (self.scale)
+                cblas.cblas_dscal(2, -3, &self.output, 1)
+            else
+                cblas.cblas_dcopy(2, &self.input, 1, &self.output, 1);
+        }
+    };
+    var scaled: Work = .{ .output = .{ 1, 2, 91 }, .scale = true };
+    var copied: Work = .{ .output = .{ 0, 0, 92 }, .scale = false };
+    const first = try std.Thread.spawn(.{}, Work.call, .{&scaled});
+    var second: ?std.Thread = null;
+    var joined = false;
+    defer {
+        for (&Observe.release) |*slot| slot.store(true, .release);
+        if (!joined) {
+            first.join();
+            if (second) |thread| thread.join();
+        }
+    }
+    second = try std.Thread.spawn(.{}, Work.call, .{&copied});
+    while (Observe.entries.load(.acquire) < 2 and !scaled.finished.load(.acquire) and !copied.finished.load(.acquire))
+        std.Thread.yield() catch {};
+    try std.testing.expectEqual(@as(usize, 2), Observe.entries.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 2), admission_execution.getContext().snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), Observe.finishes.load(.acquire));
+    try std.testing.expectEqualSlices(f64, &.{ 1, 2, 91 }, &scaled.output);
+    try std.testing.expectEqualSlices(f64, &.{ 0, 0, 92 }, &copied.output);
+
+    Observe.release[0].store(true, .release);
+    while (!scaled.finished.load(.acquire) and !copied.finished.load(.acquire)) std.Thread.yield() catch {};
+    try std.testing.expectEqual(@as(usize, 1), Observe.finishes.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 1), admission_execution.getContext().snapshot().active_operations);
+    Observe.release[1].store(true, .release);
+    first.join();
+    second.?.join();
+    joined = true;
+    try std.testing.expectEqual(@as(usize, 2), Observe.finishes.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 0), admission_execution.getContext().snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), admission_execution.getContext().snapshot().resource_pins);
+    try std.testing.expectEqualSlices(f64, &.{ -3, -6, 91 }, &scaled.output);
+    try std.testing.expectEqualSlices(f64, &.{ 4, 5, 92 }, &copied.output);
+}
+
+// Focused layout reproducer: each format below has its own literal storage and
+// independently calculated output. No production or test reference accessor is
+// used to construct the oracle. These small stride-two cases do not exercise
+// parallel scheduling or prove anything about resource ownership.
+const HermitianLayoutFixture = enum { dense, band, packed_rows };
+
+fn hermitianLayoutComplex(comptime T: type, re: f64, im: f64) T {
+    return .{ .re = @floatCast(re), .im = @floatCast(im) };
+}
+
+fn expectHermitianRowMajorLayout(comptime T: type, comptime family: HermitianLayoutFixture, comptime upper: bool) !void {
+    const storage_len: usize = switch (family) {
+        .dense => 15, // n=3, row-major lda=5.
+        .band => 9, // n=3, k=1, row-major lda=3.
+        .packed_rows => 6, // n*(n+1)/2, packed by rows.
+    };
+    const canary = hermitianLayoutComplex(T, 901, -703);
+    var matrix: [storage_len + 2]T = @splat(canary);
+    const a = matrix[1..][0..storage_len];
+    // Only the selected triangle is initialized. All ignored entries, row
+    // padding, band edge holes, and outer guards retain the finite canary.
+    const expected: [3]T = switch (family) {
+        .dense => blk: {
+            a[0] = hermitianLayoutComplex(T, 4, 0);
+            a[6] = hermitianLayoutComplex(T, 5, 0);
+            a[12] = hermitianLayoutComplex(T, 6, 0);
+            if (upper) {
+                a[1] = hermitianLayoutComplex(T, 1, 2);
+                a[2] = hermitianLayoutComplex(T, -2, 1);
+                a[7] = hermitianLayoutComplex(T, 3, -1);
+            } else {
+                a[5] = hermitianLayoutComplex(T, 1, -2);
+                a[10] = hermitianLayoutComplex(T, -2, -1);
+                a[11] = hermitianLayoutComplex(T, 3, 1);
+            }
+            // Ax = (8+2i, 12+i, 8i).
+            break :blk .{ hermitianLayoutComplex(T, 6.25, 7), hermitianLayoutComplex(T, 12.5, 5.25), hermitianLayoutComplex(T, -5.5, 6.25) };
+        },
+        .band => blk: {
+            // Upper rows: [d0,a01,pad], [d1,a12,pad], [d2,hole,pad].
+            // Lower rows: [hole,d0,pad], [a10,d1,pad], [a21,d2,pad].
+            if (upper) {
+                a[0] = hermitianLayoutComplex(T, 2, 0);
+                a[1] = hermitianLayoutComplex(T, -1, 3);
+                a[3] = hermitianLayoutComplex(T, 4, 0);
+                a[4] = hermitianLayoutComplex(T, 2, 1);
+                a[6] = hermitianLayoutComplex(T, 7, 0);
+            } else {
+                a[1] = hermitianLayoutComplex(T, 2, 0);
+                a[3] = hermitianLayoutComplex(T, -1, -3);
+                a[4] = hermitianLayoutComplex(T, 4, 0);
+                a[6] = hermitianLayoutComplex(T, 2, -1);
+                a[7] = hermitianLayoutComplex(T, 7, 0);
+            }
+            // Ax = (3+9i, 6-5i, -4+10i); A02=A20=0.
+            break :blk .{ hermitianLayoutComplex(T, -2.25, 11.5), hermitianLayoutComplex(T, 9.5, -3.75), hermitianLayoutComplex(T, -10.5, 6.25) };
+        },
+        .packed_rows => blk: {
+            // Upper order: A00,A01,A02,A11,A12,A22.
+            // Lower order: A00,A10,A11,A20,A21,A22.
+            a[0] = hermitianLayoutComplex(T, 3, 0);
+            a[5] = hermitianLayoutComplex(T, 8, 0);
+            if (upper) {
+                a[1] = hermitianLayoutComplex(T, 2, -1);
+                a[2] = hermitianLayoutComplex(T, 1, 4);
+                a[3] = hermitianLayoutComplex(T, 6, 0);
+                a[4] = hermitianLayoutComplex(T, -2, 2);
+            } else {
+                a[1] = hermitianLayoutComplex(T, 2, 1);
+                a[2] = hermitianLayoutComplex(T, 6, 0);
+                a[3] = hermitianLayoutComplex(T, 1, -4);
+                a[4] = hermitianLayoutComplex(T, -2, -2);
+            }
+            // Ax = (-3-3i, 11-9i, -9+11i).
+            break :blk .{ hermitianLayoutComplex(T, -2.25, -3.5), hermitianLayoutComplex(T, 16.5, -5.25), hermitianLayoutComplex(T, -16, 4.75) };
+        },
+    };
+    const x = [_]T{ canary, hermitianLayoutComplex(T, 1, 1), canary, hermitianLayoutComplex(T, 2, -1), canary, hermitianLayoutComplex(T, -1, 2), canary, canary };
+    var y = [_]T{ canary, hermitianLayoutComplex(T, 2, -1), canary, hermitianLayoutComplex(T, -3, 2), canary, hermitianLayoutComplex(T, 1, 4), canary, canary };
+    const alpha = hermitianLayoutComplex(T, 1, 0.5);
+    const beta = hermitianLayoutComplex(T, -0.5, 0.25);
+    const matrix_before = matrix;
+    const x_before = x;
+    const alpha_before = alpha;
+    const beta_before = beta;
+    const y_before = y;
+    const uplo: c_int = if (upper) cblas.CblasUpper else cblas.CblasLower;
+    switch (family) {
+        .dense => if (T == cblas.ComplexF32)
+            cblas.cblas_chemv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, 5, x[1..].ptr, 2, &beta, y[1..].ptr, 2)
+        else
+            cblas.cblas_zhemv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, 5, x[1..].ptr, 2, &beta, y[1..].ptr, 2),
+        .band => if (T == cblas.ComplexF32)
+            cblas.cblas_chbmv(cblas.CblasRowMajor, uplo, 3, 1, &alpha, a.ptr, 3, x[1..].ptr, 2, &beta, y[1..].ptr, 2)
+        else
+            cblas.cblas_zhbmv(cblas.CblasRowMajor, uplo, 3, 1, &alpha, a.ptr, 3, x[1..].ptr, 2, &beta, y[1..].ptr, 2),
+        .packed_rows => if (T == cblas.ComplexF32)
+            cblas.cblas_chpmv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, x[1..].ptr, 2, &beta, y[1..].ptr, 2)
+        else
+            cblas.cblas_zhpmv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, x[1..].ptr, 2, &beta, y[1..].ptr, 2),
+    }
+    // Perform immutable-input and output-gap checks before numerical assertions,
+    // so a wrong result does not mask these checks within the same case.
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&matrix_before), std.mem.asBytes(&matrix));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&x_before), std.mem.asBytes(&x));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&alpha_before), std.mem.asBytes(&alpha));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&beta_before), std.mem.asBytes(&beta));
+    for ([_]usize{ 0, 2, 4, 6, 7 }) |i| {
+        try std.testing.expectEqualSlices(u8, std.mem.asBytes(&y_before[i]), std.mem.asBytes(&y[i]));
+    }
+    const Real = @TypeOf(alpha.re);
+    const tolerance: Real = if (T == cblas.ComplexF32) 0.000001 else 0.000000000001;
+    for (expected, 0..) |want, i| {
+        try std.testing.expectApproxEqAbs(want.re, y[1 + 2 * i].re, tolerance);
+        try std.testing.expectApproxEqAbs(want.im, y[1 + 2 * i].im, tolerance);
+    }
+}
+
+test "cblas row-major chemv upper independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF32, .dense, true);
+}
+
+test "cblas row-major chemv lower independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF32, .dense, false);
+}
+
+test "cblas row-major zhemv upper independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF64, .dense, true);
+}
+
+test "cblas row-major zhemv lower independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF64, .dense, false);
+}
+
+test "cblas row-major chbmv upper independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF32, .band, true);
+}
+
+test "cblas row-major chbmv lower independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF32, .band, false);
+}
+
+test "cblas row-major zhbmv upper independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF64, .band, true);
+}
+
+test "cblas row-major zhbmv lower independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF64, .band, false);
+}
+
+test "cblas row-major chpmv upper independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF32, .packed_rows, true);
+}
+
+test "cblas row-major chpmv lower independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF32, .packed_rows, false);
+}
+
+test "cblas row-major zhpmv upper independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF64, .packed_rows, true);
+}
+
+test "cblas row-major zhpmv lower independent Hermitian layout oracle" {
+    try expectHermitianRowMajorLayout(cblas.ComplexF64, .packed_rows, false);
+}
+
+// The original 43 declarations above, including all twelve failing literal
+// layout cases, are unchanged. This extension varies only strides/scales/poison
+// around the same independently known mathematical A*x vectors.
+const HermitianLayoutEdgeScales = enum { normal, alpha_zero, beta_zero, both_zero, alpha_zero_beta_one };
+
+fn hermitianLayoutEdgePosition(inc: c_int, logical: usize) usize {
+    const distance: usize = @intCast(if (inc < 0) -inc else inc);
+    return 1 + (if (inc < 0) 2 - logical else logical) * distance;
+}
+
+fn expectHermitianRowMajorEdges(comptime T: type, comptime family: HermitianLayoutFixture, upper: bool, incx: c_int, incy: c_int, scales: HermitianLayoutEdgeScales) !void {
+    const Real = @TypeOf(@as(T, undefined).re);
+    const nan = std.math.nan(Real);
+    const poison: T = .{ .re = nan, .im = nan };
+    const storage_len: usize = switch (family) {
+        .dense => 15,
+        .band => 9,
+        .packed_rows => 6,
+    };
+    const canary = hermitianLayoutComplex(T, 901, -703);
+    var matrix: [storage_len + 2]T = @splat(canary);
+    const a = matrix[1..][0..storage_len];
+    // Literal physical storage matches the original cases, with imaginary
+    // diagonals replaced by NaN. No production indexing/access helper is used.
+    const ax: [3]T = switch (family) {
+        .dense => blk: {
+            a[0] = .{ .re = 4, .im = nan };
+            a[6] = .{ .re = 5, .im = nan };
+            a[12] = .{ .re = 6, .im = nan };
+            if (upper) {
+                a[1] = hermitianLayoutComplex(T, 1, 2);
+                a[2] = hermitianLayoutComplex(T, -2, 1);
+                a[7] = hermitianLayoutComplex(T, 3, -1);
+            } else {
+                a[5] = hermitianLayoutComplex(T, 1, -2);
+                a[10] = hermitianLayoutComplex(T, -2, -1);
+                a[11] = hermitianLayoutComplex(T, 3, 1);
+            }
+            break :blk .{ hermitianLayoutComplex(T, 8, 2), hermitianLayoutComplex(T, 12, 1), hermitianLayoutComplex(T, 0, 8) };
+        },
+        .band => blk: {
+            if (upper) {
+                a[0] = .{ .re = 2, .im = nan };
+                a[1] = hermitianLayoutComplex(T, -1, 3);
+                a[3] = .{ .re = 4, .im = nan };
+                a[4] = hermitianLayoutComplex(T, 2, 1);
+                a[6] = .{ .re = 7, .im = nan };
+            } else {
+                a[1] = .{ .re = 2, .im = nan };
+                a[3] = hermitianLayoutComplex(T, -1, -3);
+                a[4] = .{ .re = 4, .im = nan };
+                a[6] = hermitianLayoutComplex(T, 2, -1);
+                a[7] = .{ .re = 7, .im = nan };
+            }
+            break :blk .{ hermitianLayoutComplex(T, 3, 9), hermitianLayoutComplex(T, 6, -5), hermitianLayoutComplex(T, -4, 10) };
+        },
+        .packed_rows => blk: {
+            a[0] = .{ .re = 3, .im = nan };
+            a[5] = .{ .re = 8, .im = nan };
+            if (upper) {
+                a[1] = hermitianLayoutComplex(T, 2, -1);
+                a[2] = hermitianLayoutComplex(T, 1, 4);
+                a[3] = .{ .re = 6, .im = nan };
+                a[4] = hermitianLayoutComplex(T, -2, 2);
+            } else {
+                a[1] = hermitianLayoutComplex(T, 2, 1);
+                a[2] = .{ .re = 6, .im = nan };
+                a[3] = hermitianLayoutComplex(T, 1, -4);
+                a[4] = hermitianLayoutComplex(T, -2, -2);
+            }
+            break :blk .{ hermitianLayoutComplex(T, -3, -3), hermitianLayoutComplex(T, 11, -9), hermitianLayoutComplex(T, -9, 11) };
+        },
+    };
+    const alpha_zero = scales == .alpha_zero or scales == .both_zero or scales == .alpha_zero_beta_one;
+    const beta_zero = scales == .beta_zero or scales == .both_zero;
+    const alpha = if (alpha_zero) hermitianLayoutComplex(T, 0, 0) else hermitianLayoutComplex(T, 1, 0.5);
+    const beta = if (beta_zero) hermitianLayoutComplex(T, 0, 0) else if (scales == .alpha_zero_beta_one) hermitianLayoutComplex(T, 1, 0) else hermitianLayoutComplex(T, -0.5, 0.25);
+    const logical_x = [_]T{ hermitianLayoutComplex(T, 1, 1), hermitianLayoutComplex(T, 2, -1), hermitianLayoutComplex(T, -1, 2) };
+    const logical_y = [_]T{ hermitianLayoutComplex(T, 2, -1), hermitianLayoutComplex(T, -3, 2), hermitianLayoutComplex(T, 1, 4) };
+    var x: [11]T = @splat(canary);
+    var y: [11]T = @splat(canary);
+    var active: [11]bool = @splat(false);
+    var expected: [3]T = undefined;
+    if (alpha_zero) @memset(a, poison);
+    for (0..3) |i| {
+        x[hermitianLayoutEdgePosition(incx, i)] = if (alpha_zero) poison else logical_x[i];
+        const iy = hermitianLayoutEdgePosition(incy, i);
+        y[iy] = if (beta_zero) poison else logical_y[i];
+        active[iy] = true;
+        // These literal A*x values are fixed independently of the actual A/X
+        // buffers. The old logical Y is also literal, never read back after call.
+        const ar: f64 = alpha.re;
+        const ai: f64 = alpha.im;
+        const br: f64 = beta.re;
+        const bi: f64 = beta.im;
+        const pr: f64 = ax[i].re;
+        const pi: f64 = ax[i].im;
+        const yr: f64 = logical_y[i].re;
+        const yi: f64 = logical_y[i].im;
+        const product_re = if (alpha_zero) 0 else ar * pr - ai * pi;
+        const product_im = if (alpha_zero) 0 else ar * pi + ai * pr;
+        const prior_re = if (beta_zero) 0 else br * yr - bi * yi;
+        const prior_im = if (beta_zero) 0 else br * yi + bi * yr;
+        expected[i] = hermitianLayoutComplex(T, product_re + prior_re, product_im + prior_im);
+    }
+    const matrix_before = matrix;
+    const x_before = x;
+    const alpha_before = alpha;
+    const beta_before = beta;
+    const y_before = y;
+    const uplo: c_int = if (upper) cblas.CblasUpper else cblas.CblasLower;
+    switch (family) {
+        .dense => if (T == cblas.ComplexF32)
+            cblas.cblas_chemv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, 5, x[1..].ptr, incx, &beta, y[1..].ptr, incy)
+        else
+            cblas.cblas_zhemv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, 5, x[1..].ptr, incx, &beta, y[1..].ptr, incy),
+        .band => if (T == cblas.ComplexF32)
+            cblas.cblas_chbmv(cblas.CblasRowMajor, uplo, 3, 1, &alpha, a.ptr, 3, x[1..].ptr, incx, &beta, y[1..].ptr, incy)
+        else
+            cblas.cblas_zhbmv(cblas.CblasRowMajor, uplo, 3, 1, &alpha, a.ptr, 3, x[1..].ptr, incx, &beta, y[1..].ptr, incy),
+        .packed_rows => if (T == cblas.ComplexF32)
+            cblas.cblas_chpmv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, x[1..].ptr, incx, &beta, y[1..].ptr, incy)
+        else
+            cblas.cblas_zhpmv(cblas.CblasRowMajor, uplo, 3, &alpha, a.ptr, x[1..].ptr, incx, &beta, y[1..].ptr, incy),
+    }
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&matrix_before), std.mem.asBytes(&matrix));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&x_before), std.mem.asBytes(&x));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&alpha_before), std.mem.asBytes(&alpha));
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&beta_before), std.mem.asBytes(&beta));
+    for (active, 0..) |written, i| {
+        if (!written) try std.testing.expectEqualSlices(u8, std.mem.asBytes(&y_before[i]), std.mem.asBytes(&y[i]));
+    }
+    if (scales == .alpha_zero_beta_one) try std.testing.expectEqualSlices(u8, std.mem.asBytes(&y_before), std.mem.asBytes(&y));
+    const tolerance: Real = if (T == cblas.ComplexF32) 0.000001 else 0.000000000001;
+    for (expected, 0..) |want, i| {
+        const got = y[hermitianLayoutEdgePosition(incy, i)];
+        try std.testing.expectApproxEqAbs(want.re, got.re, tolerance);
+        try std.testing.expectApproxEqAbs(want.im, got.im, tolerance);
+    }
+}
+
+test "cblas row-major Hermitian edges retain strides zero-scale nonreads and poisoned diagonal semantics" {
+    inline for (.{ cblas.ComplexF32, cblas.ComplexF64 }) |T| {
+        inline for (.{ HermitianLayoutFixture.dense, HermitianLayoutFixture.band, HermitianLayoutFixture.packed_rows }) |family| {
+            for ([_]bool{ true, false }) |upper| {
+                for ([_][2]c_int{ .{ 1, 1 }, .{ -1, -1 }, .{ 2, -3 }, .{ -2, 3 }, .{ 3, 2 } }) |strides| {
+                    for ([_]HermitianLayoutEdgeScales{ .normal, .alpha_zero, .beta_zero, .both_zero, .alpha_zero_beta_one }) |scales| {
+                        expectHermitianRowMajorEdges(T, family, upper, strides[0], strides[1], scales) catch |err| {
+                            std.debug.print("Hermitian edge scalar={s} storage={s} upper={} incx={d} incy={d} scales={s}\n", .{ @typeName(T), @tagName(family), upper, strides[0], strides[1], @tagName(scales) });
+                            return err;
+                        };
+                    }
+                }
+            }
+        }
+    }
+}

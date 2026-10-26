@@ -151,3 +151,52 @@ test "structured object ABI layout remains fixed" {
     try std.testing.expectEqual(@as(usize, 88), @sizeOf(abi.Request));
     try std.testing.expectEqual(@as(usize, 88), @sizeOf(abi.GemmRequest));
 }
+
+test "isolated SYMM borrows operation allocator and finishes during close" {
+    const execution = @import("zynum-execution");
+    const fixture = execution.test_support;
+    fixture.setThreads(4);
+    var allocations: fixture.Allocations = .{ .budget = 0 };
+    var ctx = execution.context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+    defer {
+        _ = ctx.requestClose();
+        _ = ctx.tryProgressClose();
+    }
+    const n = 128;
+    const ld = 131;
+    const a = try std.testing.allocator.alloc(f64, ld * n);
+    defer std.testing.allocator.free(a);
+    const b = try std.testing.allocator.alloc(f64, ld * n);
+    defer std.testing.allocator.free(b);
+    const c = try std.testing.allocator.alloc(f64, ld * n);
+    defer std.testing.allocator.free(c);
+    @memset(a, std.math.nan(f64));
+    @memset(b, 809);
+    @memset(c, 707);
+    for (0..n) |column| {
+        for (0..column + 1) |row| a[column * ld + row] = if (row == column) 2 else 0;
+        for (0..n) |row| b[column * ld + row] = @as(f64, @floatFromInt((row + column * 2) % 11)) - 5;
+    }
+    var operation = try ctx.begin();
+    var ended = false;
+    defer if (!ended) operation.end();
+    const resources: core_pool.CallResources = .{ .admitted = &operation };
+    try std.testing.expect(!bridge.trySymmWithResources(f64, resources, .left, .upper, n, n, 1, a.ptr, ld, b.ptr, ld, 0, c.ptr, ld, false));
+    for (c) |entry| try std.testing.expectEqual(@as(f64, 707), entry);
+    try std.testing.expect(allocations.stats().rejected > 0);
+    allocations.budget = std.math.maxInt(usize);
+    try std.testing.expectEqual(execution.context.RequestResult.pending, ctx.requestClose());
+    try std.testing.expectEqual(execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectError(error.Closing, ctx.begin());
+    try std.testing.expect(bridge.trySymmWithResources(f64, resources, .left, .upper, n, n, 1, a.ptr, ld, b.ptr, ld, 0, c.ptr, ld, false));
+    for (0..n) |column| {
+        for (0..n) |row| try std.testing.expectEqual(2 * b[column * ld + row], c[column * ld + row]);
+        for (n..ld) |row| try std.testing.expectEqual(@as(f64, 707), c[column * ld + row]);
+    }
+    try std.testing.expect(allocations.stats().accepted > 0);
+    try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
+    operation.end();
+    ended = true;
+    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
+}

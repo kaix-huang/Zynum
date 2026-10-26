@@ -1,0 +1,5 @@
+EXPORTS
+    LAPACKE_ssygv
+    LAPACKE_ssygv_work
+    LAPACKE_dsygv
+    LAPACKE_dsygv_work

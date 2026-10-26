@@ -1,6 +1,7 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
+const std = @import("std");
 const gemm_task = @import("../shared/matrix_matrix/task.zig");
 const aarch64_asimd = @import("../arch/aarch64/matrix_matrix/asimd.zig");
 const aarch64_sme = @import("../arch/aarch64/matrix_matrix/sme.zig");
@@ -74,10 +75,10 @@ pub fn noTransReal(comptime T: type, task: Task(T)) void {
     }
 }
 
-pub fn tryNoTransRealF32Fast(m: gemm_task.BlasInt, n: gemm_task.BlasInt, k: gemm_task.BlasInt, alpha: f32, a: [*]const f32, lda: gemm_task.BlasInt, b: [*]const f32, ldb: gemm_task.BlasInt, beta: f32, c: [*]f32, ldc: gemm_task.BlasInt) bool {
-    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_tryNoTransRealF32Fast, void, .{ m, n, k, alpha, a, lda, b, ldb, beta, c, ldc });
+pub fn tryNoTransRealF32Fast(m: gemm_task.BlasInt, n: gemm_task.BlasInt, k: gemm_task.BlasInt, alpha: f32, a: [*]const f32, lda: gemm_task.BlasInt, b: [*]const f32, ldb: gemm_task.BlasInt, beta: f32, c: [*]f32, ldc: gemm_task.BlasInt, scratch_allocator: ?std.mem.Allocator) bool {
+    if (comptime @import("zynum-build-options").dynamic_dispatch) return @import("../multiversion/client.zig").call(.matrix_matrix_tryNoTransRealF32Fast, void, .{ m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, scratch_allocator });
     return switch (active_capability) {
-        .aarch64_sme => aarch64_sme.tryNoTransRealF32Fast(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc),
+        .aarch64_sme => aarch64_sme.tryNoTransRealF32Fast(m, n, k, alpha, a, lda, b, ldb, beta, c, ldc, scratch_allocator),
         else => false,
     };
 }

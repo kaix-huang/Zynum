@@ -198,3 +198,69 @@ Public notes describe current contracts and implementation. Raw profiling,
 disassembly, experimental variants, and run-by-run records belong outside the
 repository. The current measurement bundle contains the curated evidence
 needed to interpret and reproduce the figures.
+
+## Historical LAPACK, Sparse and FFT comparison (2026-10-15)
+
+This separate campaign used an earlier finite scientific SDK on Apple M5,
+macOS 27.0.1 and Zig 0.17.0 ReleaseFast with dynamic dispatch. It measured
+72 shapes, including 15 ABPLaS source/trace-scale models and general size
+scans, using 1,276 qualified fresh processes and 17,588 numerically checked
+timed calls. Available comparators were OpenBLAS 0.3.34, Accelerate/vDSP,
+FFTW 3.3.11 and benchmark-only Eigen 5.0.0. These are local eligible routes,
+not a worldwide fastest-vendor ranking.
+
+The measured Zynum shared image had SHA-256
+`581b47cbaac59d00e3b7227d8fcbacb7007e0f3a91f8abeec2f9858046d5dc95`.
+It predates the subsequent shared-SVD and interface revisions. These numbers
+are retained historical results, not measurements of the `scientific` branch.
+
+Cells show Zynum / fastest local comparator time in microseconds, followed
+by the comparator. **Time ratios above 1 mean Zynum is slower.** This is the
+inverse direction of the BLAS rate ratios earlier in this guide.
+
+| ABPLaS scale model | Thread cap 1: times (us) | Time ratio | Thread cap 4: times (us) | Time ratio |
+| --- | ---: | ---: | ---: | ---: |
+| abp-lattice3-rhs1 | 0.083 / 0.166 (OpenBLAS) | 0.50x | 0.084 / 0.166 (OpenBLAS) | 0.51x |
+| abp-lattice3-rhs3 | 0.125 / 0.250 (OpenBLAS) | 0.50x | 0.125 / 0.250 (OpenBLAS) | 0.50x |
+| abp-anderson8 | 2775.750 / 8.375 (OpenBLAS) | 331.43x | 2803.333 / 10.167 (Accelerate) | 275.73x |
+| abp-projected48-zpotrf | 2459.375 / 12.542 (OpenBLAS) | 196.09x | 2391.209 / 12.500 (OpenBLAS) | 191.30x |
+| abp-projected48-zheev | 37531.250 / 505.458 (OpenBLAS) | 74.25x | 37521.083 / 499.291 (OpenBLAS) | 75.15x |
+| abp-projected48-zhegv | 62693.000 / 592.792 (OpenBLAS) | 105.76x | 62857.625 / 604.042 (OpenBLAS) | 104.06x |
+| abp-lanczos19-values | 18.833 / 8.875 (Accelerate) | 2.12x | 18.584 / 8.875 (Accelerate) | 2.09x |
+| abp-kinetic1728-real_spmv | 80.917 / 24.708 (Accelerate) | 3.27x | 80.875 / 27.834 (Eigen) | 2.91x |
+| abp-kinetic1728-complex_spmv | 100.145 / 71.980 (Eigen) | 1.39x | 100.292 / 37.999 (Eigen) | 2.64x |
+| abp-kinetic1728-real_spmm | 1143.166 / 1195.875 (Accelerate) | 0.96x | 1143.709 / 1178.959 (Eigen) | 0.97x |
+| abp-kinetic1728-complex_spmm | 2191.041 / 3453.959 (Eigen) | 0.63x | 2190.291 / 1722.188 (Eigen) | 1.27x |
+| abp-cheby32768-c2c1d | 80596.917 / 210.917 (FFTW MEASURE) | 382.13x | 81001.688 / 131.958 (FFTW MEASURE) | 613.84x |
+| abp-cheby32768-r2c1d | 78862.709 / 115.959 (FFTW MEASURE) | 680.09x | 78627.666 / 76.000 (FFTW MEASURE) | 1034.57x |
+| abp-kerker12cubed-r2c3d | 75033.917 / 2.750 (fftw) | 27285.06x | 75451.959 / 25.875 (fftw) | 2916.02x |
+| abp-kerker12cubed-c2r3d | 74672.333 / 2.708 (fftw) | 27574.72x | 74687.292 / 25.833 (fftw) | 2891.16x |
+
+The statistic is the median of process medians, with three or four fresh
+processes per library/shape/thread setting and a balanced cyclic order. Each
+ABP model used 21 timed calls per process; general models used a predeclared
+1/3/21-call policy shared by all libraries for a shape. Sparse/FFT had an
+untimed warmup; LAPACK did not. Single-call general cases measure first-call
+latency. Data generation, resets, queries, checks and FFT planning were outside
+the execution interval; public-interface validation and internal scratch were
+included. FFTW MEASURE planning can cost more than ESTIMATE; selecting it as
+the fastest execution route does not compare total plan-plus-execution cost.
+
+Caps 1/4 are requested policies, not observed worker counts. Zynum FFT was
+serial; Apple caps were environment requests. vDSP comparisons covered only
+the adapter's radix-2 C2C routes. Zynum Sparse revalidated mixed-index CSR on
+each call, while Eigen compression/index conversion was setup work.
+
+Model inputs were independently constructed, rather than extracted application
+matrices. The 12-cubed order-6 CSR model had 58,752 entries and omitted
+nonlocal projectors; SpMM with 48 columns was a batching model. The 48-order
+Hermitian cases computed all vectors, the 19-order STEV case computed values,
+and the 32,768-point Chebyshev models were C2C/R2C. These results do not measure
+complete Hamiltonian, ELPA, MPI ghost exchange or SCF wall time. Tiny 3x3
+observations approach timer granularity and do not establish a stable 2x lead.
+
+An interrupted attempt without a terminal receipt was excluded. The original
+1,188 completed processes were rechecked and 88 were resumed with the original
+policy; no qualified sample was filtered by speed. Raw process records and the
+original full comparison report remain external development artifacts. No
+performance tuning or new measurement accompanies this consolidation.

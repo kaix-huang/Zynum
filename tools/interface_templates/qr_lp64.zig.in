@@ -1,0 +1,33 @@
+// Interface-only QR template: types, arithmetic and resources come from one binding.
+fn QrFactor(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("QR interface acceptance is LP64 only");
+    return struct {
+        fn invoke(layout: c_int, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, tau: ?[*]align(1) T, work: ?[*]align(1) T, lwork: WireInt) WireInt {
+            const info = binding.Shared.qrRawManagedWithDefaults(true, T, level, binding.Provider.Execution.getContext(), .{ .layout = layout, .m = @intCast(m), .n = @intCast(n), .a = a, .lda = @intCast(lda), .tau = tau, .work = work, .lwork = @intCast(lwork) }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return @intCast(info);
+        }
+        fn high(layout: c_int, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, tau: ?[*]align(1) T) callconv(.c) WireInt {
+            return invoke(layout, m, n, a, lda, tau, null, 0);
+        }
+        fn workEntry(layout: c_int, m: WireInt, n: WireInt, a: ?[*]align(1) T, lda: WireInt, tau: ?[*]align(1) T, work: ?[*]align(1) T, lwork: WireInt) callconv(.c) WireInt {
+            return invoke(layout, m, n, a, lda, tau, work, lwork);
+        }
+        pub const call = if (level == .high) high else workEntry;
+    };
+}
+fn QrApply(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("QR interface acceptance is LP64 only");
+    return struct {
+        fn invoke(layout: c_int, side: i8, trans: i8, m: WireInt, n: WireInt, k: WireInt, a: ?[*]align(1) const T, lda: WireInt, tau: ?[*]align(1) const T, c: ?[*]align(1) T, ldc: WireInt, work: ?[*]align(1) T, lwork: WireInt) WireInt {
+            const info = binding.Shared.qApplyRawManagedWithDefaults(true, T, level, binding.Provider.Execution.getContext(), .{ .layout = layout, .side = @bitCast(side), .trans = @bitCast(trans), .m = @intCast(m), .n = @intCast(n), .k = @intCast(k), .a = a, .lda = @intCast(lda), .tau = tau, .c = c, .ldc = @intCast(ldc), .work = work, .lwork = @intCast(lwork) }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return @intCast(info);
+        }
+        fn high(layout: c_int, side: i8, trans: i8, m: WireInt, n: WireInt, k: WireInt, a: ?[*]align(1) const T, lda: WireInt, tau: ?[*]align(1) const T, c: ?[*]align(1) T, ldc: WireInt) callconv(.c) WireInt {
+            return invoke(layout, side, trans, m, n, k, a, lda, tau, c, ldc, null, 0);
+        }
+        fn workEntry(layout: c_int, side: i8, trans: i8, m: WireInt, n: WireInt, k: WireInt, a: ?[*]align(1) const T, lda: WireInt, tau: ?[*]align(1) const T, c: ?[*]align(1) T, ldc: WireInt, work: ?[*]align(1) T, lwork: WireInt) callconv(.c) WireInt {
+            return invoke(layout, side, trans, m, n, k, a, lda, tau, c, ldc, work, lwork);
+        }
+        pub const call = if (level == .high) high else workEntry;
+    };
+}

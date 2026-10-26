@@ -1,0 +1,6326 @@
+{
+  "plan": {
+    "profile": "checked-sparse-v1",
+    "set": "csr-products-independent-indices-v1",
+    "target": "apple-arm64-default-c-v1",
+    "pointer_bits": 64,
+    "shared_abi": {
+      "header": "zynum/checked/checked.h",
+      "zig_source": "src/checked/abi_types.zig",
+      "types": [
+        "result",
+        "const_buffer",
+        "buffer",
+        "csr",
+        "const_dense",
+        "dense"
+      ],
+      "status_owner": "checked-v1"
+    },
+    "complex_layouts": {
+      "complex_f32": {
+        "component": "float",
+        "size": 8,
+        "alignment": 4,
+        "offsets": {
+          "re": 0,
+          "im": 4
+        }
+      },
+      "complex_f64": {
+        "component": "double",
+        "size": 16,
+        "alignment": 8,
+        "offsets": {
+          "re": 0,
+          "im": 8
+        }
+      }
+    },
+    "flags": {
+      "NORMAL": 0,
+      "TRANSPOSED": 1,
+      "ADJOINT": 2
+    },
+    "bindings": [
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_i64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_i64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f32_u64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f32_u64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f32",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "float",
+        "scalar_zig_type": "f32",
+        "type_arguments": [
+          "f32",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_i64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_i64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_f64_u64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_f64_u64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "f64",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "double",
+        "scalar_zig_type": "f64",
+        "type_arguments": [
+          "f64",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_i64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_i64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f32_u64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f32_u64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f32",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f32",
+        "scalar_zig_type": "core.sparse.ComplexF32",
+        "type_arguments": [
+          "complex_f32",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f32",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f32",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u32_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u32_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u32_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u32_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u32_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u32_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u32_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u32_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u32",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u32",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_i64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_i64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "i64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "i64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u64_i32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u64_i32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "i32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "i32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u64_u32",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u64_u32",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "u32",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "u32"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u64_i64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u64_i64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "i64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "i64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmv_complex_f64_u64_u64",
+        "operation": "sparse.mv",
+        "adapter": "spmvWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_buffer",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "buffer",
+            "result"
+          ]
+        ],
+        "result": "result"
+      },
+      {
+        "symbol": "zynum_checked_csr_spmm_complex_f64_u64_u64",
+        "operation": "sparse.mm",
+        "adapter": "spmmWithIndexTypes",
+        "scalar": "complex_f64",
+        "offset": "u64",
+        "ordinal": "u64",
+        "scalar_c_type": "zynum_checked_complex_f64",
+        "scalar_zig_type": "core.sparse.ComplexF64",
+        "type_arguments": [
+          "complex_f64",
+          "u64",
+          "u64"
+        ],
+        "parameters": [
+          [
+            "a",
+            "csr",
+            "matrix"
+          ],
+          [
+            "operation",
+            "i32",
+            "operation"
+          ],
+          [
+            "alpha",
+            "complex_f64",
+            "product_scale"
+          ],
+          [
+            "x",
+            "const_dense",
+            "input"
+          ],
+          [
+            "beta",
+            "complex_f64",
+            "result_scale"
+          ],
+          [
+            "y",
+            "dense",
+            "result"
+          ]
+        ],
+        "result": "result"
+      }
+    ],
+    "symbols": [
+      "zynum_checked_csr_spmv_f32_i32_i32",
+      "zynum_checked_csr_spmm_f32_i32_i32",
+      "zynum_checked_csr_spmv_f32_i32_u32",
+      "zynum_checked_csr_spmm_f32_i32_u32",
+      "zynum_checked_csr_spmv_f32_i32_i64",
+      "zynum_checked_csr_spmm_f32_i32_i64",
+      "zynum_checked_csr_spmv_f32_i32_u64",
+      "zynum_checked_csr_spmm_f32_i32_u64",
+      "zynum_checked_csr_spmv_f32_u32_i32",
+      "zynum_checked_csr_spmm_f32_u32_i32",
+      "zynum_checked_csr_spmv_f32_u32_u32",
+      "zynum_checked_csr_spmm_f32_u32_u32",
+      "zynum_checked_csr_spmv_f32_u32_i64",
+      "zynum_checked_csr_spmm_f32_u32_i64",
+      "zynum_checked_csr_spmv_f32_u32_u64",
+      "zynum_checked_csr_spmm_f32_u32_u64",
+      "zynum_checked_csr_spmv_f32_i64_i32",
+      "zynum_checked_csr_spmm_f32_i64_i32",
+      "zynum_checked_csr_spmv_f32_i64_u32",
+      "zynum_checked_csr_spmm_f32_i64_u32",
+      "zynum_checked_csr_spmv_f32_i64_i64",
+      "zynum_checked_csr_spmm_f32_i64_i64",
+      "zynum_checked_csr_spmv_f32_i64_u64",
+      "zynum_checked_csr_spmm_f32_i64_u64",
+      "zynum_checked_csr_spmv_f32_u64_i32",
+      "zynum_checked_csr_spmm_f32_u64_i32",
+      "zynum_checked_csr_spmv_f32_u64_u32",
+      "zynum_checked_csr_spmm_f32_u64_u32",
+      "zynum_checked_csr_spmv_f32_u64_i64",
+      "zynum_checked_csr_spmm_f32_u64_i64",
+      "zynum_checked_csr_spmv_f32_u64_u64",
+      "zynum_checked_csr_spmm_f32_u64_u64",
+      "zynum_checked_csr_spmv_f64_i32_i32",
+      "zynum_checked_csr_spmm_f64_i32_i32",
+      "zynum_checked_csr_spmv_f64_i32_u32",
+      "zynum_checked_csr_spmm_f64_i32_u32",
+      "zynum_checked_csr_spmv_f64_i32_i64",
+      "zynum_checked_csr_spmm_f64_i32_i64",
+      "zynum_checked_csr_spmv_f64_i32_u64",
+      "zynum_checked_csr_spmm_f64_i32_u64",
+      "zynum_checked_csr_spmv_f64_u32_i32",
+      "zynum_checked_csr_spmm_f64_u32_i32",
+      "zynum_checked_csr_spmv_f64_u32_u32",
+      "zynum_checked_csr_spmm_f64_u32_u32",
+      "zynum_checked_csr_spmv_f64_u32_i64",
+      "zynum_checked_csr_spmm_f64_u32_i64",
+      "zynum_checked_csr_spmv_f64_u32_u64",
+      "zynum_checked_csr_spmm_f64_u32_u64",
+      "zynum_checked_csr_spmv_f64_i64_i32",
+      "zynum_checked_csr_spmm_f64_i64_i32",
+      "zynum_checked_csr_spmv_f64_i64_u32",
+      "zynum_checked_csr_spmm_f64_i64_u32",
+      "zynum_checked_csr_spmv_f64_i64_i64",
+      "zynum_checked_csr_spmm_f64_i64_i64",
+      "zynum_checked_csr_spmv_f64_i64_u64",
+      "zynum_checked_csr_spmm_f64_i64_u64",
+      "zynum_checked_csr_spmv_f64_u64_i32",
+      "zynum_checked_csr_spmm_f64_u64_i32",
+      "zynum_checked_csr_spmv_f64_u64_u32",
+      "zynum_checked_csr_spmm_f64_u64_u32",
+      "zynum_checked_csr_spmv_f64_u64_i64",
+      "zynum_checked_csr_spmm_f64_u64_i64",
+      "zynum_checked_csr_spmv_f64_u64_u64",
+      "zynum_checked_csr_spmm_f64_u64_u64",
+      "zynum_checked_csr_spmv_complex_f32_i32_i32",
+      "zynum_checked_csr_spmm_complex_f32_i32_i32",
+      "zynum_checked_csr_spmv_complex_f32_i32_u32",
+      "zynum_checked_csr_spmm_complex_f32_i32_u32",
+      "zynum_checked_csr_spmv_complex_f32_i32_i64",
+      "zynum_checked_csr_spmm_complex_f32_i32_i64",
+      "zynum_checked_csr_spmv_complex_f32_i32_u64",
+      "zynum_checked_csr_spmm_complex_f32_i32_u64",
+      "zynum_checked_csr_spmv_complex_f32_u32_i32",
+      "zynum_checked_csr_spmm_complex_f32_u32_i32",
+      "zynum_checked_csr_spmv_complex_f32_u32_u32",
+      "zynum_checked_csr_spmm_complex_f32_u32_u32",
+      "zynum_checked_csr_spmv_complex_f32_u32_i64",
+      "zynum_checked_csr_spmm_complex_f32_u32_i64",
+      "zynum_checked_csr_spmv_complex_f32_u32_u64",
+      "zynum_checked_csr_spmm_complex_f32_u32_u64",
+      "zynum_checked_csr_spmv_complex_f32_i64_i32",
+      "zynum_checked_csr_spmm_complex_f32_i64_i32",
+      "zynum_checked_csr_spmv_complex_f32_i64_u32",
+      "zynum_checked_csr_spmm_complex_f32_i64_u32",
+      "zynum_checked_csr_spmv_complex_f32_i64_i64",
+      "zynum_checked_csr_spmm_complex_f32_i64_i64",
+      "zynum_checked_csr_spmv_complex_f32_i64_u64",
+      "zynum_checked_csr_spmm_complex_f32_i64_u64",
+      "zynum_checked_csr_spmv_complex_f32_u64_i32",
+      "zynum_checked_csr_spmm_complex_f32_u64_i32",
+      "zynum_checked_csr_spmv_complex_f32_u64_u32",
+      "zynum_checked_csr_spmm_complex_f32_u64_u32",
+      "zynum_checked_csr_spmv_complex_f32_u64_i64",
+      "zynum_checked_csr_spmm_complex_f32_u64_i64",
+      "zynum_checked_csr_spmv_complex_f32_u64_u64",
+      "zynum_checked_csr_spmm_complex_f32_u64_u64",
+      "zynum_checked_csr_spmv_complex_f64_i32_i32",
+      "zynum_checked_csr_spmm_complex_f64_i32_i32",
+      "zynum_checked_csr_spmv_complex_f64_i32_u32",
+      "zynum_checked_csr_spmm_complex_f64_i32_u32",
+      "zynum_checked_csr_spmv_complex_f64_i32_i64",
+      "zynum_checked_csr_spmm_complex_f64_i32_i64",
+      "zynum_checked_csr_spmv_complex_f64_i32_u64",
+      "zynum_checked_csr_spmm_complex_f64_i32_u64",
+      "zynum_checked_csr_spmv_complex_f64_u32_i32",
+      "zynum_checked_csr_spmm_complex_f64_u32_i32",
+      "zynum_checked_csr_spmv_complex_f64_u32_u32",
+      "zynum_checked_csr_spmm_complex_f64_u32_u32",
+      "zynum_checked_csr_spmv_complex_f64_u32_i64",
+      "zynum_checked_csr_spmm_complex_f64_u32_i64",
+      "zynum_checked_csr_spmv_complex_f64_u32_u64",
+      "zynum_checked_csr_spmm_complex_f64_u32_u64",
+      "zynum_checked_csr_spmv_complex_f64_i64_i32",
+      "zynum_checked_csr_spmm_complex_f64_i64_i32",
+      "zynum_checked_csr_spmv_complex_f64_i64_u32",
+      "zynum_checked_csr_spmm_complex_f64_i64_u32",
+      "zynum_checked_csr_spmv_complex_f64_i64_i64",
+      "zynum_checked_csr_spmm_complex_f64_i64_i64",
+      "zynum_checked_csr_spmv_complex_f64_i64_u64",
+      "zynum_checked_csr_spmm_complex_f64_i64_u64",
+      "zynum_checked_csr_spmv_complex_f64_u64_i32",
+      "zynum_checked_csr_spmm_complex_f64_u64_i32",
+      "zynum_checked_csr_spmv_complex_f64_u64_u32",
+      "zynum_checked_csr_spmm_complex_f64_u64_u32",
+      "zynum_checked_csr_spmv_complex_f64_u64_i64",
+      "zynum_checked_csr_spmm_complex_f64_u64_i64",
+      "zynum_checked_csr_spmv_complex_f64_u64_u64",
+      "zynum_checked_csr_spmm_complex_f64_u64_u64"
+    ],
+    "generation_accepted": false,
+    "runtime_abi_status": "pending",
+    "source_scope": "candidate catalog only; dependency envelope not yet bound"
+  },
+  "runtime_abi_status": "pending"
+}

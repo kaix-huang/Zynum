@@ -39,14 +39,19 @@ fn PackWorkspace(comptime T: type) type {
     return struct {
         data: []T,
         cached: bool,
+        allocator: std.mem.Allocator = std.heap.c_allocator,
 
         fn deinit(self: @This()) void {
-            if (!self.cached) std.heap.c_allocator.free(self.data);
+            if (!self.cached) self.allocator.free(self.data);
         }
     };
 }
 
-fn acquireSmePack(comptime T: type, len: usize, cache_bytes: usize) ?PackWorkspace(T) {
+fn acquireSmePack(comptime T: type, len: usize, cache_bytes: usize, scratch_allocator: ?std.mem.Allocator) ?PackWorkspace(T) {
+    if (scratch_allocator) |allocator| {
+        const data = allocator.alloc(T, len) catch return null;
+        return .{ .data = data, .cached = false, .allocator = allocator };
+    }
     const max_cached_elems = cache_bytes / @sizeOf(T);
     if (len > max_cached_elems) {
         const data = std.heap.c_allocator.alloc(T, len) catch return null;
@@ -130,7 +135,7 @@ pub fn preferredColumnBlock(comptime T: type) usize {
     return asimd.preferredColumnBlock(T);
 }
 
-pub fn tryNoTransRealF32Fast(m_: gemm_task.BlasInt, n_: gemm_task.BlasInt, k_: gemm_task.BlasInt, alpha: f32, a: [*]const f32, lda_: gemm_task.BlasInt, b: [*]const f32, ldb_: gemm_task.BlasInt, beta: f32, c: [*]f32, ldc_: gemm_task.BlasInt) bool {
+pub fn tryNoTransRealF32Fast(m_: gemm_task.BlasInt, n_: gemm_task.BlasInt, k_: gemm_task.BlasInt, alpha: f32, a: [*]const f32, lda_: gemm_task.BlasInt, b: [*]const f32, ldb_: gemm_task.BlasInt, beta: f32, c: [*]f32, ldc_: gemm_task.BlasInt, scratch_allocator: ?std.mem.Allocator) bool {
     if (comptime !amx.enabled) return false;
     if (comptime builtin.target.os.tag != .macos) return false;
     if (alpha != 1 or beta != 0) return false;
@@ -139,7 +144,7 @@ pub fn tryNoTransRealF32Fast(m_: gemm_task.BlasInt, n_: gemm_task.BlasInt, k_: g
         .stack_bytes = 128 * 1024,
         .cache_bytes = 8 * 1024 * 1024,
     };
-    return amx.sgemmN32(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, pack_plan) != 0;
+    return amx.sgemmN32WithScratch(m_, n_, k_, a, lda_, b, ldb_, c, ldc_, pack_plan, scratch_allocator) != 0;
 }
 
 fn f32TileRows() usize {
@@ -229,7 +234,7 @@ fn runSmeDirectWithWorkspace(
         return true;
     }
 
-    const workspace = acquireSmePack(T, pack_elems, task.execution.pack.cache_bytes) orelse return false;
+    const workspace = acquireSmePack(T, pack_elems, task.execution.pack.cache_bytes, task.scratch_allocator) orelse return false;
     defer workspace.deinit();
     run(task, tile, workspace.data);
     return true;
@@ -517,13 +522,13 @@ fn noTransRealF32Amx(task: gemm_task.Task(f32)) bool {
 
     return switch (task.execution.amx) {
         .apple_amx_f32_n32 => if (transposed_b)
-            amx.sgemmN32TransB(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0
+            amx.sgemmN32TransBWithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0
         else
-            amx.sgemmN32(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
+            amx.sgemmN32WithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0,
         .apple_amx_f32_n16 => if (transposed_b)
-            amx.sgemmN16TransB(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0
+            amx.sgemmN16TransBWithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0
         else
-            amx.sgemmN16(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
+            amx.sgemmN16WithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0,
         else => false,
     };
 }
@@ -548,7 +553,7 @@ fn noTransRealF32AmxInterior(task: gemm_task.Task(f32)) bool {
         task.b + matIndex(task.ldb, 0, task.n0);
     const c_panel = task.c + matIndex(task.ldc, 0, task.n0);
     const ok = if (transposed_b)
-        amx.sgemmN16TransB(
+        amx.sgemmN16TransBWithScratch(
             @intCast(m_full),
             @intCast(n_full),
             @intCast(task.k),
@@ -559,9 +564,10 @@ fn noTransRealF32AmxInterior(task: gemm_task.Task(f32)) bool {
             c_panel,
             @intCast(gemm_task.toUsize(task.ldc)),
             task.execution.amx_pack,
+            task.scratch_allocator,
         ) != 0
     else
-        amx.sgemmN16(
+        amx.sgemmN16WithScratch(
             @intCast(m_full),
             @intCast(n_full),
             @intCast(task.k),
@@ -572,6 +578,7 @@ fn noTransRealF32AmxInterior(task: gemm_task.Task(f32)) bool {
             c_panel,
             @intCast(gemm_task.toUsize(task.ldc)),
             task.execution.amx_pack,
+            task.scratch_allocator,
         ) != 0;
     if (!ok) return false;
 
@@ -608,7 +615,7 @@ fn noTransRealF32AmxFullPanels(task: gemm_task.Task(f32)) bool {
 
     const b_panel = task.b + matIndex(task.ldb, 0, task.n0);
     const c_panel = task.c + matIndex(task.ldc, 0, task.n0);
-    const ok = amx.sgemmN16(
+    const ok = amx.sgemmN16WithScratch(
         @intCast(task.m),
         @intCast(n_full),
         @intCast(task.k),
@@ -619,6 +626,7 @@ fn noTransRealF32AmxFullPanels(task: gemm_task.Task(f32)) bool {
         c_panel,
         @intCast(gemm_task.toUsize(task.ldc)),
         task.execution.amx_pack,
+        task.scratch_allocator,
     ) != 0;
     if (!ok) return false;
 
@@ -732,9 +740,9 @@ fn noTransRealF64Amx(task: gemm_task.Task(f64)) bool {
     const ldc_c: c_int = @intCast(gemm_task.toUsize(task.ldc));
 
     return switch (task.execution.amx) {
-        .apple_amx_f64_n32 => amx.dgemmN32(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
-        .apple_amx_f64_n16 => amx.dgemmN16(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
-        .apple_amx_f64_n8 => amx.dgemmN8(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack) != 0,
+        .apple_amx_f64_n32 => amx.dgemmN32WithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0,
+        .apple_amx_f64_n16 => amx.dgemmN16WithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0,
+        .apple_amx_f64_n8 => amx.dgemmN8WithScratch(m_c, n_c, k_c, task.a, lda_c, b_panel, ldb_c, c_panel, ldc_c, task.execution.amx_pack, task.scratch_allocator) != 0,
         else => false,
     };
 }
@@ -755,7 +763,7 @@ fn noTransRealF64AmxInterior(task: gemm_task.Task(f64)) bool {
 
     const b_panel = task.b + matIndex(task.ldb, 0, task.n0);
     const c_panel = task.c + matIndex(task.ldc, 0, task.n0);
-    const ok = amx.dgemmN8(
+    const ok = amx.dgemmN8WithScratch(
         @intCast(m_full),
         @intCast(n_full),
         @intCast(task.k),
@@ -766,6 +774,7 @@ fn noTransRealF64AmxInterior(task: gemm_task.Task(f64)) bool {
         c_panel,
         @intCast(gemm_task.toUsize(task.ldc)),
         task.execution.amx_pack,
+        task.scratch_allocator,
     ) != 0;
     if (!ok) return false;
 

@@ -1,0 +1,17 @@
+// Interface-only explicit Q generation; one implementation and resource owner.
+fn QrGenerate(comptime T: type, comptime level: Level) type {
+    if (InternalInt != i32) @compileError("Q generation interface acceptance is LP64 only");
+    return struct {
+        fn invoke(layout: c_int, m: WireInt, n: WireInt, k: WireInt, a: ?[*]align(1) T, lda: WireInt, tau: ?[*]align(1) const T, work: ?[*]align(1) T, lwork: WireInt) WireInt {
+            const info = binding.Shared.qGenerateRawManagedWithDefaults(true, T, level, binding.Provider.Execution.getContext(), .{ .layout = layout, .m = @intCast(m), .n = @intCast(n), .k = @intCast(k), .a = a, .lda = @intCast(lda), .tau = tau, .work = work, .lwork = @intCast(lwork) }, profileDefaults()) catch |err| terminal(@errorName(err));
+            return @intCast(info);
+        }
+        fn high(layout: c_int, m: WireInt, n: WireInt, k: WireInt, a: ?[*]align(1) T, lda: WireInt, tau: ?[*]align(1) const T) callconv(.c) WireInt {
+            return invoke(layout, m, n, k, a, lda, tau, null, 0);
+        }
+        fn workEntry(layout: c_int, m: WireInt, n: WireInt, k: WireInt, a: ?[*]align(1) T, lda: WireInt, tau: ?[*]align(1) const T, work: ?[*]align(1) T, lwork: WireInt) callconv(.c) WireInt {
+            return invoke(layout, m, n, k, a, lda, tau, work, lwork);
+        }
+        pub const call = if (level == .high) high else workEntry;
+    };
+}

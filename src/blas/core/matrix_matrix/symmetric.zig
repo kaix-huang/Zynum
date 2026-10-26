@@ -8,9 +8,10 @@ const scalar = @import("../shared/scalar.zig");
 const indexing = @import("../shared/indexing.zig");
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const core_pool = @import("../execution/thread_pool.zig");
+const CallResources = core_pool.CallResources;
+const Operation = @import("zynum-execution").context.Operation;
 const blocked = @import("structured_blocked.zig");
 const gemm_dispatch = @import("../../kernels/dispatch/matrix_matrix.zig");
-const runtime = @import("../../runtime.zig");
 const isolated_structured = @import("../../kernels/isolated/x86_64_structured_bridge.zig");
 const structured_tuning = @import("../../kernels/tuning/structured.zig");
 
@@ -93,7 +94,7 @@ fn runSymmTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runSymmTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn runParallelSymm(comptime T: type, tasks: []const SymmTask(T)) bool {
+fn runParallelSymm(comptime T: type, resources: CallResources, tasks: []const SymmTask(T)) bool {
     const runner = if (T == f32)
         runSymmTaskF32
     else if (T == f64)
@@ -104,10 +105,21 @@ fn runParallelSymm(comptime T: type, tasks: []const SymmTask(T)) bool {
         runSymmTaskC64
     else
         @compileError("parallel SYMM supports BLAS scalar types");
-    return core_pool.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
+    return resources.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    return symmWithResources(T, .legacy_default, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
+}
+
+/// Synchronous borrow of the entrypoint Operation; never admits again.
+pub fn symmAdmitted(comptime T: type, operation: *const Operation, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    _ = operation.borrowedContext();
+    return symmWithResources(T, .{ .admitted = operation }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
+}
+
+pub fn symmWithResources(comptime T: type, resources: CallResources, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
     if (m_ <= 0 or n_ <= 0) return;
     if (isZero(T, alpha)) {
         if (scalar.isOne(T, beta)) return;
@@ -127,15 +139,15 @@ pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, 
         if (m_ > 0 and n_ > 0 and profile.candidate(toUsize(m_), toUsize(n_))) {
             const capability = gemm_dispatch.activeCapability();
             if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
-                if (blocked.trySymm(T, .{ .block_size = profile.block_size }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+                if (blocked.trySymmWithResources(T, resources, .{ .block_size = profile.block_size }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
             }
         }
     }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
     if (comptime builtin.target.cpu.arch == .x86_64) {
-        if (m_ >= 128 and n_ >= 128 and (runtime.maxThreads() == 1 or (m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
-            if (blocked.trySymm(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+        if (m_ >= 128 and n_ >= 128 and (resources.maxThreads() == 1 or (m_ >= 256 and n_ >= 256)) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.trySymmWithResources(T, resources, .{ .block_size = if (resources.maxThreads() > 1) 256 else if (scalar.isComplex(T)) 128 else 64 }, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
         }
     }
     if (m_ <= 0 or n_ <= 0) return;
@@ -145,12 +157,12 @@ pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, 
         const profile = structured_tuning.x86_64_object_profile;
         const tuning_side: structured_tuning.Side = if (side == .left) .left else .right;
         if (profile.denseCandidate(structured_tuning.scalarKind(T), tuning_side, herm, m, n) and
-            isolated_structured.trySymm(T, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+            isolated_structured.trySymmWithResources(T, resources, side, uplo, m_, n_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
     }
     var tasks: [core_pool.max_tasks]SymmTask(T) = undefined;
     const order = if (side == .left) m else n;
     const work = m *| n *| order;
-    const task_count = if (work >= 8 * 1024 * 1024) @min(core_pool.taskCount(n, 4), 32) else 1;
+    const task_count = if (work >= 8 * 1024 * 1024) @min(resources.taskCount(n, 4), 32) else 1;
     if (task_count > 1) {
         for (tasks[0..task_count], 0..) |*task, task_index| {
             task.* = .{
@@ -171,7 +183,7 @@ pub fn symm(comptime T: type, side: Side, uplo: Uplo, m_: BlasInt, n_: BlasInt, 
                 .task_count = task_count,
             };
         }
-        if (runParallelSymm(T, tasks[0..task_count])) return;
+        if (runParallelSymm(T, resources, tasks[0..task_count])) return;
     }
     runSymmColumns(T, .{
         .side = side,
@@ -312,7 +324,7 @@ fn runSyrkTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runSyrkTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn runParallelSyrk(comptime T: type, tasks: []const SyrkTask(T)) bool {
+fn runParallelSyrk(comptime T: type, resources: CallResources, tasks: []const SyrkTask(T)) bool {
     const runner = if (T == f32)
         runSyrkTaskF32
     else if (T == f64)
@@ -323,16 +335,27 @@ fn runParallelSyrk(comptime T: type, tasks: []const SyrkTask(T)) bool {
         runSyrkTaskC64
     else
         @compileError("parallel SYRK supports BLAS scalar types");
-    return core_pool.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
+    return resources.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
 }
 
 // Keep the macOS candidate implementation out of the public fallback body.
-noinline fn tryMacSyrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) bool {
+noinline fn tryMacSyrk(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) bool {
     const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
-    return blocked.trySyrk(T, .{ .block_size = profile.block_size, .direct_rank_panels = profile.direct_panels, .packed_rank_panels = profile.packed_panels, .parallel_packed_rank_panels = profile.parallel_packed_panels }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm);
+    return blocked.trySyrkWithResources(T, resources, .{ .block_size = profile.block_size, .direct_rank_panels = profile.direct_panels, .packed_rank_panels = profile.packed_panels, .parallel_packed_rank_panels = profile.parallel_packed_panels }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm);
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    return syrkWithResources(T, .legacy_default, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm);
+}
+
+/// Synchronous borrow of the entrypoint Operation; never admits again.
+pub fn syrkAdmitted(comptime T: type, operation: *const Operation, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    _ = operation.borrowedContext();
+    return syrkWithResources(T, .{ .admitted = operation }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm);
+}
+
+pub fn syrkWithResources(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
     if (n_ <= 0) return;
     if (k_ == 0 or isZero(T, alpha)) {
         scaleStoredRank(T, uplo, toUsize(n_), beta, c, ldc, herm);
@@ -342,18 +365,18 @@ pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasIn
     // triangle. All workspace is acquired before changing caller output.
     if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
-        if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (runtime.maxThreads() == 1 or (profile.candidate(toUsize(n_), toUsize(k_), true) and (T != scalar.ComplexF64 or n_ >= 128 or k_ >= 64)))) {
+        if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (resources.maxThreads() == 1 or (profile.candidate(toUsize(n_), toUsize(k_), true) and (T != scalar.ComplexF64 or n_ >= 128 or k_ >= 64)))) {
             const capability = gemm_dispatch.activeCapability();
             if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
-                if (tryMacSyrk(T, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
+                if (tryMacSyrk(T, resources, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
             }
         }
     }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
     if (comptime builtin.target.cpu.arch == .x86_64) {
-        if (n_ >= 128 and k_ >= 64 and (runtime.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
-            if (blocked.trySyrk(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
+        if (n_ >= 128 and k_ >= 64 and (resources.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.trySyrkWithResources(T, resources, .{ .block_size = if (resources.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, beta, c, ldc, herm)) return;
         }
     }
     if (n_ <= 0) return;
@@ -361,7 +384,7 @@ pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasIn
     const k = toUsize(k_);
     var tasks: [core_pool.max_tasks]SyrkTask(T) = undefined;
     const work = n *| n *| k;
-    const task_count = if (work >= 128 * 1024) @min(core_pool.taskCount(n, 8), 32) else 1;
+    const task_count = if (work >= 128 * 1024) @min(resources.taskCount(n, 8), 32) else 1;
     if (task_count > 1) {
         for (tasks[0..task_count], 0..) |*task, task_index| {
             task.* = .{
@@ -380,7 +403,7 @@ pub fn syrk(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasIn
                 .task_count = task_count,
             };
         }
-        if (runParallelSyrk(T, tasks[0..task_count])) return;
+        if (runParallelSyrk(T, resources, tasks[0..task_count])) return;
     }
     runSyrkColumns(T, .{
         .uplo = uplo,
@@ -470,7 +493,7 @@ fn runSyr2kTaskC64(raw_tasks: *const anyopaque, index: usize) void {
     runSyr2kTask(scalar.ComplexF64, raw_tasks, index);
 }
 
-fn runParallelSyr2k(comptime T: type, tasks: []const Syr2kTask(T)) bool {
+fn runParallelSyr2k(comptime T: type, resources: CallResources, tasks: []const Syr2kTask(T)) bool {
     const runner = if (T == f32)
         runSyr2kTaskF32
     else if (T == f64)
@@ -481,16 +504,27 @@ fn runParallelSyr2k(comptime T: type, tasks: []const Syr2kTask(T)) bool {
         runSyr2kTaskC64
     else
         @compileError("parallel SYR2K supports BLAS scalar types");
-    return core_pool.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
+    return resources.runLowLatency(runner, @ptrCast(tasks.ptr), tasks.len);
 }
 
 // Keep the macOS candidate implementation out of the public fallback body.
-noinline fn tryMacSyr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) bool {
+noinline fn tryMacSyr2k(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) bool {
     const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
-    return blocked.trySyr2k(T, .{ .block_size = profile.block_size, .direct_rank_panels = profile.direct_panels, .packed_rank_panels = profile.packed_panels, .parallel_packed_rank_panels = profile.parallel_packed_panels }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
+    return blocked.trySyr2kWithResources(T, resources, .{ .block_size = profile.block_size, .direct_rank_panels = profile.direct_panels, .packed_rank_panels = profile.packed_panels, .parallel_packed_rank_panels = profile.parallel_packed_panels }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
 }
 
+/// Legacy internal caller: explicitly retains the existing default services.
 pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    return syr2kWithResources(T, .legacy_default, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
+}
+
+/// Synchronous borrow of the entrypoint Operation; never admits again.
+pub fn syr2kAdmitted(comptime T: type, operation: *const Operation, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
+    _ = operation.borrowedContext();
+    return syr2kWithResources(T, .{ .admitted = operation }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm);
+}
+
+pub fn syr2kWithResources(comptime T: type, resources: CallResources, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt, herm: bool) void {
     if (n_ <= 0) return;
     if (k_ == 0 or isZero(T, alpha)) {
         scaleStoredRank(T, uplo, toUsize(n_), beta, c, ldc, herm);
@@ -500,18 +534,18 @@ pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasI
     // once while committing only the stored triangle.
     if (comptime builtin.target.cpu.arch == .aarch64 and builtin.target.os.tag == .macos) {
         const profile = structured_tuning.aarch64_macos_rank_tile_candidate;
-        if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (runtime.maxThreads() == 1 or profile.candidate(toUsize(n_), toUsize(k_), true))) {
+        if (n_ > 0 and k_ > 0 and profile.candidate(toUsize(n_), toUsize(k_), false) and (resources.maxThreads() == 1 or profile.candidate(toUsize(n_), toUsize(k_), true))) {
             const capability = gemm_dispatch.activeCapability();
             if (capability == .aarch64_asimd_fma or capability == .aarch64_sme) {
-                if (tryMacSyr2k(T, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+                if (tryMacSyr2k(T, resources, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
             }
         }
     }
     // Use larger updates for multi-thread execution; retain small-kernel fallbacks
     // for modes that did not improve in the threaded comparison.
     if (comptime builtin.target.cpu.arch == .x86_64) {
-        if (n_ >= 128 and k_ >= 64 and (runtime.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
-            if (blocked.trySyr2k(T, .{ .block_size = if (runtime.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
+        if (n_ >= 128 and k_ >= 64 and (resources.maxThreads() == 1 or n_ >= 256) and gemm_dispatch.activeCapability() == .x86_64_avx2_fma) {
+            if (blocked.trySyr2kWithResources(T, resources, .{ .block_size = if (resources.maxThreads() > 1) 256 else if (T == scalar.ComplexF32) 128 else 64 }, uplo, trans_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, herm)) return;
         }
     }
     if (n_ <= 0) return;
@@ -519,7 +553,7 @@ pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasI
     const k = toUsize(k_);
     var tasks: [core_pool.max_tasks]Syr2kTask(T) = undefined;
     const work = n *| n *| k;
-    const task_count = if (work >= 128 * 1024) @min(core_pool.taskCount(n, 8), 32) else 1;
+    const task_count = if (work >= 128 * 1024) @min(resources.taskCount(n, 8), 32) else 1;
     if (task_count > 1) {
         for (tasks[0..task_count], 0..) |*task, task_index| {
             task.* = .{
@@ -540,7 +574,7 @@ pub fn syr2k(comptime T: type, uplo: Uplo, trans_: Order, n_: BlasInt, k_: BlasI
                 .task_count = task_count,
             };
         }
-        if (runParallelSyr2k(T, tasks[0..task_count])) return;
+        if (runParallelSyr2k(T, resources, tasks[0..task_count])) return;
     }
     runSyr2kColumns(T, .{
         .uplo = uplo,

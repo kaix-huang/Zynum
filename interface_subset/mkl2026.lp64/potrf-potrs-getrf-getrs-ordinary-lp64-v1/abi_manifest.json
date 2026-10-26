@@ -1,0 +1,6794 @@
+{
+  "schema": "zynum-finite-interface-subset-v1",
+  "plan": {
+    "schema": "standard-finite-binding-plan-v1",
+    "profile": "mkl2026.lp64",
+    "set": "potrf-potrs-getrf-getrs-ordinary-lp64-v1",
+    "target": {
+      "id": "apple-arm64-default-c-v1",
+      "arch": "aarch64",
+      "os": "macos",
+      "object_format": "macho",
+      "pointer_bits": 64,
+      "endian": "little",
+      "char_signed": true,
+      "ordinary_visible": true,
+      "explicit64_visible": false,
+      "overrides": [],
+      "layout": [
+        [
+          "c_int",
+          4,
+          4
+        ],
+        [
+          "c_char",
+          1,
+          1
+        ],
+        [
+          "c_longlong",
+          8,
+          8
+        ],
+        [
+          "f32",
+          4,
+          4
+        ],
+        [
+          "f64",
+          8,
+          8
+        ],
+        [
+          "complex_f32",
+          8,
+          4,
+          0,
+          4
+        ],
+        [
+          "complex_f64",
+          16,
+          8,
+          0,
+          8
+        ]
+      ]
+    },
+    "bindings": [
+      {
+        "id": "b029",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_spotrf",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          9915,
+          9917,
+          "6b92fbe0fd756b31cc767e13cec2a0898d34617b3306bf5ffa025fe0a6eb332b"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b003",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_spotrf_work",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          9927,
+          9929,
+          "73fb2e1e15d4ccc78b81ce276a41ddd1ab34e5d8ba6d2be605ff4209e7b50494"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b051",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_spotrs",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          9939,
+          9942,
+          "04e56ab3f2955bbe0f1709e8df9599bac1a935543acbdc35aceaca7ebe9a8639"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b017",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_spotrs_work",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          9944,
+          9947,
+          "93a08a6abf6836926613be1bd6a742f2fd8bdfb89e5cbb8cdb6513782be61d66"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b066",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_dpotrf",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          6431,
+          6433,
+          "49751b0dcdd62173e7e4105f6f13e4ce0f78e18aabe8d63b9f92fcf906936bc8"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b008",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_dpotrf_work",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          6443,
+          6445,
+          "504fadc1b7287e8820eaf178fd8a0ddda905a91a1f5c609afe469103ee96b53e"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b090",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_dpotrs",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          6455,
+          6458,
+          "0041f41891a09ea25d5de84bd10062ae4bdb30a14233acec314a98af1b5a1167"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b012",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_dpotrs_work",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          6460,
+          6463,
+          "7fef9258fd7a74ab4deea047bbbea18b1409b563e639aa758372a6f99d8fbd8c"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b047",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_cpotrf",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          3004,
+          3006,
+          "d9c2de8c427a502cd0ca74795978dfa50a6058f3314cda1fac81fce505738f70"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b001",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_cpotrf_work",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          3016,
+          3018,
+          "4fe6f3f3b5a08a7e33143ce8d60ae61ce4d36577d2ea95d8bd4739ed3e7d5bc6"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b081",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_cpotrs",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          3028,
+          3032,
+          "58c3ee7b1ce144c8eb2aa680e2dced70f179d3312fb69bee1762cb4d3e30f363"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b023",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_cpotrs_work",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          3034,
+          3038,
+          "ed5cdc96c78e483d8f92a224cf8260fc09b08a7b014767b739e4024bd66c85a6"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b074",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_zpotrf",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          14042,
+          14044,
+          "fa3e849420de39da942ef6802ba87d03709c415d33f7f9c02dcc3aeb67f4aec0"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b015",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.factor",
+        "symbol": "LAPACKE_zpotrf_work",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_factor_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          14054,
+          14056,
+          "22706f55dec3cda9e48408cf55e32ab5fcf4796c7e9571259225264dfa37bed1"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b038",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_zpotrs",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          14066,
+          14070,
+          "92b7c4e04d550af4ba72dcdcbc95cd9785bed772c2dd0c3bd2f802dbbe28c633"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b099",
+        "profile": "mkl2026.lp64",
+        "operation": "cholesky.solve",
+        "symbol": "LAPACKE_zpotrs_work",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "uplo",
+            "c_char",
+            "triangle",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "triangle",
+            [
+              "uplo"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_solve_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          14072,
+          14076,
+          "3922ac7a6c5a87bbdc99593736b74a1fbf1b5e92c91cee0045cb93c0ae2db9d3"
+        ],
+        "semantic_contracts": [
+          "reference-staged-potrf-potrs-control-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "uplo",
+            "role": "triangle",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b207",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_sgetrf",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          8777,
+          8779,
+          "3c82921a9e16a7159b0b559a789967fda04092f99b38d2c1b5a2ebf1d10d96a4"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b219",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_sgetrf_work",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          8789,
+          8791,
+          "421c8e5b1facce8c7b275c1511ff8e8401a3ed0d8c322ae8639277ba6c291ec7"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b202",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_sgetrs",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          8802,
+          8805,
+          "a1bb644383106a1f0debe25eb53b9bde2e8e1d8c6a9935bd72e9ef3e43b4e8f9"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b231",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_sgetrs_work",
+        "scalar": "f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          8807,
+          8811,
+          "735b6cc7b8f78ee72c203c18ee26bcee1f37858c94e3b31a2fb7d3cfe401859f"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "float",
+            "zig_type": "f32",
+            "internal_type": "f32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b213",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_dgetrf",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          5282,
+          5284,
+          "7de326c3525c67cf201404671daa3024b41dc8ce9727a5b28af89416a4faf9ba"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b225",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_dgetrf_work",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          5294,
+          5296,
+          "26ec57baea07806c289115455cbaad458dde71a6167dd44c27a5b6c643975e0b"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b208",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_dgetrs",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          5307,
+          5310,
+          "7c9d0a14a472a957e0b61d084be8720f3c270cb5823d4d81f19d8973e22f57bf"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b237",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_dgetrs_work",
+        "scalar": "f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          5312,
+          5316,
+          "d35a65032c02892fd359276916ebb249e8a89cd9cb79a2394b1de204e2cd638a"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "double",
+            "zig_type": "f64",
+            "internal_type": "f64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b204",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_cgetrf",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          1219,
+          1222,
+          "b66ecf955fdb0c370404302f15182eb5bb2534933f1c10a466d50504b52379c4"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b229",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_cgetrf_work",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          1234,
+          1237,
+          "2bccd1b57783f4636b18391416456a226366201da372f97d14a46a536ef4247d"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b211",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_cgetrs",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          1250,
+          1254,
+          "59d7264bc0d7c469be7f99b1e1e9abaa102ab9350f854613c5c7ea587228cceb"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b239",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_cgetrs_work",
+        "scalar": "complex_f32",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          1256,
+          1260,
+          "a6a9cd1a9dbb8c4642a197ab85733b6677f013f34ff38d7e5cd5c007a1f16d64"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex8",
+            "zig_type": "ComplexF32",
+            "internal_type": "ComplexF32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b216",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_zgetrf",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          12231,
+          12234,
+          "b60156a9fedccd5e67a6eddb6505fcde54e188fa20cb93178418de9ce6e07ea4"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b221",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.factor",
+        "symbol": "LAPACKE_zgetrf_work",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "m",
+            "lapack_int",
+            "row_count",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "column_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "matrix",
+            1,
+            false
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "matrix_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "matrix",
+            [
+              "a",
+              "m",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "m",
+              "n"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrf_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          12246,
+          12249,
+          "9b0475546f6598eaf6a963476ffd424565f330e955fab5845a56cbf58146377e"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "m",
+            "role": "row_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "column_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "matrix",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "lda",
+            "role": "matrix_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b206",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_zgetrs",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "high",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          12262,
+          12266,
+          "b7298007960ce7ca0db59521983e2e9f4b345b62b466699f91a27d8d604bcfcf"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      },
+      {
+        "id": "b233",
+        "profile": "mkl2026.lp64",
+        "operation": "lu.solve",
+        "symbol": "LAPACKE_zgetrs_work",
+        "scalar": "complex_f64",
+        "integer_family": "ordinary",
+        "level": "work",
+        "return": [
+          "lapack_int",
+          "info",
+          0,
+          false
+        ],
+        "parameters": [
+          [
+            "matrix_layout",
+            "c_int",
+            "layout",
+            0,
+            false
+          ],
+          [
+            "trans",
+            "c_char",
+            "operation",
+            0,
+            false
+          ],
+          [
+            "n",
+            "lapack_int",
+            "order",
+            0,
+            false
+          ],
+          [
+            "nrhs",
+            "lapack_int",
+            "rhs_count",
+            0,
+            false
+          ],
+          [
+            "a",
+            "scalar",
+            "factor",
+            1,
+            true
+          ],
+          [
+            "lda",
+            "lapack_int",
+            "factor_stride",
+            0,
+            false
+          ],
+          [
+            "ipiv",
+            "lapack_int",
+            "pivots",
+            1,
+            true
+          ],
+          [
+            "b",
+            "scalar",
+            "rhs",
+            1,
+            false
+          ],
+          [
+            "ldb",
+            "lapack_int",
+            "rhs_stride",
+            0,
+            false
+          ]
+        ],
+        "operands": [
+          [
+            "factor",
+            [
+              "a",
+              "n",
+              "lda",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "pivots",
+            [
+              "ipiv",
+              "n"
+            ]
+          ],
+          [
+            "rhs",
+            [
+              "b",
+              "n",
+              "nrhs",
+              "ldb",
+              "matrix_layout"
+            ]
+          ],
+          [
+            "operation",
+            [
+              "trans"
+            ]
+          ]
+        ],
+        "owner": "lapacke-interface-owner",
+        "recipe": "raw_getrs_profile_defaults",
+        "declaration": [
+          "mkl_lapacke.h",
+          "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd",
+          12268,
+          12272,
+          "100f7bd60c6bd295c4b08ecfe2ec2dbc8c235f0a6fb713816ee6104e264ca07d"
+        ],
+        "semantic_contracts": [
+          "reference-staged-getrf-getrs-control-v1",
+          "borrowed-one-based-pivot-output-or-validated-read-v1",
+          "raw-valid-address-and-capacity-precondition-v1",
+          "abort-only-after-managed-return-and-cleanup-v1",
+          "per-call-profile-default-diagnostics-v1"
+        ],
+        "generation_acceptance": null,
+        "runtime_evidence": [],
+        "wire_parameters": [
+          {
+            "name": "matrix_layout",
+            "role": "layout",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "trans",
+            "role": "operation",
+            "c_type": "char",
+            "zig_type": "i8",
+            "internal_type": "u8-bitcast",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "n",
+            "role": "order",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "nrhs",
+            "role": "rhs_count",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "a",
+            "role": "factor",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "lda",
+            "role": "factor_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          },
+          {
+            "name": "ipiv",
+            "role": "pivots",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 1,
+            "pointee_const": true
+          },
+          {
+            "name": "b",
+            "role": "rhs",
+            "c_type": "MKL_Complex16",
+            "zig_type": "ComplexF64",
+            "internal_type": "ComplexF64",
+            "pointer_depth": 1,
+            "pointee_const": false
+          },
+          {
+            "name": "ldb",
+            "role": "rhs_stride",
+            "c_type": "int",
+            "zig_type": "c_int",
+            "internal_type": "i32",
+            "pointer_depth": 0,
+            "pointee_const": false
+          }
+        ],
+        "wire_return": {
+          "c_type": "int",
+          "zig_type": "c_int",
+          "internal_type": "i32"
+        },
+        "value_preserving_integer_casts": true
+      }
+    ],
+    "symbols": [
+      "LAPACKE_spotrf",
+      "LAPACKE_spotrf_work",
+      "LAPACKE_spotrs",
+      "LAPACKE_spotrs_work",
+      "LAPACKE_dpotrf",
+      "LAPACKE_dpotrf_work",
+      "LAPACKE_dpotrs",
+      "LAPACKE_dpotrs_work",
+      "LAPACKE_cpotrf",
+      "LAPACKE_cpotrf_work",
+      "LAPACKE_cpotrs",
+      "LAPACKE_cpotrs_work",
+      "LAPACKE_zpotrf",
+      "LAPACKE_zpotrf_work",
+      "LAPACKE_zpotrs",
+      "LAPACKE_zpotrs_work",
+      "LAPACKE_sgetrf",
+      "LAPACKE_sgetrf_work",
+      "LAPACKE_sgetrs",
+      "LAPACKE_sgetrs_work",
+      "LAPACKE_dgetrf",
+      "LAPACKE_dgetrf_work",
+      "LAPACKE_dgetrs",
+      "LAPACKE_dgetrs_work",
+      "LAPACKE_cgetrf",
+      "LAPACKE_cgetrf_work",
+      "LAPACKE_cgetrs",
+      "LAPACKE_cgetrs_work",
+      "LAPACKE_zgetrf",
+      "LAPACKE_zgetrf_work",
+      "LAPACKE_zgetrs",
+      "LAPACKE_zgetrs_work"
+    ],
+    "owner_imports": [
+      {
+        "import": "lapacke-interface-owner",
+        "configured_field": "lapacke_binding",
+        "module_local": "lapacke_binding_mod",
+        "source": "src/interop/lapacke_binding.zig",
+        "core_import": "zynum-core",
+        "same_core_as": [
+          "execution",
+          "resources",
+          "options"
+        ],
+        "instantiate": false,
+        "relative_import": false,
+        "attach_objects": false
+      }
+    ],
+    "semantic_contracts": [
+      "reference-staged-potrf-potrs-control-v1",
+      "raw-valid-address-and-capacity-precondition-v1",
+      "abort-only-after-managed-return-and-cleanup-v1",
+      "per-call-profile-default-diagnostics-v1",
+      "reference-staged-getrf-getrs-control-v1",
+      "borrowed-one-based-pivot-output-or-validated-read-v1"
+    ],
+    "source_dependencies": [
+      [
+        "src/blas.zig",
+        "f6b65db8fa45e5f10646190a8b986c719a4adfceb6c3c01da372648768f43b3f"
+      ],
+      [
+        "src/blas/api.zig",
+        "b59ccc7f47b6bf8f5cec54cfe9e5175fbd140e01a971af73ad7dd1e08e686e95"
+      ],
+      [
+        "src/blas/api/aliasing.zig",
+        "afc9b97831404ca4e251c26310929a1d5b47f09180cd68cb2592ec326fda5f57"
+      ],
+      [
+        "src/blas/api/operations.zig",
+        "3d4444f8549a13cbc37a487fa2498c40cbc6b92700d7d32df51928f843d0dd73"
+      ],
+      [
+        "src/blas/api/views.zig",
+        "841ba3c76e6c6ef409c19e9ceb4660f8cea45f42519484ab4c83f92b24fb040d"
+      ],
+      [
+        "src/blas/core/checked.zig",
+        "268944365935d369dc125c00bb98cf953502826ac31e5b422d8a5f6ff34c7ac3"
+      ],
+      [
+        "src/blas/core/checked/operands.zig",
+        "2c50e747789a075d24ac5aad11379f51bf05332447059f6ed5d7b1bc2880a3f6"
+      ],
+      [
+        "src/blas/core/checked/operations.zig",
+        "19a0f23959ed3f7571b383610dceb20cb4bab2b8e7bcb083f46c1cc90cf76625"
+      ],
+      [
+        "src/blas/core/execution/thread_pool.zig",
+        "6e43d0d60202129453bfbd5bdd529443048ce01d7dd761208135779112108656"
+      ],
+      [
+        "src/blas/core/matrix_matrix.zig",
+        "a87add0c06c2d393ed0621afee59fce1d870464bd2711aaf8c601a9ea52b9098"
+      ],
+      [
+        "src/blas/core/matrix_matrix/gemm.zig",
+        "3c37270aa9db81b70f597e6d53f11b9b18c03dc6e05e1bb95957386f7bd58829"
+      ],
+      [
+        "src/blas/core/matrix_matrix/planner.zig",
+        "ecc91fc40144ffd00c849be228927ecd5f0a0aac9aba252714ae7342a9b7eb6e"
+      ],
+      [
+        "src/blas/core/matrix_matrix/structured_blocked.zig",
+        "05aa3154f329dcf7a5266331cb1b7df6e845f77e4a96f303d2d87c99e240d4c5"
+      ],
+      [
+        "src/blas/core/matrix_matrix/symmetric.zig",
+        "c33b4a5d8e71b53a4ec2f9966ae58a752c7df21fff3667452cf65371714e52fe"
+      ],
+      [
+        "src/blas/core/matrix_matrix/triangular.zig",
+        "9865d10b57a30158f6665ecb96b265a1d5c5b112c5e55f288ca3966f8bf0c35a"
+      ],
+      [
+        "src/blas/core/matrix_vector.zig",
+        "4578eaf71ee598a305bb3141db80b5821ca5dba6d60873fd54f8ef6703b8d56d"
+      ],
+      [
+        "src/blas/core/matrix_vector/access.zig",
+        "6a23a20cd73e787f8863297ab99e4853a7192045db5f2ab441c348516559261b"
+      ],
+      [
+        "src/blas/core/matrix_vector/compact_triangular_entry.zig",
+        "66dbdf03ae1d615186f35b7b5eac10dc99ddf5846d8eeb1ac58f7836baba0801"
+      ],
+      [
+        "src/blas/core/matrix_vector/general.zig",
+        "56494845263fb61be37a1615e4da691c186dffd9df0ad4db24d5226424421ba8"
+      ],
+      [
+        "src/blas/core/matrix_vector/rank_update.zig",
+        "646aa7b418f7308b6c65c8174b61e8c4e9eb00d2fd0cd8f4f1073d96effe8244"
+      ],
+      [
+        "src/blas/core/matrix_vector/symmetric.zig",
+        "14a492592677a5efea25fef104ce9659577a635105fb5defc743a73e24948c20"
+      ],
+      [
+        "src/blas/core/matrix_vector/triangular.zig",
+        "10bfd305adea0bbb9df52219af03b3a35dd9bb3fcc2215c6cbd6e15914d7f88c"
+      ],
+      [
+        "src/blas/core/shared/indexing.zig",
+        "5e1cd0c92210d841abe76abb273bdd983f480f7def9c27d60055a57e9f68f932"
+      ],
+      [
+        "src/blas/core/shared/scalar.zig",
+        "5f8d5c976681a934aebb718481ce2d421c724984be7726665a21552de6902f41"
+      ],
+      [
+        "src/blas/core/unchecked.zig",
+        "90b8f39995b1ad0b90f06fe2e6a84cfb503d25b870e19aced8ddbf90746eddc7"
+      ],
+      [
+        "src/blas/core/vector.zig",
+        "24269f4202a147b52dfc065139d5a88520cd37674a7b3220b18e9f5ad29d2db4"
+      ],
+      [
+        "src/blas/core/vector/operations.zig",
+        "1d6c345c7809875858ca33fc05ff16a7b9bdfd264f9138370094777d3af6c8b7"
+      ],
+      [
+        "src/blas/hardware.zig",
+        "9f01696b38decc36225a3fc3fe8f7321f9cb3a845428b14014c9f3af5b0092db"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/asm/builders.zig",
+        "196f4b32362e1445ab69969f92ecf2c50ada30205099f7804a4aa4f2ef3d4e1b"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/asm/matrix_vector.zig",
+        "baec407f4580762fe819b7eaded472788f1d51876b00561670f00945cd5368fb"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/asm/vector.zig",
+        "03eeb7bb9ac4bcf9f9c255a308626fd118b018cfe93c37793dda50b0fc5d2189"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/features.zig",
+        "904cd2b9f686122122bead48f930cac0c301cad702cf29b61a036a26aa90b0fc"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_matrix/amx.zig",
+        "7bf3d84591e1d23cd6eea1f642f9e3975c892749fdcc76b46add984dd305141a"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_matrix/amx_ops.zig",
+        "abb09b82cdd960ed93a74f38e25ccc82611ab3e641220eb781ba9436725f1c4a"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_matrix/asimd.zig",
+        "8681654969d6b4884fd87f6eef6bee7127d0d95b9abd05a9a591264c648a80f1"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_matrix/sme.zig",
+        "ed014ccfe0dacbbd28bcfe5c26df346b61478fbb257909e720ae7f394df4f1d9"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_matrix/sme_asm.zig",
+        "963bcf844178b178bf515a8f25eb3e8c37e99f5c9dcd499b21eb67510ed3aca4"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_matrix/sve2.zig",
+        "09b835c7eaaf9404e6a7edd49a43fb180b24bb3813d19463e11a032aaed5968c"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/matrix_vector.zig",
+        "a9f1e734b4a26259f4905e03fa9b63bdd71afa503d06774854b95b60b65e426d"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/simd_config.zig",
+        "4f1925ad1fca9824947467c23940e086ceec43ec721562700ba83f4a499b4b87"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/vector/binary.zig",
+        "7235896993fa06b05d9a34ad3cca2e5163d2d1f45d5cdf8bea93098bbadb8abd"
+      ],
+      [
+        "src/blas/kernels/arch/aarch64/vector/unary.zig",
+        "500365c235ef2997c10d789a50d05a3a4167f524c7b6652050043a4118d788d3"
+      ],
+      [
+        "src/blas/kernels/arch/x86_64/features.zig",
+        "2d04e9710c80bfe0722130cdd23eb6aa973529704fa3d200ed0b8a0f418a09c8"
+      ],
+      [
+        "src/blas/kernels/arch/x86_64/matrix_matrix/simd.zig",
+        "70a9f03c87b7deb9b870d87c5f5c2fd71f0d55f1a4f09e2054ef6ecc5e447907"
+      ],
+      [
+        "src/blas/kernels/arch/x86_64/matrix_vector.zig",
+        "c85d01173e5db108ab82b9084991959d49080b32ae2c20d29541110a809a4a53"
+      ],
+      [
+        "src/blas/kernels/arch/x86_64/simd_config.zig",
+        "c4f84d703b7e40f5e64aada4c56553d970c6c820a7acf6fd638ec269e1501320"
+      ],
+      [
+        "src/blas/kernels/arch/x86_64/vector/binary.zig",
+        "79822c7a14429f1bf97344ff66e7beb6a5be9bf2922cbfb9f818f9a6b08fd846"
+      ],
+      [
+        "src/blas/kernels/arch/x86_64/vector/unary.zig",
+        "17808909252c0e56131de2f3788b054a2377192251ec7bec8b3efa9a1063214b"
+      ],
+      [
+        "src/blas/kernels/contract.zig",
+        "1f996a29524f0d8502854f81fafbdb104093313b99a300ec6636582c8245d603"
+      ],
+      [
+        "src/blas/kernels/coverage.zig",
+        "bf89755d09a2edf5dbd5937233905e2668cd652203554ae172b5defc14bc5d34"
+      ],
+      [
+        "src/blas/kernels/dispatch/matrix_matrix.zig",
+        "64e20d2855e1e2c19ba2be858464e8dc3ba0035d71163b9eb7112d73f2f81cdb"
+      ],
+      [
+        "src/blas/kernels/dispatch/matrix_vector.zig",
+        "56aca946c16f0bcd6f1459b6050d527cdaa3992dff8bf8171ab510ad0d57aa8f"
+      ],
+      [
+        "src/blas/kernels/dispatch/vector_binary.zig",
+        "4efebb3ceb98db50a0ff2aa7c25ff60bace4a443aa463712526cbf2913839960"
+      ],
+      [
+        "src/blas/kernels/dispatch/vector_unary.zig",
+        "459326aac97741f4e5e1ea0508f6f404beba5819213113a37a29d5ad32895865"
+      ],
+      [
+        "src/blas/kernels/isolated/structured_gemm_host.zig",
+        "91571ed9670b67eeb193e9676dbfb772835048b9af570eceee026047de278bcc"
+      ],
+      [
+        "src/blas/kernels/isolated/structured_services_host.zig",
+        "19926a8c0c2c01c99fd71048241c342ce8be22d9be0970b8a95451273170d6f1"
+      ],
+      [
+        "src/blas/kernels/isolated/task_runtime_host.zig",
+        "760990e89b1fb5219f332f57bdd58a11932893fa5a68d53ac55646f508acf461"
+      ],
+      [
+        "src/blas/kernels/isolated/x86_64_compact_triangular_abi.zig",
+        "97c25151ab98720f62dd19370c01f17d532ec4ca0b4fb69b6c28eed1cba2c9f3"
+      ],
+      [
+        "src/blas/kernels/isolated/x86_64_compact_triangular_bridge.zig",
+        "84774e5af0cf027a60721bbb8593f98a61ebae422ae98488d7570ff29660bbfd"
+      ],
+      [
+        "src/blas/kernels/isolated/x86_64_level2_width_abi.zig",
+        "066143fe4b0549dce4630c0fe1c29821af44e0c06417f63c7fa899af1bdcff68"
+      ],
+      [
+        "src/blas/kernels/isolated/x86_64_level2_width_bridge.zig",
+        "ffaedb4a8059448b2c987f8ef07bc9654b612a43d5920e8567c63d6b784513d0"
+      ],
+      [
+        "src/blas/kernels/isolated/x86_64_structured_abi.zig",
+        "8235853fbbccbe7dcd2c3b80e4927d8a97cf94dd8153685c0f7c0fa094ecd0e2"
+      ],
+      [
+        "src/blas/kernels/isolated/x86_64_structured_bridge.zig",
+        "fec9f718c1c6cba22ab4a0a397deb1c0bc2629c23d0ed1da7fc76d16deadb26b"
+      ],
+      [
+        "src/blas/kernels/multiversion/client.zig",
+        "4202cf803d36b28a8cbbf8f1e21605be99c96b46784f3b0c601fceb9bc2d52e5"
+      ],
+      [
+        "src/blas/kernels/multiversion/protocol.zig",
+        "2a49bbe8146b39866dd0edb9ca97a2429affab9863facdf09fb410f96d857e75"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/catalog.zig",
+        "c3a5380ce2fcdd7a3ac6c17d8a3b920f468dcbc23718f04307703957dde20e8c"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/coverage.zig",
+        "fef279347d8f298bc90e78c3a046b58cf6b87b12839ee4501c42f9742657db21"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/epilogue.zig",
+        "786fa22fe5804014c6faf7bfb8d5672261995c27a0ae6937012d8cbef9bf773b"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/executor.zig",
+        "fbf9ac80917f052325699da5d88fc53ac35e8b6070ad07db2be7f9ff3f328ee1"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/generic.zig",
+        "06e33fb8393fe1fce124339ca334e0dd4622137a50e021a5c9612c84147d7935"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/generic/basic.zig",
+        "bcf9b85b8725dd7759c083c127c7e538212f981a2fc67dc3f77820ecbc5307d1"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/packed_params.zig",
+        "09d6bb46b795d821a3b77de58f880f876d8020db4eac943a185520169b978f25"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/packed_simd.zig",
+        "0b3f94bf7f1df314380bd6abe25adc0ce768032cc7d2ab6e5752c4bd4aedbd55"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/packing.zig",
+        "83d16beddfd87bc03441ed73a02e0b9fac80b95d632f85d4ee037d4de8da8b68"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/structured_catalog.zig",
+        "c38b69c69d4c3a6bb29e225d8c539844728f8a40041870e16eb85b816488fd97"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/structured_packing.zig",
+        "ed01ae5350b951e1d6ce51747eb7cc23bb03817f7740598e79e304fe94ff9d78"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/task.zig",
+        "61835dc0efbea35fa0a91e6bc0d57a66b7fa3892e54d6f431a75047cbbe83aed"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_matrix/tuning.zig",
+        "484ff19aaa59c8a7eaf3d2f99f9576d4d7d946faec19c8ee39a045072b100f73"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_vector/catalog.zig",
+        "d4ea68ef8392d83734d801e9c2411079cbdbb4efa5c7a4d3a178ffa903ff6269"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_vector/coverage.zig",
+        "0cdc9cb9495459a6727d0b16ca9f7ed777283b7b2faa4eb134d0783efad613b4"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_vector/fixed_simd.zig",
+        "709b87db330809876e3422da66433314201634c5c138702185665b0b8ffe0397"
+      ],
+      [
+        "src/blas/kernels/shared/matrix_vector/tuning.zig",
+        "e5d1fd88ad6f022e01a285bd7eedabe745c2fc2ea72cbf7f5850dfe7fec77c03"
+      ],
+      [
+        "src/blas/kernels/shared/vector/catalog.zig",
+        "f93125297fd39bf83d9282f3e5ef028c997b45f29f06cf24dbdba99b553d0ec1"
+      ],
+      [
+        "src/blas/kernels/shared/vector/coverage.zig",
+        "bc6c88c23af7cf6f2ca5fceca68e656968b3bd3003bd8d30f452c1d9502db3d2"
+      ],
+      [
+        "src/blas/kernels/shared/vector/fixed_simd.zig",
+        "8c547297f28d0c501ebb32e4e272bd1010357218e0bbfe902da0b5ef9dd845ea"
+      ],
+      [
+        "src/blas/kernels/shared/vector/tuning.zig",
+        "c8a943a10db2c921be06bc9a69cae813f8f95050a701a1b8d3f4157694a534f4"
+      ],
+      [
+        "src/blas/kernels/tuning/structured.zig",
+        "3884e55f8538f9da1f9facf21aa040f50e97fd6b55d779a7fe795f70c5d0ee84"
+      ],
+      [
+        "src/blas/runtime.zig",
+        "b5cc8f7649a0ef60beb118d6412927040f8807efc958eea5d445f8d02d2a52a7"
+      ],
+      [
+        "src/blas/types.zig",
+        "a005dba016020d8dd55bb5e9d9bdf364912ab1c0108751b6d6275746e1c8c975"
+      ],
+      [
+        "src/fft/core.zig",
+        "d19ebc4d54a291ff090330dcd05b2e005c02bff491f9146f96b2eac1cbff49b7"
+      ],
+      [
+        "src/fft/managed.zig",
+        "0c1dd153c5b5fc581337a2deee7b171e18a21f53e08e583bf799e83b059f1ec7"
+      ],
+      [
+        "src/interop/lapacke_access.zig",
+        "9a256df65b65a340a8ea260300aa71a9c950922ad27c5ee0a4f43f00470b5e17"
+      ],
+      [
+        "src/interop/lapacke_binding.zig",
+        "bbe8b4757a9ee83edd70608f98ef53d393570a02039f5baaf3189b754dc446ed"
+      ],
+      [
+        "src/interop/lapacke_common.zig",
+        "0db95b374f33c380c71726593e357aaf70c0573befff041992790eda363a932d"
+      ],
+      [
+        "src/interop/lapacke_complex_gelsd.zig",
+        "eefc1b37d5292c91aa14e03074682536468aa2b9fd6f910e253e5ca7f8c5128d"
+      ],
+      [
+        "src/interop/lapacke_complex_gelsd_column.zig",
+        "3c1101e65c6199429302b8307ad06ea45af33e12ca3f1898a0be21a89dfb086b"
+      ],
+      [
+        "src/interop/lapacke_complex_gelsd_policy.zig",
+        "8de758465b276f833fbfc9a957483ec862718fc8e80592cb9e366d0754c4e042"
+      ],
+      [
+        "src/interop/lapacke_complex_gelsd_query.zig",
+        "6d8b03cf568705648577ffc2e9b1508730ff218a6b9c5f3234e42eb82f50ab11"
+      ],
+      [
+        "src/interop/lapacke_complex_gelsd_workspace.zig",
+        "e5a4766522570308277c8cdb88c47b9b44379a248bc120e0ba60d778b49dc337"
+      ],
+      [
+        "src/interop/lapacke_default_errors.c",
+        "aeab75b1f803104eca2508b4c17e7b11d583d69e01872eb5af5b01e36ce3767d"
+      ],
+      [
+        "src/interop/lapacke_diagnostics.zig",
+        "972ffda6bd04e9540d95691648706bb942d0611cb56826d996b5c3aa09866c8c"
+      ],
+      [
+        "src/interop/lapacke_evd.zig",
+        "8aa0f1e1e715e86c47a0d8b67376becea77476d3b9c2a4c7d1b21c343a14eb1c"
+      ],
+      [
+        "src/interop/lapacke_evd_policy.zig",
+        "cf17503fcd72049d9a7c1637cc10f5f93fd23e3eaa3e53a34472a6d23e6e58a0"
+      ],
+      [
+        "src/interop/lapacke_gels.zig",
+        "f8572fb6bf4be3f46df101f7bd41a76c1218d31f92a3e881b4518c95c9671be7"
+      ],
+      [
+        "src/interop/lapacke_gelsd.zig",
+        "e898f80c40c8135cc0222ced4e3545a4a9f7e7f9cf9c1ccb9809b3eb876233aa"
+      ],
+      [
+        "src/interop/lapacke_gelsd_column.zig",
+        "bf1e45c46afe9f335ac871e56f627df4641cb36f926ab1bbec29e3fe6442ff0e"
+      ],
+      [
+        "src/interop/lapacke_gelsd_policy.zig",
+        "e17c43097a2ea0b25211500683eba97a6c947659a3908862bdddedccbc0e78ae"
+      ],
+      [
+        "src/interop/lapacke_gelsd_query.zig",
+        "8f5a314f0dfbcc50a2096343f10034b6930be3adc8450590d79f0ebf618dcd7d"
+      ],
+      [
+        "src/interop/lapacke_gelsd_workspace.zig",
+        "1c5f197385acf7b9c11499b5169bdd38a2113cc348227547ae8ed022c25f5766"
+      ],
+      [
+        "src/interop/lapacke_gelss.zig",
+        "34b7d8945020242356c85630a468dfb2c4c8bedcf9bfaa26fe66ae523bba243f"
+      ],
+      [
+        "src/interop/lapacke_gesv.zig",
+        "f682931f06f331339cc0d08f2ce39910ed64f715de2020728d25da148d9cc2d3"
+      ],
+      [
+        "src/interop/lapacke_gesvd.zig",
+        "3d6d6d9d1da9625058764d09762720b8e47dff115d0a409b58a1d44414a6f3a4"
+      ],
+      [
+        "src/interop/lapacke_gesvd_policy.zig",
+        "d3d42b8be8d6184d68bee5590553204a67d7b4e0bcf9e1c3bfbb3584f15694c5"
+      ],
+      [
+        "src/interop/lapacke_getrf.zig",
+        "6cb1abb9c3d0a600a276ef3c75814d501fe6f1fd8a68138c1a6e8280ce2c62ef"
+      ],
+      [
+        "src/interop/lapacke_getri.zig",
+        "79aa6a7d3afe36e6ed96e812fcb0e56bb82802fa42849ad50079a8716f6add48"
+      ],
+      [
+        "src/interop/lapacke_getrs.zig",
+        "3787dd19483a870d869bfd6e929e163b940291cc46d838d1b86d8ee95a377054"
+      ],
+      [
+        "src/interop/lapacke_hermitian.zig",
+        "b30ddcd5e97048eb1552cbc0c003c87d6b16e80254ff967bd55e14926b3c83b1"
+      ],
+      [
+        "src/interop/lapacke_posv.zig",
+        "8d4a743002ba3495849aa854e9063ac2ec07780cbc3852af44b2e00813f8b02e"
+      ],
+      [
+        "src/interop/lapacke_potrf.zig",
+        "1982e0fe3d5239801522c5f1c0dedfac18c8ba588d02ba8faaa7eebd3a7d6bcd"
+      ],
+      [
+        "src/interop/lapacke_potri.zig",
+        "73d0767f900032627ca9cf7f6e382a5c68b9ecca71bff9f1ea6a996c1fc77de6"
+      ],
+      [
+        "src/interop/lapacke_potrs.zig",
+        "9d41bb7110c668d8486cbb7997b946298307e855a020d725053cb3bd35ac82e6"
+      ],
+      [
+        "src/interop/lapacke_q_apply.zig",
+        "22bc43e2eccf72d1e94ab08140955c3891ce7a60878bda39606ce282c7c47093"
+      ],
+      [
+        "src/interop/lapacke_q_generate.zig",
+        "70fc1d89739cf3b54598edf93d373bc469233559417349b234191dd1d762459d"
+      ],
+      [
+        "src/interop/lapacke_qr.zig",
+        "03d2d1d23540dd3ee94cb95c4baf4f141be2300610222a1ead5ba65a1a650eca"
+      ],
+      [
+        "src/interop/lapacke_services.zig",
+        "aa03019fafccd55ab8dc757b77effe1bbaa0cbe7afbeb210c1ca88e4166055d3"
+      ],
+      [
+        "src/interop/lapacke_stev.zig",
+        "b7734588ab350482324a9c4d1c71cca60ec26fd608b580be1fe85b94d60d06be"
+      ],
+      [
+        "src/interop/lapacke_symmetric.zig",
+        "1ae69bbc248de5b86cf4a53530c7089c8ef7591ff3840ef12eb6b972bcee936f"
+      ],
+      [
+        "src/interop/lapacke_symmetric_generalized.zig",
+        "ef8089dce0171fa09872369c2b490bb9f1a3254f0d906090de6da16863c18624"
+      ],
+      [
+        "src/interop/lapacke_trtri.zig",
+        "8a6d2d62d8baee7ccb5dd7cafab7200593b70361221c136a8d141199b57a039e"
+      ],
+      [
+        "src/interop/lapacke_trtrs.zig",
+        "9bce2fb2437ebfbaaf9330ed43676a13a800f33e8a455fec926882be76d9f023"
+      ],
+      [
+        "src/interop/mkl_sparse_solve.zig",
+        "167c43f5a68ac73b3e51b57c95520265c475556b63982953547a923b5e771da2"
+      ],
+      [
+        "src/interop/mkl_sparse_solve_raw.zig",
+        "6b935d2007454a5441df8571b2b49cfe2575ede248647a25b9436f7388b90191"
+      ],
+      [
+        "src/lapack.zig",
+        "5af738ddf2c88430fb7c358df41a2c18d56905ddb9176bb52db8d7242d8e0296"
+      ],
+      [
+        "src/lapack/cholesky.zig",
+        "a48a38af7211ea4a8c28f9ea10d48ba260d801ad6d0d035225542479695c0c5b"
+      ],
+      [
+        "src/lapack/column_update.zig",
+        "604c8bc0300aec4fc932e8e5ed7ba2f7b023936f830781765bf61e51c63183dc"
+      ],
+      [
+        "src/lapack/complex_cholesky.zig",
+        "341ec4987badfc8f45a147b194f7a8c4921628c5971c87eb96db5a4439ea428e"
+      ],
+      [
+        "src/lapack/complex_lu.zig",
+        "f75e666468b6a1e041da524b955592379d0de916d13d9062a19111eeca0b6eb0"
+      ],
+      [
+        "src/lapack/complex_qr.zig",
+        "33b81d0ea1ba9ce2e7d49058c63ae562d1413e914880c0b6234fec4a3f50fb17"
+      ],
+      [
+        "src/lapack/complex_support.zig",
+        "1833b1c10984342bffeea1d89f2b0b2751482b0ca734557067d237e54479c0be"
+      ],
+      [
+        "src/lapack/core/bidiagonal.zig",
+        "b1ed992da5203d667d1573211dfaaba35b7853908f81207f4e147e02b14557a7"
+      ],
+      [
+        "src/lapack/core/bidiagonal_partial.zig",
+        "4657460366461cb21e5b377d15074f0e83949c0294afde32b00aead64884eccc"
+      ],
+      [
+        "src/lapack/core/bidiagonal_svd.zig",
+        "ca6f5638f55d76dafa06b8e2027ed08a8ee879b26f5f0ba26a55a7bde04bfbac"
+      ],
+      [
+        "src/lapack/core/cholesky.zig",
+        "143c622e690209c30eb8327224334b960861f82d55623e785f96288281ae9450"
+      ],
+      [
+        "src/lapack/core/cholesky_contract.zig",
+        "105fb7c48112d8dff7bcc8f42c83f1c3887b8ed3f3601a72d2364793f06ec445"
+      ],
+      [
+        "src/lapack/core/complex_bidiagonal.zig",
+        "9036b893a9c3b7466331e947bd2a64f93a76ac4e043a53c383342881bab92a70"
+      ],
+      [
+        "src/lapack/core/complex_bidiagonal_svd.zig",
+        "73745463efdec56ea2fde03f0910cafa2f043dc3e85981b2882213fcd27f7d6c"
+      ],
+      [
+        "src/lapack/core/complex_cholesky.zig",
+        "f7a9c5831a4e6837c79153cf4cf0420bd7dc6777c07e261e43f5ac4d840d2959"
+      ],
+      [
+        "src/lapack/core/complex_minimum_norm.zig",
+        "fe7fb5c61e412271d2e0cf667c2a26d1c67a38fbb400ac138b77d3fe358df348"
+      ],
+      [
+        "src/lapack/core/complex_rank_least_squares.zig",
+        "b257248e2036084b3286568dce48d951011e30bc0f21fef9ea37b329085cbbee"
+      ],
+      [
+        "src/lapack/core/complex_svd.zig",
+        "1112422b9dc99ee4c92d17762867f6c8ce425c63e50463f803e9542f610743aa"
+      ],
+      [
+        "src/lapack/core/hermitian_eigen.zig",
+        "b157a5ebd001037f56af84efa378f5348bfd86f41b67187681f668701c94cd3c"
+      ],
+      [
+        "src/lapack/core/hermitian_tridiagonal.zig",
+        "93e9ba3d944982076f0f6d5d981828fbd7e7a0eef14499f2d4bc7f07e2646f0e"
+      ],
+      [
+        "src/lapack/core/lu.zig",
+        "72966f206f0e1e3933b0acdb676b7fd581a0119bc571446dc972435d565b148a"
+      ],
+      [
+        "src/lapack/core/minimum_norm.zig",
+        "fbf4c98223ed984880b814ebdabb4975c900bad5f4be76259c599d73014e9aa0"
+      ],
+      [
+        "src/lapack/core/orthonormal_completion.zig",
+        "f5b54381f80085bb8edf75e97eb3e66427fad3b18d1667ba259bc5990dfd32d4"
+      ],
+      [
+        "src/lapack/core/rank_least_squares.zig",
+        "65c1f8b6b6a3feaae9cb80d37a4a4084d2549585cea66ef984c4733c5bcfecd9"
+      ],
+      [
+        "src/lapack/core/svd.zig",
+        "ae0cf928a92f07ba0c874ac2005e8e63c9c8c1f742b23cb4d46d4d4db943f1fb"
+      ],
+      [
+        "src/lapack/core/triangular_substitute.zig",
+        "1d56376fb9dfe34f35926c3a063a85127aa2389e95d5873d5a833556afdf548f"
+      ],
+      [
+        "src/lapack/core/tridiagonal_eigen.zig",
+        "3463241854a4c17b1444616916184c2b21c0114be943cede7113b5fa408f9330"
+      ],
+      [
+        "src/lapack/factorization.zig",
+        "adb6801b4518d7a578e3cf8dd0363833cc651904302490fb258f5aa91f8324c0"
+      ],
+      [
+        "src/lapack/full_rank_least_squares.zig",
+        "bd2c3deeaadb8d45db1e8fd07579019b1d27edda07f3c7a08153d042be21bfe0"
+      ],
+      [
+        "src/lapack/hermitian_managed.zig",
+        "1aa94eaa6f755b3064db2635ba196f66e3d5ff5750463e5678a606dc651829cd"
+      ],
+      [
+        "src/lapack/least_squares.zig",
+        "c36bc54bd28c25014d7d0be4414bf8182039039c3e708393be7c0759efcc9ec6"
+      ],
+      [
+        "src/lapack/lq.zig",
+        "f5ca9e97e473b27712965211981b0f1a598bc3bb11efae982270a2b2837004aa"
+      ],
+      [
+        "src/lapack/lu.zig",
+        "3278c388e1c402b0db0ac2b84afeeaddba94d40ea92da3388ce14905e128f8d3"
+      ],
+      [
+        "src/lapack/qr.zig",
+        "b2f556f85bd4f1d6a73e9b1e815d00482e7237ad8ed4225809873134af49f595"
+      ],
+      [
+        "src/lapack/svd.zig",
+        "e56fe8102d15a6b123e21e6845cc5208dbe8c706de5e7cc90b42df6025ffd12c"
+      ],
+      [
+        "src/lapack/svd_least_squares.zig",
+        "e119fbde0667e7a0f233168e53220627a2e90af9319292219a83b02d631c6af8"
+      ],
+      [
+        "src/lapack/symmetric_eigen.zig",
+        "c1cbb44a631c294704bf7792c0e6041a91294372f61191f75b95ee7107e22784"
+      ],
+      [
+        "src/lapack/validation.zig",
+        "5e8705d14c411363d32bc933a752adda6132d632afea80154e062c1e8d1d81c0"
+      ],
+      [
+        "src/numerics/bicgstab.zig",
+        "f7f39fcbc75abece53f5beaaf47c4cc1f4ba7c125a84a245ef53f38c09b4b2d7"
+      ],
+      [
+        "src/numerics/chebyshev.zig",
+        "b5f775a62ad660fb653978a282309eee54f3aa357938dea50354e5f7e37b46c5"
+      ],
+      [
+        "src/numerics/cholesky_inverse.zig",
+        "3eb6785eaaf7848560e7592ea0aa95715b60bc99b0ab6624cc32c88f7f109902"
+      ],
+      [
+        "src/numerics/complex.zig",
+        "9454d00173d52acdbfe73dffa7d4e048036601f97f92de0c255e661d704e741f"
+      ],
+      [
+        "src/numerics/contour_eigensolver.zig",
+        "109a603bc44b301ff0171ed17bf5b1fff353f1cb692f644cda17e60ce79a6871"
+      ],
+      [
+        "src/numerics/contour_quadrature.zig",
+        "9c841b182551422773c9043d01c2948bd814c6f677ff7bac3c2a2f4cc305d53a"
+      ],
+      [
+        "src/numerics/dense.zig",
+        "4dbdbc980179822174afb2ed89b9d2c569169c4ce0320cd862a103d46681214b"
+      ],
+      [
+        "src/numerics/execution/context.zig",
+        "b4db413d7d6302afe5cff0bc0a82eff0306380a827ee3c6a65b9af852208eb6f"
+      ],
+      [
+        "src/numerics/execution/context_scratch_test.zig",
+        "74c511f6b609811a53a88aa39c3ba3525f2f82a3a7bbaaaba458d039a9122573"
+      ],
+      [
+        "src/numerics/execution/context_test.zig",
+        "a2a89c8ad54dab5d3ac9eb9191e5088b57c090453854f614c2b68d3d092d7065"
+      ],
+      [
+        "src/numerics/execution/default.zig",
+        "270086f74d74bd28bc3000d287c2d9a29b0c3111a29dae8126105c07be4ac732"
+      ],
+      [
+        "src/numerics/execution/owner.zig",
+        "d4775db5207477cac23bcf3aa0bd75b8616a04797905c2253f8dabcc6980dc3a"
+      ],
+      [
+        "src/numerics/execution/policy.zig",
+        "0512ae2636f3b5fee1f726531b51baa005172b5bd9a57afa880afed12095a5f8"
+      ],
+      [
+        "src/numerics/execution/test_support.zig",
+        "565cb6f0fe5dbf0f3245d6543b0cf7ffb42e9abdd78b0baa1e6982cac9b2d09a"
+      ],
+      [
+        "src/numerics/lanczos.zig",
+        "d3e6043ca7b584d895370b8f5209eca95414fbb254025ef2774ef23a265b33a9"
+      ],
+      [
+        "src/numerics/lanczos_chain.zig",
+        "4cb2de5f0ee78f31b690f32b84c007757ed2485f040567bb3da7ee3f70326cca"
+      ],
+      [
+        "src/numerics/lu_inverse.zig",
+        "821f92622e3f7215c7e8fc9dbd4ee55c6f65cc86b8cbd6e0c534b8175880fb4f"
+      ],
+      [
+        "src/numerics/normalized_chebyshev.zig",
+        "f3e8802561c360e36eacecddfca6040e63215d0d933bb8ac4456b168994c213c"
+      ],
+      [
+        "src/numerics/operator.zig",
+        "861b29caa6f1c0846f84467dee4e59b7029f5c570546d8e27f3c8b8a2f2e01f2"
+      ],
+      [
+        "src/numerics/pivot.zig",
+        "7a347613b59f2ea3b74ef57d3d830e737a81a8e3c29c5d17315009272fb29e0a"
+      ],
+      [
+        "src/numerics/rank_reduced_ritz.zig",
+        "8a1e82718c5a8f13385c74623e6a18794e6db297086f850c8422f7e90920aded"
+      ],
+      [
+        "src/numerics/rational_filter.zig",
+        "bcb0a871a51733e3c6f88aa7e3e7cc533077d658f71f141d10ed74fa6d39efae"
+      ],
+      [
+        "src/numerics/recurrence_arithmetic.zig",
+        "16624a3b7fe2487ea48db2de2b809c42fa34aa0ef95a0c02d7360746e81cacdc"
+      ],
+      [
+        "src/numerics/reductions.zig",
+        "06b86c98f0d7325007b28c702fb03c86047d0c8b055c2a2a53e2bb2525590912"
+      ],
+      [
+        "src/numerics/resources.zig",
+        "7c35ddf131ee7832140921c794291a80d54a69e1d99815ecb11759c785906e0f"
+      ],
+      [
+        "src/numerics/storage.zig",
+        "2b615abc2d108049e678e08e0280a9db42ee2e03fbc27494ee69725682ec7cf0"
+      ],
+      [
+        "src/numerics/subspace_projection.zig",
+        "b338b908856c04f887a29b50ea4a84c8b81716f726f7ee14ce62d2a8af35be50"
+      ],
+      [
+        "src/numerics/synchronization.zig",
+        "a6412c75c4dabc553066af4fe8faf27d91fa47c051f5b1432e3c51ba11fc122e"
+      ],
+      [
+        "src/numerics/triangular_ieee.zig",
+        "7259cdcdcde7a7feb821a69f11c9ec7ee604d8dac33896006912d08ca8f16bac"
+      ],
+      [
+        "src/numerics/triangular_inverse.zig",
+        "7b46b75f9a6aa971fefee3b54ce3b9d368e0852ef140487beebc76d29cad8ead"
+      ],
+      [
+        "src/sparse.zig",
+        "20ce7f4f08cdcad68c31fb82f8ff5bb5e5198a0bffc213281909dc09893ea1d4"
+      ],
+      [
+        "src/sparse/cg.zig",
+        "4fc2e6bf4560e3dd920d906f3ab481e06700d244e56a2350a3d0c86aaf9003d4"
+      ],
+      [
+        "src/sparse/core/product.zig",
+        "10ae035ab5eec98ae5097063c82552f0593420173353f8dcf76d2f93ab062822"
+      ],
+      [
+        "src/sparse/core/triangular_complex.zig",
+        "eb957d1281c3a7df11539b0c5f60102be4af7b0b9ef0e0c1f1d7c4aabf832a85"
+      ],
+      [
+        "src/sparse/formats.zig",
+        "2176c9ffd7cbd3344c10acbea0240efc4f4e5b12b4ee6f4d0a9b67b634ed539e"
+      ],
+      [
+        "src/sparse/object.zig",
+        "e6c4ed270bb0dc9b82bd5168bc10329245fe856611a654aa60ac219b2edcc7d2"
+      ],
+      [
+        "src/sparse/operations.zig",
+        "5adf63051132ca579b5faaaef443efb93738a6eb1dd72abe0c680facbcb0826a"
+      ],
+      [
+        "src/sparse/operator.zig",
+        "e5d32e8198f7e3f74dd3b08f9ad812ca5bbbce0409f25841ce290e4d7fca4ced"
+      ],
+      [
+        "src/sparse/pattern.zig",
+        "e4b0f4ec040be891151ba49780dad03e47e470278de6287ff30ee497e476d4f5"
+      ],
+      [
+        "src/sparse/scalar.zig",
+        "1132c4f780ff224459132600835335070edf0d82ed9fabb3ba97873942e88fb4"
+      ],
+      [
+        "src/sparse/triangular.zig",
+        "a0198dd1e0d1f0e0f9649b4b169e8a894f84e6937b8946b212c4fea6d3f7eb4f"
+      ],
+      [
+        "src/sparse/views.zig",
+        "d77e6a9cf6ff8027f81876afd23812b43367ac6a6107c91a6a16fc1ad7fe26af"
+      ],
+      [
+        "src/zynum.zig",
+        "139e5db1efb8a7198211e7e47d51488e49227086fe1e7085a5ead9e0063a5dac"
+      ]
+    ],
+    "source_envelope_sha256": "afbbadadfde822dda2f597bb69b92c5b7855cefdd8ded7ff9b44d8f662a8842d",
+    "source_snapshot_sha256": "afbbadadfde822dda2f597bb69b92c5b7855cefdd8ded7ff9b44d8f662a8842d",
+    "external_module_contracts": [
+      [
+        "std",
+        "selected-zig-toolchain"
+      ],
+      [
+        "builtin",
+        "selected-target-and-mode"
+      ],
+      [
+        "root",
+        "finite-generated-export-root-no-tuning-overrides"
+      ],
+      [
+        "zynum-build-options",
+        "same-exact-configured-core-options-module"
+      ]
+    ],
+    "source_scope": "literal-import-envelope-with-unverified-external-build-obligations",
+    "declaration_inventory_sha256": "28d78b96b8af9aaef4f5859de28343daea9570b4b46b71e5a8f7eb1e14074f3e",
+    "declaration_headers": [
+      [
+        "mkl_lapacke.h",
+        "00558bd2799718ab85b903e0601304b30fafda19bb5101917c371d8b7a0307cd"
+      ],
+      [
+        "mkl_types.h",
+        "0039030497854ba329fe20f6a89bef50c9ab3901f44a1aaef39fbc842a1a0cc4"
+      ]
+    ],
+    "reserved_manifest": [
+      "include/zynum/blas/abi_manifest.json",
+      "a9f41560199d642614ebe418c5cce5beff8a7392f5a179614043603f521de285"
+    ],
+    "output_paths": [
+      "interface_subset/mkl2026.lp64/potrf-potrs-getrf-getrs-ordinary-lp64-v1/subset.h",
+      "interface_subset/mkl2026.lp64/potrf-potrs-getrf-getrs-ordinary-lp64-v1/exports.zig",
+      "interface_subset/mkl2026.lp64/potrf-potrs-getrf-getrs-ordinary-lp64-v1/abi_manifest.json",
+      "interface_subset/mkl2026.lp64/potrf-potrs-getrf-getrs-ordinary-lp64-v1/exports.def"
+    ],
+    "runtime_abi_status": "pending",
+    "build_owner_identity_status": "pending",
+    "full_profile_ready": false,
+    "generation_acceptance": {
+      "id": "scientific-consolidation-v1-mkl2026.lp64-potrf-potrs-getrf-getrs-ordinary-lp64-v1",
+      "profile": "mkl2026.lp64",
+      "set": "potrf-potrs-getrf-getrs-ordinary-lp64-v1",
+      "target": "apple-arm64-default-c-v1",
+      "scope": "finite-callable-generation-only",
+      "plan_sha256": "d1c9895955894b80ddd582bfdabff81ff75a04e096a118a025ec35fe7035da27",
+      "source_envelope_sha256": "afbbadadfde822dda2f597bb69b92c5b7855cefdd8ded7ff9b44d8f662a8842d",
+      "review_sha256": "c269bbdc6881b9820a873f9d7386d30c943f8d46c50050dcd6a4e7d6771775f1"
+    }
+  },
+  "renderer": "potrf-potrs-getrf-getrs-ordinary-native-arm64-v1",
+  "renderer_source_sha256": "c8fa85c2ae4e04d975984181ba86e1693fbd3ff8a438527deb80c11d0d6cf722",
+  "type_declaration_reference": {
+    "path": "mkl_types.h",
+    "sha256": "0039030497854ba329fe20f6a89bef50c9ab3901f44a1aaef39fbc842a1a0cc4",
+    "purpose": "reference layout only; installed header is standalone"
+  },
+  "default_complex_only": true,
+  "custom_type_or_packing_overrides_supported": false,
+  "integer_model": {
+    "ordinary_c_type": "int",
+    "wire_zig_type": "c_int",
+    "internal_zig_type": "i32",
+    "layout_c_type": "int",
+    "triangle_c_type": "char",
+    "transpose_c_type": "char",
+    "pivot_element_c_type": "int"
+  },
+  "terminal": "abort after managed raw call returns and cleanup/end completes; never invent INFO",
+  "standard_xerbla_compatibility": false,
+  "diagnostic_handlers": {
+    "source": "src/interop/lapacke_default_errors.c",
+    "integer_macro": null,
+    "compilation": "separate C object, no numerical state",
+    "replacement": "weak defaults with external calls; target evidence required",
+    "runtime_status": "pending-for-generated-artifact"
+  },
+  "export_list_kind": "COFF declaration list only; not Mach-O linker enforcement",
+  "platform_support_exports": [
+    "__dso_handle",
+    "_mh_dylib_header"
+  ],
+  "public_api_ready": false,
+  "full_vendor_profile_ready": false,
+  "this_generated_artifact_runtime_status": "pending"
+}

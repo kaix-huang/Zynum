@@ -1,0 +1,13 @@
+; Copyright (C) 2026 Zynum contributors
+; SPDX-License-Identifier: LGPL-3.0-or-later
+
+LIBRARY zynum_lapacke_subset_ilp64
+EXPORTS
+    LAPACKE_strtrs
+    LAPACKE_strtrs_work
+    LAPACKE_dtrtrs
+    LAPACKE_dtrtrs_work
+    LAPACKE_ctrtrs
+    LAPACKE_ctrtrs_work
+    LAPACKE_ztrtrs
+    LAPACKE_ztrtrs_work

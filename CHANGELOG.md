@@ -8,7 +8,57 @@ change. Standard BLAS ABI compatibility is a core project goal.
 
 ## 0.1.x - Unreleased
 
-The `0.1.x` line is the BLAS-completion and performance line.
+The `0.1.x` line continues BLAS completion and performance work and introduces
+LAPACK and Sparse foundations.
+
+### Added
+
+- Scientific integration: finite LP64/ILP64 LAPACKE profiles, complex/mixed-index
+  Sparse products and solves, f32/f64 FFTW profiles, Hermitian drivers and common
+  operator algorithms over shared Core, Context, workspace and execution owners.
+  Optional interfaces remain explicitly selected and finitely qualified.
+- Standalone `tools/generate_interfaces.py` entry point for existing profile
+  renderers and a read-only drift check of all committed accepted selections.
+- Current capability/ownership map and separate interface contracts, historical
+  checkpoints and validation record under `docs/`.
+
+- Initial `zynum-lapack` Zig module: checked real/complex single/double-precision
+  Cholesky, rectangular pivoted LU and multiple-right-hand-side solves. Real
+  operations include compact Householder QR, Q/Qᵀ application, prefactored
+  least squares, symmetric Jacobi eigenproblems and thin Jacobi SVD with explicit
+  workspace, convergence and numerical-failure contracts.
+- Initial `zynum-sparse` Zig module: checked borrowed CSR with signed/unsigned
+  32/64-bit indices, real/complex normal/transposed/adjoint SpMV and SpMM,
+  borrowed CSC/COO and conversion to sorted CSR using caller-owned buffers.
+  Conversions preserve duplicate entries and their relative order. Real CSR
+  triangular solves and unpreconditioned CG provide checked caller workspace;
+  CG verifies a fresh widened true residual before claiming convergence.
+- Top-level `zynum.lapack` and `zynum.sparse` namespaces, independent test roots,
+  focused test steps, and module documentation. These portable implementations
+  use caller-owned storage and no external computation backend.
+
+- Experimental checked C/Fortran ABI revision 1 in the separate `zynum_checked`
+  library: eight real Cholesky factor/solve and CSR SpMV functions, explicit
+  lengths and fixed-width status/layout contracts, generated C and ISO_C_BINDING
+  interfaces, opt-in installation, and supplemental C/C++/Fortran consumers.
+- Source-bound real Cholesky/LU and CSR SpMV/SpMM comparison tools against
+  Accelerate and OpenBLAS where applicable, with isolated interleaved processes,
+  numerical and storage checks, separate setup costs, raw timing samples and
+  explicit comparator-contract limitations.
+
+### Changed
+
+- Converge GESVD and complex GELSD on shared bidiagonal SVD mathematics. GESVD
+  iteration exhaustion publishes upper bidiagonal factors and unfinished-edge
+  INFO; finite/range faults retain their separate failure behavior. Full-U
+  staging reuses an existing lease and introduces no additional runtime owner.
+
+- Traverse real dense factorization and forward-solve updates by contiguous columns,
+  with portable vector updates and finite-result checks. Preserve factorization
+  pivot behavior, per-output subtraction order, and checked argument handling.
+- Combine CSR metadata comparisons into reductions, fuse normal output scaling
+  with accumulation, and share sparse loads across two right-hand sides in SpMM.
+  Borrowed structure and aliasing are still checked on every call.
 
 ### Maintenance
 
