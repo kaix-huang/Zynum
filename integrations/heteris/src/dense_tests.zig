@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 const std = @import("std");
-const api = @import("root.zig").testing;
+const api = @import("test_api.zig");
 const c = api.abi;
 const eq = std.testing.expectEqual;
 const R = c.HETERIS_VIEW_READ;

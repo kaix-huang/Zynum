@@ -20,11 +20,6 @@ typedef heteris_map_fn zynum_map_fn;
  * Callers serialize provider allocation/release and prevent concurrent writes. */
 typedef heteris_resources zynum_resources;
 
-/* Explicit lightweight malloc/free provider, no pools. A destroy with live
- * allocations returns BUSY and leaves the resource table valid. */
-heteris_status zynum_resources_create_naive(zynum_resources *out);
-heteris_status zynum_resources_destroy_naive(zynum_resources *resources);
-
 /* Views must be host F64, rank 1 for axpy/dot or rank 3 for Laplacian.
  * Signed byte strides, read broadcasts and empty views follow Heteris rules.
  * Metadata, resources, shapes, map results and cross-view aliasing are checked

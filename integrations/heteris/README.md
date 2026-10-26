@@ -13,18 +13,25 @@ From this directory:
 
 ```sh
 zig build -Doptimize=safe -Dheteris-include=/absolute/path/to/heteris/include
+zig build -Dstandalone=true -Doptimize=safe -Dheteris-include=/absolute/path/to/heteris/include
 zig build test -Dheteris-include=/absolute/path/to/heteris/include
 zig build -Dshared=true -Doptimize=safe -Dheteris-include=/absolute/path/to/heteris/include
 ```
 
 Default artifacts are `zig-out/lib/libzynum.a` and `zig-out/include/zynum.h`.
-The shared option instead produces `libzynum.so` on Linux. Supply the installed
+The shared option instead produces `libzynum.so` on Linux. The default
+`-Dstandalone=false` excludes the provider. Explicit `-Dstandalone=true` adds
+`libzynum-standalone.a` (or `.so` with `-Dshared=true`) and
+`zynum_standalone.h`. Link both libraries for a standalone caller. Supply the installed
 Heteris Data include directory or Heteris source `abi/include` explicitly. The
 adapter is built within the complete Zynum checkout: its named source module
 imports the original scalar/type/recurrence files without a copied source tree.
 No Rust library, runtime loading, package download, or GPU SDK is required.
 Use `--prefix`, `--cache-dir`, and the `ZIG_GLOBAL_CACHE_DIR` environment variable
 to place outputs and caches elsewhere (Zig 0.17 removed `--global-cache-dir`).
+Use a fresh prefix when checking the disabled standalone configuration: like
+ordinary SDK installation, direct Zig installation preserves files installed by
+earlier configurations and does not delete a previously installed provider.
 On WSL, prefer caches in the Linux filesystem (for example under
 `~/.cache/zynum`) if the Windows mount denies cache result renames. This bridge
 uses LLVM and LLD explicitly. This configuration and the small `src/descriptor.c`
@@ -44,18 +51,29 @@ the platform's `scripts/validate.py` also runs these consumers against debug and
 The standalone CMake project also qualifies a plain C consumer:
 
 ```sh
-cmake -S . -B /tmp/zynum-build -DCMAKE_BUILD_TYPE=Debug -DHETERIS_ABI_INCLUDE_DIR=/absolute/path/to/heteris/include
+cmake -S . -B /tmp/zynum-build -DCMAKE_BUILD_TYPE=Debug -DZYNUM_BUILD_STANDALONE=ON -DHETERIS_ABI_INCLUDE_DIR=/absolute/path/to/heteris/include
 cmake --build /tmp/zynum-build -j2
 ctest --test-dir /tmp/zynum-build --output-on-failure
 ```
 
 The parent platform can `add_subdirectory(libs/zynum)` and link target `zynum`.
-Its only interface dependency is `heteris_data`. CMake places Zig archives and
+Its Data interface dependency is `heteris_data`. `ZYNUM_BUILD_STANDALONE`
+defaults to `OFF`; enable it to expose `zynum_standalone_provider`, which
+transitively links `zynum`. The math target never links back to the provider.
+The standalone header/library and plain C consumer are present only when enabled.
+`zynum_zig_tests` remains registered with testing enabled in either mode;
+`zynum_test_build` builds the selected CTest dependencies. CMake places Zig archives and
 caches under its build directory, isolated per configuration, and installs the
 archive, public header, source provenance and license texts. Upstream optimized
 BLAS dispatch, GPU dispatch, and thread pools are not included in this bridge.
 
 ## Explicit execution resources
+
+Include `zynum_standalone.h` and explicitly link `zynum-standalone` to access
+the optional provider. Production `libzynum` has no naive implementation,
+provider sequence state, or unresolved reference to it. Unit tests import the
+provider through a test-only adapter, including when the production standalone
+artifact is disabled.
 
 `zynum_resources_create_naive` creates a small serial malloc/free provider.
 Invoke its `allocate`, `map`, and `release` callbacks directly to manage storage;

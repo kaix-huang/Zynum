@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: LGPL-3.0-or-later */
-#include "zynum.h"
+#include "zynum_standalone.h"
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>

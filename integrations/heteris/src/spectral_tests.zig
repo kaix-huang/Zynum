@@ -3,7 +3,7 @@ const std = @import("std");
 const V = @import("views.zig");
 const c = V.c;
 const S = @import("spectral.zig");
-const api = @import("root.zig").testing;
+const api = @import("test_api.zig");
 const eq = std.testing.expectEqual;
 const Buffer = struct {
     storage: c.heteris_storage,
