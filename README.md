@@ -21,6 +21,11 @@ from earlier SDK and ABPLaS evidence.
 
 ## Quick start
 
+Scientific Platform integration is developed in this repository under
+[`integrations/heteris/`](integrations/heteris/README.md). It provides the explicit
+Heteris C data/provider boundary and imports existing scalar/recurrence sources.
+Its Linux CPU qualification is separate from the full scientific API below.
+
 Requires **Zig 0.17.x**. Build the shared and static libraries, C headers,
 Fortran module, and pkg-config metadata:
 
