@@ -1701,8 +1701,9 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         task_runtime_host_test_library.root_module.addImport("zynum-execution", execution_test_mod);
         header_smoke_mod.addObject(task_runtime_host_test_library);
         triangular_band_window_tests.root_module.addObject(task_runtime_host_test_library);
-        triangular_packed_unit_test_mod.addObject(task_runtime_host_test_library);
-        triangular_band_solve_test_mod.addObject(task_runtime_host_test_library);
+        // The packed and band-solve modules already export this host through
+        // their isolated-kernel bridges. Only roots without that path borrow
+        // the auxiliary object; attaching it there would define the host twice.
     }
     const header_smoke_tests = b.addTest(.{
         .name = "zynum-blas-header-smoke-tests",

@@ -15,6 +15,7 @@
         "interface_subset",
         "interface_components",
         "interface_reviews",
+        "integrations/heteris",
         "pkgconfig",
         "bench/bench.zig",
         "bench/dynamic_library.zig",

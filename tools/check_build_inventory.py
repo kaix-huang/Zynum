@@ -451,9 +451,9 @@ SOURCE_PROJECTION_FIELDS = (
     "conditional_link_guard_digests",
     "workflow_source_digests",
 )
-CURRENT_SOURCE_PROJECTION_SHA256 = '9552038e9565f14b53fc66bb5f534d5625558ad0bed9702cd58e4ead85ebf8c4'
+CURRENT_SOURCE_PROJECTION_SHA256 = 'eed4252ac38fd48711114e01caec4b7f24c6a03e76f7bc2d824ee7045ae25970'
 NEXT_SOURCE_PROJECTION_SHA256 = None
-REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = 'd07657063efaba1d0699b015563e479711ace30a65853b0398c39081d60773ad'
+REVIEWED_TEST_INVENTORY_LOADER_CONTRACT_SHA256 = 'e381799bb0dd06c8ae937f89449868c2811d745048d1cadd18457da1ae911c7a'
 REVIEWED_TEST_INVENTORY_BOOTSTRAP_SHA256 = '33bfc25162a8e6f77f359dde8202e2812ba44295216e6cc4355d11cd626db7d2'
 REVIEWED_TEST_INVENTORY_CAPSULE_LAUNCHER_SHA256 = '94d94c9eacf3c84dd01ac289d82c970d15395469634738c109222d16d2be73e5'
 REVIEWED_TEST_INVENTORY_CAPSULE_RUNTIME_SHA256 = (
@@ -604,7 +604,7 @@ REQUIRED_GAP_FACT_DIGESTS = {
     "gap:process-bounds-deferred": "165ca9d0f5a67a60e33c0687c1752307caf444f89df7ff499cf7418694a22ee0",
     "gap:cross-target-benchmark-payload-execution": "b7173a413ffc971a81554ff46c4ceedaa68ae606106928b2ec03a75c9f4780a5"
 }
-REQUIRED_SECTION_FACT_DIGESTS = {'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd', 'derived_candidates': 'd3b624112579936861bf3a5d0eab993be64ce4721abaa26bf23aba6f32773aa0', 'option_surfaces': '9c82e63283898cc76ba24ff3bca4c777cd8401aed338c607e4ac97d2f1fcde57', 'repository_file_classifications': 'e5f69b00576ea51804c527953b5a6c350557079fec6db41d52c1148f5e26963b'}
+REQUIRED_SECTION_FACT_DIGESTS = {'current_gaps': '781536f16eb764faa692240e7b2d052078e85efbc279e2f302ff6214aa44e0cd', 'derived_candidates': 'd3b624112579936861bf3a5d0eab993be64ce4721abaa26bf23aba6f32773aa0', 'option_surfaces': '532ab33cde34cd46342f661e4933d917619eafb8fa1f17371a5a8cdee7244b78', 'repository_file_classifications': '415ae6fdae8079226286c76e71e8ad9cb89ae2fc5b53b59c27643f4183b51afd'}
 REVIEWED_PYTHON_SCRIPT_STOP_DIGESTS = {
     # Six fixed non-option case operands; entire physical controller AST is pinned below.
     "test/runtime/run_blas_io_lifecycle.py:main": '684713805a1ac1750b35ee6985b357570c1848827f9c4b4947bd008fcb335d33',
@@ -989,6 +989,7 @@ def _requires_cached_bytes(path: str, inventory_path: str | None) -> bool:
             and pure.suffix.lower() in {".yml", ".yaml"}
         )
         or path == DEPENDABOT_CONFIG_PATH
+        or path == "integrations/heteris/include/zynum.h"
         or path in {"tools/interface_templates/complex_gelsd_lp64.zig.in", "tools/interface_templates/gesvd_lp64.zig.in"}
         or path in {"tools/interface_templates/sparse_exports.zig.in", "tools/interface_templates/sparse_solve_exports.zig.in"}
         or path in {"tools/fftw_f32_profile.json", "tools/fftw_profile.json", "tools/interface_templates/fftw_exports.zig.in", "tools/interface_templates/hermitian_lp64.zig.in", "tools/interface_templates/qr_lp64.zig.in", "tools/interface_templates/q_generate_lp64.zig.in"}
@@ -5551,7 +5552,7 @@ def _discover_option_surface_semantics(
 NUMERICS_RESOURCES_ALIAS = "zynum-numerics-resources"
 NUMERICS_RESOURCES_PATH = "src/numerics/resources.zig"
 NUMERICS_RESOURCES_SOURCE_SHA256 = "7c35ddf131ee7832140921c794291a80d54a69e1d99815ecb11759c785906e0f"
-NUMERICS_RESOURCES_GRAPH_SHA256 = 'dd2bbd5974b25df393618184bb10447f7da83909d15da77b7948b0be35e8d1b6'
+NUMERICS_RESOURCES_GRAPH_SHA256 = '38ff1815a3a3f3c16968ba8774eec26283801b216d9eaa1af0db5b8470346b5d'
 NUMERICS_RESOURCES_OWNERS = ('csp', 'zynum_core_mod',
  'zynum_core_test_mod',
  'execution_mod',
@@ -5622,8 +5623,6 @@ EXECUTION_IMPORT_OWNERS = {'csp': 'execution_mod', 'zynum_core_mod': 'execution_
 EXECUTION_OBJECT_CONSUMERS = {
     "header_smoke_tests": "header_smoke_mod",
     "triangular_band_window_tests": "triangular_band_window_tests.root_module",
-    "triangular_packed_unit_tests": "triangular_packed_unit_test_mod",
-    "triangular_band_solve_tests": "triangular_band_solve_test_mod",
 }
 EXECUTION_OBJECT_SOURCE_SHA256 = {'src/blas/task_runtime_host_object_root.zig': '8dc937ffc3c886ec70746bc1dd81cbc58052f12ecc7dd22392b599e832ba41b0'}
 EXECUTION_SOURCE_SHA256 = {'src/blas/core/execution/thread_pool.zig': '6e43d0d60202129453bfbd5bdd529443048ce01d7dd761208135779112108656', 'src/blas/runtime.zig': 'b5cc8f7649a0ef60beb118d6412927040f8807efc958eea5d445f8d02d2a52a7', 'src/numerics/execution/default.zig': '270086f74d74bd28bc3000d287c2d9a29b0c3111a29dae8126105c07be4ac732', 'src/numerics/execution/owner.zig': 'd4775db5207477cac23bcf3aa0bd75b8616a04797905c2253f8dabcc6980dc3a', 'src/numerics/execution/policy.zig': '0512ae2636f3b5fee1f726531b51baa005172b5bd9a57afa880afed12095a5f8', 'src/numerics/execution/test_support.zig': '565cb6f0fe5dbf0f3245d6543b0cf7ffb42e9abdd78b0baa1e6982cac9b2d09a'}
@@ -17641,6 +17640,8 @@ def _validate(
         "example option surfaces must contain target/cpu/ofmt/dynamic-linker/optimize/dispatch exactly",
         errors,
     )
+    _require(surfaces_by_root.get("integrations/heteris/build.zig") == example_standard_names | {"shared", "standalone", "heteris-include"},
+             "adapter option surfaces must contain exactly the reviewed standard/shared/standalone/include options", errors)
     option_observation_ids = {
         item["id"]
         for item in inventory["build_observations"]
@@ -17740,6 +17741,9 @@ def _validate(
                         "host generate_kernel_coverage tool fixed at debug",
                     ],
                 }
+            elif build_root == "integrations/heteris/build.zig":
+                expected_partition = {"included": ["adapter math library", "optional standalone provider", "adapter arithmetic tests"],
+                                      "excluded": ["original Core build and its host tools"]}
             elif build_root == "examples/zig/build.zig" and name == "optimize":
                 expected_partition = {
                     "included": [
@@ -17882,6 +17886,11 @@ def _validate(
                         "macho": {"primary": f"lib{name}.a"},
                         "windows": {"primary": f"{name}.lib"},
                     }
+                if item['id'] in {"compile:integrations/heteris/build.zig:build:library", "compile:integrations/heteris/build.zig:build:provider"}:
+                    reviewed = HETERIS_ADAPTER_OBSERVATION_TEMPLATES[item['id']]
+                    expected_outputs = reviewed["produced_outputs_by_target"]
+                    for field in ("linkage", "linkage_selector", "install_destinations_by_target", "condition", "root_source"):
+                        _require(item.get(field) == reviewed[field], f"{item['id']}: adapter {field} changed", errors)
                 if item['id'] in {"compile:build.zig:build:csp_shared", "compile:build.zig:build:csp_static"}:
                     # These exact artifacts are guarded to Apple arm64 in the reviewed graph.
                     expected_outputs["elf"] = {}
@@ -19289,6 +19298,18 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
     inventory["repository_file_classifications"] = [
         classifications[path] for path in sorted(classifications)
     ]
+    for path in HETERIS_ADAPTER_PUBLIC_FILES:
+        kind = ("zig-build-root" if path.endswith("build.zig") else
+                "zig-build-manifest" if path.endswith("build.zig.zon") else
+                "zig-source" if path.endswith(".zig") else
+                "documentation" if path.endswith(".md") else
+                "foreign-language-source" if path.endswith((".h", ".c")) else "other-public-file")
+        owner = ("build-composition" if kind in {"zig-build-root", "zig-build-manifest", "other-public-file"} else
+                 "documentation-maintainers" if kind == "documentation" else
+                 "public-api" if "/include/" in path else
+                 "test-infrastructure" if path.endswith(("_tests.zig", "/tests.zig", "/test_api.zig", "/tests/standalone.c")) else "library-source")
+        classifications[path] = {"path": path, "kind": kind, "class": "non-generated-source", "owner": owner}
+    inventory["repository_file_classifications"] = [classifications[path] for path in sorted(classifications)]
     inventory["repository_file_classifications_digest"] = _json_fact_digest(
         inventory["repository_file_classifications"]
     )
@@ -19353,6 +19374,7 @@ def _apply_reviewed_build_inventory_migrations(inventory: dict[str, Any]) -> Non
     option_surfaces[FFTW_F32_OPTION_SURFACE["id"]] = copy.deepcopy(FFTW_F32_OPTION_SURFACE)
     option_surfaces[FEAST_OPTION_SURFACE["id"]] = copy.deepcopy(FEAST_OPTION_SURFACE)
     option_surfaces[CONTOUR_OPTION_SURFACE["id"]] = copy.deepcopy(CONTOUR_OPTION_SURFACE)
+    option_surfaces.update({row["id"]: copy.deepcopy(row) for row in HETERIS_ADAPTER_OPTION_SURFACES})
     inventory["option_surfaces"] = [option_surfaces[key] for key in sorted(option_surfaces)]
 
     observations = {item["id"]: item for item in inventory["build_observations"]}
@@ -19577,9 +19599,132 @@ CONTOUR_OBSERVATION_TEMPLATES = {'option:build.zig:build:contour-interface': {'o
 CONTOUR_OPTION_SURFACE = {'id': 'option-surface:build.zig:contour-interface', 'build_root': 'build.zig', 'name': 'contour-interface', 'option_kind': 'project', 'type': 'ContourInterfaceProfile', 'default': 'none', 'description': 'Optional generated neutral Contour extension over the agreed operator-v1 owner', 'consumers': ['explicit unified LP64 package'], 'role': 'optional neutral Contour frontend selection', 'conflict': 'requires Apple arm64 LP64 target, operator-interface=zynum_v1 and operator-phase-agreement=true', 'precedence': 'none preserves selected base package; zynum_v1 adds four generated entries over the existing operator owner', 'source_observation': 'option:build.zig:build:contour-interface'}
 
 
+def _heteris_adapter_observation_templates() -> dict[str, dict[str, Any]]:
+    """Reviewed finite adapter build, separate from the original Core graph."""
+    prefix = "integrations/heteris/build.zig:build:"
+    templates: dict[str, dict[str, Any]] = {}
+    for name in ("target", "optimize", "shared", "standalone", "heteris-include"):
+        templates["option:" + prefix + name] = {"owner": "build-composition"}
+    for symbol, name, source, condition in (
+        ("library", "zynum", "src/root.zig", "always"),
+        ("provider", "zynum-standalone", "src/standalone.zig", "standalone is true"),
+    ):
+        outputs = {"elf": {"static": f"lib{name}.a", "dynamic": f"lib{name}.so"},
+                   "macho": {"static": f"lib{name}.a", "dynamic": f"lib{name}.dylib"},
+                   "windows": {"static": f"{name}.lib", "dynamic": f"{name}.dll",
+                               "import_library": f"{name}.lib"}}
+        destinations = {target: {kind: "zig-out/" + ("bin/" if target == "windows" and kind == "dynamic" else "lib/") + value
+                                  for kind, value in values.items()} for target, values in outputs.items()}
+        templates["compile:" + prefix + symbol] = {
+            "owner": "build-composition", "artifact_kind": "library", "output_name": name,
+            "root_source": ["integrations/heteris/" + source], "linkage": "static-or-dynamic",
+            "linkage_selector": "shared", "compile_for": "requested-target", "execute_on": "not-executable",
+            "optimize_source": "optimize", "condition": condition,
+            "produced_outputs": sorted({value for values in outputs.values() for value in values.values()}),
+            "install_destinations": sorted({value for values in destinations.values() for value in values.values()}),
+            "produced_outputs_by_target": outputs, "install_destinations_by_target": destinations,
+        }
+        templates["install:" + prefix + symbol] = {
+            "owner": "build-composition", "producer": "compile:" + prefix + symbol,
+            "source": "emitted artifact", "destination": templates["compile:" + prefix + symbol]["install_destinations"],
+            "condition": condition,
+        }
+    for symbol, kind, source, output, execute in (
+        ("tests", "test", "src/root.zig", "test", "requested-target"),
+        ("translated", "translated-source", "include/zynum.h", "zynum.zig", "not-executable"),
+    ):
+        templates["compile:" + prefix + symbol] = {
+            "owner": "test-infrastructure" if symbol == "tests" else "build-composition",
+            "artifact_kind": kind, "output_name": output, "root_source": ["integrations/heteris/" + source],
+            "linkage": "not-applicable", "compile_for": "requested-target", "execute_on": execute,
+            "optimize_source": "optimize", "condition": "adapter test step is reached" if symbol == "tests" else "adapter compilation is reached",
+            "produced_outputs": ["test", "test.exe"] if symbol == "tests" else [output], "install_destinations": [],
+        }
+    for name in ("zynum.h", "zynum_spectral.h", "zynum_standalone.h", "heteris.h"):
+        key = name if name == "heteris.h" else "include/" + name
+        templates["install:" + prefix + key] = {
+            "owner": "build-composition", "producer": "external Heteris Data SDK file" if name == "heteris.h" else "repository file",
+            "source": "explicit heteris-include/heteris.h" if name == "heteris.h" else "integrations/heteris/include/" + name,
+            "destination": ["zig-out/include/" + name],
+            "condition": "standalone is true" if name == "zynum_standalone.h" else "install step is reached",
+        }
+    templates["launch:" + prefix + "run_tests"] = {
+        "owner": "test-infrastructure", "detail_status": "process-lifecycle-out-of-scope",
+        "cwd_shape": "adapter-package-root", "command_shape": "run-artifact",
+        "source_artifact": "compile:" + prefix + "tests", "compile_for": "requested-target",
+        "execute_on": "requested-target", "argv_shape": [], "launch_class": "validation",
+    }
+    for name, description, role in (("install", "Install declared artifacts", "standard-lifecycle"),
+                                     ("uninstall", "Remove installed artifacts", "standard-lifecycle"),
+                                     ("test", "Run CPU arithmetic, ABI, stride, and validation tests", "standalone-build")):
+        dependencies = []
+        if name == "test":
+            dependencies = [{"id": "launch:" + prefix + "run_tests", "condition": "always"}]
+        elif name == "install":
+            dependencies = [{"id": "install:" + prefix + key, "condition": condition}
+                            for key, condition in (("library", "always"), ("provider", "standalone is true"),
+                            ("include/zynum.h", "always"), ("include/zynum_spectral.h", "always"),
+                            ("include/zynum_standalone.h", "standalone is true"), ("heteris.h", "always"))]
+        templates["step:" + prefix + name] = {
+            "owner": "build-composition", "description": description, "direct_dependencies": dependencies,
+            "aggregate_test_membership": "not-applicable", "aggregate_condition": "not-applicable",
+            "intentional_orphan": False, "orphan_reason": "separate adapter package build lifecycle",
+            "step_role": role,
+        }
+    return templates
+
+
+HETERIS_ADAPTER_OBSERVATION_TEMPLATES = _heteris_adapter_observation_templates()
+
+
+def _heteris_adapter_option_surfaces() -> list[dict[str, Any]]:
+    root = "integrations/heteris/build.zig"
+    partition = {"included": ["adapter math library", "optional standalone provider", "adapter arithmetic tests"],
+                 "excluded": ["original Core build and its host tools"]}
+    rows = []
+    for name, kind, option_type, default, description, observation in (
+        ("target", "standard", "target-query", "native requested target", "Select target triple", "target"),
+        ("cpu", "standard", "cpu-model-and-features", "target default CPU selection", "Select CPU model and feature set", "target"),
+        ("ofmt", "standard", "object-format", "target default object format", "Select output object format", "target"),
+        ("dynamic-linker", "standard", "path", "target default dynamic linker", "Select dynamic linker path", "target"),
+        ("optimize", "standard", "std.lang.Optimize", "debug", "Select debug, safe, fast, or small optimization", "optimize"),
+        ("standalone", "project", "bool", "false", "Build the explicit standalone provider (default: false)", "standalone"),
+        ("shared", "project", "bool", "false", "Build shared libraries (default: static)", "shared"),
+        ("heteris-include", "project", "[]const u8", "unset", "Absolute Heteris Data SDK include directory", "heteris-include"),
+    ):
+        row = {"id": f"option-surface:{root}:{name}", "build_root": root, "name": name,
+               "option_kind": kind, "type": option_type, "default": default, "description": description,
+               "consumers": partition["included"], "role": "explicit adapter package configuration",
+               "conflict": "none", "precedence": "explicit command-line value overrides the recorded default",
+               "source_observation": f"option:{root}:build:{observation}"}
+        if kind == "standard":
+            row["consumer_partition"] = copy.deepcopy(partition)
+        if name == "optimize":
+            row["value_domain"] = ["debug", "safe", "fast", "small"]
+        rows.append(row)
+    return rows
+
+
+HETERIS_ADAPTER_OPTION_SURFACES = _heteris_adapter_option_surfaces()
+HETERIS_ADAPTER_PUBLIC_FILES = (
+    "CMakeLists.txt", "integrations/heteris/CMakeLists.txt", "integrations/heteris/README.md",
+    "integrations/heteris/UPSTREAM.md", "integrations/heteris/build.zig", "integrations/heteris/build.zig.zon",
+    "integrations/heteris/include/zynum.h", "integrations/heteris/include/zynum_spectral.h",
+    "integrations/heteris/include/zynum_standalone.h", "integrations/heteris/src/adapted/gemm.zig",
+    "integrations/heteris/src/dense.zig", "integrations/heteris/src/dense_tests.zig",
+    "integrations/heteris/src/descriptor.c", "integrations/heteris/src/root.zig",
+    "integrations/heteris/src/spectral.zig", "integrations/heteris/src/spectral_tests.zig",
+    "integrations/heteris/src/standalone.zig", "integrations/heteris/src/test_api.zig",
+    "integrations/heteris/src/tests.zig", "integrations/heteris/src/views.zig",
+    "integrations/heteris/tests/standalone.c", "src/scientific_platform_sources.zig",
+)
+
+
 def _new_test_inventory_observation(
     identifier: str, inventory: dict[str, Any]
 ) -> dict[str, Any]:
+    if identifier in HETERIS_ADAPTER_OBSERVATION_TEMPLATES:
+        return copy.deepcopy(HETERIS_ADAPTER_OBSERVATION_TEMPLATES[identifier])
     if identifier in CONTOUR_OBSERVATION_TEMPLATES:
         return copy.deepcopy(CONTOUR_OBSERVATION_TEMPLATES[identifier])
     if identifier in FEAST_OBSERVATION_TEMPLATES:
@@ -20299,8 +20444,6 @@ def _new_test_inventory_observation(
     test_host_links = {
         "link:build.zig:build:header_smoke_mod<-task_runtime_host_test_library": "header_smoke_mod",
         "link:build.zig:build:triangular_band_window_tests.root_module<-task_runtime_host_test_library": "triangular_band_window_tests.root_module",
-        "link:build.zig:build:triangular_packed_unit_test_mod<-task_runtime_host_test_library": "triangular_packed_unit_test_mod",
-        "link:build.zig:build:triangular_band_solve_test_mod<-task_runtime_host_test_library": "triangular_band_solve_test_mod",
     }
     if identifier in test_host_links:
         return {

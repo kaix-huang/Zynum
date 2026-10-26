@@ -37,6 +37,8 @@ SCHEMA_VERSION = 3
 BUILD_SCHEMA_ID = "zynum-build-inventory-v3"
 INVENTORY_PATH = "tools/test_inventory.json"
 BUILD_INVENTORY_PATH = "tools/build_inventory.json"
+HETERIS_ADAPTER_COMPILE_ID = "compile:integrations/heteris/build.zig:build:tests"
+HETERIS_ADAPTER_ROOT_ID = "correctness-root:heteris-adapter-package"
 SELF_TEST_PATH = "test/build/test_test_inventory.py"
 AGGREGATE_STEP_ID = "step:build.zig:build:test"
 HOST_TOOL_SMOKE_STEP_ID = "step:build.zig:build:test-host-tool-smoke"
@@ -155,7 +157,7 @@ _PYTHON_TOOLING_EXECUTION_SOURCE_SHA256 = (('bench/tools/test_benchmark_artifact
   '2f101f8cd50b035fecb215815b709d90d1956d3ee57eb4d7261acfc5c996a138'),
  ('tools/repository_git.py', '0335896512a2ae707b1321a44f2e749fe015b04b9de6809816cc8ddd6a078cec'),
  ('tools/repository_snapshot.py',
-  '5ce200930baaa090170b65c393f04eab786e8c831eb72d5120c9344b465aff35'),
+  '223f323032c50a85156ae56fdb979e5a14d219abffe91ed0df61d216acb455e0'),
  ('bench/tools/run_windows_benchmark.py',
   '0f95907fa2f6640dc7ee459b068085170f90968bdbbcefc52b8b05e0e42a6206'),
  ('bench/tools/run_windows_comparison.py',
@@ -215,7 +217,7 @@ _PYTHON_TOOLING_EXECUTION_MODULES = (('test_benchmark_artifact_snapshot', 'bench
  ('plot_windows_comparison', 'bench/tools/plot_windows_comparison.py'),
  ('test_module_foundation', 'bench/tools/test_module_foundation.py'),
  ('module_controller', 'bench/modules/run_foundation_comparison.py'))
-_PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = 'f754daccade50166ac42b7331ef76da7b13934c2407c16e13b8e18a6e511a993'
+_PYTHON_TOOLING_EXECUTION_MANIFEST_SHA256 = 'a93692aa549fb69542c6b11934c8209e04981396008f4f2948bccc7e83dee0c2'
 _PYTHON_TOOLING_RUNTIME_ORDER_SHA256 = '0a3701d5d563f58cf54e878af1b01a4ccf4591d773ccc4262f0d2ee7e0c1c191'
 _PYTHON_TOOLING_CAPSULE_MAGIC = b"ZYNUM-PYTHON-CAPSULE-V1\0"
 _PYTHON_TOOLING_CAPSULE_MAX_BYTES = 16 * 1024 * 1024
@@ -846,9 +848,9 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '6fd46a264d81a34a03e66bc23ef683608132842e80b849b1aabf7ffb34d69626'
+CURRENT_TEST_INVENTORY_SHA256 = 'e717be147ad3d3de8d88ddb7d524fb2e4c3278b79844fe0c0f84fc31f92846d9'
 NEXT_TEST_INVENTORY_SHA256 = None
-CURRENT_NATIVE_PROJECTION_SHA256 = '94521f6f5d581d4de647108492c0e04675f4b15758f92a6a3ca095b0febc8508'
+CURRENT_NATIVE_PROJECTION_SHA256 = '3a127e1cd4c3c533e0d9e6e84edaafa204f10ca8bf7f63f114fae189aa58331a'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 TOP_LEVEL_KEYS = {
     "schema_id",
@@ -2329,7 +2331,7 @@ def _zig_source_closure(
     pending = [(root_owner, entry_paths[0])]
     pending.extend((provider, _zig_module_source(provider, resource_graph)) for alias, provider in imports.get(root_owner, {}).items()
                    if alias != BUILD_CHECKER.NUMERICS_RESOURCES_ALIAS)
-    # Four reviewed x86 host-runtime object attachments are source dependencies
+    # Reviewed x86 host-runtime object attachments are source dependencies
     # of their actual consumers. Static reachability is not native enumeration.
     pending.extend((entry["module"], entry["path"])
                    for entry in resource_graph["linked_module_entries"].get(resource_root, ()))
@@ -2395,6 +2397,66 @@ def _zig_object_owners(root_symbol: str, graph: dict[str, Any]) -> set[str]:
     return {"official_tests.root_module", graph["root_owners"][root_symbol]}
 
 
+def _validate_heteris_adapter_package_graph(by_id: dict[str, dict[str, Any]]) -> bool:
+    ids = (HETERIS_ADAPTER_COMPILE_ID, "launch:integrations/heteris/build.zig:build:run_tests",
+           "step:integrations/heteris/build.zig:build:test")
+    if not any(identifier in by_id for identifier in ids):
+        return False
+    if any(row.get("call") == "b.addTest" and identifier.startswith("compile:integrations/heteris/")
+           and identifier != HETERIS_ADAPTER_COMPILE_ID for identifier, row in by_id.items()):
+        raise InventoryError("unreviewed separate adapter package test root")
+    for identifier, category, call in zip(ids, ("compile", "launch", "step"),
+                                         ("b.addTest", "b.addRunArtifact", "b.step"), strict=True):
+        row = by_id.get(identifier, {})
+        reviewed = BUILD_CHECKER.HETERIS_ADAPTER_OBSERVATION_TEMPLATES[identifier]
+        if (row.get("category") != category or row.get("call") != call or
+                any(row.get(key) != value for key, value in reviewed.items())):
+            raise InventoryError("separate Heteris adapter package test graph changed: " + identifier)
+    return True
+
+
+def _heteris_adapter_source_closure(
+    zig_text: dict[str, str], public_paths: frozenset[str], context: Any
+) -> tuple[set[str], list[dict[str, Any]]]:
+    """Source-only reachability for the one explicitly reviewed adapter package."""
+    aliases = {"scientific_sources": "src/scientific_platform_sources.zig"}
+    root = "integrations/heteris/src/root.zig"
+    pending = [root, *aliases.values()]
+    reached: set[str] = set()
+    while pending:
+        path = pending.pop()
+        if path in reached:
+            continue
+        if path not in public_paths or path not in zig_text:
+            raise InventoryError("adapter dependency source is missing: " + path)
+        reached.add(path)
+        for imported in _zig_imports(zig_text[path], path):
+            if imported in aliases:
+                pending.append(aliases[imported])
+            elif imported == "zynum_c" and path == "integrations/heteris/src/views.zig":
+                continue  # Explicit build-time translation, recorded below.
+            elif imported in _ZIG_NON_RELATIVE_IMPORTS:
+                continue
+            elif "/" not in imported and not imported.endswith(".zig"):
+                raise InventoryError("unreviewed adapter named dependency: " + imported)
+            else:
+                candidate = posixpath.normpath((PurePosixPath(path).parent / imported).as_posix())
+                if candidate not in public_paths:
+                    raise InventoryError("adapter dependency source is missing: " + candidate)
+                pending.append(candidate)
+    build_path = "integrations/heteris/build.zig"
+    build_digest = hashlib.sha256(BUILD_CHECKER._frozen_regular_bytes(context, build_path, "adapter build")).hexdigest()
+    header = "integrations/heteris/include/zynum.h"
+    receipts = [{"alias": alias, "path": path, "source_sha256": hashlib.sha256(zig_text[path].encode()).hexdigest(),
+                 "module": "adapter upstream", "attachment_owner": "adapter module", "target": "target",
+                 "build_contract_sha256": build_digest} for alias, path in aliases.items()]
+    receipts.append({"alias": "zynum_c", "source_kind": "generated-non-source",
+                     "generator_observation_id": "compile:integrations/heteris/build.zig:build:translated",
+                     "input_sha256": {header: hashlib.sha256(BUILD_CHECKER._frozen_regular_bytes(context, header, "adapter header")).hexdigest()},
+                     "external_input": "explicit Heteris Data SDK heteris.h", "build_contract_sha256": build_digest})
+    return reached, receipts
+
+
 def discover(
     root: Path, inventory_path: Path, *, _context: Any | None = None
 ) -> dict[str, Any]:
@@ -2429,6 +2491,7 @@ def discover(
             and item.get("id") != "compile:build.zig:build:dynamic_tests"
             and item.get("id") != CHECKED_CHOLESKY_COMPILE_ID
             and item.get("id") != POSV_COMPILE_ID
+            and item.get("id") != HETERIS_ADAPTER_COMPILE_ID
         ),
         key=lambda item: item["id"],
     )
@@ -2756,9 +2819,32 @@ def discover(
             }
         )
 
+    # The adapter is a separate package, whose own arithmetic test step is not
+    # one of the original Core's 25 canonical roots. Admit only this exact graph.
+    adapter_ids = (HETERIS_ADAPTER_COMPILE_ID,
+                   "launch:integrations/heteris/build.zig:build:run_tests",
+                   "step:integrations/heteris/build.zig:build:test")
+    if _validate_heteris_adapter_package_graph(by_id):
+        reached, receipts = _heteris_adapter_source_closure(zig_text, public_paths, context)
+        correctness_only_roots.append({
+            "id": HETERIS_ADAPTER_ROOT_ID, "language": "zig",
+            "physical_path": "integrations/heteris/src/root.zig",
+            "compile_observation_id": HETERIS_ADAPTER_COMPILE_ID,
+            "launch_observation_ids": [adapter_ids[1]], "selector_step_observation_id": adapter_ids[2],
+            "guard": "separate integrations/heteris package test step with explicit Heteris Data headers",
+            "executor_guard_dependency": None, "process_environments": [{}],
+            "enumeration_source": "static-source-reachability-only", "native_inventory_evidence": False,
+            "source_reachability": sorted(reached), "named_dependency_sources": receipts,
+        })
+
     # Track source declarations of the correctness-only root without adding native
     # protocol rows or manufacturing compiler-enumerated test names.
     for correctness_root in correctness_only_roots:
+        if correctness_root["id"] == HETERIS_ADAPTER_ROOT_ID:
+            for path in correctness_root["source_reachability"]:
+                if path in zig_declarations:
+                    root_reach[path].append(correctness_root["id"])
+            continue
         symbol = correctness_root["compile_observation_id"].rsplit(":", 1)[1]
         named_dependencies = []
         reached = _zig_source_closure(
@@ -4360,10 +4446,33 @@ def _matrix_incomplete_count(inventory: dict[str, Any]) -> int:
     )
 
 
+HOST_ASSEMBLY_SOURCE_FIELDS = ("test_roots", "correctness_only_roots", "zig_test_files")
+HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256 = "fd03d10b73522d661e132255c72b001b82205e3b3241c2c045803d8d5a930839"
+HOST_ASSEMBLY_CURRENT_SOURCE_SHA256 = "fd0648fdb2e1de84288b32a7c053e10dc384dc8024c297cf93191ad8c5fb263b"
+
+
+def _host_assembly_source_facts(inventory: dict[str, Any]) -> dict[str, Any]:
+    return {key: inventory.get(key) for key in HOST_ASSEMBLY_SOURCE_FIELDS}
+
+
+def _reviewed_host_assembly_source_refresh(previous_sha256: str, current: dict[str, Any]) -> bool:
+    """One exact source migration; never admits another root or dependency delta.
+
+    The reviewed pair removes the band-solve/packed auxiliary host entries and
+    their execution receipts, updates the unchanged graph's receipt digest, and
+    records the previously unregistered separate adapter and four test files.
+    Native rows, bindings, and compiler observations are outside this projection.
+    """
+    return (previous_sha256 == HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256 and
+            _fact_digest(_host_assembly_source_facts(current)) == HOST_ASSEMBLY_CURRENT_SOURCE_SHA256)
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
     """Reconstruct the only source-derived facts allowed to be stale at refresh."""
+    host_assembly_migration = _reviewed_host_assembly_source_refresh(
+        _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -4377,6 +4486,8 @@ def _refresh_base_compatible_discovery(
     for recorded, current in zip(recorded_roots, current_roots, strict=True):
         if recorded == current:
             continue
+        if host_assembly_migration:
+            continue  # The complete old/new source facts were checked above.
         legacy = dict(current)
         legacy["launch_observation_ids"] = []
         tooling_migration = (
@@ -4567,6 +4678,9 @@ def _refresh_base_compatible_discovery(
 
     compatible = dict(discovered)
     compatible["test_roots"] = recorded_roots
+    if host_assembly_migration:
+        compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
+        compatible["zig_test_files"] = inventory["zig_test_files"]
     compatible["python_test_modules"] = recorded_modules
     compatible["expected_test_sets"] = derived_sets
     compatible["test_mode_rows"] = inventory["test_mode_rows"]

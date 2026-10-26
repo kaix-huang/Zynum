@@ -1965,23 +1965,33 @@ class _RegularFileRound:
     read_bytes: int = 0
     cached_bytes: int = 0
 
-    def admit(self, size: int, *, capture_bytes: bool, limit: int) -> None:
+    def admit(self, size: int, *, path: str, capture_bytes: bool, limit: int) -> None:
         if size < 0:
-            raise RepositorySnapshotError("regular file has an invalid frozen size")
+            raise RepositorySnapshotError(
+                f"regular file has an invalid frozen size: path={path!a}, size_bytes={size}"
+            )
         if size > limit:
-            raise RepositorySnapshotError("regular file exceeds its input limit")
+            raise RepositorySnapshotError(
+                f"regular file exceeds its input limit: path={path!a}, "
+                f"size_bytes={size}, limit_bytes={limit}"
+            )
         if self.read_bytes + size > self.limits.max_round_bytes:
             raise RepositorySnapshotError(
-                "regular-file round exceeds its cumulative input limit"
+                f"regular-file round exceeds its cumulative input limit: path={path!a}, "
+                f"size_bytes={size}, used_bytes={self.read_bytes}, "
+                f"limit_bytes={self.limits.max_round_bytes}"
             )
         if capture_bytes:
             if size > self.limits.max_cached_file_bytes:
                 raise RepositorySnapshotError(
-                    "regular file exceeds its cache input limit"
+                    f"regular file exceeds its cache input limit: path={path!a}, "
+                    f"size_bytes={size}, limit_bytes={self.limits.max_cached_file_bytes}"
                 )
             if self.cached_bytes + size > self.limits.max_cached_total_bytes:
                 raise RepositorySnapshotError(
-                    "regular-file round exceeds its cumulative cache limit"
+                    f"regular-file round exceeds its cumulative cache limit: path={path!a}, "
+                    f"size_bytes={size}, used_bytes={self.cached_bytes}, "
+                    f"limit_bytes={self.limits.max_cached_total_bytes}"
                 )
         self.read_bytes += size
         if capture_bytes:
@@ -2442,7 +2452,10 @@ class SnapshotSession:
             if limit is not None:
                 effective_limit = min(effective_limit, limit)
             if previous.kind == "regular" and previous.size > effective_limit:
-                raise RepositorySnapshotError("regular file exceeds its input limit")
+                raise RepositorySnapshotError(
+                    f"regular file exceeds its input limit: path={path!a}, "
+                    f"size_bytes={previous.size}, limit_bytes={effective_limit}"
+                )
             return previous
         round_budget = self._capture_round if regular_round is None else regular_round
         parent_fd, parents = self._open_parent(path)
@@ -2489,6 +2502,7 @@ class SnapshotSession:
                     effective_limit = min(effective_limit, limit)
                 round_budget.admit(
                     identity.size,
+                    path=path,
                     capture_bytes=include_bytes,
                     limit=effective_limit,
                 )
@@ -3263,6 +3277,7 @@ class SnapshotSession:
             regular_round = _RegularFileRound(self._regular_file_limits)
             regular_round.admit(
                 identity.size,
+                path=node.path,
                 capture_bytes=node.bytes is not None,
                 limit=min(self._regular_file_limits.max_file_bytes, node.size),
             )

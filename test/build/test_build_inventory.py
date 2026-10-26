@@ -13356,6 +13356,97 @@ class BuildInventoryTests(unittest.TestCase):
                 session.capture_paths(("one.py",), include_bytes=True)
                 session.capture_paths(("three.py",), include_bytes=True)
 
+    def test_regular_file_limit_diagnostic_escapes_relative_path_before_read(self) -> None:
+        snapshot = CHECKER.repository_snapshot
+        limits = snapshot.RegularFileLimits(4, 8, 4, 8)
+        with tempfile.TemporaryDirectory(prefix="snapshot-limit-diagnostic-") as directory:
+            root = Path(directory)
+            (root / "nested").mkdir()
+            relative = "nested/input\n\x1b\u202e.bin"
+            (root / relative).write_bytes(b"12345")
+            with (
+                snapshot.SnapshotSession(root, regular_file_limits=limits) as session,
+                mock.patch.object(
+                    snapshot,
+                    "_read_regular_file",
+                    side_effect=AssertionError("oversized file was read"),
+                ),
+                self.assertRaises(snapshot.RepositorySnapshotError) as raised,
+            ):
+                session.capture_paths((relative,), limit=None)
+            message = str(raised.exception)
+            self.assertEqual(
+                "regular file exceeds its input limit: "
+                f"path={relative!a}, size_bytes=5, limit_bytes=4",
+                message,
+            )
+            self.assertTrue(message.isascii())
+            self.assertNotIn("\n", message)
+            self.assertNotIn("\x1b", message)
+            self.assertNotIn(str(root), message)
+
+    def test_cached_regular_file_limit_diagnostic_uses_stricter_caller_bound(self) -> None:
+        snapshot = CHECKER.repository_snapshot
+        with tempfile.TemporaryDirectory(prefix="snapshot-cached-diagnostic-") as directory:
+            root = Path(directory)
+            (root / "cached.py").write_bytes(b"1234")
+            with snapshot.SnapshotSession(root) as session:
+                session.capture_paths(("cached.py",), include_bytes=True)
+                with (
+                    mock.patch.object(
+                        snapshot,
+                        "_read_regular_file",
+                        side_effect=AssertionError("cached oversized file was reread"),
+                    ),
+                    self.assertRaises(snapshot.RepositorySnapshotError) as raised,
+                ):
+                    session.capture_paths(("cached.py",), include_bytes=True, limit=3)
+                self.assertEqual(
+                    "regular file exceeds its input limit: "
+                    "path='cached.py', size_bytes=4, limit_bytes=3",
+                    str(raised.exception),
+                )
+
+    def test_regular_file_round_limit_diagnostics_report_member_usage_and_bound(self) -> None:
+        snapshot = CHECKER.repository_snapshot
+        cases = (
+            (snapshot.RegularFileLimits(3, 5, 3, 5), False, True,
+             "regular-file round exceeds its cumulative input limit: "
+             "path='two.py', size_bytes=3, used_bytes=3, limit_bytes=5"),
+            (snapshot.RegularFileLimits(6, 12, 2, 4), True, False,
+             "regular file exceeds its cache input limit: "
+             "path='two.py', size_bytes=3, limit_bytes=2"),
+            (snapshot.RegularFileLimits(3, 8, 3, 5), True, True,
+             "regular-file round exceeds its cumulative cache limit: "
+             "path='two.py', size_bytes=3, used_bytes=3, limit_bytes=5"),
+        )
+        for limits, include_bytes, capture_first, expected in cases:
+            with (
+                self.subTest(expected=expected),
+                tempfile.TemporaryDirectory(prefix="snapshot-round-diagnostic-") as directory,
+            ):
+                root = Path(directory)
+                (root / "one.py").write_bytes(b"123")
+                (root / "two.py").write_bytes(b"456")
+                with snapshot.SnapshotSession(root, regular_file_limits=limits) as session:
+                    if capture_first:
+                        session.capture_paths(("one.py",), include_bytes=include_bytes)
+                    with (
+                        mock.patch.object(
+                            snapshot,
+                            "_read_regular_file",
+                            side_effect=AssertionError("over-budget file was read"),
+                        ),
+                        self.assertRaises(snapshot.RepositorySnapshotError) as raised,
+                    ):
+                        session.capture_paths(("two.py",), include_bytes=include_bytes)
+                    self.assertEqual(expected, str(raised.exception))
+                    self.assertEqual(3 if capture_first else 0, session._capture_round.read_bytes)
+                    self.assertEqual(
+                        3 if capture_first and include_bytes else 0,
+                        session._capture_round.cached_bytes,
+                    )
+
     def test_archive_and_repository_growth_fail_without_reading_to_moving_eof(
         self,
     ) -> None:

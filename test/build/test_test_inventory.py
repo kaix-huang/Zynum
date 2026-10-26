@@ -85,6 +85,8 @@ def _source_refreshed_build_fixture(context: Any) -> dict[str, Any]:
         rows.append(item)
     # The default install step is implicit, not a b.step source occurrence.
     rows.append(copy.deepcopy(recorded["step:build.zig:build:install"]))
+    rows.extend(copy.deepcopy(row) for row in recorded.values()
+                if row.get("anchor", {}).get("file") != "build.zig")
     inventory["build_observations"] = rows
     CHECKER.BUILD_CHECKER._apply_reviewed_build_inventory_migrations(inventory)
     for row in inventory["python_launches"]:
@@ -318,7 +320,52 @@ class SharedFacadeReachabilityTests(NumericsResourcesReachabilityTests):
 class SharedExecutionReachabilityTests(NumericsResourcesReachabilityTests):
     """Real admitted graph in both source walkers, without native test claims."""
 
-    def test_all_four_linked_object_sources_and_execution_receipts_are_retained(self) -> None:
+    def test_adapter_package_rejects_unknown_dependencies_and_preserves_core_scope(self) -> None:
+        row = next(row for row in self.discovered['correctness_only_roots'] if row['id'] == CHECKER.HETERIS_ADAPTER_ROOT_ID)
+        self.assertFalse(row['native_inventory_evidence'])
+        self.assertEqual(25, sum(row['language'] == 'zig' for row in self.discovered['test_roots']))
+        for imported in ('unreviewed-adapter-provider', './missing_dependency.zig'):
+            source = dict(self.zig_text)
+            source['integrations/heteris/src/root.zig'] += f'\nconst rejected = @import("{imported}");\n'
+            with self.subTest(imported=imported), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._heteris_adapter_source_closure(source, self.context.public_files.path_set, self.context)
+        inventory = json.loads((REPOSITORY_ROOT / 'tools/test_inventory.json').read_text())
+        self.assertEqual(CHECKER.CURRENT_NATIVE_PROJECTION_SHA256, CHECKER._native_projection_digest(inventory))
+        self.assertFalse(any('heteris-adapter' in row['root_id'] for row in inventory['test_mode_rows']))
+
+    def test_adapter_package_graph_rejects_replacement_calls_sources_and_extra_roots(self) -> None:
+        source = self.source_inventory['build_observations']
+        graph = {row['id']: copy.deepcopy(row) for row in source}
+        self.assertTrue(CHECKER._validate_heteris_adapter_package_graph(graph))
+        ids = (CHECKER.HETERIS_ADAPTER_COMPILE_ID,
+               'launch:integrations/heteris/build.zig:build:run_tests',
+               'step:integrations/heteris/build.zig:build:test')
+        for identifier, field, value in ((ids[0], 'root_source', ['src/zynum.zig']),
+                (ids[1], 'source_artifact', 'compile:build.zig:build:numerics_contract_tests'),
+                (ids[2], 'direct_dependencies', []),
+                *[(identifier, field, 'unreviewed') for identifier in ids for field in ('call', 'category')]):
+            changed = copy.deepcopy(graph)
+            changed[identifier][field] = value
+            with self.subTest(identifier=identifier, field=field), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._validate_heteris_adapter_package_graph(changed)
+        extra = copy.deepcopy(graph[ids[0]])
+        extra['id'] = 'compile:integrations/heteris/build.zig:build:unreviewed_tests'
+        graph[extra['id']] = extra
+        with self.assertRaisesRegex(CHECKER.InventoryError, 'unreviewed separate adapter'):
+            CHECKER._validate_heteris_adapter_package_graph(graph)
+
+    def test_exact_host_source_migration_rejects_any_extra_facts(self) -> None:
+        facts = {key: self.discovered[key] for key in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS}
+        previous = CHECKER.HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256
+        self.assertTrue(CHECKER._reviewed_host_assembly_source_refresh(previous, facts))
+        self.assertFalse(CHECKER._reviewed_host_assembly_source_refresh('0' * 64, facts))
+        for field in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            changed = copy.deepcopy(facts)
+            changed[field][0]['unreviewed'] = True
+            with self.subTest(field=field):
+                self.assertFalse(CHECKER._reviewed_host_assembly_source_refresh(previous, changed))
+
+    def test_auxiliary_host_sources_and_execution_receipts_are_retained(self) -> None:
         rows = {row['compile_observation_id'].rsplit(':', 1)[1]: row for row in self.discovered['test_roots'] if row['language'] == 'zig'}
         path = 'src/blas/task_runtime_host_object_root.zig'
         for symbol in CHECKER.BUILD_CHECKER.EXECUTION_OBJECT_CONSUMERS:
@@ -336,6 +383,25 @@ class SharedExecutionReachabilityTests(NumericsResourcesReachabilityTests):
                 with self.assertRaisesRegex(CHECKER.InventoryError, 'dependency source is missing'):
                     CHECKER._zig_source_closure(source, self.context.public_files.path_set,
                         CHECKER._zig_source_entries(symbol, self.graph), resource_root=symbol, resource_graph=self.graph)
+
+    def test_isolated_bridge_roots_use_their_reachable_host_without_an_auxiliary_object(self) -> None:
+        for name in ('triangular-band-solve', 'triangular-packed-unit'):
+            row = next(row for row in self.discovered['test_roots'] if row['id'] == f'zig-root:{name}-tests')
+            self.assertNotIn('src/blas/task_runtime_host_object_root.zig', row['source_entry_paths'])
+            self.assertNotIn('src/blas/task_runtime_host_object_root.zig', row['source_reachability'])
+            self.assertIn('src/blas/kernels/isolated/x86_64_compact_triangular_bridge.zig', row['source_reachability'])
+            self.assertIn('src/blas/kernels/isolated/task_runtime_host.zig', row['source_reachability'])
+        self.assertEqual({'header_smoke_tests', 'triangular_band_window_tests'},
+                         set(CHECKER.BUILD_CHECKER.EXECUTION_OBJECT_CONSUMERS))
+        source = CHECKER._cached_text(self.context, 'build.zig')
+        for receiver in ('triangular_band_solve_test_mod', 'triangular_packed_unit_test_mod'):
+            duplicate = source.replace(
+                'header_smoke_mod.addObject(task_runtime_host_test_library);',
+                'header_smoke_mod.addObject(task_runtime_host_test_library);\n'
+                f'        {receiver}.addObject(task_runtime_host_test_library);', 1)
+            self.assertNotEqual(source, duplicate)
+            with self.assertRaisesRegex(CHECKER.BUILD_CHECKER.InventoryError, 'owner/source/target/attachment graph drifted'):
+                CHECKER.BUILD_CHECKER._numerics_resources_build_contract(duplicate)
 
     def test_execution_root_retains_context_scratch_and_only_shared_resource_dependency(self) -> None:
         row = next(row for row in self.discovered['test_roots'] if row['id'] == 'zig-root:execution-contract-tests')
