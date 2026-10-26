@@ -830,10 +830,12 @@ and [`common/zig_std_io_threading.md`](common/zig_std_io_threading.md).
 
 ## Runtime Configuration
 
-`ZYNUM_MAXIMUM_THREADS` is the only project-specific environment variable.
-When unset, concurrency derives from the execution environment; a positive
-value caps it. Instruction tier, backend, task strategy, and tuning profile are
-internal policy or explicit build/API choices, not environment variables.
+`ZYNUM_MAXIMUM_THREADS` controls the thread ceiling. When unset, concurrency
+derives from the execution environment; a positive value caps it. The dynamic
+dispatcher also accepts `ZYNUM_MAX_ISA` as a diagnostic ceiling before its first
+selection. It can remove capabilities, never enable unsupported instructions;
+unknown or wrong-architecture values select baseline. Backend, task strategy,
+ABI profile and tuning remain internal policy or explicit build/API choices.
 
 ## File Ownership And Split Rules
 
