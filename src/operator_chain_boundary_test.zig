@@ -677,7 +677,8 @@ pub fn checkBiCGStabBoundary() !void {
             for (exact, 0..) |x, column| out.* = S.add(T, out.*, S.mul(T, foreign.matrix[row * 3 + column], x));
         }
         const b_before = b;
-        var output: [4]T = @splat(value(T, 77));
+        // The result-alias case must reach overlap validation for four-byte scalars.
+        var output: [4]T align(@alignOf(B.LinearResult(T))) = @splat(value(T, 77));
         var result: B.LinearResult(T) = .{ .status = 41, .reserved = 42, .iterations = 43, .action_count = 44, .preconditioner_count = 45, .residual_restarts = 46, .residual_norm = 47 };
         const original = result;
         const rhs: W.const_buffer = .{ .data = &b, .length = 3 };
@@ -791,7 +792,8 @@ pub fn checkRationalFilterBoundary() !void {
         const reduction: B.Reduction(T) = .{ .context = &foreign, .inner = BiCGForeign(T).inner, .norm = BiCGForeign(T).norm };
         const agreement: B.Agreement = .{ .context = &foreign, .agree = BiCGForeign(T).agree };
         const input = [_]T{ seriesSetValue(T, 2, -1), seriesSetValue(T, -1, 1), seriesSetValue(T, 0.5, 0.25), seriesSetValue(T, 3, 0.5), seriesSetValue(T, -2, 1), seriesSetValue(T, 1, -0.5) };
-        var output: [8]T = @splat(seriesSetValue(T, 77, -33));
+        // The summary-alias case must reach overlap validation even for ComplexF32.
+        var output: [8]T align(@alignOf(B.RationalResult(T))) = @splat(seriesSetValue(T, 77, -33));
         const before = output;
         var nodes = [_]T{ value(T, 1), value(T, 2) };
         const weights = [_]T{ value(T, 1), value(T, 1) };

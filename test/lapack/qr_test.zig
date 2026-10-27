@@ -309,6 +309,42 @@ test "Q application preserves representable corrections whose intermediate produ
     try expectEqual(@as(usize, 0), try qr.qrApplyQ(f64, matrix(f64, &tiny_factor, 2, 1, 2).asConst(), &tiny_tau, matrix(f64, &tiny_rhs, 2, 1, 2), .normal));
     try expectEqual(-smallest, tiny_rhs[0]);
     try expectEqual(smallest, tiny_rhs[1]);
+
+    // Generate matching compact QR factors. The two low zero bits in g make
+    // 3*g and 6*g exact: 4*g^2 is below the smaller half-ULP toward zero at
+    // one, while 6*g^2 is above it and below that full ULP.
+    const g: f64 = 0x1.ffffffffffffcp-29;
+    const below_one: f64 = 0x1.fffffffffffffp-1;
+    for ([_]f64{ -1, 1 }) |tail_sign| {
+        const tail = tail_sign * g;
+        var boundary_factor = [_]f64{ 1, 2 * tail };
+        var boundary_tau = [_]f64{sentinel};
+        try expectEqual(@as(usize, 0), try qr.qrFactorize(f64, matrix(f64, &boundary_factor, 2, 1, 2), &boundary_tau));
+        try expectEqual(tail, boundary_factor[1]);
+        try expectEqual(@as(f64, 2), boundary_tau[0]);
+        const boundary_view = matrix(f64, &boundary_factor, 2, 1, 2).asConst();
+        for ([_]f64{ -1, 1 }) |entry_sign| {
+            for ([_]usize{ 0, 1, 2 }) |m| {
+                // The scaled zero-head case would expose a missing nonzero
+                // guard: its representable head update has exponent below -55.
+                const target = entry_sign * (if (m == 0) @as(f64, 0x1p-100) else @as(f64, 1));
+                const initial_head = @as(f64, @floatFromInt(m)) * tail * target;
+                const expected_head = -@as(f64, @floatFromInt(m + 2)) * tail * target;
+                const expected_tail = if (m == 2) entry_sign * below_one else target;
+                var boundary_rhs = [_]f64{ initial_head, target };
+                try expectEqual(@as(usize, 0), try qr.qrApplyQ(f64, boundary_view, &boundary_tau, matrix(f64, &boundary_rhs, 2, 1, 2), .normal));
+                try expectEqual(expected_head, boundary_rhs[0]);
+                try expectEqual(expected_tail, boundary_rhs[1]);
+
+                // The zero head must still change through the strided right-side path.
+                var padded_rhs = [_]f64{ initial_head, sentinel, sentinel, target, sentinel, sentinel };
+                try expectEqual(@as(usize, 0), try qr.qrApplyQSide(f64, boundary_view, &boundary_tau, matrix(f64, &padded_rhs, 1, 2, 3), .right, .normal));
+                try expectEqual(expected_head, padded_rhs[0]);
+                try expectEqual(expected_tail, padded_rhs[3]);
+                for ([_]usize{ 1, 2, 4, 5 }) |padding| try expectEqual(@as(f64, sentinel), padded_rhs[padding]);
+            }
+        }
+    }
 }
 
 test "Numerical failure info identifies the reflector, including reverse Q application" {

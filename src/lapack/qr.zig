@@ -142,6 +142,14 @@ fn reflectStridedWithContract(comptime T: type, tail: []const T, tau: T, vector:
         // A correction strictly below half the smallest subnormal cannot
         // change a representable entry under round-to-nearest semantics.
         if (exponent <= -1075) continue;
+        // The correction is p*2^exponent with |p|<1. For a finite nonzero
+        // f64 entry with frexp exponent e, even the smaller spacing toward
+        // zero at a power of two is at least 2^(e-54). This bound is strictly
+        // below half that spacing, so rounding must preserve the entry.
+        // Promoted f32 entries have no finer spacing, making it conservative.
+        const widened_entry: f64 = @floatCast(entry.*);
+        if (widened_entry != 0 and std.math.isFinite(widened_entry) and
+            exponent <= std.math.frexp(widened_entry).exponent - 55) continue;
         const first_exponent = @divFloor(exponent, 2);
         const first = std.math.ldexp(normalized_v.significand * normalized_weight.significand, first_exponent);
         const second = std.math.ldexp(@as(f64, 1), exponent - first_exponent);
