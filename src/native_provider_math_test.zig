@@ -24,6 +24,8 @@ var bulk_statuses: [2]i32 = undefined;
 var close_after_packing: ?*execution.Context = null;
 var close_was_busy: bool = false;
 var second_phase_admitted: bool = false;
+var grid_close_during: ?*execution.Context = null;
+var grid_close_during_busy: std.atomic.Value(bool) = .init(false);
 fn allocate(token: c.heteris_rp_token, bytes: u64, alignment: u64, out: [*c]c.heteris_rp_scratch_v1) callconv(.c) i32 {
     allocations += 1;
     if (mode == .budget) return c.HETERIS_BUDGET_EXCEEDED;
@@ -43,6 +45,12 @@ fn callback(data: ?*anyopaque, begin: u64, end: u64) callconv(.c) i32 {
     if (std.Thread.getCurrentId() == caller) @panic("mathematics ran on submitting caller");
     const forward: *const Forward = @ptrCast(@alignCast(data.?));
     _ = callbacks.fetchAdd(1, .monotonic);
+    if (grid_close_during) |context| {
+        _ = context.requestClose();
+        var report: execution.CallReport = .{};
+        if (context.tryProgressClose(&report) == .busy and context.snapshot().active_operations == 1)
+            grid_close_during_busy.store(true, .release);
+    }
     const status = forward.callback.?(forward.data, begin, end);
     return if (status == 0 and (mode == .callback_error or (forward.submission == fail_submission and bulk_failure == .callback))) -1903 else status;
 }
@@ -97,6 +105,8 @@ const Fixture = struct {
         close_after_packing = null;
         close_was_busy = false;
         second_phase_admitted = false;
+        grid_close_during = null;
+        grid_close_during_busy.store(false, .monotonic);
         const desc: c.heteris_rp_cpu_create_desc_v1 = .{ .abi_version = 1, .struct_size = @sizeOf(c.heteris_rp_cpu_create_desc_v1), .compute_workers = 2, .managed_thread_limit = 3, .max_tasks = 16, .max_dependencies = 8, .host_bytes_limit = 4 * 1024 * 1024, .task_scratch_bytes_limit = 0, .reserved = .{ 0, 0 } };
         try std.testing.expectEqual(@as(i32, 0), c.heteris_cpu_runtime_create_v1(&desc, &self.root));
         try std.testing.expectEqual(@as(i32, 0), c.heteris_cpu_runtime_export_provider_v1(self.root, &self.source));
@@ -485,4 +495,240 @@ test "native TN physical validation aliases transforms and closing precedence pr
     try std.testing.expectError(error.ContextClosing, native.matrixMultiplyF64TN(&fixture.context, tnArgs(&.{}, &.{}, &.{}, 0, 0, 0, 0, 0, 0, 1, 0), &fixture.report));
     try std.testing.expectEqualSlices(f64, &.{ 7, 7, 7, 7 }, &output);
     try std.testing.expectEqual(@as(usize, 0), allocations);
+}
+
+const grid = @import("zynum-core").native_grid;
+const periodic_reference = @import("periodic-test-reference");
+fn gridArgs(shape: [3]usize, input: []const f64, output: []f64) grid.PeriodicLaplacianF64 {
+    return .{ .shape = shape, .input = input, .output = output, .inv_h2 = .{ 2, 3, 4 } };
+}
+fn expectGridCase(fixture: *Fixture, shape: [3]usize, permutation: [3]usize) !void {
+    const n = shape[0] * shape[1] * shape[2];
+    const input = try std.testing.allocator.alloc(f64, n + 3);
+    defer std.testing.allocator.free(input);
+    const output = try std.testing.allocator.alloc(f64, n + 5);
+    defer std.testing.allocator.free(output);
+    @memset(input, -991);
+    @memset(output, 773);
+    const h: [3]f64 = .{ 2, 3, 4 };
+    for (0..shape[0]) |i| for (0..shape[1]) |j| for (0..shape[2]) |k| {
+        const index: [3]usize = .{ i, j, k };
+        input[(i * shape[1] + j) * shape[2] + k] = periodic_reference.fourierInput(index[permutation[0]], index[permutation[2]], shape[permutation[0]], shape[permutation[2]]);
+    };
+    const saved = try std.testing.allocator.dupe(f64, input);
+    defer std.testing.allocator.free(saved);
+    const before_allocations = allocations;
+    const before_submissions = submissions;
+    try grid.periodicLaplacianF64(&fixture.context, gridArgs(shape, input, output), &fixture.report);
+    try std.testing.expectEqual(@as(usize, 2), allocations - before_allocations);
+    try std.testing.expectEqual(@as(usize, 1), submissions - before_submissions);
+    try std.testing.expectEqual(execution.OutputState.complete, fixture.report.output);
+    try std.testing.expectEqual(execution.SubmissionState.quiescent, fixture.report.provider.state);
+    for (0..shape[0]) |i| for (0..shape[1]) |j| for (0..shape[2]) |k| {
+        const index: [3]usize = .{ i, j, k };
+        const expected = periodic_reference.fourierExpected(index[permutation[0]], index[permutation[2]], shape[permutation[0]], shape[permutation[2]], .{ h[permutation[0]], h[permutation[1]], h[permutation[2]] });
+        try std.testing.expectApproxEqAbs(expected, output[(i * shape[1] + j) * shape[2] + k], 2e-13);
+    };
+    try std.testing.expectEqualSlices(f64, saved, input);
+    for (output[n..]) |value| try std.testing.expectEqual(@as(f64, 773), value);
+    try std.testing.expectEqual(@as(usize, 0), live_scratch);
+}
+
+test "native periodic Laplacian reuses original Fourier oracle across geometry and task limits" {
+    const shapes = [_][3]usize{ .{ 1, 1, 1 }, .{ 1, 2, 3 }, .{ 2, 1, 3 }, .{ 2, 3, 1 }, .{ 2, 2, 2 }, .{ 4, 3, 5 }, .{ 7, 8, 9 } };
+    for ([_]u32{ 1, 2 }) |limit| {
+        var fixture: Fixture = .{};
+        try fixture.init(limit);
+        defer fixture.deinit();
+        for (shapes) |shape| for ([_][3]usize{ .{ 0, 1, 2 }, .{ 1, 2, 0 }, .{ 2, 0, 1 } }) |permutation| try expectGridCase(&fixture, shape, permutation);
+        const x = [_]f64{ 1, 2, -1, 4, 3, -2, 7, 0 };
+        const y = [_]f64{ 2, -1, 3, 1, -2, 4, 0, 5 };
+        var lx: [8]f64 = undefined;
+        var ly: [8]f64 = undefined;
+        try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 2, 2, 2 }, &x, &lx), &fixture.report);
+        try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 2, 2, 2 }, &y, &ly), &fixture.report);
+        var xly: f64 = 0;
+        var lxy: f64 = 0;
+        for (x, lx, y, ly) |a, la, b, lb| {
+            xly += a * lb;
+            lxy += la * b;
+        }
+        try std.testing.expectEqual(xly, lxy);
+        const constant: [8]f64 = @splat(1);
+        try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 2, 2, 2 }, &constant, &lx), &fixture.report);
+        for (lx) |value| try std.testing.expectEqual(@as(f64, 0), value);
+    }
+}
+
+test "native periodic Laplacian zero axes and extreme geometry preserve validation and admission" {
+    for ([_]u32{ 1, 2 }) |limit| {
+        var fixture: Fixture = .{};
+        try fixture.init(limit);
+        defer fixture.deinit();
+        for (0..8) |bits| {
+            const shape: [3]usize = .{ if ((bits & 1) == 0) 0 else 1, if ((bits & 2) == 0) 0 else 1, if ((bits & 4) == 0) 0 else 1 };
+            const x = [_]f64{3};
+            var y = [_]f64{9};
+            allocations = 0;
+            submissions = 0;
+            try grid.periodicLaplacianF64(&fixture.context, gridArgs(shape, &x, &y), &fixture.report);
+            try std.testing.expectEqual(@as(usize, if (bits == 7) 2 else 0), allocations);
+            try std.testing.expectEqual(@as(usize, if (bits == 7) 1 else 0), submissions);
+            try std.testing.expectEqual(if (bits == 7) execution.OutputState.complete else execution.OutputState.unchanged, fixture.report.output);
+            try std.testing.expectEqual(@as(f64, if (bits == 7) 0 else 9), y[0]);
+        }
+        allocations = 0;
+        submissions = 0;
+        try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ std.math.maxInt(usize), 0, std.math.maxInt(usize) }, &.{}, &.{}), &fixture.report);
+        try std.testing.expectError(error.ExtentOverflow, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ std.math.maxInt(usize), 2, 1 }, &.{}, &.{}), &fixture.report));
+        try std.testing.expectError(error.ExtentOverflow, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ std.math.maxInt(usize), 1, 1 }, &.{}, &.{}), &fixture.report));
+        _ = fixture.context.requestClose();
+        try std.testing.expectError(error.ContextClosing, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 0, 1, 1 }, &.{}, &.{}), &fixture.report));
+        try std.testing.expectEqual(@as(usize, 0), allocations);
+        try std.testing.expectEqual(@as(usize, 0), submissions);
+    }
+}
+
+test "native periodic Laplacian bounded controls views aliases and coefficients precede resources" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    const x = [_]f64{ 1, 2, 3, 4 };
+    var y = [_]f64{ 7, 7, 7, 7 };
+    try std.testing.expectError(error.InvalidView, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, x[0..3], &y), &fixture.report));
+    try std.testing.expectError(error.InvalidView, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, y[0..3]), &fixture.report));
+    try std.testing.expectError(error.AliasingNotAllowed, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 0, 2, 2 }, y[0..3], y[2..]), &fixture.report));
+    for ([_]f64{ 0, -0.0, -1, std.math.nan(f64), std.math.inf(f64) }) |h| for (0..3) |axis| {
+        var request = gridArgs(.{ 0, 2, 2 }, &x, &y);
+        request.inv_h2[axis] = h;
+        try std.testing.expectError(error.InvalidCoefficient, grid.periodicLaplacianF64(&fixture.context, request, &fixture.report));
+    };
+    _ = fixture.context.requestClose();
+    var request = gridArgs(.{ 0, 2, 2 }, &x, &y);
+    request.inv_h2[0] = -1;
+    try std.testing.expectError(error.InvalidCoefficient, grid.periodicLaplacianF64(&fixture.context, request, &fixture.report));
+    try std.testing.expectEqualDeep(execution.CallReport{}, fixture.report);
+    try std.testing.expectEqualSlices(f64, &.{ 7, 7, 7, 7 }, &y);
+    try std.testing.expectEqual(@as(usize, 0), allocations);
+    try std.testing.expectEqual(@as(usize, 0), submissions);
+    // Opaque C controls, null capacities and uncheckable declared ranges are
+    // exercised by the independent C consumer, not by invalid Zig slices.
+}
+
+test "native periodic Laplacian allocation rejection and quiescent failures preserve raw diagnostics" {
+    for ([_]u32{ 1, 2 }) |limit| {
+        for ([_]i32{ c.HETERIS_BUDGET_EXCEEDED, c.HETERIS_OUT_OF_MEMORY }) |status| for (1..3) |site| {
+            var fixture: Fixture = .{};
+            try fixture.init(limit);
+            defer fixture.deinit();
+            const x = [_]f64{ 1, 2, 3, 4 };
+            var y = [_]f64{ 7, 7, 7, 7 };
+            fail_allocation = site;
+            allocation_status = status;
+            const expected: grid.Error = if (status == c.HETERIS_BUDGET_EXCEEDED) error.ResourceBudgetExceeded else error.OutOfMemory;
+            try std.testing.expectError(expected, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report));
+            try std.testing.expectEqualSlices(f64, &.{ 7, 7, 7, 7 }, &y);
+            try std.testing.expectEqualDeep(execution.CallReport{ .provider = .{ .stage = .scratch_allocate, .returned_status = status } }, fixture.report);
+            try std.testing.expectEqual(site, allocations);
+            try std.testing.expectEqual(@as(usize, 0), submissions);
+            try std.testing.expectEqual(@as(usize, 0), live_scratch);
+            fail_allocation = 0;
+            try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report);
+            try std.testing.expectEqual(@as(usize, 1), submissions);
+        };
+        for ([_]BulkFailure{ .reject, .execution, .callback }) |failure| {
+            var fixture: Fixture = .{};
+            try fixture.init(limit);
+            defer fixture.deinit();
+            const x = [_]f64{ 1, 2, 3, 4 };
+            var y = [_]f64{ 7, 7, 7, 7 };
+            fail_submission = 1;
+            bulk_failure = failure;
+            const expected: grid.Error = switch (failure) {
+                .reject => error.ProviderRejected,
+                .execution => error.ProviderExecutionFailed,
+                .callback => error.ProviderCallbackFailed,
+                .none => unreachable,
+            };
+            try std.testing.expectError(expected, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report));
+            try expectBulkDiagnostic(fixture.report, 1);
+            try std.testing.expectEqual(@as(usize, 1), submissions);
+            try std.testing.expectEqual(@as(usize, 0), live_scratch);
+            try std.testing.expectEqual(if (failure == .reject) execution.OutputState.unchanged else execution.OutputState.partial_or_invalid, fixture.report.output);
+            if (failure == .reject) try std.testing.expectEqualSlices(f64, &.{ 7, 7, 7, 7 }, &y);
+        }
+    }
+}
+const GridWorker = struct {
+    context: *execution.Context,
+    nonempty_error: ?grid.Error = null,
+    empty_ok: bool = false,
+    fn run(raw: ?*anyopaque, begin: u64, end: u64) callconv(.c) i32 {
+        if (begin != 0 or end != 1) return c.HETERIS_INVALID_ARGUMENT;
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        const x = [_]f64{1};
+        var y = [_]f64{7};
+        var report: execution.CallReport = .{};
+        grid.periodicLaplacianF64(self.context, gridArgs(.{ 1, 1, 1 }, &x, &y), &report) catch |err| {
+            self.nonempty_error = err;
+        };
+        grid.periodicLaplacianF64(self.context, gridArgs(.{ 0, 1, 1 }, &.{}, &.{}), &report) catch return c.HETERIS_INVALID_ARGUMENT;
+        self.empty_ok = report.output == .unchanged and report.provider.state == .not_submitted and y[0] == 7;
+        return c.HETERIS_OK;
+    }
+};
+test "native periodic Laplacian admitted close and managed worker paths preserve lifecycle" {
+    {
+        var fixture: Fixture = .{};
+        try fixture.init(2);
+        defer fixture.deinit();
+        grid_close_during = &fixture.context;
+        const x = [_]f64{ 1, 2, 3, 4 };
+        var y = [_]f64{ 7, 7, 7, 7 };
+        try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report);
+        try std.testing.expect(grid_close_during_busy.load(.acquire));
+        try std.testing.expectEqual(@as(usize, 1), submissions);
+        try std.testing.expectEqual(@as(usize, 0), live_scratch);
+        try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+        try std.testing.expectError(error.ContextClosing, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report));
+        var other = try execution.Context.initIntegrated(&fixture.source, .{}, &fixture.report);
+        grid_close_during = null;
+        try grid.periodicLaplacianF64(&other, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report);
+        _ = other.requestClose();
+        try std.testing.expect(other.tryProgressClose(&fixture.report) == .closed);
+    }
+    {
+        var fixture: Fixture = .{};
+        try fixture.init(1);
+        defer fixture.deinit();
+        var worker: GridWorker = .{ .context = &fixture.context };
+        var outcome: c.heteris_rp_bulk_result_v1 = undefined;
+        try std.testing.expectEqual(@as(i32, 0), original.cpu_bulk_sync.?(fixture.source.provider, 0, 1, 1, 1, GridWorker.run, &worker, &outcome));
+        try std.testing.expectEqual(@as(?grid.Error, error.WouldDeadlock), worker.nonempty_error);
+        try std.testing.expect(worker.empty_ok);
+        try std.testing.expectEqual(@as(u32, c.HETERIS_RP_QUIESCENT), outcome.state);
+        try std.testing.expectEqual(@as(usize, 0), live_scratch);
+    }
+}
+
+test "native periodic Laplacian IEEE outputs and capacity tails retain direct output semantics" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    for ([_]f64{ std.math.nan(f64), std.math.inf(f64), std.math.floatMax(f64) }) |value| {
+        const x = [_]f64{ value, 991 };
+        var y = [_]f64{ 7, 773 };
+        try grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 1, 1 }, &x, &y), &fixture.report);
+        try std.testing.expect(!std.math.isFinite(y[0]));
+        try std.testing.expectEqual(@as(f64, 773), y[1]);
+        try std.testing.expectEqual(execution.OutputState.complete, fixture.report.output);
+    }
+    const x = [_]f64{ 1, 0 };
+    var y = [_]f64{ 7, 7, 773 };
+    var request = gridArgs(.{ 1, 1, 2 }, &x, &y);
+    request.inv_h2[2] = std.math.floatMax(f64);
+    try grid.periodicLaplacianF64(&fixture.context, request, &fixture.report);
+    try std.testing.expect(std.math.isInf(y[0]) and std.math.isInf(y[1]));
+    try std.testing.expectEqual(@as(f64, 773), y[2]);
+    try std.testing.expectEqual(execution.OutputState.complete, fixture.report.output);
 }

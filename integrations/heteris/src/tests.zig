@@ -116,8 +116,7 @@ test "periodic 3D Laplacian: padded signed strides, Fourier eigenvalue, no parti
     yv.flags = c.HETERIS_VIEW_WRITE;
     const h = [3]f64{ 2, 3, 4 };
     for (0..4) |i| for (0..3) |j| for (0..5) |k| {
-        x.data[((3 - i) * 3 * 5 + j * 5 + k) * 2] = @cos(2 * std.math.pi * @as(f64, @floatFromInt(i)) / 4) +
-            @sin(2 * std.math.pi * @as(f64, @floatFromInt(k)) / 5);
+        x.data[((3 - i) * 3 * 5 + j * 5 + k) * 2] = @import("periodic_reference.zig").fourierInput(i, k, 4, 5);
     };
     const bad_h = [3]f64{ 1, std.math.inf(f64), 1 };
     try expectEqual(@as(i32, c.HETERIS_INVALID_ARGUMENT), api.laplacian(&r, &xv, &yv, &bad_h));
@@ -125,8 +124,7 @@ test "periodic 3D Laplacian: padded signed strides, Fourier eigenvalue, no parti
     try expectEqual(@as(i32, 0), api.laplacian(&r, &xv, &yv, &h));
     for (0..4) |i| for (0..3) |j| for (0..5) |k| {
         const index = ((3 - i) * 3 * 5 + j * 5 + k) * 2;
-        const expected = 2 * h[0] * (@cos(@as(f64, 2 * std.math.pi) / 4) - 1) * @cos(2 * std.math.pi * @as(f64, @floatFromInt(i)) / 4) +
-            2 * h[2] * (@cos(@as(f64, 2 * std.math.pi) / 5) - 1) * @sin(2 * std.math.pi * @as(f64, @floatFromInt(k)) / 5);
+        const expected = @import("periodic_reference.zig").fourierExpected(i, k, 4, 5, h);
         try std.testing.expectApproxEqAbs(expected, y.data[index], 2e-14);
         try expectEqual(@as(f64, 123), y.data[index + 1]);
     };

@@ -82,16 +82,16 @@ export fn zynum_laplacian_periodic_3d_f64(r_arg: ?*const Resources, x_arg: ?*con
         while (index[1] < x.shape[1]) : (index[1] += 1) {
             index[2] = 0;
             while (index[2] < x.shape[2]) : (index[2] += 1) {
-                const center = at(x, xm, index).*;
-                var value: f64 = 0;
-                for (0..3) |d| {
-                    var left = index;
-                    var right = index;
-                    left[d] = if (index[d] == 0) x.shape[d] - 1 else index[d] - 1;
-                    right[d] = if (index[d] + 1 == x.shape[d]) 0 else index[d] + 1;
-                    value += inv_h2[d] * (at(x, xm, left).* - 2 * center + at(x, xm, right).*);
-                }
-                at(y, ym, index).* = value;
+                const shape: [3]usize = .{ @intCast(x.shape[0]), @intCast(x.shape[1]), @intCast(x.shape[2]) };
+                const point: [3]usize = .{ @intCast(index[0]), @intCast(index[1]), @intCast(index[2]) };
+                const Reader = struct {
+                    view: *const View,
+                    mapping: Mapping,
+                    pub fn read(self: @This(), position: [3]usize) f64 {
+                        return at(self.view, self.mapping, .{ @intCast(position[0]), @intCast(position[1]), @intCast(position[2]) }).*;
+                    }
+                };
+                at(y, ym, index).* = @import("scientific_sources").periodic_laplacian.valueAt(shape, point, inv_h2, Reader{ .view = x, .mapping = xm });
             }
         }
     }

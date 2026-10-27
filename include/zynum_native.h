@@ -72,6 +72,17 @@ zynum_native_status zynum_native_gemm_f64_tn_v1(void *storage,
  const double *a, uint64_t a_backing_elements, uint64_t lda,
  const double *b, uint64_t b_backing_elements, uint64_t ldb, double beta,
  double *c, uint64_t c_backing_elements, uint64_t ldc, zynum_native_report_v1 *report);
+/* Contiguous periodic 3D FP64 grid, axis 2 fastest. Positive finite inverse
+   squared spacings. No in-place operation: full declared X/Y spans are disjoint.
+   Control ranges are checked before any report write; an uncheckable declared
+   span or control overlap returns INVALID_ARGUMENT with report untouched.
+   Any zero axis still validates and admits, but allocates/submits/writes nothing.
+   Success describes completed IEEE arithmetic, not finite/scientific validity.
+   A quiescent execution/callback failure may leave Y partial or invalid. */
+zynum_native_status zynum_native_laplacian_periodic_3d_f64_v1(void *storage,
+ uint64_t n0, uint64_t n1, uint64_t n2,
+ const double *x, uint64_t x_backing_elements, double *y, uint64_t y_backing_elements,
+ double inv_h2_0, double inv_h2_1, double inv_h2_2, zynum_native_report_v1 *report);
 #ifdef ZYNUM_NATIVE_IDENTITY_TESTING
 const void *zynum_native_core_identity_v1(void);
 const void *zynum_native_execution_identity_v1(void);

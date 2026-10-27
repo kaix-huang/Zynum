@@ -320,3 +320,68 @@ export fn zynum_native_gemm_f64_tn_v1(storage: ?*anyopaque, m64: u64, n64: u64, 
     reportResult(report, result);
     return c.ZYNUM_NATIVE_OK;
 }
+
+// Full declared ranges, including empty-grid tails, must be computable before
+// any control bytes change. This intentionally does not alter GEMM precedence.
+fn gridDeclaredBytes(address: usize, backing: u64) ?usize {
+    const count = std.math.cast(usize, backing) orelse return null;
+    const bytes = std.math.mul(usize, count, @sizeOf(f64)) catch return null;
+    _ = std.math.add(usize, address, bytes) catch return null;
+    return bytes;
+}
+fn gridErrorStatus(err: native.PeriodicLaplacianError) i32 {
+    return switch (err) {
+        error.InvalidView, error.AliasingNotAllowed => c.ZYNUM_NATIVE_VIEW_INVALID,
+        error.InvalidCoefficient => c.ZYNUM_NATIVE_INVALID_ARGUMENT,
+        else => |execution_error| errorStatus(execution_error),
+    };
+}
+export fn zynum_native_laplacian_periodic_3d_f64_v1(storage: ?*anyopaque, n0: u64, n1: u64, n2: u64, x_raw: ?*align(1) const f64, x_backing: u64, y_raw: ?*align(1) f64, y_backing: u64, h0: f64, h1: f64, h2: f64, report_raw: ?*align(1) Report) i32 {
+    const storage_address = if (storage) |pointer| @intFromPtr(pointer) else 0;
+    const report_address = if (report_raw) |pointer| @intFromPtr(pointer) else 0;
+    const x_address = if (x_raw) |pointer| @intFromPtr(pointer) else 0;
+    const y_address = if (y_raw) |pointer| @intFromPtr(pointer) else 0;
+    // Step 0: no dereference, report initialization, admission or buffer slice.
+    if (!validAddress(storage_address, @sizeOf(Context), @alignOf(Context)) or
+        !validAddress(report_address, @sizeOf(Report), @alignOf(Report)) or
+        overlaps(storage_address, @sizeOf(Context), report_address, @sizeOf(Report))) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const x_bytes = gridDeclaredBytes(x_address, x_backing) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const y_bytes = gridDeclaredBytes(y_address, y_backing) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    if (overlaps(storage_address, @sizeOf(Context), x_address, x_bytes) or
+        overlaps(storage_address, @sizeOf(Context), y_address, y_bytes) or
+        overlaps(report_address, @sizeOf(Report), x_address, x_bytes) or
+        overlaps(report_address, @sizeOf(Report), y_address, y_bytes)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report: *Report = @ptrCast(@alignCast(report_raw.?));
+    report.* = std.mem.zeroes(Report);
+    report.abi_version = 1;
+    report.struct_size = @sizeOf(Report);
+    // Step 2: independently representable axes; zero precedes multiplication.
+    const shape: [3]usize = .{
+        std.math.cast(usize, n0) orelse return c.ZYNUM_NATIVE_OVERFLOW,
+        std.math.cast(usize, n1) orelse return c.ZYNUM_NATIVE_OVERFLOW,
+        std.math.cast(usize, n2) orelse return c.ZYNUM_NATIVE_OVERFLOW,
+    };
+    const count = if (shape[0] == 0 or shape[1] == 0 or shape[2] == 0) 0 else blk: {
+        const plane = std.math.mul(usize, shape[0], shape[1]) catch return c.ZYNUM_NATIVE_OVERFLOW;
+        break :blk std.math.mul(usize, plane, shape[2]) catch return c.ZYNUM_NATIVE_OVERFLOW;
+    };
+    const required_bytes = std.math.mul(usize, count, @sizeOf(f64)) catch return c.ZYNUM_NATIVE_OVERFLOW;
+    // Step 3: X then Y address/null/capacity, including empty geometry.
+    if ((x_address == 0 and (x_backing != 0 or count != 0)) or
+        x_address % @alignOf(f64) != 0 or x_backing < count) return c.ZYNUM_NATIVE_VIEW_INVALID;
+    if ((y_address == 0 and (y_backing != 0 or count != 0)) or
+        y_address % @alignOf(f64) != 0 or y_backing < count) return c.ZYNUM_NATIVE_VIEW_INVALID;
+    const h: [3]f64 = .{ h0, h1, h2 };
+    for (h) |value| if (!std.math.isFinite(value) or value <= 0) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    if (overlaps(x_address, x_bytes, y_address, y_bytes)) return c.ZYNUM_NATIVE_VIEW_INVALID;
+    const x: BufferRange = .{ .address = x_address, .backing = @intCast(x_backing), .backing_bytes = x_bytes, .required_bytes = required_bytes };
+    const y: BufferRange = .{ .address = y_address, .backing = @intCast(y_backing), .backing_bytes = y_bytes, .required_bytes = required_bytes };
+    const ctx: *Context = @ptrCast(@alignCast(storage.?));
+    var result: execution.CallReport = .{};
+    native.periodicLaplacianF64(ctx, .{ .shape = shape, .input = constSlice(x), .output = mutableSlice(y), .inv_h2 = h }, &result) catch |err| {
+        reportResult(report, result);
+        return gridErrorStatus(err);
+    };
+    reportResult(report, result);
+    return c.ZYNUM_NATIVE_OK;
+}

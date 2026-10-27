@@ -169,3 +169,50 @@ controlled fail-stop children, original Core gates and installed C/C++ consumers
 must pass before TN is described as locally qualified. NT/TT, complex, new SIMD
 policies, asynchronous tickets, MPI/cluster, materials/SCF, GPU and performance
 are outside this increment.
+
+## Native periodic Laplacian
+
+The additive `zynum_native_laplacian_periodic_3d_f64_v1` entrypoint borrows one
+contiguous FP64 orthogonal periodic grid, with axis 2 fastest and index
+`(i0*n1+i1)*n2+i2`. Its three scalar coefficients are finite, strictly positive
+inverse squared spacings. It evaluates the original seven-point arithmetic
+shared with the legacy signed-stride adapter; it does not apply the physical
+kinetic factor -1/2 or a local potential. Singleton axes retain both periodic
+center reads and length-two axes count the same neighbor twice.
+
+The Context and report must be live accessible objects, mutually disjoint and
+separate from both complete declared payload spans. The new entrypoint proves
+computable control and payload ranges before any report write. Invalid or
+uncheckable control separation returns INVALID_ARGUMENT with the report
+untouched; these numeric checks do not prove pointer lifetime or provenance.
+This rule is local to the new function; released NN/TN precedence is unchanged.
+
+After control preflight, the order is: initialize report; checked individual
+axis conversions and nonempty product/byte extent; X then Y null/alignment and
+capacity checks; coefficients; full-declared-span X/Y separation; original
+checked Core admission. A zero axis short-circuits multiplication, not the other
+validation or Context admission. Null requires zero declared capacity and empty
+geometry. Unrepresentable declared spans fail control preflight, whereas a
+nonempty geometry product/byte overflow returns OVERFLOW with an initialized
+unchanged report. All checks remain ordinary runtime checks in ReleaseFast.
+
+Each nonempty call holds one Operation, allocates bounded Task descriptors and
+Invocation scratch from its Context provider, and submits one checked bulk even
+at task limit one. Empty calls allocate, submit and write nothing and return
+UNCHANGED/NOT_SUBMITTED if admission succeeds. Closing still rejects empty
+calls. A managed-worker nonempty invocation follows the actual provider's
+WOULD_DEADLOCK response; empty calls do not invent a submit-time rejection.
+
+The output is direct: prevalidation/allocation/rejected-submit failures preserve
+Y; quiescent execution or callback failures may leave PARTIAL_OR_INVALID Y.
+Malformed/nonquiescent completion and valid scratch-release failures retain
+fail-stop protection. Success means completed IEEE arithmetic, including
+possible NaN/Inf or finite-input overflow; it does not promise a finite or
+scientifically valid result. Capacity tails and input remain untouched.
+ABPLaS physical composition and finite staged public-output commit are separate
+work. No new Runtime, resource owner, allocator, fallback or Heteris ABI is added.
+
+The appended component test declarations and C/C++ cases are source coverage,
+not execution evidence. Source inventory registration, three-mode actual-provider
+runs, original Core/host, installed consumers and full CPU integration are required
+before qualification or release.

@@ -14,3 +14,6 @@ pub const NativeError = core.native.NativeError;
 pub const matrixMultiplyF64NN = core.native.matrixMultiplyF64NN;
 pub const matrixMultiplyF64TN = core.native.matrixMultiplyF64TN;
 pub const coreIdentity = core.internal.nativeCoreIdentity;
+pub const PeriodicLaplacianF64 = core.native_grid.PeriodicLaplacianF64;
+pub const PeriodicLaplacianError = core.native_grid.Error;
+pub const periodicLaplacianF64 = core.native_grid.periodicLaplacianF64;

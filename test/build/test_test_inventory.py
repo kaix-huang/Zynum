@@ -11327,6 +11327,294 @@ class OperatorPhaseSourceReachabilityTests(unittest.TestCase):
         self.assertEqual(5, len([r for r in declarations if r["name"].startswith("Operator phase agreement")]))
 
 
+_PERIODIC_LAPLACIAN_FACT_PAIR: tuple[dict[str, Any], dict[str, Any]] | None = None
+_PERIODIC_LAPLACIAN_CORE_PATHS = (
+    "src/numerics/periodic_laplacian.zig",
+    "src/numerics/periodic_laplacian_native.zig",
+)
+_PERIODIC_LAPLACIAN_ROOT_IDS = (
+    "zig-root:blas-module-tests", "zig-root:blas-public-surface-contract-tests",
+    "zig-root:cblas-tests", "zig-root:fortran-tests", "zig-root:lapack-tests",
+    "zig-root:modern-tests", "zig-root:sparse-tests",
+    "zig-root:zynum-public-surface-contract-tests",
+)
+_PERIODIC_LAPLACIAN_ORACLE_PATH = "integrations/heteris/src/periodic_reference.zig"
+_PERIODIC_LAPLACIAN_NATIVE_OWNERS = {
+    "correctness-root:heteris-adapter-package": "adapter",
+    "correctness-root:native-provider-c_tests": "main",
+    "correctness-root:native-provider-math_tests": "math_module",
+}
+
+
+def _periodic_laplacian_source_fact_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Rebuild current facts with bounded walkers; reverse only this exact delta.
+
+    Both full digests bind the fixture. No Git history, external inventory,
+    discovery replacement, validator mock or digest override supplies the facts.
+    """
+    global _PERIODIC_LAPLACIAN_FACT_PAIR
+    if _PERIODIC_LAPLACIAN_FACT_PAIR is not None:
+        return copy.deepcopy(_PERIODIC_LAPLACIAN_FACT_PAIR)
+    inventory_path = REPOSITORY_ROOT / "tools/test_inventory.json"
+    inventory = json.loads(inventory_path.read_text())
+    current = copy.deepcopy(CHECKER._host_assembly_source_facts(inventory))
+    context = CHECKER.BUILD_CHECKER._make_discovery_context(REPOSITORY_ROOT, inventory_path)
+    sources = {path: CHECKER._cached_text(context, path)
+               for path in context.public_files.paths if path.endswith(".zig")}
+    graph = CHECKER.BUILD_CHECKER._numerics_resources_build_contract(
+        CHECKER._cached_text(context, "build.zig"))
+    for row in current["test_roots"]:
+        if row["id"] not in _PERIODIC_LAPLACIAN_ROOT_IDS:
+            continue
+        symbol = row["compile_observation_id"].rsplit(":", 1)[1]
+        receipts: list[dict[str, Any]] = []
+        row["source_reachability"] = sorted(CHECKER._zig_source_closure(
+            sources, context.public_files.path_set, CHECKER._zig_source_entries(symbol, graph),
+            resource_root=symbol, resource_graph=graph, named_dependencies=receipts))
+        row["named_dependency_sources"] = receipts
+    for row in current["correctness_only_roots"]:
+        receipts = []
+        owner = _PERIODIC_LAPLACIAN_NATIVE_OWNERS.get(row["id"])
+        if owner is not None:
+            reached, receipts = CHECKER._native_source_closure(
+                sources, context.public_files.path_set, context, owner)
+            if row["language"] == "c":
+                reached.add(row["physical_path"])
+        else:
+            symbol = row["compile_observation_id"].rsplit(":", 1)[1]
+            reached = CHECKER._zig_source_closure(
+                sources, context.public_files.path_set, CHECKER._zig_source_entries(symbol, graph),
+                resource_root=symbol, resource_graph=graph, named_dependencies=receipts)
+        row["source_reachability"] = sorted(reached)
+        row["named_dependency_sources"] = receipts
+    provider_path = "src/native_provider_math_test.zig"
+    provider = next(row for row in current["zig_test_files"] if row["path"] == provider_path)
+    provider["declarations"] = CHECKER._zig_declarations(sources[provider_path], provider_path)
+    if CHECKER._fact_digest(current) != "8222af6680713f6cfd51821eb0239db098b08b69fa34a6f7b7b3223cdac69473":
+        raise AssertionError("bounded Laplacian walkers differ from reviewed current source facts")
+    previous = copy.deepcopy(current)
+    previous_source_hashes = {
+        "src/zynum.zig": "f811c79b9967e2a9f355e265a50249139f9a39854b6f8a8f7c4a77bad6e76893",
+        "src/facades/native.zig": "53b429f3a280f5d5af29e61319463b6bfe574071d82af3cb527fe87e752bd038",
+        "src/facades/scientific_sources.zig": "5b65b41834c8fb3a5a6c05cb6f74b52a73fdfe745d8e02ab63e27c2729c9fda5",
+        "integrations/heteris/src/root.zig": "21a61f9709e062fa5aa4900020cc22cfa2a92639db40d6a9296412527376ac63",
+    }
+    for section in ("test_roots", "correctness_only_roots"):
+        for row in previous[section]:
+            if section == "test_roots" and row["id"] not in _PERIODIC_LAPLACIAN_ROOT_IDS:
+                continue
+            for path in _PERIODIC_LAPLACIAN_CORE_PATHS:
+                row["source_reachability"].remove(path)
+            if row["id"] in _PERIODIC_LAPLACIAN_NATIVE_OWNERS:
+                row["source_reachability"].remove(_PERIODIC_LAPLACIAN_ORACLE_PATH)
+            row["named_dependency_sources"] = [receipt for receipt in row["named_dependency_sources"]
+                                                if receipt["alias"] != "periodic-test-reference"]
+            for receipt in row["named_dependency_sources"]:
+                path = receipt.get("path")
+                if path in previous_source_hashes:
+                    receipt["source_sha256"] = previous_source_hashes[path]
+                if row["id"] in _PERIODIC_LAPLACIAN_NATIVE_OWNERS:
+                    receipt["build_contract_sha256"] = "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
+                    if "input_sha256" in receipt:
+                        receipt["input_sha256"]["include/zynum_native.h"] = "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
+    next(row for row in previous["zig_test_files"] if row["path"] == provider_path)["declarations"] = provider["declarations"][:11]
+    if CHECKER._fact_digest(previous) != "e49ca061a2381143089d517ecb420109eaf7c7e93896367d6da37082857b2d52":
+        raise AssertionError("reversing only the reviewed Laplacian delta changed historical facts")
+    _PERIODIC_LAPLACIAN_FACT_PAIR = previous, current
+    return copy.deepcopy(_PERIODIC_LAPLACIAN_FACT_PAIR)
+
+
+class PeriodicLaplacianSourceRefreshTests(unittest.TestCase):
+    """The exact source transition cannot manufacture native qualifications."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.previous_facts, cls.current_facts = _periodic_laplacian_source_fact_pair()
+        inventory = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        cls.previous = copy.deepcopy(inventory)
+        cls.previous.update(copy.deepcopy(cls.previous_facts))
+        cls.current = copy.deepcopy(inventory)
+        cls.current.update(copy.deepcopy(cls.current_facts))
+        for value in (cls.previous, cls.current):
+            value["strict_summary"] = CHECKER._section_summary(value)
+
+    def assert_refresh_rejected(self, previous: dict[str, Any], current: dict[str, Any]) -> None:
+        self.assertFalse(CHECKER._reviewed_periodic_laplacian_source_refresh(
+            CHECKER._fact_digest(CHECKER._host_assembly_source_facts(previous)), current))
+        try:
+            compatible = CHECKER._refresh_base_compatible_discovery(previous, current)
+        except CHECKER.InventoryError:
+            return
+        self.assertTrue(CHECKER._validate_runtime_bound_sections(REPOSITORY_ROOT, previous, compatible))
+
+    def test_exact_pair_rebuilds_all_root_receipts_and_preserves_declarations(self) -> None:
+        self.assertEqual(CHECKER.PERIODIC_LAPLACIAN_PREVIOUS_SOURCE_SHA256, CHECKER._fact_digest(self.previous_facts))
+        self.assertEqual(CHECKER.PERIODIC_LAPLACIAN_CURRENT_SOURCE_SHA256, CHECKER._fact_digest(self.current_facts))
+        self.assertTrue(CHECKER._reviewed_periodic_laplacian_source_refresh(
+            CHECKER._fact_digest(self.previous_facts), self.current_facts))
+        self.assertFalse(CHECKER._reviewed_periodic_laplacian_source_refresh("0" * 64, self.current_facts))
+        self.assertEqual(_PERIODIC_LAPLACIAN_ROOT_IDS, CHECKER.PERIODIC_LAPLACIAN_CHANGED_ROOT_IDS)
+        for section, count in (("test_roots", 49), ("correctness_only_roots", 6), ("zig_test_files", 173)):
+            self.assertEqual(count, len(self.previous_facts[section]))
+            self.assertEqual([r["id"] for r in self.previous_facts[section]], [r["id"] for r in self.current_facts[section]])
+        for section in ("test_roots", "correctness_only_roots"):
+            for old, new in zip(self.previous_facts[section], self.current_facts[section], strict=True):
+                with self.subTest(root=old["id"]):
+                    if section == "test_roots" and old["id"] not in _PERIODIC_LAPLACIAN_ROOT_IDS:
+                        self.assertEqual(old, new)
+                        continue
+                    self.assertEqual({"source_reachability", "named_dependency_sources"},
+                                     {k for k in old if old[k] != new[k]})
+                    additions = set(_PERIODIC_LAPLACIAN_CORE_PATHS)
+                    if old["id"] in _PERIODIC_LAPLACIAN_NATIVE_OWNERS:
+                        additions.add(_PERIODIC_LAPLACIAN_ORACLE_PATH)
+                    self.assertEqual(sorted([*old["source_reachability"], *additions]), new["source_reachability"])
+                    oracle_receipts = [r for r in new["named_dependency_sources"] if r["alias"] == "periodic-test-reference"]
+                    self.assertEqual(int(old["id"] == "correctness-root:native-provider-math_tests"), len(oracle_receipts))
+                    if oracle_receipts:
+                        self.assertEqual("math_module", oracle_receipts[0]["attachment_owner"])
+                        self.assertEqual(_PERIODIC_LAPLACIAN_ORACLE_PATH, oracle_receipts[0]["path"])
+        for old, new in zip(self.previous_facts["zig_test_files"], self.current_facts["zig_test_files"], strict=True):
+            if old["path"] != "src/native_provider_math_test.zig":
+                self.assertEqual(old, new)
+                continue
+            self.assertEqual(11, len(old["declarations"]))
+            self.assertEqual(17, len(new["declarations"]))
+            self.assertEqual(old["declarations"], new["declarations"][:11])
+            self.assertEqual(new["declarations"], CHECKER._zig_declarations(
+                (REPOSITORY_ROOT / new["path"]).read_text(), new["path"]))
+        oracle = (REPOSITORY_ROOT / _PERIODIC_LAPLACIAN_ORACLE_PATH).read_text()
+        self.assertEqual([], CHECKER._zig_declarations(oracle, _PERIODIC_LAPLACIAN_ORACLE_PATH))
+        self.assertEqual(["std"], CHECKER._zig_imports(oracle, _PERIODIC_LAPLACIAN_ORACLE_PATH))
+
+    def test_exact_refresh_base_changes_only_validation_view(self) -> None:
+        previous, current = copy.deepcopy(self.previous), copy.deepcopy(self.current)
+        compatible = CHECKER._refresh_base_compatible_discovery(previous, current)
+        self.assertEqual([], CHECKER._validate_runtime_bound_sections(REPOSITORY_ROOT, previous, compatible))
+        for field in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            self.assertEqual(previous[field], compatible[field])
+        CHECKER._assert_source_only_native_unchanged(previous, current)
+        self.assertEqual(self.previous, previous)
+        self.assertEqual(self.current, current)
+        for field in ("native_observation_bindings", "environment_profiles", "test_enumeration_classes"):
+            self.assertEqual(previous[field], compatible[field])
+        # Mutation of returned fixture data cannot poison its memoized facts.
+        facts, _ = _periodic_laplacian_source_fact_pair()
+        facts["test_roots"][0]["unreviewed"] = True
+        self.assertEqual(self.previous_facts, _periodic_laplacian_source_fact_pair()[0])
+
+    def test_previous_facts_and_unreviewed_roots_cannot_enter_transition(self) -> None:
+        for section in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            previous = copy.deepcopy(self.previous)
+            previous[section][0]["unreviewed"] = True
+            with self.subTest(previous_section=section):
+                self.assert_refresh_rejected(previous, self.current)
+        for field in ("id", "physical_path", "compile_observation_id", "launch_observation_id",
+                      "source_entry_paths", "required_isolated_objects", "root-order", "unrelated-root"):
+            current = copy.deepcopy(self.current)
+            row = next(r for r in current["test_roots"] if r["id"] == "zig-root:fortran-tests")
+            if field == "root-order":
+                current["test_roots"][:2] = reversed(current["test_roots"][:2])
+            elif field == "unrelated-root":
+                next(r for r in current["test_roots"] if r["id"] == "zig-root:triangular-band-solve-tests")["source_reachability"].append("src/unreviewed.zig")
+            elif isinstance(row[field], list):
+                row[field].append("unreviewed")
+            else:
+                row[field] += "-unreviewed"
+            with self.subTest(field=field):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_oracle_replacement_extra_source_and_production_reachability_reject(self) -> None:
+        for mutation in ("missing-oracle", "replaced-oracle", "extra-core", "production-oracle"):
+            current = copy.deepcopy(self.current)
+            row = next(r for r in current["correctness_only_roots"] if r["id"] == "correctness-root:native-provider-math_tests")
+            if mutation in ("missing-oracle", "replaced-oracle"):
+                row["source_reachability"].remove(_PERIODIC_LAPLACIAN_ORACLE_PATH)
+                if mutation == "replaced-oracle":
+                    row["source_reachability"].append("test/unreviewed_oracle.zig")
+            elif mutation == "extra-core":
+                row["source_reachability"].append("src/unreviewed.zig")
+            else:
+                row = next(r for r in current["test_roots"] if r["id"] == "zig-root:fortran-tests")
+                row["source_reachability"].append(_PERIODIC_LAPLACIAN_ORACLE_PATH)
+            row["source_reachability"].sort()
+            with self.subTest(mutation=mutation):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_named_receipts_and_correctness_identity_or_guard_drift_reject(self) -> None:
+        for field in ("alias", "path", "attachment_owner", "source_sha256", "build_contract_sha256",
+                      "input_sha256", "id", "guard", "compile_observation_id", "launch_observation_ids"):
+            current = copy.deepcopy(self.current)
+            row = next(r for r in current["correctness_only_roots"] if r["id"] == "correctness-root:native-provider-math_tests")
+            if field == "input_sha256":
+                next(r for r in row["named_dependency_sources"] if "input_sha256" in r)[field]["include/zynum_native.h"] = "0" * 64
+            elif field in ("id", "guard", "compile_observation_id"):
+                row[field] += "-unreviewed"
+            elif field == "launch_observation_ids":
+                row[field].append("launch:unreviewed")
+            else:
+                receipt = next(r for r in row["named_dependency_sources"] if r["alias"] == "periodic-test-reference")
+                receipt[field] += "-unreviewed"
+            with self.subTest(field=field):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_declaration_names_ids_kinds_ordinals_and_file_order_reject(self) -> None:
+        for mutation in ("old-name", "new-name", "kind", "ordinal", "id", "declaration-order", "file-order", "other-file"):
+            current = copy.deepcopy(self.current)
+            row = next(r for r in current["zig_test_files"] if r["path"] == "src/native_provider_math_test.zig")
+            if mutation == "file-order":
+                current["zig_test_files"][:2] = reversed(current["zig_test_files"][:2])
+            elif mutation == "other-file":
+                next(r for r in current["zig_test_files"] if r["path"] == "test/abi/fortran_compat_test.zig")["declarations"][0]["name"] += " unreviewed"
+            elif mutation == "declaration-order":
+                row["declarations"][:2] = reversed(row["declarations"][:2])
+            elif mutation in ("old-name", "new-name"):
+                row["declarations"][0 if mutation == "old-name" else 11]["name"] += " unreviewed"
+            elif mutation == "ordinal":
+                row["declarations"][11][mutation] += 1
+            else:
+                row["declarations"][11][mutation] += "-unreviewed"
+            with self.subTest(mutation=mutation):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_native_rows_sets_bindings_and_review_policies_remain_immutable(self) -> None:
+        CHECKER._assert_source_only_native_unchanged(self.previous, self.current)
+        for field in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings", "test_mode_rows"):
+            current = copy.deepcopy(self.current)
+            current[field][0]["unreviewed"] = True
+            with self.subTest(field=field), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._assert_source_only_native_unchanged(self.previous, current)
+        for mutation in ("native-name", "pending-to-frozen", "pending-order"):
+            current = copy.deepcopy(self.current)
+            if mutation == "native-name":
+                native_set = next(r for r in current["expected_test_sets"] if r["root_id"].startswith("zig-root:"))
+                native_set["tests"][0]["name"] += " unreviewed"
+            else:
+                pending = [r for r in current["test_mode_rows"] if r["expectation_state"] == CHECKER.PENDING_STATE]
+                if mutation == "pending-to-frozen":
+                    pending[0]["expectation_state"] = CHECKER.FROZEN_STATE
+                else:
+                    a, b = [current["test_mode_rows"].index(r) for r in pending[:2]]
+                    current["test_mode_rows"][a], current["test_mode_rows"][b] = current["test_mode_rows"][b], current["test_mode_rows"][a]
+            with self.subTest(mutation=mutation), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._assert_source_only_native_unchanged(self.previous, current)
+        data = (REPOSITORY_ROOT / "tools/test_inventory.json").read_bytes()
+        self.assertIsNone(CHECKER._reviewed_inventory_bytes_error(data))
+        self.assertIsNotNone(CHECKER._reviewed_inventory_bytes_error(CHECKER._canonical_inventory_bytes(self.current)))
+        changed = copy.deepcopy(self.current)
+        changed["native_observation_bindings"][0]["digest"] = "0" * 64
+        self.assertIsNotNone(CHECKER._reviewed_native_projection_error(changed))
+
+    def test_historical_host_and_tn_exact_pairs_remain_distinct(self) -> None:
+        host_current, tn_current = _tn_oracle_source_fact_pair()
+        self.assertEqual(CHECKER.HOST_ASSEMBLY_CURRENT_SOURCE_SHA256, CHECKER._fact_digest(host_current))
+        self.assertEqual(CHECKER.TN_ORACLE_CURRENT_SOURCE_SHA256, CHECKER._fact_digest(tn_current))
+        self.assertTrue(CHECKER._reviewed_host_assembly_source_refresh(CHECKER.HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256, host_current))
+        self.assertTrue(CHECKER._reviewed_tn_oracle_source_refresh(CHECKER.TN_ORACLE_PREVIOUS_SOURCE_SHA256, tn_current))
+        self.assertFalse(CHECKER._reviewed_host_assembly_source_refresh(CHECKER.HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256, self.current_facts))
+        self.assertFalse(CHECKER._reviewed_tn_oracle_source_refresh(CHECKER.TN_ORACLE_PREVIOUS_SOURCE_SHA256, self.current_facts))
+
+
 _TN_ORACLE_FACT_PAIR: tuple[dict[str, Any], dict[str, Any]] | None = None
 
 
@@ -11339,35 +11627,14 @@ def _tn_oracle_source_fact_pair() -> tuple[dict[str, Any], dict[str, Any]]:
     global _TN_ORACLE_FACT_PAIR
     if _TN_ORACLE_FACT_PAIR is not None:
         return copy.deepcopy(_TN_ORACLE_FACT_PAIR)
-    inventory_path = REPOSITORY_ROOT / "tools/test_inventory.json"
-    inventory = json.loads(inventory_path.read_text())
-    current = copy.deepcopy(CHECKER._host_assembly_source_facts(inventory))
-    context = CHECKER.BUILD_CHECKER._make_discovery_context(REPOSITORY_ROOT, inventory_path)
-    sources = {path: CHECKER._cached_text(context, path)
-               for path in context.public_files.paths if path.endswith(".zig")}
-    graph = CHECKER.BUILD_CHECKER._numerics_resources_build_contract(
-        CHECKER._cached_text(context, "build.zig"))
-    fortran = next(row for row in current["test_roots"] if row["id"] == "zig-root:fortran-tests")
-    receipts: list[dict[str, Any]] = []
-    fortran["source_reachability"] = sorted(CHECKER._zig_source_closure(
-        sources, context.public_files.path_set, CHECKER._zig_source_entries("fortran_tests", graph),
-        resource_root="fortran_tests", resource_graph=graph, named_dependencies=receipts))
-    fortran["named_dependency_sources"] = receipts
+    # The live source is now Laplacian-era. Reverse that separately reviewed
+    # exact delta first, then retain the original TN historical reversal below.
+    current, _ = _periodic_laplacian_source_fact_pair()
     owners = {"correctness-root:heteris-adapter-package": "adapter",
               "correctness-root:native-provider-c_tests": "main",
               "correctness-root:native-provider-math_tests": "math_module"}
-    for row in current["correctness_only_roots"]:
-        if row["id"] not in owners:
-            continue
-        reached, receipts = CHECKER._native_source_closure(
-            sources, context.public_files.path_set, context, owners[row["id"]])
-        if row["language"] == "c":
-            reached.add(row["physical_path"])
-        row["source_reachability"] = sorted(reached)
-        row["named_dependency_sources"] = receipts
     provider_path = "src/native_provider_math_test.zig"
     provider = next(row for row in current["zig_test_files"] if row["path"] == provider_path)
-    provider["declarations"] = CHECKER._zig_declarations(sources[provider_path], provider_path)
     if CHECKER._fact_digest(current) != "e49ca061a2381143089d517ecb420109eaf7c7e93896367d6da37082857b2d52":
         raise AssertionError("bounded TN walkers differ from reviewed current source facts")
     previous = copy.deepcopy(current)
@@ -11405,6 +11672,8 @@ class TNOracleSourceRefreshTests(unittest.TestCase):
         cls.previous.update(copy.deepcopy(cls.previous_facts))
         cls.current = copy.deepcopy(inventory)
         cls.current.update(copy.deepcopy(cls.current_facts))
+        for value in (cls.previous, cls.current):
+            value["strict_summary"] = CHECKER._section_summary(value)
 
     def assert_refresh_rejected(self, previous: dict[str, Any], current: dict[str, Any]) -> None:
         self.assertFalse(CHECKER._reviewed_tn_oracle_source_refresh(
@@ -11441,8 +11710,10 @@ class TNOracleSourceRefreshTests(unittest.TestCase):
         self.assertEqual(5, len(old_files[provider]["declarations"]))
         self.assertEqual(11, len(new_files[provider]["declarations"]))
         self.assertEqual(old_files[provider]["declarations"], new_files[provider]["declarations"][:5])
+        # Historical TN owns the first eleven; the Laplacian test above checks
+        # the complete current parser output and both exact source digests.
         self.assertEqual(new_files[provider]["declarations"], CHECKER._zig_declarations(
-            (REPOSITORY_ROOT / provider).read_text(), provider))
+            (REPOSITORY_ROOT / provider).read_text(), provider)[:11])
         fortran = "test/abi/fortran_compat_test.zig"
         self.assertEqual(old_files[fortran]["declarations"], CHECKER._zig_declarations(
             (REPOSITORY_ROOT / fortran).read_text(), fortran))

@@ -848,7 +848,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '2569d13274aa2e8075476bf48c8a25a08041281989e551015b33e59e9f0496af'
+CURRENT_TEST_INVENTORY_SHA256 = '7ff2a3cfa10d5032750e092e542eb2ed2462ece03b0f15d98eee686471878cbb'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = 'f25ebd580dbfcb572385fd85af4499a86ae898b644108c100ca53dada3aa5094'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -4724,6 +4724,29 @@ def _reviewed_tn_oracle_source_refresh(previous_sha256: str, current: dict[str, 
             _fact_digest(_host_assembly_source_facts(current)) == TN_ORACLE_CURRENT_SOURCE_SHA256)
 
 
+# Exact reviewed Laplacian source-only delta: eight existing Core roots and
+# six correctness-only roots gain shared Core reachability/receipts. The pure
+# oracle is reachable only from optional test graphs; provider declarations
+# retain the old eleven records and append six. This creates no native evidence.
+PERIODIC_LAPLACIAN_PREVIOUS_SOURCE_SHA256 = "e49ca061a2381143089d517ecb420109eaf7c7e93896367d6da37082857b2d52"
+PERIODIC_LAPLACIAN_CURRENT_SOURCE_SHA256 = "8222af6680713f6cfd51821eb0239db098b08b69fa34a6f7b7b3223cdac69473"
+PERIODIC_LAPLACIAN_CHANGED_ROOT_IDS = (
+    "zig-root:blas-module-tests",
+    "zig-root:blas-public-surface-contract-tests",
+    "zig-root:cblas-tests",
+    "zig-root:fortran-tests",
+    "zig-root:lapack-tests",
+    "zig-root:modern-tests",
+    "zig-root:sparse-tests",
+    "zig-root:zynum-public-surface-contract-tests",
+)
+
+
+def _reviewed_periodic_laplacian_source_refresh(previous_sha256: str, current: dict[str, Any]) -> bool:
+    return (previous_sha256 == PERIODIC_LAPLACIAN_PREVIOUS_SOURCE_SHA256 and
+            _fact_digest(_host_assembly_source_facts(current)) == PERIODIC_LAPLACIAN_CURRENT_SOURCE_SHA256)
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -4731,6 +4754,8 @@ def _refresh_base_compatible_discovery(
     host_assembly_migration = _reviewed_host_assembly_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     tn_oracle_migration = _reviewed_tn_oracle_source_refresh(
+        _fact_digest(_host_assembly_source_facts(inventory)), discovered)
+    periodic_laplacian_migration = _reviewed_periodic_laplacian_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
@@ -4749,6 +4774,8 @@ def _refresh_base_compatible_discovery(
             continue  # The complete old/new source facts were checked above.
         if tn_oracle_migration and recorded.get("id") == "zig-root:fortran-tests":
             continue  # Only this exact root gains the pure helper dependency.
+        if periodic_laplacian_migration and recorded.get("id") in PERIODIC_LAPLACIAN_CHANGED_ROOT_IDS:
+            continue  # The complete reviewed pair binds these exact records.
         legacy = dict(current)
         legacy["launch_observation_ids"] = []
         tooling_migration = (
@@ -4954,7 +4981,7 @@ def _refresh_base_compatible_discovery(
              for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
             key=lambda gap: gap["id"],
         )
-    if tn_oracle_migration:
+    if tn_oracle_migration or periodic_laplacian_migration:
         # Reconstruct the reviewed old source metadata for base validation only.
         # The candidate still comes from discover(); native-ledger immutability
         # and the original whole-file CURRENT/NEXT/publication gates remain.

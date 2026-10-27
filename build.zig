@@ -3418,6 +3418,8 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
         math_module.addImport("heteris-provider-c", provider_c);
         const gemm_test_reference = b.createModule(.{ .root_source_file = b.path("test/abi/gemm_reference.zig"), .target = target, .optimize = optimize });
         math_module.addImport("gemm-test-reference", gemm_test_reference);
+        const periodic_test_reference = b.createModule(.{ .root_source_file = b.path("integrations/heteris/src/periodic_reference.zig"), .target = target, .optimize = optimize });
+        math_module.addImport("periodic-test-reference", periodic_test_reference);
         math_module.addObjectFile(.{ .cwd_relative = archive });
         for ([_][]const u8{ "gcc_s", "m", "dl", "pthread" }) |name| math_module.linkSystemLibrary(name, .{});
         const math_tests = b.addTest(.{ .name = "zynum-native-provider-math-tests", .root_module = math_module, .use_llvm = true, .use_lld = true });
