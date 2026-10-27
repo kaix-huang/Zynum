@@ -45,7 +45,7 @@ fn finish(owner: *Ctx.Context, alloc: *F.Allocations) !void {
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     _ = owner.requestClose();
-    try E.expectEqual(Ctx.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(owner));
     try E.expectEqual(alloc.stats().accepted, alloc.stats().freed);
 }
 const Recorder = struct {
@@ -78,7 +78,9 @@ test "GVD any-slot query borrows one closing owner and reads no matrices or eige
         const Engine = if (raw) Raw else A;
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         _ = owner.requestClose();
         for (0..if (S.isComplex(T)) @as(usize, 3) else 2) |slot| {
@@ -94,7 +96,7 @@ test "GVD any-slot query borrows one closing owner and reads no matrices or eige
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -107,9 +109,11 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, uppe
     const am = [_]Z{ .{ .re = 4 }, .{ .re = 1, .im = -ia }, .{ .re = 1, .im = ia }, .{ .re = 3 } };
     const bm = [_]Z{ .{ .re = 3 }, .{ .re = 0.5, .im = -ib }, .{ .re = 0.5, .im = ib }, .{ .re = 2 } };
     var alloc: F.Allocations = .{ .budget = 256 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
-    var rec: Recorder = .{ .owner = &owner };
+    var rec: Recorder = .{ .owner = owner };
     var a: [10]T = @splat(value(T, -997, 0));
     var b: [12]T = @splat(value(T, -993, 0));
     for (0..2) |j| for (0..2) |i| {
@@ -195,7 +199,7 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, uppe
     try E.expectEqual(@as(usize, 0), rec.count);
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 
 test "GVD all scalar layouts triangles problem types and entries satisfy independent eigen and metric checks" {
@@ -206,7 +210,9 @@ test "GVD failed B publishes the shared-kernel factor prefix before unused colum
     inline for (types) |T| for ([_]c_int{ 101, 102 }) |layout| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 64 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var a: [4]T = @splat(value(T, 77, 0));
         var b = [_]T{ value(T, 4, 0), value(T, if (layout == 102) 2 else 99, 0), value(T, if (layout == 102) 99 else 2, 0), value(T, 1, 0) };
@@ -225,13 +231,15 @@ test "GVD failed B publishes the shared-kernel factor prefix before unused colum
         try near(.{ .re = 99 }, read(T, b[at(layout, 0, 1, 2)]), 0);
         for (a) |x| try near(.{ .re = 77 }, read(T, x), 0);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
 test "GVD scalar and row leading dimension precedence retains public argument positions" {
     var alloc: F.Allocations = .{ .budget = 0 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var args: A.Arguments(f64) = .{ .layout = 99, .itype = 0, .jobz = 'X', .uplo = 'X', .n = -1, .lda = -2, .ldb = -2, .lwork = -1 };
     try E.expectEqual(@as(i32, -1), try A.workAdmitted(f64, &op, args));
@@ -254,7 +262,7 @@ test "GVD scalar and row leading dimension precedence retains public argument po
     try E.expectEqual(@as(i32, -9), try A.workAdmitted(f64, &op, args));
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 
 test "GVD high allocation failures close all shared leases and emit one diagnostic" {
@@ -264,9 +272,11 @@ test "GVD high allocation failures close all shared leases and emit one diagnost
         var successes: usize = 0;
         for (0..11) |budget| {
             var alloc: F.Allocations = .{ .budget = budget };
-            var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
             var op = try owner.begin();
-            var rec: Recorder = .{ .owner = &owner };
+            var rec: Recorder = .{ .owner = owner };
             var a = [_]T{ value(T, 4, 0), value(T, 1, 0), value(T, 1, 0), value(T, 3, 0) };
             var b = [_]T{ value(T, 3, 0), value(T, 0.5, 0), value(T, 0.5, 0), value(T, 2, 0) };
             var values = [_]R{ 77, 77 };
@@ -282,7 +292,7 @@ test "GVD high allocation failures close all shared leases and emit one diagnost
                 try E.expectEqual(if (info == -1010) B.common.Entry.high else .work, rec.events[0].entry);
             }
             op.end();
-            try finish(&owner, &alloc);
+            try finish(owner, &alloc);
         }
         try E.expect(failures != 0 and successes != 0);
     };
@@ -292,7 +302,9 @@ test "GVD workspace errors retain real and complex public positions before unuse
     inline for (types) |T| for ([_]c_int{ 101, 102 }) |layout| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 32 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var a: [4]T = @splat(value(T, 77, 0));
         var b: [4]T = @splat(value(T, 77, 0));
@@ -311,13 +323,15 @@ test "GVD workspace errors retain real and complex public positions before unuse
         for (a) |x| try near(.{ .re = 77 }, read(T, x), 0);
         for (b) |x| try near(.{ .re = 77 }, read(T, x), 0);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
 test "GVD query heads reject missing overlapping and misaligned destinations before writes" {
     var alloc: F.Allocations = .{ .budget = 0 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var work = [_]f64{77};
     var integers = [_]i32{77};
@@ -333,15 +347,17 @@ test "GVD query heads reject missing overlapping and misaligned destinations bef
     for (bytes) |x| try E.expectEqual(@as(u8, 77), x);
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 
 test "GVD high NaN checks identify both selected matrices and preserve compile-time scan control" {
     inline for (types) |T| {
         var alloc: F.Allocations = .{ .budget = 32 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var a = [_]T{value(T, std.math.nan(f64), 0)};
         var b = [_]T{value(T, 4, 0)};
         var args: A.Arguments(T) = .{ .layout = 102, .jobz = 'V', .uplo = 'L', .n = 1, .lda = 1, .ldb = 1, .a = &a, .b = &b };
@@ -359,7 +375,7 @@ test "GVD high NaN checks identify both selected matrices and preserve compile-t
         try E.expectEqual(@as(i32, 0), try A.highAdmitted(true, T, &op, &rec.services(), args));
         try E.expectEqual(@as(usize, 0), rec.count);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     }
 }
 
@@ -367,9 +383,11 @@ test "GVD failed iteration keeps reduced vectors and reports the actual EVD bloc
     inline for (types) |T| for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |wants| for ([_]i32{ 1, 2, 3 }) |itype| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 32 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var a: [49]T = @splat(value(T, 0, 0));
         var b: [49]T = @splat(value(T, 0, 0));
         const diagonal = [_]f64{ 11, 13, 4, -1, 5, 17, 19 };
@@ -396,7 +414,7 @@ test "GVD failed iteration keeps reduced vectors and reports the actual EVD bloc
         };
         try E.expectEqual(@as(usize, 0), rec.count);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -404,7 +422,9 @@ test "GVD zero singleton and negative row return paths retain their actual acces
     inline for (types) |T| for ([_]c_int{ 101, 102 }) |layout| for ([_]i32{ 1, 2, 3 }) |itype| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 32 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var work = [_]T{value(T, 77, 0)};
         var real = [_]R{77};
@@ -440,23 +460,31 @@ test "GVD zero singleton and negative row return paths retain their actual acces
             try E.expectEqual(@as(i32, -5), try A.workAdmitted(T, &op, args));
         }
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
 test "GVD managed bridge captures existing callbacks and rejects a closed owner" {
     inline for (types) |T| {
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
-        var rec: Recorder = .{ .owner = &owner };
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        var rec: Recorder = .{ .owner = owner };
         const callback: B.shared_services.Callback = .{ .userdata = &rec, .function = Recorder.event };
         const args: Raw.Arguments(T) = .{ .layout = 99, .jobz = 'V', .uplo = 'L', .n = 0, .lda = 1, .ldb = 1 };
-        try E.expectEqual(@as(i32, -1), try B.Shared.gvdRawManagedWithDefaults(true, T, .high, &owner, args, .{ .lapacke = callback, .fortran_returning_test = callback }));
+        try E.expectEqual(@as(i32, -1), try B.Shared.gvdRawManagedWithDefaults(true, T, .high, owner, args, .{ .lapacke = callback, .fortran_returning_test = callback }));
         try E.expectEqual(@as(usize, 1), rec.count);
         try E.expectEqual(if (S.isComplex(T)) B.common.Routine.hegvd else .sygvd, rec.events[0].routine);
         try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
-        try finish(&owner, &alloc);
-        try E.expectError(error.Closing, B.Shared.gvdRawManagedWithDefaults(true, T, .high, &owner, args, .{}));
+        try finish(owner, &alloc);
+        try E.expectError(error.Closing, B.Shared.gvdRawManagedWithDefaults(true, T, .high, owner, args, .{}));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

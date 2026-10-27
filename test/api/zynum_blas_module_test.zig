@@ -42,10 +42,19 @@ test "BLAS package Into vector operations require equal lengths" {
 // It is an internal test dependency; no new public runtime API is introduced.
 const execution = @import("zynum-execution");
 
+// Reference-only fixture: recover the actual Executor bound to the supplied
+// Context. The legacy adapter stores its Executor directly in userdata.
+fn referenceExecutor(ctx: *execution.context.Context) *execution.owner.Executor {
+    return switch (ctx.binding) {
+        .legacy => |services| @ptrCast(@alignCast(services.userdata)),
+        .integrated => @panic("reference executor fixture requires legacy Context"),
+    };
+}
+
 test "BLAS facade shares execution policy and completes caller fallback while default is busy" {
     const policy = execution.policy;
     const shared = execution.get();
-    try std.testing.expect(shared == &execution.getContext().executor);
+    try std.testing.expect(shared == referenceExecutor(execution.getContext()));
     try std.testing.expectEqual(execution.context.RequestResult.immortal, execution.getContext().requestClose());
 
     try std.testing.expect(blas.runtime.setMaxThreads == policy.setMaxThreads);
@@ -112,8 +121,8 @@ test "BLAS facade shares execution policy and completes caller fallback while de
         var finishes: usize = 0;
         var observed_values: []const f64 = &.{};
         fn call(ctx: *execution.context.Context, event: execution.context.TestEvent) void {
-            if (ctx != execution.getContext() or &ctx.executor != execution.get()) @panic("duplicate default instance");
-            if (ctx.snapshot().active_operations != 1 or ctx.executor.io_busy.load(.acquire) != 1)
+            if (ctx != execution.getContext() or referenceExecutor(ctx) != execution.get()) @panic("duplicate default instance");
+            if (ctx.snapshot().active_operations != 1 or referenceExecutor(ctx).io_busy.load(.acquire) != 1)
                 @panic("fallback escaped its operation or busy batch");
             switch (event) {
                 .admitted => entries += 1,
@@ -167,7 +176,7 @@ const VectorAdmissionObservation = struct {
         expected = wanted;
     }
     fn call(ctx: *execution.context.Context, event: execution.context.TestEvent) void {
-        if (ctx != execution.getContext() or &ctx.executor != execution.get())
+        if (ctx != execution.getContext() or referenceExecutor(ctx) != execution.get())
             @panic("vector entry used a different default owner");
         if (ctx.snapshot().active_operations != 1)
             @panic("vector entry did not retain exactly one operation");
@@ -305,7 +314,7 @@ test "simultaneous public vector calls retain separate operations on one default
         var finishes: std.atomic.Value(usize) = .init(0);
         var release: [2]std.atomic.Value(bool) = .{ .init(false), .init(false) };
         fn call(ctx: *execution.context.Context, event: execution.context.TestEvent) void {
-            if (ctx != execution.getContext() or &ctx.executor != execution.get())
+            if (ctx != execution.getContext() or referenceExecutor(ctx) != execution.get())
                 @panic("concurrent vector call used a different default owner");
             const active = ctx.snapshot().active_operations;
             if (active == 0 or active > 2) @panic("invalid concurrent operation count");

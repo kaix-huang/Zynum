@@ -138,13 +138,13 @@ test "GELSD query shares one admission and honors closing from its diagnostic" {
     var work: [1]f64 = undefined;
     var iwork: [1]i64 = undefined;
     var args: owner.GelsdQuery.Arguments(f64, i64) = .{ .layout = 102, .m = 3, .n = 2, .nrhs = 1, .lda = 3, .ldb = 3, .work = &work, .iwork = &iwork };
-    try support.expectInfo(i64, 0, try owner.GelsdQuery.callManaged(f64, i64, &rig.context, &rig.services, args));
+    try support.expectInfo(i64, 0, try owner.GelsdQuery.callManaged(f64, i64, rig.context, &rig.services, args));
     rig.trigger = .hook;
     rig.action = .close_nested;
     args.m = -1;
-    try support.expectInfo(i64, -2, try owner.GelsdQuery.callManaged(f64, i64, &rig.context, &rig.services, args));
+    try support.expectInfo(i64, -2, try owner.GelsdQuery.callManaged(f64, i64, rig.context, &rig.services, args));
     try std.testing.expectEqual(error.Closing, rig.nested_error.?);
-    try std.testing.expectError(error.Closing, owner.GelsdQuery.callManaged(f64, i64, &rig.context, &rig.services, args));
+    try std.testing.expectError(error.Closing, owner.GelsdQuery.callManaged(f64, i64, rig.context, &rig.services, args));
     try std.testing.expectEqual(@as(usize, 1), rig.max_active);
     try std.testing.expectEqual(@as(usize, 0), rig.reads);
     try std.testing.expectEqual(@as(usize, 0), rig.x.attempts);
@@ -326,7 +326,7 @@ test "GELSD high managed invocation remains single while callbacks request closi
         var b = [_]f64{ 4, 6 };
         var s: [2]f64 = undefined;
         var rank = [_]i32{-1};
-        const result = try owner.GelsdAdapter.callManaged(f64, i32, .high, &rig.context, &rig.services, .{ .layout = 101, .column = .{ .m = 2, .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = &a, .b = &b, .singular = &s, .rank = &rank, .rcond = -1, .work = null, .lwork = 0, .iwork = null } });
+        const result = try owner.GelsdAdapter.callManaged(f64, i32, .high, rig.context, &rig.services, .{ .layout = 101, .column = .{ .m = 2, .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = &a, .b = &b, .singular = &s, .rank = &rank, .rcond = -1, .work = null, .lwork = 0, .iwork = null } });
         try std.testing.expect(result == .lapacke_info);
         try std.testing.expectEqual(@as(i32, if (trigger == .hook) -1010 else 0), result.lapacke_info);
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
@@ -415,7 +415,7 @@ test "GELSD shared raw high route uses existing owner admission and rejects clos
     var b = [_]f64{ 4, 6 };
     var s: [2]f64 = undefined;
     var rank = [_]i64{-1};
-    const result = try owner.Shared.gelsdRawManaged(false, f64, i64, .high, &rig.context, .{ .layout = 101, .column = .{ .m = 2, .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr, .singular = s[0..].ptr, .rank = rank[0..].ptr, .rcond = -1, .work = null, .lwork = 0, .iwork = null } });
+    const result = try owner.Shared.gelsdRawManaged(false, f64, i64, .high, rig.context, .{ .layout = 101, .column = .{ .m = 2, .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr, .singular = s[0..].ptr, .rank = rank[0..].ptr, .rcond = -1, .work = null, .lwork = 0, .iwork = null } });
     try std.testing.expect(result == .lapacke_info);
     try std.testing.expectEqual(@as(i64, 0), result.lapacke_info);
     try std.testing.expectApproxEqAbs(@as(f64, 1), b[0], 2e-12);
@@ -432,7 +432,7 @@ test "GELSD shared raw high route uses existing owner admission and rejects clos
     try std.testing.expectEqual(@as(usize, 4), rig.x.attempts);
     try std.testing.expectEqual(@as(usize, 0), rig.x.live);
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.gelsdRawManaged(false, f64, i64, .high, &rig.context, undefined));
+    try std.testing.expectError(error.Closing, owner.Shared.gelsdRawManaged(false, f64, i64, .high, rig.context, undefined));
 }
 
 test "GELSD finite input overflow returns success with IEEE outputs across integer widths" {

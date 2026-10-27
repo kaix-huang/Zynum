@@ -13,7 +13,7 @@ fn done(owner: *E.context.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn Backend(comptime T: type) type {
     return struct {
@@ -32,7 +32,7 @@ fn Backend(comptime T: type) type {
             try std.testing.expectEqual(@as(usize, 1), op.borrowedContext().snapshot().active_operations);
             if (self.close_at == self.calls) {
                 _ = op.borrowedContext().requestClose();
-                try std.testing.expectEqual(E.context.CloseResult.busy, op.borrowedContext().tryProgressClose());
+                try std.testing.expectEqual(E.context.CloseResult.busy, fixtureProgressClose(op.borrowedContext()));
             }
             for (y, 0..) |*out, row| {
                 out.* = S.zero(T);
@@ -62,8 +62,10 @@ fn pos(layout: D.Layout, ld: usize, row: usize, column: usize) usize {
 }
 test "Residual contour filter two precisions independent triangular resolvent all layouts" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         var backend = Backend(T){};
         const nodes = [_]T{ z(T, 2, 0.7), z(T, 5, -0.4), z(T, 1.5, 0) };
         const weights = [_]T{ z(T, 0.3, 0.1), z(T, -0.2, 0.15), z(T, 0, 0) };
@@ -84,7 +86,7 @@ test "Residual contour filter two precisions independent triangular resolvent al
             const before_basis = basis;
             const before_residual = residual;
             backend.calls = 0;
-            const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &residual, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = rld, .layout = rl } }, .ritz_correction = .{ .basis = .{ .values = &basis, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = bld, .layout = bl } }, .eigenvalues = &lambdas }, .output = .{ .values = &output, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = old, .layout = ol } }, .nodes = &nodes, .weights = &weights, .global_dimension = 3, .max_iterations = 32, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
+            const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &residual, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = rld, .layout = rl } }, .ritz_correction = .{ .basis = .{ .values = &basis, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = bld, .layout = bl } }, .eigenvalues = &lambdas }, .output = .{ .values = &output, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = old, .layout = ol } }, .nodes = &nodes, .weights = &weights, .global_dimension = 3, .max_iterations = 32, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
             try std.testing.expectEqual(F.Status.success, result.status);
             try std.testing.expectEqual(@as(usize, 4), result.completed_systems);
             try std.testing.expectEqual(backend.calls, result.action_count);
@@ -107,8 +109,10 @@ test "Residual contour filter two precisions independent triangular resolvent al
 }
 test "Residual contour filter full input basis output overlap late failures retry and original close" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         var backend = Backend(T){ .order = 1 };
         const initial = [_]T{ z(T, 1, 0.5), z(T, -0.3, 0.4), z(T, 77, -33) };
         var shared = initial;
@@ -117,7 +121,7 @@ test "Residual contour filter full input basis output overlap late failures retr
         const lambdas = [_]S.Real(T){ 0, 0 };
         const shape = D.PanelShape{ .row_count = 1, .column_count = 2, .leading_dimension = 1, .layout = .column_major };
         const q = F.Request(T){ .action = backend.action(), .input = .{ .values = &shared, .shape = shape }, .ritz_correction = .{ .basis = .{ .values = &shared, .shape = shape }, .eigenvalues = &lambdas }, .output = .{ .values = &shared, .shape = shape }, .nodes = &nodes, .weights = &weights, .global_dimension = 1, .max_iterations = 8, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 };
-        const baseline = try F.Managed(E).runScratch(T, &owner, q);
+        const baseline = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.success, baseline.status);
         const response = S.add(T, S.divv(T, weights[0], S.sub(T, nodes[0], z(T, 1, 0))), S.divv(T, weights[1], S.sub(T, nodes[1], z(T, 1, 0))));
         for (initial[0..2], shared[0..2]) |a, b| try near(T, S.mul(T, response, a), b);
@@ -126,24 +130,26 @@ test "Residual contour filter full input basis output overlap late failures retr
         backend.calls = 0;
         backend.fail_at = last;
         shared = initial;
-        try std.testing.expectError(error.InjectedResidualFilterAction, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.InjectedResidualFilterAction, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(initial, shared);
         backend.calls = 0;
         backend.fail_at = 0;
         backend.nan_at = last;
-        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(initial, shared);
         backend.calls = 0;
         backend.nan_at = 0;
         backend.close_at = 1;
-        try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runScratch(T, &owner, q)).status);
-        try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+        try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runScratch(T, owner, q)).status);
+        try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
     }
 }
 test "Residual contour filter correction geometry shifts byte aliases finite policy and scratch tails" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer done(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer done(owner) catch unreachable;
     var backend = Backend(T){ .order = 1 };
     const input = [_]T{z(T, 0, 0)};
     var basis = [_]T{z(T, 1, 0)};
@@ -155,36 +161,38 @@ test "Residual contour filter correction geometry shifts byte aliases finite pol
     var q = F.Request(T){ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .ritz_correction = .{ .basis = .{ .values = &basis, .shape = shape }, .eigenvalues = &lambdas }, .output = .{ .values = &output, .shape = shape }, .nodes = &nodes, .weights = &weights, .global_dimension = 1, .max_iterations = 8, .relative_tolerance = 1e-14 };
     var work: [14]T = @splat(z(T, 66, -22));
     var wide: [3]f128 = @splat(44);
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, work[0..12], &wide));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, work[0..12], &wide));
     q.ritz_correction.?.eigenvalues = &.{};
-    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runBorrowed(T, &owner, q, &work, &wide));
+    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runBorrowed(T, owner, q, &work, &wide));
     q.ritz_correction.?.eigenvalues = &lambdas;
     lambdas[0] = std.math.nan(f64);
-    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runBorrowed(T, &owner, q, &work, &wide));
+    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runBorrowed(T, owner, q, &work, &wide));
     lambdas[0] = 1;
     nodes[0] = z(T, 1, 0);
-    try std.testing.expectError(error.ShiftCoincidesWithRitzValue, F.Managed(E).runBorrowed(T, &owner, q, &work, &wide));
+    try std.testing.expectError(error.ShiftCoincidesWithRitzValue, F.Managed(E).runBorrowed(T, owner, q, &work, &wide));
     nodes[0] = z(T, 2, 1);
     const raw: [*]f64 = @ptrCast(&output);
     q.ritz_correction.?.eigenvalues = raw[0..1];
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, &owner, q, &work, &wide));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, owner, q, &work, &wide));
     q.ritz_correction.?.eigenvalues = &lambdas;
     try std.testing.expectEqualDeep(z(T, 77, -33), output[0]);
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
-    try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runBorrowed(T, &owner, q, &work, &wide)).status);
+    try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runBorrowed(T, owner, q, &work, &wide)).status);
     try near(T, z(T, 0.5, -0.5), output[0]);
     try std.testing.expectEqualDeep(z(T, 78, -34), output[1]);
     try std.testing.expectEqualDeep(z(T, 66, -22), work[13]);
     try std.testing.expectEqual(@as(f128, 44), wide[2]);
     weights[0] = z(T, 0, 0);
     basis[0] = z(T, std.math.nan(f64), 0);
-    try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runBorrowed(T, &owner, q, &work, &wide)).status);
+    try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runBorrowed(T, owner, q, &work, &wide)).status);
     try std.testing.expectEqualDeep(z(T, 0, 0), output[0]);
 }
 test "Residual contour filter widens opposite extreme shift and Ritz values before division" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         var backend = Backend(T){ .order = 1 };
         const input = [_]T{z(T, 0, 0)};
         const basis = [_]T{z(T, 1, 0)};
@@ -194,8 +202,14 @@ test "Residual contour filter widens opposite extreme shift and Ritz values befo
         const nodes = [_]T{z(T, maximum, 1)};
         const weights = [_]T{z(T, maximum, 0)};
         const shape = D.PanelShape{ .row_count = 1, .column_count = 1, .leading_dimension = 1, .layout = .column_major };
-        const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .ritz_correction = .{ .basis = .{ .values = &basis, .shape = shape }, .eigenvalues = &lambdas }, .output = .{ .values = &output, .shape = shape }, .nodes = &nodes, .weights = &weights, .global_dimension = 1, .max_iterations = 8, .relative_tolerance = 1e-14 });
+        const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .ritz_correction = .{ .basis = .{ .values = &basis, .shape = shape }, .eigenvalues = &lambdas }, .output = .{ .values = &output, .shape = shape }, .nodes = &nodes, .weights = &weights, .global_dimension = 1, .max_iterations = 8, .relative_tolerance = 1e-14 });
         try std.testing.expectEqual(F.Status.success, result.status);
         try near(T, z(T, 0.5, 0), output[0]);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

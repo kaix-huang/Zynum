@@ -1,123 +1,43 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
-
+//! Core scheduling names alias the unique execution owner. Legacy forwards are
+//! reference-only and fail compilation if reached from an integrated profile.
 const std = @import("std");
-const execution_owner = @import("zynum-execution").owner;
-const default_owner = @import("zynum-execution");
-fn freeWorkerCaches() void {
-    // Only SME owns persistent kernel pack allocations. Keep the baseline
-    // scheduler independent of the matrix kernel graph (and its test roots).
-    const builtin = @import("builtin");
-    if (comptime @import("zynum-build-options").dynamic_dispatch or
-        (builtin.target.cpu.arch == .aarch64 and builtin.target.cpu.features.isEnabled(@backingInt(std.Target.aarch64.Feature.sme))))
-    {
-        @import("../../kernels/dispatch/matrix_matrix.zig").freeCurrentThreadCaches();
-    }
+const execution = @import("zynum-execution");
+const default_owner = execution;
+const execution_owner = execution.owner;
+const options = @import("zynum-build-options");
+pub const max_tasks = execution.max_tasks;
+pub const TaskFn = execution.TaskFn;
+pub const WorkerCacheDomain = execution.WorkerCacheDomain;
+pub const AdmittedCallResources = execution.AdmittedCallResources;
+pub const admittedResources = execution.admittedResources;
+pub const CallResources = execution.CallResources;
+fn referenceResources() execution.reference.ReferenceCallResources {
+    if (comptime !options.reference_compat) @compileError("legacy scheduling requires reference_compat");
+    return .legacy_default;
 }
-
-pub const max_tasks = execution_owner.max_tasks;
-pub const TaskFn = execution_owner.TaskFn;
-const blas_cache_domain: execution_owner.WorkerCacheDomain = .{ .release_current_worker = freeWorkerCaches };
-
-/// Synchronous internal borrow, never an independently owned executor/allocator
-/// pair. Admitted calls derive both from the same live Operation. Existing
-/// internal callers retain their default services until their entrypoint is
-/// migrated; this bridge does not acquire a second operation.
-pub const CallResources = union(enum) {
-    admitted: *const default_owner.context.Operation,
-    legacy_default,
-
-    pub fn executor(self: CallResources) *execution_owner.Executor {
-        return switch (self) {
-            .admitted => |operation| &operation.borrowedContext().executor,
-            .legacy_default => default_owner.get(),
-        };
-    }
-
-    /// A non-null allocator owns call-local kernel packs. Null preserves the
-    /// existing legacy allocation/cache policy; it never selects another Context.
-    pub fn scratchAllocator(self: CallResources) ?std.mem.Allocator {
-        return switch (self) {
-            .admitted => |operation| operation.allocator(),
-            .legacy_default => null,
-        };
-    }
-
-    pub fn maxThreads(self: CallResources) usize {
-        return self.executor().policy.max_threads();
-    }
-
-    pub fn taskCount(self: CallResources, items: usize, min_items_per_task: usize) usize {
-        return self.executor().taskCount(items, min_items_per_task);
-    }
-
-    pub fn run(self: CallResources, task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-        return self.executor().run(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
-    }
-
-    pub fn runLowLatency(self: CallResources, task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-        return self.executor().runLowLatency(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
-    }
-
-    pub fn runQueued(self: CallResources, task_fn: TaskFn, tasks: *const anyopaque, count: usize, worker_limit: usize) bool {
-        return self.executor().runQueued(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain }, worker_limit);
-    }
-
-    pub fn runTyped(self: CallResources, comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
-        const Adapter = struct {
-            fn call(raw: *const anyopaque, index: usize) void {
-                const typed: [*]const Task = @ptrCast(@alignCast(raw));
-                task_fn(typed[index]);
-            }
-        };
-        return self.run(Adapter.call, @ptrCast(tasks.ptr), tasks.len);
-    }
-
-    pub fn runTypedLowLatency(self: CallResources, comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
-        const Adapter = struct {
-            fn call(raw: *const anyopaque, index: usize) void {
-                const typed: [*]const Task = @ptrCast(@alignCast(raw));
-                task_fn(typed[index]);
-            }
-        };
-        return self.runLowLatency(Adapter.call, @ptrCast(tasks.ptr), tasks.len);
-    }
-};
-
-pub fn taskCount(items: usize, min_items_per_task: usize) usize {
-    return default_owner.get().taskCount(items, min_items_per_task);
+pub fn taskCount(items: usize, minimum: usize) usize {
+    return referenceResources().taskCount(items, minimum);
 }
 pub fn run(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-    return default_owner.get().run(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
+    return referenceResources().run(task_fn, tasks, count);
 }
 pub fn runLowLatency(task_fn: TaskFn, tasks: *const anyopaque, count: usize) bool {
-    return default_owner.get().runLowLatency(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain });
+    return referenceResources().runLowLatency(task_fn, tasks, count);
 }
-pub fn runQueued(task_fn: TaskFn, tasks: *const anyopaque, count: usize, worker_limit: usize) bool {
-    return default_owner.get().runQueued(.{ .task_fn = task_fn, .tasks = tasks, .count = count, .cache_domain = &blas_cache_domain }, worker_limit);
+pub fn runQueued(task_fn: TaskFn, tasks: *const anyopaque, count: usize, limit: usize) bool {
+    return referenceResources().runQueued(task_fn, tasks, count, limit);
 }
-pub fn runTyped(comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
-    const Adapter = struct {
-        fn run(ctx: *const anyopaque, index: usize) void {
-            const typed: [*]const Task = @ptrCast(@alignCast(ctx));
-            task_fn(typed[index]);
-        }
-    };
-    return run(Adapter.run, @ptrCast(tasks.ptr), tasks.len);
+pub fn runTyped(comptime T: type, comptime task_fn: fn (T) void, tasks: []const T) bool {
+    return referenceResources().runTyped(T, task_fn, tasks);
 }
-
-pub fn runTypedLowLatency(comptime Task: type, comptime task_fn: fn (Task) void, tasks: []const Task) bool {
-    const Adapter = struct {
-        fn run(ctx: *const anyopaque, index: usize) void {
-            const typed: [*]const Task = @ptrCast(@alignCast(ctx));
-            task_fn(typed[index]);
-        }
-    };
-    return runLowLatency(Adapter.run, @ptrCast(tasks.ptr), tasks.len);
+pub fn runTypedLowLatency(comptime T: type, comptime task_fn: fn (T) void, tasks: []const T) bool {
+    return referenceResources().runTypedLowLatency(T, task_fn, tasks);
 }
-
 pub fn shutdown() void {
-    default_owner.get().drainAndReset();
+    if (comptime !options.reference_compat) @compileError("legacy shutdown requires reference_compat");
+    execution.reference.get().drainAndReset();
 }
 
 const WrapperTestWork = struct {

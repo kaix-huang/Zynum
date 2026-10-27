@@ -14,7 +14,7 @@ fn close(owner: *E.context.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn expectValue(comptime T: type, expected: T, actual: T) !void {
     const tolerance: S.Real(T) = if (S.Real(T) == f32) 3e-5 else 3e-12;
@@ -140,8 +140,10 @@ fn HermitianAction(comptime T: type) type {
 }
 test "Contour quadrature both rules feed shared rational solver and recover analytic complex projector" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| for ([_]Q.Rule{ .midpoint_trapezoidal, .gauss_legendre }) |rule| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var backend = HermitianAction(T){};
         var nodes: [64]T = undefined;
         var weights: [64]T = undefined;
@@ -149,7 +151,7 @@ test "Contour quadrature both rules feed shared rational solver and recover anal
         const input = [_]T{ z(T, 1, 0.25), z(T, -0.5, 1), z(T, -1, -2), z(T, 0.75, -0.25) };
         var output: [6]T = @splat(z(T, 77, -33));
         const shape: D.PanelShape = .{ .row_count = 2, .column_count = 2, .leading_dimension = 2, .layout = .column_major };
-        const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &output, .shape = shape }, .global_dimension = 2, .max_iterations = 16, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
+        const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &output, .shape = shape }, .global_dimension = 2, .max_iterations = 16, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(@as(usize, 128), result.completed_systems);
         try std.testing.expectEqual(backend.calls, result.action_count);
@@ -162,4 +164,10 @@ test "Contour quadrature both rules feed shared rational solver and recover anal
         try std.testing.expectEqualDeep(z(T, 77, -33), output[4]);
         try std.testing.expectEqualDeep(z(T, 77, -33), output[5]);
     };
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

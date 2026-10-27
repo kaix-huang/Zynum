@@ -181,3 +181,8 @@ pub fn multiplyComplexMatricesAdmitted(comptime T: type, operation: *const @impo
         args.output.leading_dimension,
     );
 }
+
+/// Pointer operands have already passed the public view, shape and alias checks.
+pub fn multiplyF64NNExplicit(operation: *const @import("zynum-execution").Operation, args: operands.MatrixProduct(f64), report: *@import("zynum-execution").CallReport) @import("zynum-execution").ExecutionError!void {
+    try @import("../matrix_matrix/gemm.zig").gemmF64NNExplicit(operation, args, report);
+}

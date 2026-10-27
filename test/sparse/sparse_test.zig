@@ -491,7 +491,7 @@ const AdmissionProbe = struct {
     var admitted: usize = 0;
     var finished: usize = 0;
     fn observe(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
-        if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get() or ctx.snapshot().active_operations != 1)
+        if (ctx != admission_execution.getContext() or fixtureExecutor(ctx) != admission_execution.get() or ctx.snapshot().active_operations != 1)
             @panic("direct Sparse admission owner/count mismatch");
         const active = watches orelse @panic("unexpected nested or unarmed default call");
         switch (event) {
@@ -824,19 +824,21 @@ test "checked Sparse SpMV borrows one closable operation after close request wit
     AdmissionProbe.install();
     defer AdmissionProbe.restore(); // Unarmed: any accidental default entry panics.
     const Context = admission_execution.context.Context;
-    var ctx = Context.init(std.heap.c_allocator, admission_execution.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.heap.c_allocator, admission_execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     const offsets = [_]u32{ 0, 1 };
     const indices = [_]u32{0};
     const values = [_]f64{3};
     const input = [_]f64{2};
     var output = [_]f64{ 5, 91 };
     const a: sparse.ConstCsrMatrix(f64, u32) = .{ .row_offsets = &offsets, .column_indices = &indices, .values = &values, .row_count = 1, .column_count = 1 };
-    Context.testing.configure(&ctx, 1, null);
+    Context.testing.configure(ctx, 1, null);
     var operation = try ctx.begin();
     var ended = false;
     defer if (!ended) operation.end();
     try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     try admission_core.internal.sparse_checked.matrixVectorMultiplyAdmitted(&operation, .{ .matrix = a, .input_vector = &input, .result_vector = output[0..1], .product_scale = 2, .result_scale = -1 });
     try std.testing.expectEqualSlices(f64, &.{ 7, 91 }, &output);
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
@@ -845,7 +847,19 @@ test "checked Sparse SpMV borrows one closable operation after close request wit
     try std.testing.expectEqualSlices(f64, &.{ 7, 91 }, &output);
     operation.end();
     ended = true;
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectError(error.Closing, ctx.begin());
     try std.testing.expectEqualSlices(f64, &.{ 7, 91 }, &output);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn fixtureExecutor(ctx: *@import("zynum-execution").Context) *@import("zynum-execution").reference.owner.Executor {
+    const fixture_execution = @import("zynum-execution");
+    if (ctx == fixture_execution.reference.getContext()) return @ptrCast(@alignCast(ctx.binding.legacy.userdata));
+    const wrapper: *FixtureReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
 }

@@ -12,7 +12,7 @@ test "GESV shared raw route admits once and rejects a closing Context before ope
     var a = [_]f64{ 0, 2, 1, 3 };
     var b = [_]f64{ 6, 10 };
     var pivots: [2]i32 = undefined;
-    try s.expectInfo(i32, 0, try owner.Shared.gesvRawManaged(false, f64, i32, .work, &rig.context, .{ .layout = 101, .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr, .pivots = pivots[0..].ptr }));
+    try s.expectInfo(i32, 0, try owner.Shared.gesvRawManaged(false, f64, i32, .work, rig.context, .{ .layout = 101, .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr, .pivots = pivots[0..].ptr }));
     try std.testing.expectEqualSlices(f64, &.{ 1, 3 }, &b);
     var starts: usize = 0;
     var ends: usize = 0;
@@ -23,7 +23,7 @@ test "GESV shared raw route admits once and rejects a closing Context before ope
     try std.testing.expectEqual(@as(usize, 1), starts);
     try std.testing.expectEqual(@as(usize, 1), ends);
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.gesvRawManaged(false, f64, i32, .work, &rig.context, undefined));
+    try std.testing.expectError(error.Closing, owner.Shared.gesvRawManaged(false, f64, i32, .work, rig.context, undefined));
 }
 
 test "GESV parameter and NaN diagnostics preserve caller outputs" {
@@ -88,7 +88,7 @@ test "GESV managed closing during callbacks retains one operation through all fr
         var a = [_]f64{ 0, 2, 1, 3 };
         var b = [_]f64{ 6, 10 };
         var pivots: [2]i64 = undefined;
-        const result = try owner.GesvAdapter.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .n = if (trigger == .hook) -1 else 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = &a, .b = &b, .pivots = &pivots });
+        const result = try owner.GesvAdapter.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .n = if (trigger == .hook) -1 else 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = &a, .b = &b, .pivots = &pivots });
         try s.expectInfo(i64, if (trigger == .hook) -2 else 0, result);
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);

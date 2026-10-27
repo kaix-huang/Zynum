@@ -148,7 +148,7 @@ test "complex GELSD shared raw managed high work query capture one original oper
             args.column.rank = null;
             args.column.rcond = std.math.nan(Core.Scalar.Real(C));
         }
-        try std.testing.expectEqual(@as(i32, 0), try project(try Shared.complexGelsdRawManagedWithDefaults(scan, C, i32, level, &r.context, args, .{})));
+        try std.testing.expectEqual(@as(i32, 0), try project(try Shared.complexGelsdRawManagedWithDefaults(scan, C, i32, level, r.context, args, .{})));
         if (query) {
             try bytes(&before.a, &f.a);
             try bytes(&before.b, &f.b);
@@ -195,7 +195,7 @@ test "complex GELSD unchecked nonfinite A B and NaN cutoff return projectable fa
             else => unreachable,
         }
         const before = f;
-        const result = try Shared.complexGelsdRawManagedWithDefaults(scan, C, i32, level, &r.context, args, .{});
+        const result = try Shared.complexGelsdRawManagedWithDefaults(scan, C, i32, level, r.context, args, .{});
         try numerical(result, if (location == 2) error.InvalidTolerance else error.NonFiniteInput);
         try bytes(&before.b, &f.b);
         try bytes(&before.rank, &f.rank);
@@ -228,7 +228,7 @@ test "complex GELSD shared enabled high NaN scanning retains minus5 minus7 minus
             else => unreachable,
         }
         const before = f;
-        try std.testing.expectEqual(@as(i32, if (location == 0) -5 else if (location == 1) -7 else -10), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C, i32, .high, &r.context, args, .{})));
+        try std.testing.expectEqual(@as(i32, if (location == 0) -5 else if (location == 1) -7 else -10), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C, i32, .high, r.context, args, .{})));
         try bytes(&before.b, &f.b);
         try bytes(&before.rank, &f.rank);
         try done(&r, 0);
@@ -253,7 +253,7 @@ test "complex GELSD infinite cutoffs retain reference comparison normalization a
         defer std.testing.allocator.free(w);
         var args = f.args(scan, w, @intCast(w.len));
         args.column.rcond = if (negative) -std.math.inf(Core.Scalar.Real(C)) else std.math.inf(Core.Scalar.Real(C));
-        try std.testing.expectEqual(@as(i32, 0), try project(try Shared.complexGelsdRawManagedWithDefaults(scan, C, i32, level, &r.context, args, .{})));
+        try std.testing.expectEqual(@as(i32, 0), try project(try Shared.complexGelsdRawManagedWithDefaults(scan, C, i32, level, r.context, args, .{})));
         try f.verify(&before);
         try done(&r, null);
         try snapshotSingle(if (scan and level == .high) 1 else 0);
@@ -315,7 +315,10 @@ test "complex GELSD shared defaults are call local captured before allocation an
         defer r.done() catch @panic("capture cleanup");
         var changing: CaptureAllocator = .{ .original = r.x.allocator(), .replacement = .{ .lapacke = next.callback(), .fortran_returning_test = next.callback() } };
         const test_state = r.context.test_state;
-        r.context = Ctx.Context.init(changing.allocator(), Core.Execution.test_support.policy, .internal_closable);
+        _ = r.context.requestClose();
+        try std.testing.expectEqual(@import("zynum-execution").CloseResult.closed, fixtureProgressClose(r.context));
+        r.reference_context.initInPlace(changing.allocator(), Core.Execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        r.context = r.reference_context.borrowedContext();
         r.context.test_state = test_state;
         r.x.fail_at = 0;
         var f = Fixture(C, i32).init(102);
@@ -324,7 +327,7 @@ test "complex GELSD shared defaults are call local captured before allocation an
         defer std.testing.allocator.free(w);
         var args = f.args(true, w, @intCast(w.len));
         const defaults: cfg.Callbacks = .{ .lapacke = first.callback(), .fortran_returning_test = first.callback() };
-        try std.testing.expectEqual(@as(i32, -1010), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C, i32, .high, &r.context, args, defaults)));
+        try std.testing.expectEqual(@as(i32, -1010), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C, i32, .high, r.context, args, defaults)));
         try std.testing.expect(changing.switched);
         try std.testing.expectEqual(@as(usize, 1), first.calls);
         try std.testing.expectEqual(@as(usize, 0), next.calls);
@@ -335,7 +338,7 @@ test "complex GELSD shared defaults are call local captured before allocation an
         try std.testing.expectEqual(@as(usize, 1), eventCount(&r, .admitted));
         try std.testing.expectEqual(@as(usize, 1), eventCount(&r, .finishing));
         args.layout = 777;
-        try std.testing.expectEqual(@as(i32, -1), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C, i32, .work, &r.context, args, defaults)));
+        try std.testing.expectEqual(@as(i32, -1), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C, i32, .work, r.context, args, defaults)));
         try std.testing.expectEqual(@as(usize, 1), first.calls);
         try std.testing.expectEqual(@as(usize, 1), next.calls);
         try std.testing.expectEqual(@as(usize, 2), cfg.testing.snapshot().captures);
@@ -361,7 +364,7 @@ test "complex GELSD shared defaults are call local captured before allocation an
     defer std.testing.allocator.free(w);
     var args = f.args(true, w, @intCast(w.len));
     args.column.m = -1;
-    try std.testing.expectEqual(@as(i32, -2), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C64, i32, .work, &r.context, args, .{ .lapacke = fallback.callback(), .fortran_returning_test = fallback.callback() })));
+    try std.testing.expectEqual(@as(i32, -2), try project(try Shared.complexGelsdRawManagedWithDefaults(true, C64, i32, .work, r.context, args, .{ .lapacke = fallback.callback(), .fortran_returning_test = fallback.callback() })));
     try std.testing.expectEqual(@as(usize, 0), selected.calls);
     try std.testing.expectEqual(@as(usize, 1), fallback.calls);
     try std.testing.expectEqual(owner.common.HookKind.fortran_returning_test, fallback.last.?.kind);
@@ -422,7 +425,7 @@ test "complex GELSD default wrapper preserves the one immortal actual Context af
         calls += 1;
     };
     try std.testing.expect(context == @import("zynum-execution").getContext());
-    try std.testing.expectEqual(Ctx.Lifetime.immortal_default, context.lifetime);
+    try std.testing.expectEqual(@import("zynum-execution").reference.LegacyLifetime.immortal_default, context.binding.legacy.lifetime);
     try std.testing.expectEqual(calls, default_admissions);
     try std.testing.expectEqual(calls, default_finishes);
     try std.testing.expectEqual(@as(usize, 1), default_max_active);
@@ -442,7 +445,7 @@ test "complex GELSD real Column exhaustion returns own one token and stable nume
         const w = try workFor(C);
         defer std.testing.allocator.free(w);
         const args = f.args(true, w, @intCast(w.len));
-        const result = try owner.RawComplexGelsdColumnWork.callManaged(C, I, &r.context, &r.services, args.column, .{ .max_sweeps = 0 });
+        const result = try owner.RawComplexGelsdColumnWork.callManaged(C, I, r.context, &r.services, args.column, .{ .max_sweeps = 0 });
         try std.testing.expectEqual(@as(i32, 1), try project(result));
         switch (result) {
             .lapacke_info => |i| try std.testing.expectEqual(@as(I, 1), i),
@@ -474,7 +477,7 @@ test "complex GELSD real Column exhaustion returns own one token and stable nume
         defer std.testing.allocator.free(w);
         const args: owner.RawComplexGelsdColumnWork.Arguments(C, i32) = .{ .m = 2, .n = 1, .nrhs = 1, .lda = 2, .ldb = 2, .a = raw(C, &a), .b = raw(C, &b), .singular = raw(R, &singular), .rank = raw(i32, &rank), .rcond = -1, .work = raw(C, w), .lwork = p.work, .rwork = raw(R, &rw), .iwork = raw(i32, &iw) };
         const options: Core.ComplexRankLeastSquares.Options = if (scenario == 0) .{ .relative_tolerance = 1e-30 } else if (scenario == 1) .{ .relative_tolerance = 0 } else .{};
-        try numerical(try owner.RawComplexGelsdColumnWork.callManaged(C, i32, &r.context, &r.services, args, options), if (scenario == 0) error.RangeLimit else if (scenario == 1) error.InvalidTolerance else error.NonFiniteResult);
+        try numerical(try owner.RawComplexGelsdColumnWork.callManaged(C, i32, r.context, &r.services, args, options), if (scenario == 0) error.RangeLimit else if (scenario == 1) error.InvalidTolerance else error.NonFiniteResult);
         try bytes(&before, &b);
         try bytes(&original_rank, &rank);
         try done(&r, 0);
@@ -489,4 +492,10 @@ test "complex GELSD minimum WORK honors reference f32 ILAENV6 conversion at larg
         try std.testing.expectEqual(@as(I, 9437194), try policy.minimumWork(I, 4194308, 2621443, 0));
         try std.testing.expectEqual(@as(I, 7864329), try policy.minimumWork(I, 4194309, 2621443, 0));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

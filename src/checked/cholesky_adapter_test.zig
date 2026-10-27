@@ -61,16 +61,20 @@ test "generated checked Cholesky enters one default admission and ends after wri
 test "checked factor storage survives its admitted Context close and is reused by another Context without allocations" {
     inline for (.{ core.lapack.ComplexF32, core.lapack.ComplexF64 }) |T| {
         var allocations: execution.test_support.Allocations = .{ .budget = 0 };
-        var first = C.Context.init(allocations.allocator(), execution.test_support.policy, .internal_closable);
+        var reference_first: FixtureReferenceContext = undefined;
+        reference_first.initInPlace(allocations.allocator(), execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const first = reference_first.borrowedContext();
         var a = [_]T{.{ .re = 4, .im = 0 }};
         var admission = try first.begin();
         try std.testing.expectEqual(C.RequestResult.pending, first.requestClose());
-        try std.testing.expectEqual(C.CloseResult.busy, first.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(first));
         try std.testing.expectEqual(@as(usize, 0), try core.internal.lapack_checked.choleskyFactorizeAdmitted(&admission, T, .{ .values = &a, .row_count = 1, .column_count = 1, .leading_dimension = 1 }, .lower));
         admission.end();
-        try std.testing.expectEqual(C.CloseResult.closed, first.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(first));
         const saved = a;
-        var second = C.Context.init(allocations.allocator(), execution.test_support.policy, .internal_closable);
+        var reference_second: FixtureReferenceContext = undefined;
+        reference_second.initInPlace(allocations.allocator(), execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const second = reference_second.borrowedContext();
         for (0..3) |_| {
             var b = [_]T{.{ .re = 12, .im = 4 }};
             var op = try second.begin();
@@ -80,7 +84,13 @@ test "checked factor storage survives its admitted Context close and is reused b
             try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&a));
         }
         try std.testing.expectEqual(C.RequestResult.pending, second.requestClose());
-        try std.testing.expectEqual(C.CloseResult.closed, second.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(second));
         try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

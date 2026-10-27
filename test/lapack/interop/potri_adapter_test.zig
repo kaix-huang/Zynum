@@ -57,7 +57,7 @@ fn numerical(comptime T: type, comptime I: type, comptime raw: bool, managed: bo
         var rig: h.Rig = .{};
         rig.init();
         rig.services.allocator = undefined;
-        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, &rig.context, &rig.services, args));
+        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, rig.context, &rig.services, args));
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, if (level == .high) 1 else 0), rig.reads);
         try std.testing.expectEqual(@as(usize, if (layout == 101) 2 else 1), rig.x.attempts);
@@ -174,7 +174,7 @@ test "POTRI empty raw pointers are unread and singleton inverses borrow no wide 
         var rig: h.Rig = .{};
         rig.init();
         rig.services.allocator = undefined;
-        try s.expectInfo(I, 0, try A.callManaged(T, I, level, &rig.context, &rig.services, .{ .layout = layout, .uplo = 'U', .n = 1, .a = &a, .lda = 5 }));
+        try s.expectInfo(I, 0, try A.callManaged(T, I, level, rig.context, &rig.services, .{ .layout = layout, .uplo = 'U', .n = 1, .a = &a, .lda = 5 }));
         try std.testing.expectEqual(s.value(T, 0.25, 0), a[0]);
         try std.testing.expectEqual(@as(usize, if (layout == 101) 1 else 0), rig.x.attempts);
         try rig.done();
@@ -188,7 +188,7 @@ test "POTRI singular preflight preserves all A bytes and bypasses intrinsic wide
             var rig: h.Rig = .{};
             rig.init();
             rig.x.fail_at = if (layout == 101) 1 else 0;
-            try s.expectInfo(I, 2, try A.callManaged(T, I, .work, &rig.context, &rig.services, .{ .layout = layout, .uplo = 'L', .n = 2, .a = &a, .lda = 2 }));
+            try s.expectInfo(I, 2, try A.callManaged(T, I, .work, rig.context, &rig.services, .{ .layout = layout, .uplo = 'L', .n = 2, .a = &a, .lda = 2 }));
             try s.bytes(&before, &a);
             try std.testing.expectEqual(@as(usize, if (layout == 101) 1 else 0), rig.x.attempts);
             try std.testing.expectEqual(@as(usize, 0), rig.hooks);
@@ -207,7 +207,7 @@ test "POTRI transpose and intrinsic workspace OOM have distinct INFO and release
             rig.init();
             rig.x.fail_at = fail_at;
             const expected: i64 = if (layout == 101 and fail_at == 0) -1011 else -1010;
-            try s.expectInfo(i64, expected, try A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = layout, .uplo = 'U', .n = 2, .a = &a, .lda = 2 }));
+            try s.expectInfo(i64, expected, try A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = layout, .uplo = 'U', .n = 2, .a = &a, .lda = 2 }));
             try s.bytes(&before, &a);
             try std.testing.expectEqual(fail_at + 1, rig.x.attempts);
             try std.testing.expectEqual(fail_at, rig.x.frees);
@@ -233,7 +233,7 @@ test "POTRI captured allocator and services survive getter allocation and free c
         rig.b = &a;
         rig.expect_copyback = false;
         rig.free_observer = expectFullInverseAtFree;
-        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .n = 2, .a = &a, .lda = 3 }));
+        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .n = 2, .a = &a, .lda = 3 }));
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, 2), rig.x.frees);
@@ -257,8 +257,8 @@ test "POTRI address capacity and pin counter failures preserve A outside INFO" {
     for ([_]usize{ 0, 1 }) |limit| {
         var rig: h.Rig = .{};
         rig.init();
-        h.C.Context.testing.configure(&rig.context, limit, null);
-        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .n = 2, .a = &a, .lda = 2 }));
+        h.C.Context.testing.configure(rig.context, limit, null);
+        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .n = 2, .a = &a, .lda = 2 }));
         try std.testing.expectEqual(limit, rig.x.attempts);
         try std.testing.expectEqual(limit, rig.x.frees);
         try std.testing.expectEqual(@as(usize, 0), rig.hooks);
@@ -275,8 +275,8 @@ test "POTRI own configured Core and shared routes reject close before callbacks 
     rig.init();
     _ = rig.context.requestClose();
     const args: Raw.Arguments(f64, i64) = .{ .layout = 102, .uplo = 'U', .n = 0, .a = null, .lda = 1 };
-    try std.testing.expectError(error.Closing, owner.Shared.potriRawManaged(false, f64, i64, .work, &rig.context, args));
-    try std.testing.expectError(error.Closing, Raw.callManaged(f64, i64, .high, &rig.context, @ptrFromInt(@alignOf(A.Services)), args));
+    try std.testing.expectError(error.Closing, owner.Shared.potriRawManaged(false, f64, i64, .work, rig.context, args));
+    try std.testing.expectError(error.Closing, Raw.callManaged(f64, i64, .high, rig.context, @ptrFromInt(@alignOf(A.Services)), args));
     try std.testing.expectEqual(@as(usize, 0), rig.count);
     try rig.done();
 }
@@ -287,7 +287,7 @@ test "POTRI returning Fortran diagnostics retain live admission and transpose pi
     rig.trigger = .hook;
     rig.action = .close_nested;
     rig.rebind = true;
-    try s.expectInfo(i64, -3, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .n = -1, .a = null, .lda = 0 }));
+    try s.expectInfo(i64, -3, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .n = -1, .a = null, .lda = 0 }));
     try std.testing.expectEqual(error.Closing, rig.nested_error.?);
     try std.testing.expectEqual(@as(usize, 1), rig.hooks);
     try std.testing.expectEqual(@as(usize, 1), rig.reads);
@@ -316,7 +316,7 @@ test "POTRI concurrent close waits for paused wide free after numerical copyback
         result: ?A.Result(i64) = null,
         failure: ?anyerror = null,
         fn run(self: *@This()) void {
-            self.result = A.callManaged(f64, i64, .work, &self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = 'L', .n = 2, .a = self.a, .lda = 3 }) catch |err| {
+            self.result = A.callManaged(f64, i64, .work, self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = 'L', .n = 2, .a = self.a, .lda = 3 }) catch |err| {
                 self.failure = err;
                 return;
             };
@@ -338,12 +338,12 @@ test "POTRI concurrent close waits for paused wide free after numerical copyback
         }
         h.execution.test_support.wait(&rig.paused);
         try std.testing.expectEqual(h.C.RequestResult.pending, rig.context.requestClose());
-        try std.testing.expectEqual(h.C.CloseResult.busy, rig.context.tryProgressClose());
+        try std.testing.expectEqual(h.C.CloseResult.busy, fixtureProgressClose(rig.context));
         const snapshot = rig.context.snapshot();
         try std.testing.expectEqual(@as(usize, 1), snapshot.active_operations);
         try std.testing.expectEqual(@as(usize, 2), snapshot.resource_pins);
         try std.testing.expectEqualSlices(f64, &.{ 16448, -900, 20 }, a[0..3]);
-        try std.testing.expectError(error.Closing, owner.Shared.potriRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .uplo = 'U', .n = 0, .a = null, .lda = 1 }));
+        try std.testing.expectError(error.Closing, owner.Shared.potriRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .uplo = 'U', .n = 0, .a = null, .lda = 1 }));
     }
     try std.testing.expect(call.failure == null);
     try s.expectInfo(i64, 0, call.result.?);
@@ -375,9 +375,9 @@ test "POTRI all five shared routes use the original owner and agree on the numer
         const typed: A.Arguments(f64, i32) = .{ .layout = 102, .uplo = 'L', .n = 2, .a = &a, .lda = 2 };
         const raw: Raw.Arguments(f64, i32) = .{ .layout = 102, .uplo = 'L', .n = 2, .a = a[0..].ptr, .lda = 2 };
         switch (route) {
-            0 => try s.expectInfo(i32, 0, try owner.Shared.potriManaged(false, f64, i32, .high, &rig.context, typed)),
-            1 => try s.expectInfo(i32, 0, try owner.Shared.potriRawManaged(false, f64, i32, .work, &rig.context, raw)),
-            2 => try s.expectInfo(i32, 0, try owner.Shared.potriRawManagedWithDefaults(false, f64, i32, .high, &rig.context, raw, .{})),
+            0 => try s.expectInfo(i32, 0, try owner.Shared.potriManaged(false, f64, i32, .high, rig.context, typed)),
+            1 => try s.expectInfo(i32, 0, try owner.Shared.potriRawManaged(false, f64, i32, .work, rig.context, raw)),
+            2 => try s.expectInfo(i32, 0, try owner.Shared.potriRawManagedWithDefaults(false, f64, i32, .high, rig.context, raw, .{})),
             3 => try s.expectInfo(i32, 0, try owner.Shared.potriDefault(false, f64, i32, .high, typed)),
             4 => try s.expectInfo(i32, 0, try owner.Shared.potriRawDefault(false, f64, i32, .work, raw)),
             else => unreachable,
@@ -449,7 +449,7 @@ test "POTRI managed widths layouts and triangles retain underflowed-factor Hermi
             const before = a;
             var rig: h.Rig = .{};
             rig.init();
-            try s.expectInfo(I, 0, try A.callManaged(T, I, .high, &rig.context, &rig.services, .{ .layout = layout, .uplo = if (upper) 'U' else 'L', .n = 4, .a = &a, .lda = 5 }));
+            try s.expectInfo(I, 0, try A.callManaged(T, I, .high, rig.context, &rig.services, .{ .layout = layout, .uplo = if (upper) 'U' else 'L', .n = 4, .a = &a, .lda = 5 }));
             const value = a[s.pos(layout, if (upper) 0 else 2, if (upper) 2 else 0, 5)];
             try std.testing.expectEqual(s.value(T, -small, if (upper) small else -small), value);
             for (0..a.len) |index| {
@@ -512,7 +512,7 @@ test "POTRI scalar width raw spans typed capacity and metadata overflow remain a
         }
         var rig: h.Rig = .{};
         rig.init();
-        try fault(error.SizeOverflow, try Raw.callManaged(T, i64, .work, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .n = std.math.maxInt(i64), .a = @ptrFromInt(1), .lda = std.math.maxInt(i64) }));
+        try fault(error.SizeOverflow, try Raw.callManaged(T, i64, .work, rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .n = std.math.maxInt(i64), .a = @ptrFromInt(1), .lda = std.math.maxInt(i64) }));
         try std.testing.expectEqual(@as(usize, 0), rig.x.attempts);
         try std.testing.expectEqual(@as(usize, 0), rig.hooks);
         try rig.done();
@@ -530,7 +530,7 @@ test "POTRI all scalar width and level OOM positions free prior leases and retai
             rig.services.allocator = undefined;
             rig.x.fail_at = position;
             const info: I = if (layout == 101 and position == 0) -1011 else -1010;
-            try s.expectInfo(I, info, try A.callManaged(T, I, level, &rig.context, &rig.services, .{ .layout = layout, .uplo = 'L', .n = 2, .a = &a, .lda = 2 }));
+            try s.expectInfo(I, info, try A.callManaged(T, I, level, rig.context, &rig.services, .{ .layout = layout, .uplo = 'L', .n = 2, .a = &a, .lda = 2 }));
             try s.bytes(&before, &a);
             try std.testing.expectEqual(position + 1, rig.x.attempts);
             try std.testing.expectEqual(position, rig.x.frees);
@@ -556,4 +556,9 @@ test "POTRI all scalar width and level OOM positions free prior leases and retai
     try std.testing.expectEqual(@as(usize, 1), ctx.hook_count);
     try std.testing.expectEqual(@as(usize, 0), ctx.live);
     try s.bytes(&before, &a);
+}
+
+fn fixtureProgressClose(ctx: *@import("managed_support.zig").Core.Execution.Context) @import("managed_support.zig").Core.Execution.CloseResult {
+    var report: @import("managed_support.zig").Core.Execution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

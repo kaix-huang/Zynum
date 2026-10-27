@@ -32,7 +32,7 @@ fn finish(owner: *Ctx.Context, alloc: *F.Allocations) !void {
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     _ = owner.requestClose();
-    try E.expectEqual(Ctx.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(owner));
     try E.expectEqual(alloc.stats().accepted, alloc.stats().freed);
 }
 fn argument(comptime raw: bool, comptime T: type, slice: []T) B.common.access.Operand(T, true, if (raw) .raw else .typed) {
@@ -69,7 +69,9 @@ test "EVD frontends query every workspace slot without allocation after close" {
         const R = S.Real(T);
         const complex = S.isComplex(T);
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         _ = owner.requestClose();
         for (0..if (complex) @as(usize, 3) else 2) |slot| {
@@ -86,7 +88,7 @@ test "EVD frontends query every workspace slot without allocation after close" {
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -94,7 +96,9 @@ test "EVD scalar row precedence and query nonreads preserve workspace heads" {
     inline for (types) |T| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var work = [_]T{value(T, 999, 33)};
         var real = [_]R{999};
@@ -129,7 +133,7 @@ test "EVD scalar row precedence and query nonreads preserve workspace heads" {
         args.layout = 102;
         try E.expectEqual(@as(i32, -2), try A.workAdmitted(T, &op, args));
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     }
 }
 
@@ -139,7 +143,9 @@ test "EVD workspace errors retain public positions before unused outputs" {
         const family: P.Family = if (S.isComplex(T)) .complex else .real;
         const required = try P.minimumWorkspace(i32, 2, true, family);
         var alloc: F.Allocations = .{ .budget = 256 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var matrix = [_]T{ value(T, 4, 0), value(T, 1, 0), value(T, 1, 0), value(T, 3, 0) };
         const original = matrix;
@@ -156,7 +162,7 @@ test "EVD workspace errors retain public positions before unused outputs" {
             for ([_]usize{ 0, 2, 3 }) |i| try eqBytes(T, original[i .. i + 1], matrix[i .. i + 1]);
         }
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -166,9 +172,11 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, uppe
     const complex = S.isComplex(T);
     const eps: f64 = std.math.floatEps(R) * 400;
     var alloc: F.Allocations = .{ .budget = 256 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
-    var recorder: Recorder = .{ .owner = &owner };
+    var recorder: Recorder = .{ .owner = owner };
     var matrix: [10]T = @splat(value(T, -997, 0));
     const im: f64 = if (complex) 0.5 else 0;
     matrix[at(layout, 0, 0, 4)] = value(T, 4, 0);
@@ -215,7 +223,7 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, uppe
         if (complex) try E.expectEqual(@as(R, 73), real[@intCast(required.rwork)]);
     }
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 test "EVD all scalar typed raw high work layouts and triangles satisfy analytic residuals" {
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |upper| for ([_]bool{ false, true }) |wants| for ([_]bool{ false, true }) |high| try numeric(T, raw, high, layout, upper, wants);
@@ -225,9 +233,11 @@ test "EVD high NaN scan order and diagnostic channels retain routine identity" {
     inline for (types) |T| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 256 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var matrix = [_]T{value(T, std.math.nan(f64), 0)};
         var values = [_]R{73};
         var work = [_]T{value(T, 73, 0)};
@@ -255,7 +265,7 @@ test "EVD high NaN scan order and diagnostic channels retain routine identity" {
         try E.expectEqual(@as(i32, 0), try A.highAdmitted(false, T, &op, &rec.services(), args));
         try E.expectEqual(scans, rec.nan_calls);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     }
 }
 
@@ -266,9 +276,11 @@ test "EVD high allocation failures release all scratch and report exactly one er
         var successes: usize = 0;
         for (0..8) |budget| {
             var alloc: F.Allocations = .{ .budget = budget };
-            var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
             var op = try owner.begin();
-            var rec: Recorder = .{ .owner = &owner };
+            var rec: Recorder = .{ .owner = owner };
             var matrix = [_]T{ value(T, 4, 0), value(T, 1, 0), value(T, 1, 0), value(T, 3, 0) };
             const original = matrix;
             var values = [_]R{ 73, 73 };
@@ -287,7 +299,7 @@ test "EVD high allocation failures release all scratch and report exactly one er
             }
             if (budget == 0) try E.expectEqual(@as(i32, -1010), info);
             op.end();
-            try finish(&owner, &alloc);
+            try finish(owner, &alloc);
         }
         try E.expect(failures != 0 and successes != 0);
     };
@@ -297,7 +309,9 @@ test "EVD zero singleton and oversized claimed lengths touch only actual quick-r
     inline for (types) |T| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var work = [_]T{value(T, 73, 0)};
         var real = [_]R{73};
@@ -320,13 +334,15 @@ test "EVD zero singleton and oversized claimed lengths touch only actual quick-r
         try E.expectEqual(@as(f64, 73), part(T, matrix[1]));
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     }
 }
 
 test "EVD query destinations reject missing misaligned and overlapping outputs before writes" {
     var alloc: F.Allocations = .{ .budget = 0 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var work = [_]f64{73};
     var integers = [_]i32{73};
@@ -342,16 +358,18 @@ test "EVD query destinations reject missing misaligned and overlapping outputs b
     for (bytes) |x| try E.expectEqual(@as(u8, 73), x);
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 
 test "EVD frontend nonconvergence encodes the actual failed submatrix" {
     inline for (types) |T| for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |wants| {
         const R = S.Real(T);
         var alloc: F.Allocations = .{ .budget = 256 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var matrix: [49]T = @splat(value(T, 0, 0));
         const diagonal = [_]f64{ 11, 13, 4, -1, 5, 17, 19 };
         for (diagonal, 0..) |x, i| matrix[at(layout, i, i, 7)] = value(T, x, 0);
@@ -366,22 +384,30 @@ test "EVD frontend nonconvergence encodes the actual failed submatrix" {
         try E.expectEqual(@as(i32, if (wants) 29 else 2), try A.workWithDiagnosticsAdmitted(T, &op, &rec.services(), args));
         try E.expectEqual(@as(usize, 0), rec.count);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
 test "EVD managed raw bridge captures the existing callbacks and closes its one operation" {
     inline for (types) |T| {
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
-        var rec: Recorder = .{ .owner = &owner };
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        var rec: Recorder = .{ .owner = owner };
         const callback: B.shared_services.Callback = .{ .userdata = &rec, .function = Recorder.event };
         const args: Raw.Arguments(T) = .{ .layout = 99, .jobz = 'V', .uplo = 'L', .n = 0, .lda = 1 };
-        try E.expectEqual(@as(i32, -1), try B.Shared.evdRawManagedWithDefaults(true, T, .high, &owner, args, .{ .lapacke = callback, .fortran_returning_test = callback }));
+        try E.expectEqual(@as(i32, -1), try B.Shared.evdRawManagedWithDefaults(true, T, .high, owner, args, .{ .lapacke = callback, .fortran_returning_test = callback }));
         try E.expectEqual(@as(usize, 1), rec.count);
         try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
-        try finish(&owner, &alloc);
-        try E.expectError(error.Closing, B.Shared.evdRawManagedWithDefaults(true, T, .high, &owner, args, .{}));
+        try finish(owner, &alloc);
+        try E.expectError(error.Closing, B.Shared.evdRawManagedWithDefaults(true, T, .high, owner, args, .{}));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

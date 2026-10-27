@@ -396,26 +396,26 @@ test "GETRF managed refusal precedes borrowed Services and raw reads and pin ove
         defer close(&r);
         var held: ?C.Operation = null;
         if (overflow) {
-            C.Context.testing.configure(&r.context, 1, null);
+            C.Context.testing.configure(r.context, 1, null);
             held = try r.context.begin();
         } else _ = r.context.requestClose();
         defer if (held) |*op| op.end();
         var services: Core.Services = undefined;
         const expected = if (overflow) error.CounterOverflow else error.Closing;
-        try std.testing.expectError(expected, A.callManaged(f64, i64, .high, &r.context, &services, args(null, null)));
-        try std.testing.expectError(expected, R.callManaged(f64, i64, .high, &r.context, &services, .{ .layout = 102, .m = 1, .n = 1, .lda = 1, .values = @ptrFromInt(1), .pivots = @ptrFromInt(1) }));
+        try std.testing.expectError(expected, A.callManaged(f64, i64, .high, r.context, &services, args(null, null)));
+        try std.testing.expectError(expected, R.callManaged(f64, i64, .high, r.context, &services, .{ .layout = 102, .m = 1, .n = 1, .lda = 1, .values = @ptrFromInt(1), .pivots = @ptrFromInt(1) }));
         try std.testing.expectEqual(@as(usize, 0), r.count);
     }
     var r: h.Rig = .{};
     r.init();
     defer close(&r);
-    C.Context.testing.configure(&r.context, 1, null);
+    C.Context.testing.configure(r.context, 1, null);
     var op = try r.context.begin();
     var held = try C.ContextScratch(u8).acquire(&op, 1);
     op.end();
     var a = [_]f64{ 2, 1, 4, 3 };
     var p = [_]i64{ -77, -77 };
-    try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, &r.context, &r.services, args(&a, &p)));
+    try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, r.context, &r.services, args(&a, &p)));
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts); // Only the held lease.
     try std.testing.expectEqual(@as(usize, 0), r.hooks);
     try std.testing.expectEqualSlices(f64, &.{ 2, 1, 4, 3 }, &a);
@@ -430,7 +430,7 @@ test "GETRF managed captures allocator and callbacks once and real OOM rolls bac
     r.rebind = true;
     var f = args(null, null);
     f.m = -1;
-    try s.expectInfo(i64, -2, try A.callManaged(f64, i64, .high, &r.context, &r.services, f));
+    try s.expectInfo(i64, -2, try A.callManaged(f64, i64, .high, r.context, &r.services, f));
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 1), r.x.frees);
     try std.testing.expectEqual(@as(usize, 0), r.y.attempts + r.z.attempts);
@@ -441,7 +441,7 @@ test "GETRF managed captures allocator and callbacks once and real OOM rolls bac
     var a = [_]f64{ 2, 1, 4, 3 };
     var p = [_]i64{ -77, -77 };
     const first = r.count;
-    try s.expectInfo(i64, -1011, try A.callManaged(f64, i64, .work, &r.context, &r.services, args(&a, &p)));
+    try s.expectInfo(i64, -1011, try A.callManaged(f64, i64, .work, r.context, &r.services, args(&a, &p)));
     var found = false;
     for (r.events[first..r.count]) |e| if (e.tag == .hook) {
         found = true;
@@ -465,7 +465,7 @@ test "GETRF managed close from getter allocator hook and free retains one operat
         var p = [_]i64{ -77, -77 };
         var f = args(&a, &p);
         if (trigger == .hook) f.m = -1;
-        try s.expectInfo(i64, if (trigger == .hook) -2 else 0, try A.callManaged(f64, i64, .high, &r.context, &r.services, f));
+        try s.expectInfo(i64, if (trigger == .hook) -2 else 0, try A.callManaged(f64, i64, .high, r.context, &r.services, f));
         try std.testing.expectEqual(error.Closing, r.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), r.max_active);
         var starts: usize = 0;
@@ -499,7 +499,8 @@ test "GETRF managed close from getter allocator hook and free retains one operat
 // This allocator inspects actual factor/pivot copyback at the real free call,
 // including positive INFO; it never supplies a fake numerical body.
 const FreeAudit = struct {
-    context: C.Context = undefined,
+    reference_context: FixtureReferenceContext = undefined,
+    context: *C.Context = undefined,
     a: [9]f64 = .{ 0, 2, 0, 0, 0, 1, 0, 4, 3 },
     p: [3]i64 = .{ -77, -77, -77 },
     allocated: bool = false,
@@ -525,7 +526,7 @@ const FreeAudit = struct {
         if (!std.mem.eql(f64, &self.a, &.{ 0, 2, 0, 0, 4, 3, 0, 0, 1 }) or !std.mem.eql(i64, &self.p, &.{ 1, 3, 3 })) @panic("free preceded completed copyback");
         const state = self.context.snapshot();
         if (state.active_operations != 1 or state.resource_pins != 1) @panic("free lost operation/pin");
-        if (self.context.requestClose() != .pending or self.context.tryProgressClose() != .busy) @panic("close during free");
+        if (self.context.requestClose() != .pending or fixtureProgressClose(self.context) != .busy) @panic("close during free");
         std.testing.allocator.rawFree(mem, alignment, ra);
         const after = self.context.snapshot();
         if (after.active_operations != 1 or after.resource_pins != 1) @panic("unpin preceded allocator return");
@@ -535,15 +536,16 @@ const FreeAudit = struct {
 
 test "GETRF singular row copyback and immediate pivots precede captured allocator free then unpin" {
     var audit: FreeAudit = .{};
-    audit.context = C.Context.init(audit.allocator(), actual_execution.test_support.policy, .internal_closable);
+    audit.reference_context.initInPlace(audit.allocator(), actual_execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    audit.context = audit.reference_context.borrowedContext();
     var services_ctx: s.Context = .{};
     var services = services_ctx.services();
     services.allocator = undefined;
-    try s.expectInfo(i64, 1, try A.callManaged(f64, i64, .work, &audit.context, &services, .{ .layout = 101, .m = 3, .n = 3, .lda = 3, .values = &audit.a, .pivots = &audit.p }));
+    try s.expectInfo(i64, 1, try A.callManaged(f64, i64, .work, audit.context, &services, .{ .layout = 101, .m = 3, .n = 3, .lda = 3, .values = &audit.a, .pivots = &audit.p }));
     try std.testing.expect(audit.freed);
     try std.testing.expectEqual(@as(usize, 0), audit.context.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), audit.context.snapshot().resource_pins);
-    try std.testing.expectEqual(C.CloseResult.closed, audit.context.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(audit.context));
     try std.testing.expectEqual(@as(usize, 0), services_ctx.attempts);
 }
 
@@ -556,9 +558,9 @@ test "GETRF shared typed and raw routes capture once and preserve admission-befo
     defer close(&r);
     var a = [_]f64{ 2, 1, 4, 3 };
     var p = [_]i64{ -77, -77 };
-    try s.expectInfo(i64, 0, try owner.Shared.getrfManaged(true, f64, i64, .high, &r.context, args(&a, &p)));
+    try s.expectInfo(i64, 0, try owner.Shared.getrfManaged(true, f64, i64, .high, r.context, args(&a, &p)));
     a = .{ 2, 1, 4, 3 };
-    try s.expectInfo(i64, 0, try owner.Shared.getrfRawManaged(true, f64, i64, .high, &r.context, .{ .layout = 101, .m = 2, .n = 2, .lda = 2, .values = a[0..].ptr, .pivots = p[0..].ptr }));
+    try s.expectInfo(i64, 0, try owner.Shared.getrfRawManaged(true, f64, i64, .high, r.context, .{ .layout = 101, .m = 2, .n = 2, .lda = 2, .values = a[0..].ptr, .pivots = p[0..].ptr }));
     try std.testing.expectEqual(@as(usize, 2), cfg.testing.snapshot().captures);
     try std.testing.expectEqual(@as(usize, 2), cfg.testing.snapshot().getter_calls);
     try std.testing.expectEqual(@as(usize, 1), r.max_active);
@@ -568,6 +570,12 @@ test "GETRF shared typed and raw routes capture once and preserve admission-befo
     };
     try std.testing.expectEqual(@as(usize, 2), starts);
     _ = r.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.getrfRawManaged(true, f64, i64, .high, &r.context, .{ .layout = 0, .m = 1, .n = 1, .lda = 1, .values = @ptrFromInt(1), .pivots = @ptrFromInt(1) }));
+    try std.testing.expectError(error.Closing, owner.Shared.getrfRawManaged(true, f64, i64, .high, r.context, .{ .layout = 0, .m = 1, .n = 1, .lda = 1, .values = @ptrFromInt(1), .pivots = @ptrFromInt(1) }));
     try std.testing.expectEqual(@as(usize, 2), cfg.testing.snapshot().captures);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

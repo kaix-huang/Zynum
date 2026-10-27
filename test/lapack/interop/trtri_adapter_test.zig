@@ -43,7 +43,7 @@ fn numerical(comptime T: type, comptime I: type, comptime raw: bool, managed: bo
         var rig: h.Rig = .{};
         rig.init();
         rig.services.allocator = undefined;
-        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, &rig.context, &rig.services, args));
+        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, rig.context, &rig.services, args));
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, if (level == .high) 1 else 0), rig.reads);
         try std.testing.expectEqual(@as(usize, if (layout == 101) 2 else 1), rig.x.attempts);
@@ -189,7 +189,7 @@ test "TRTRI singular preflight preserves all A bytes and bypasses intrinsic wide
             var rig: h.Rig = .{};
             rig.init();
             rig.x.fail_at = if (layout == 101) 1 else 0;
-            try s.expectInfo(I, 2, try A.callManaged(T, I, .work, &rig.context, &rig.services, .{ .layout = layout, .uplo = 'L', .diag = 'N', .n = 2, .a = &a, .lda = 2 }));
+            try s.expectInfo(I, 2, try A.callManaged(T, I, .work, rig.context, &rig.services, .{ .layout = layout, .uplo = 'L', .diag = 'N', .n = 2, .a = &a, .lda = 2 }));
             try s.bytes(&before, &a);
             try std.testing.expectEqual(@as(usize, if (layout == 101) 1 else 0), rig.x.attempts);
             try std.testing.expectEqual(@as(usize, 0), rig.hooks);
@@ -208,7 +208,7 @@ test "TRTRI transpose and intrinsic workspace OOM have distinct INFO and release
             rig.init();
             rig.x.fail_at = fail_at;
             const expected: i64 = if (layout == 101 and fail_at == 0) -1011 else -1010;
-            try s.expectInfo(i64, expected, try A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = layout, .uplo = 'U', .diag = 'N', .n = 2, .a = &a, .lda = 2 }));
+            try s.expectInfo(i64, expected, try A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = layout, .uplo = 'U', .diag = 'N', .n = 2, .a = &a, .lda = 2 }));
             try s.bytes(&before, &a);
             try std.testing.expectEqual(fail_at + 1, rig.x.attempts);
             try std.testing.expectEqual(fail_at, rig.x.frees);
@@ -234,7 +234,7 @@ test "TRTRI captured allocator and services survive getter allocation and free c
         rig.b = &a;
         rig.expect_copyback = true;
         rig.free_observer = expectFullInverseAtFree;
-        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .diag = 'N', .n = 2, .a = &a, .lda = 3 }));
+        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .diag = 'N', .n = 2, .a = &a, .lda = 3 }));
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, 2), rig.x.frees);
@@ -258,8 +258,8 @@ test "TRTRI address capacity and pin counter failures preserve A outside INFO" {
     for ([_]usize{ 0, 1 }) |limit| {
         var rig: h.Rig = .{};
         rig.init();
-        h.C.Context.testing.configure(&rig.context, limit, null);
-        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .diag = 'N', .n = 2, .a = &a, .lda = 2 }));
+        h.C.Context.testing.configure(rig.context, limit, null);
+        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .diag = 'N', .n = 2, .a = &a, .lda = 2 }));
         try std.testing.expectEqual(limit, rig.x.attempts);
         try std.testing.expectEqual(limit, rig.x.frees);
         try std.testing.expectEqual(@as(usize, 0), rig.hooks);
@@ -275,7 +275,7 @@ test "TRTRI own configured Core and shared routes admit once and reject close be
     var rig: h.Rig = .{};
     rig.init();
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.trtriRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .uplo = 'U', .diag = 'U', .n = 0, .a = null, .lda = 1 }));
+    try std.testing.expectError(error.Closing, owner.Shared.trtriRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .uplo = 'U', .diag = 'U', .n = 0, .a = null, .lda = 1 }));
     try std.testing.expectEqual(@as(usize, 0), rig.count);
     try rig.done();
     try s.expectInfo(i32, 0, try owner.Shared.trtriDefault(false, f64, i32, .work, .{ .layout = 102, .uplo = 'U', .diag = 'U', .n = 1, .a = null, .lda = 1 }));
@@ -288,7 +288,7 @@ test "TRTRI returning Fortran diagnostics retain live admission and transpose pi
     rig.trigger = .hook;
     rig.action = .close_nested;
     rig.rebind = true;
-    try s.expectInfo(i64, -4, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .diag = 'N', .n = -1, .a = null, .lda = 0 }));
+    try s.expectInfo(i64, -4, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .diag = 'N', .n = -1, .a = null, .lda = 0 }));
     try std.testing.expectEqual(error.Closing, rig.nested_error.?);
     try std.testing.expectEqual(@as(usize, 1), rig.hooks);
     try std.testing.expectEqual(@as(usize, 1), rig.reads);
@@ -310,7 +310,7 @@ test "TRTRI concurrent close waits for paused wide free after numerical copyback
         result: ?A.Result(i64) = null,
         failure: ?anyerror = null,
         fn run(self: *@This()) void {
-            self.result = A.callManaged(f64, i64, .work, &self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = 'L', .diag = 'N', .n = 2, .a = self.a, .lda = 3 }) catch |err| {
+            self.result = A.callManaged(f64, i64, .work, self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = 'L', .diag = 'N', .n = 2, .a = self.a, .lda = 3 }) catch |err| {
                 self.failure = err;
                 return;
             };
@@ -332,12 +332,12 @@ test "TRTRI concurrent close waits for paused wide free after numerical copyback
         }
         h.execution.test_support.wait(&rig.paused);
         try std.testing.expectEqual(h.C.RequestResult.pending, rig.context.requestClose());
-        try std.testing.expectEqual(h.C.CloseResult.busy, rig.context.tryProgressClose());
+        try std.testing.expectEqual(h.C.CloseResult.busy, fixtureProgressClose(rig.context));
         const snapshot = rig.context.snapshot();
         try std.testing.expectEqual(@as(usize, 1), snapshot.active_operations);
         try std.testing.expectEqual(@as(usize, 2), snapshot.resource_pins);
         try std.testing.expectEqualSlices(f64, &.{ 10, -900, 20 }, a[0..3]);
-        try std.testing.expectError(error.Closing, owner.Shared.trtriRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .uplo = 'U', .diag = 'U', .n = 0, .a = null, .lda = 1 }));
+        try std.testing.expectError(error.Closing, owner.Shared.trtriRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .uplo = 'U', .diag = 'U', .n = 0, .a = null, .lda = 1 }));
     }
     try std.testing.expect(call.failure == null);
     try s.expectInfo(i64, 0, call.result.?);
@@ -376,7 +376,7 @@ test "TRTRI both width and layout routes preserve scaled representable cross ent
             a[s.pos(layout, if (upper) 1 else 2, if (upper) 2 else 1, 3)] = s.value(T, large, 0);
             var rig: h.Rig = .{};
             rig.init();
-            try s.expectInfo(I, 0, try A.callManaged(T, I, .high, &rig.context, &rig.services, .{ .layout = layout, .uplo = if (upper) 'U' else 'L', .diag = 'N', .n = 3, .a = &a, .lda = 3 }));
+            try s.expectInfo(I, 0, try A.callManaged(T, I, .high, rig.context, &rig.services, .{ .layout = layout, .uplo = if (upper) 'U' else 'L', .diag = 'N', .n = 3, .a = &a, .lda = 3 }));
             const value = a[s.pos(layout, if (upper) 0 else 2, if (upper) 2 else 0, 3)];
             const expected: f128 = 1 / @as(f128, large);
             try std.testing.expectApproxEqAbs(expected, @as(f128, s.re(T, value)), expected * 1e-6);
@@ -385,4 +385,9 @@ test "TRTRI both width and layout routes preserve scaled representable cross ent
         };
     };
     try std.testing.expectEqual(@as(usize, 32), count);
+}
+
+fn fixtureProgressClose(ctx: *@import("managed_support.zig").Core.Execution.Context) @import("managed_support.zig").Core.Execution.CloseResult {
+    var report: @import("managed_support.zig").Core.Execution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

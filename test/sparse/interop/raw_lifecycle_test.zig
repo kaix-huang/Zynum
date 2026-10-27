@@ -90,10 +90,12 @@ test "raw Sparse reuses the typed family actual Core and Context without another
     try expect(Core.internal.numerics.Execution.getContext() == execution.getContext());
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, empty(), &h);
+    try Raw.createBorrowed(f64, i32, context, empty(), &h);
     var out: OutputState(f64, i32) = .{};
     out.sentinel();
     try Raw.exportBorrowed(f64, i32, h, .row, out.slots());
@@ -103,7 +105,7 @@ test "raw Sparse reuses the typed family actual Core and Context without another
     try expect(out.starts == null and out.ends == null and out.ordinals == null and out.values == null);
     try Raw.destroy(h);
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse all eight scalar index pairs preserve split gaps duplicate order and numerical bits in CSR CSC" {
@@ -124,10 +126,12 @@ test "raw Sparse all eight scalar index pairs preserve split gaps duplicate orde
                 const value_bytes = std.mem.asBytes(&values).*;
                 const ordinal_copy = ordinals;
                 for ([_]Raw.Axis{ .row, .column }) |axis| {
-                    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                    var reference_context: FixtureReferenceContext = undefined;
+                    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+                    const context = reference_context.borrowedContext();
                     const input: Raw.Input(T, I) = .{ .base = base, .rows = if (axis == .row) 3 else 2, .columns = if (axis == .row) 2 else 3, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values };
                     var h: ?Handles.Handle = null;
-                    try Raw.createBorrowed(T, I, &context, input, &h);
+                    try Raw.createBorrowed(T, I, context, input, &h);
                     var out: OutputState(T, I) = .{};
                     out.sentinel();
                     try Raw.exportBorrowed(T, I, h, axis, out.slots());
@@ -143,7 +147,7 @@ test "raw Sparse all eight scalar index pairs preserve split gaps duplicate orde
                     try Raw.destroy(h);
                     try std.testing.expectEqualSlices(u8, &value_bytes, std.mem.asBytes(&values));
                     try std.testing.expectEqualSlices(I, &ordinal_copy, &ordinals);
-                    try helpers.close(&context);
+                    try helpers.close(context);
                 }
             }
         }
@@ -156,13 +160,15 @@ test "raw Sparse null ends use real shifted offsets while explicit shifted ends 
         inline for (.{ i32, i64 }) |I| {
             for ([_]Raw.Axis{ .row, .column }) |axis| {
                 for ([_]bool{ false, true }) |null_end| {
-                    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                    var reference_context: FixtureReferenceContext = undefined;
+                    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+                    const context = reference_context.borrowedContext();
                     var offsets = [_]I{ 1, 3, 3, 4 };
                     var ordinals = [_]I{ 2, 1, 2 };
                     var values = [_]T{ number(T, 2), number(T, 3), number(T, 4) };
                     const input: Raw.Input(T, I) = .{ .base = 1, .rows = if (axis == .row) 3 else 2, .columns = if (axis == .row) 2 else 3, .axis = axis, .starts = &offsets, .ends = if (null_end) null else offsets[1..].ptr, .ordinals = &ordinals, .values = &values };
                     var h: ?Handles.Handle = null;
-                    try Raw.createBorrowed(T, I, &context, input, &h);
+                    try Raw.createBorrowed(T, I, context, input, &h);
                     var out: OutputState(T, I) = .{};
                     out.sentinel();
                     try Raw.exportBorrowed(T, I, h, axis, out.slots());
@@ -177,7 +183,7 @@ test "raw Sparse null ends use real shifted offsets while explicit shifted ends 
                     // Destroy never revalidates the now-invalid borrowed offsets.
                     try Raw.destroy(h);
                     try equal(@as(I, 5), offsets[3]);
-                    try helpers.close(&context);
+                    try helpers.close(context);
                 }
             }
         }
@@ -192,10 +198,12 @@ test "raw Sparse every zero prefix preserves NULL or unaligned original pointer 
             const unaligned_i: Raw.Pointer(I) = @ptrCast(&bytes[1]);
             const unaligned_t: Raw.Pointer(T) = @ptrCast(&bytes[1]);
             for (0..16) |mask| {
-                var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                var reference_context: FixtureReferenceContext = undefined;
+                reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+                const context = reference_context.borrowedContext();
                 const input: Raw.Input(T, I) = .{ .base = 1, .rows = 0, .columns = 7, .axis = .row, .starts = if (mask & 1 == 0) null else unaligned_i, .ends = if (mask & 2 == 0) null else unaligned_i, .ordinals = if (mask & 4 == 0) null else unaligned_i, .values = if (mask & 8 == 0) null else unaligned_t };
                 var h: ?Handles.Handle = null;
-                try Raw.createBorrowed(T, I, &context, input, &h);
+                try Raw.createBorrowed(T, I, context, input, &h);
                 var out: OutputState(T, I) = .{};
                 out.sentinel();
                 try Raw.exportBorrowed(T, I, h, .row, out.slots());
@@ -204,7 +212,7 @@ test "raw Sparse every zero prefix preserves NULL or unaligned original pointer 
                 try equal(@as(I, 7), out.columns);
                 try Raw.destroy(h);
                 for (bytes) |byte| try equal(@as(u8, 0x6d), byte);
-                try helpers.close(&context);
+                try helpers.close(context);
             }
         }
     }
@@ -212,13 +220,15 @@ test "raw Sparse every zero prefix preserves NULL or unaligned original pointer 
 
 test "raw Sparse zero extent with nonempty metadata cannot promote empty pointer tokens after mutation" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
     var offsets = [_]i64{ 1, 1, 1 };
     var bytes: [16]u8 align(16) = @splat(0xb3);
     const ordinals: Raw.Pointer(i64) = @ptrCast(&bytes[1]);
     const values: Raw.Pointer(f64) = @ptrCast(&bytes[3]);
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i64, &context, .{ .base = 1, .rows = 2, .columns = 0, .axis = .row, .starts = &offsets, .ends = null, .ordinals = ordinals, .values = values }, &h);
+    try Raw.createBorrowed(f64, i64, context, .{ .base = 1, .rows = 2, .columns = 0, .axis = .row, .starts = &offsets, .ends = null, .ordinals = ordinals, .values = values }, &h);
     var out: OutputState(f64, i64) = .{};
     out.sentinel();
     try Raw.exportBorrowed(f64, i64, h, .row, out.slots());
@@ -229,59 +239,63 @@ test "raw Sparse zero extent with nonempty metadata cannot promote empty pointer
     try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&out));
     for (bytes) |byte| try equal(@as(u8, 0xb3), byte);
     try Raw.destroy(h);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse create rejects required null alignment geometry domain and extent overflow before allocation" {
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
     var h: ?Handles.Handle = null;
     var input = empty();
     input.base = 99;
     input.rows = -1;
-    try expectError(error.NullOutput, Raw.createBorrowed(f64, i32, &context, input, null));
-    try expectError(error.InvalidBase, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.NullOutput, Raw.createBorrowed(f64, i32, context, input, null));
+    try expectError(error.InvalidBase, Raw.createBorrowed(f64, i32, context, input, &h));
     input.base = 0;
-    try expectError(error.InvalidDimension, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.InvalidDimension, Raw.createBorrowed(f64, i32, context, input, &h));
     input.rows = 2;
     input.columns = 2;
-    try expectError(error.NullInput, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.NullInput, Raw.createBorrowed(f64, i32, context, input, &h));
     var bytes: [64]u8 align(16) = @splat(0);
     input.starts = @ptrCast(&bytes[1]);
-    try expectError(error.InvalidAlignment, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.InvalidAlignment, Raw.createBorrowed(f64, i32, context, input, &h));
     var starts = [_]i32{ 0, 0 };
     var ends = [_]i32{ 1, 2 };
     var ordinals = [_]i32{ 0, 1 };
     var values = [_]f64{ 3, 4 };
     input.starts = &starts;
     input.ends = &ends;
-    try expectError(error.UnsupportedDomain, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.UnsupportedDomain, Raw.createBorrowed(f64, i32, context, input, &h));
     starts[1] = 1;
-    try expectError(error.NullInput, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.NullInput, Raw.createBorrowed(f64, i32, context, input, &h));
     input.ordinals = &ordinals;
-    try expectError(error.NullInput, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.NullInput, Raw.createBorrowed(f64, i32, context, input, &h));
     input.values = @ptrCast(&bytes[1]);
-    try expectError(error.InvalidAlignment, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.InvalidAlignment, Raw.createBorrowed(f64, i32, context, input, &h));
     input.values = &values;
     ordinals[0] = 2;
-    try expectError(error.InvalidOrdinal, Raw.createBorrowed(f64, i32, &context, input, &h));
+    try expectError(error.InvalidOrdinal, Raw.createBorrowed(f64, i32, context, input, &h));
     // Count arithmetic fails before a giant slice is formed or any offset read.
     // On 32-bit targets the same case stops earlier at dimension-to-usize cast.
     var wide = [_]i64{0};
-    try expectError(error.SizeOverflow, Raw.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = std.math.maxInt(i64), .columns = 0, .axis = .row, .starts = &wide, .ends = null, .ordinals = null, .values = null }, &h));
+    try expectError(error.SizeOverflow, Raw.createBorrowed(f64, i64, context, .{ .base = 0, .rows = std.math.maxInt(i64), .columns = 0, .axis = .row, .starts = &wide, .ends = null, .ordinals = null, .values = null }, &h));
     try expect(h == null);
     try equal(@as(usize, 0), spy.attempts);
     try equal(@as(usize, 0), context.snapshot().resource_pins);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse all twenty one output pair overlaps fail before any output commit" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, empty(), &h);
+    try Raw.createBorrowed(f64, i32, context, empty(), &h);
     var pairs: usize = 0;
     for (0..7) |first| {
         for (first + 1..7) |second| {
@@ -315,14 +329,16 @@ test "raw Sparse all twenty one output pair overlaps fail before any output comm
         try equal(@as(usize, 12), partial_pairs);
     }
     try Raw.destroy(h);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse all seven slots require real aligned nonnull storage independently of empty pointees" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, empty(), &h);
+    try Raw.createBorrowed(f64, i32, context, empty(), &h);
     for (0..7) |index| {
         var cells: Cells = .{};
         var output = cellsOutput(&cells);
@@ -344,12 +360,14 @@ test "raw Sparse all seven slots require real aligned nonnull storage independen
         try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&cells.bytes));
     }
     try Raw.destroy(h);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse output spans reject captured inputs gaps shell and control without writes" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
     var starts = [_]i32{1};
     var ends = [_]i32{2};
     var ordinals = [_]i32{ -99, 0 };
@@ -357,9 +375,9 @@ test "raw Sparse output spans reject captured inputs gaps shell and control with
     const input: Raw.Input(f64, i32) = .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values };
     const before_values = std.mem.asBytes(&values).*;
     const handle_slot: *align(1) ?Handles.Handle = @ptrCast(&values[0]);
-    try expectError(error.BufferOverlap, Raw.createBorrowed(f64, i32, &context, input, handle_slot));
+    try expectError(error.BufferOverlap, Raw.createBorrowed(f64, i32, context, input, handle_slot));
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, input, &h);
+    try Raw.createBorrowed(f64, i32, context, input, &h);
     const control = try Handles.testing.retainControl(f64, i32, h.?);
     const targets = [_]*align(1) anyopaque{ @ptrCast(&starts), @ptrCast(&ends), @ptrCast(&ordinals[0]), @ptrCast(&ordinals[1]), @ptrCast(&values[0]), @ptrCast(&values[1]), @ptrCast(h.?), @ptrCast(control) };
     for (targets) |target| {
@@ -385,17 +403,19 @@ test "raw Sparse output spans reject captured inputs gaps shell and control with
     try std.testing.expectEqualSlices(u8, before_values[0 .. 2 * @sizeOf(f64)], std.mem.asBytes(&values)[0 .. 2 * @sizeOf(f64)]);
     control.release();
     try Raw.destroy(h);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse type format and revalidation errors preserve all outputs and typed split provenance" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
     var offsets = [_]i32{ 0, 1, 2 };
     var ordinals = [_]i32{ 0, 1 };
     var values = [_]f64{ 2, 3 };
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = offsets[0..2], .ends = offsets[1..3], .ordinals = &ordinals, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = offsets[0..2], .ends = offsets[1..3], .ordinals = &ordinals, .values = &values }, &h);
     var scalar_out: OutputState(f32, i32) = .{};
     scalar_out.sentinel();
     const scalar_before = std.mem.asBytes(&scalar_out).*;
@@ -419,14 +439,16 @@ test "raw Sparse type format and revalidation errors preserve all outputs and ty
     try expect(out.starts == @as(Raw.Pointer(i32), offsets[0..2].ptr));
     try expect(out.ends == @as(Raw.Pointer(i32), offsets[1..3].ptr));
     try Raw.destroy(h);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse provenance rejects missing empty tokens encoding conflicts and fake null-end shifting" {
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
     var operation = try context.begin();
     const data: Handles.MutableData(f64, i32) = .{ .starts = &.{}, .ends = &.{}, .ordinals = &.{}, .values = &.{} };
     var source: Handles.Provenance(f64, i32) = .{ .encoding = .c_null_end };
@@ -448,21 +470,23 @@ test "raw Sparse provenance rejects missing empty tokens encoding conflicts and 
     operation.end();
     try equal(@as(usize, 0), spy.attempts);
     try equal(@as(usize, 0), context.snapshot().resource_pins);
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse control and shell OOM rollback before unpin and admission overflow remains distinct" {
     fixture.setThreads(1);
     for (0..2) |fail_at| {
         var spy: helpers.Spy = .{};
-        var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-        spy.ctx = &context;
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+        const context = reference_context.borrowedContext();
+        spy.ctx = context;
         var prior: ?Handles.Handle = null;
-        try Raw.createBorrowed(f64, i32, &context, empty(), &prior);
+        try Raw.createBorrowed(f64, i32, context, empty(), &prior);
         const prior_attempts = spy.attempts;
         spy.fail_at = prior_attempts + fail_at;
         var output = prior; // Nonnull live canary: a buggy failure clear is visible.
-        try expectError(error.OutOfMemory, Raw.createBorrowed(f64, i32, &context, empty(), &output));
+        try expectError(error.OutOfMemory, Raw.createBorrowed(f64, i32, context, empty(), &output));
         try expect(output == prior);
         try equal(prior_attempts + fail_at + 1, spy.attempts);
         try equal(@as(usize, 1), context.snapshot().resource_pins);
@@ -477,24 +501,26 @@ test "raw Sparse control and shell OOM rollback before unpin and admission overf
         try Raw.destroy(prior);
         try equal(@as(usize, 0), context.snapshot().resource_pins);
         try spy.balanced();
-        try helpers.close(&context);
+        try helpers.close(context);
     }
     var spy: helpers.Spy = .{ .fail_at = 0 };
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
-    Context.testing.configure(&context, 1, null);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
+    Context.testing.configure(context, 1, null);
     var operation = try context.begin();
     var pin = try operation.pinResource();
     var h: ?Handles.Handle = null;
-    try expectError(error.CounterOverflow, Raw.createBorrowed(f64, i32, &context, empty(), null));
+    try expectError(error.CounterOverflow, Raw.createBorrowed(f64, i32, context, empty(), null));
     operation.end();
-    try expectError(error.CounterOverflow, Raw.createBorrowed(f64, i32, &context, empty(), &h));
+    try expectError(error.CounterOverflow, Raw.createBorrowed(f64, i32, context, empty(), &h));
     try equal(@as(usize, 0), spy.attempts);
     pin.releaseAfterResourceFree();
-    try expectError(error.OutOfMemory, Raw.createBorrowed(f64, i32, &context, empty(), &h));
+    try expectError(error.OutOfMemory, Raw.createBorrowed(f64, i32, context, empty(), &h));
     try equal(@as(usize, 1), spy.attempts);
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse admitted creation survives close callbacks while destruction never readmits" {
@@ -503,36 +529,40 @@ test "raw Sparse admitted creation survives close callbacks while destruction ne
             spy.callback_count += 1;
             if (spy.ctx.snapshot().active_operations != 1) @panic("raw create did not admit exactly once");
             _ = spy.ctx.requestClose();
-            if (spy.ctx.tryProgressClose() != .busy) @panic("close escaped admitted raw create");
+            if (fixtureProgressClose(spy.ctx) != .busy) @panic("close escaped admitted raw create");
         }
     };
     fixture.setThreads(1);
     var spy: helpers.Spy = .{ .on_alloc = Callback.call };
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, empty(), &h);
+    try Raw.createBorrowed(f64, i32, context, empty(), &h);
     try equal(@as(usize, 2), spy.callback_count);
     var out: OutputState(f64, i32) = .{};
     out.sentinel();
     const before = std.mem.asBytes(&out).*;
     try expectError(error.Closing, Raw.exportBorrowed(f64, i32, h, .row, out.slots()));
-    try expectError(error.Closing, Raw.createBorrowed(f64, i32, &context, empty(), null));
+    try expectError(error.Closing, Raw.createBorrowed(f64, i32, context, empty(), null));
     try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&out));
-    try equal(execution.context.CloseResult.waiting_resources, context.tryProgressClose());
+    try equal(execution.context.CloseResult.waiting_resources, fixtureProgressClose(context));
     try Raw.destroy(h);
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse shell and control free callbacks keep the single pin until each free returns" {
     fixture.setThreads(1);
     for ([_]usize{ 1, 0 }) |pause_id| {
         var spy: helpers.Spy = .{ .pause_id = pause_id };
-        var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-        spy.ctx = &context;
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+        const context = reference_context.borrowedContext();
+        spy.ctx = context;
         var h: ?Handles.Handle = null;
-        try Raw.createBorrowed(f64, i32, &context, empty(), &h);
+        try Raw.createBorrowed(f64, i32, context, empty(), &h);
         _ = context.requestClose();
         const thread = try std.Thread.spawn(.{}, releaseHandle, .{h.?});
         var joined = false;
@@ -541,7 +571,7 @@ test "raw Sparse shell and control free callbacks keep the single pin until each
             if (!joined) thread.join();
         }
         fixture.wait(&spy.entered);
-        try equal(execution.context.CloseResult.waiting_resources, context.tryProgressClose());
+        try equal(execution.context.CloseResult.waiting_resources, fixtureProgressClose(context));
         try equal(@as(usize, 1), context.snapshot().resource_pins);
         try equal(@as(usize, 0), context.snapshot().active_operations);
         try expect(!spy.returned.load(.acquire));
@@ -551,7 +581,7 @@ test "raw Sparse shell and control free callbacks keep the single pin until each
         try expect(spy.returned.load(.acquire));
         try std.testing.expectEqualSlices(usize, &.{ 1, 0 }, spy.free_order[0..spy.freed]);
         try spy.balanced();
-        try helpers.close(&context);
+        try helpers.close(context);
     }
 }
 
@@ -572,28 +602,31 @@ test "raw Sparse free callback may operate on a different handle and close witho
             }
             Raw.destroy(spy.other) catch @panic("other raw destroy while closing failed");
             spy.other = null;
-            if (spy.ctx.tryProgressClose() != .waiting_resources) @panic("outer raw control pin lost during callback");
+            if (fixtureProgressClose(spy.ctx) != .waiting_resources) @panic("outer raw control pin lost during callback");
         }
     };
     fixture.setThreads(1);
     var spy: helpers.Spy = .{ .on_free = Callback.call };
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
     var first: ?Handles.Handle = null;
     var second: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, empty(), &first);
-    try Raw.createBorrowed(f64, i32, &context, empty(), &second);
+    try Raw.createBorrowed(f64, i32, context, empty(), &first);
+    try Raw.createBorrowed(f64, i32, context, empty(), &second);
     spy.other = first;
     try Raw.destroy(second);
     try equal(@as(usize, 1), spy.callback_count);
     try equal(@as(usize, 6), spy.accepted);
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "raw Sparse export admission covers close through all seven committed slots and finishing" {
     const Observation = struct {
-        context: Context,
+        reference_context: FixtureReferenceContext = undefined,
+        context: *Context = undefined,
         export_phase: bool = false,
         admitted: usize = 0,
         finishing: usize = 0,
@@ -601,7 +634,7 @@ test "raw Sparse export admission covers close through all seven committed slots
         expected: Raw.Input(f64, i32),
 
         fn observe(context: *Context, event: execution.context.TestEvent) void {
-            const self: *@This() = @fieldParentPtr("context", context);
+            const self: *@This() = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", context)));
             if (!self.export_phase) return; // Already installed during creation.
             const snapshot = context.snapshot();
             if (snapshot.active_operations != 1 or snapshot.resource_pins != 1)
@@ -610,7 +643,7 @@ test "raw Sparse export admission covers close through all seven committed slots
                 self.admitted += 1;
                 if (self.finishing != 0) @panic("unexpected callback order");
                 _ = context.requestClose();
-                if (context.tryProgressClose() != .busy) @panic("export admitted callback closed early");
+                if (fixtureProgressClose(context) != .busy) @panic("export admitted callback closed early");
             } else {
                 self.finishing += 1;
                 if (self.admitted != 1) @panic("export admitted more than once or skipped admission");
@@ -619,7 +652,7 @@ test "raw Sparse export admission covers close through all seven committed slots
                     output.starts != self.expected.starts or output.ends != self.expected.ends or
                     output.ordinals != self.expected.ordinals or output.values != self.expected.values)
                     @panic("raw export ended before all seven output slots were committed");
-                if (context.tryProgressClose() != .busy) @panic("export finishing callback lost active Operation");
+                if (fixtureProgressClose(context) != .busy) @panic("export finishing callback lost active Operation");
             }
         }
     };
@@ -631,11 +664,13 @@ test "raw Sparse export admission covers close through all seven committed slots
     var out: OutputState(f64, i32) = .{};
     out.sentinel();
     const input: Raw.Input(f64, i32) = .{ .base = 0, .rows = 1, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values };
-    var observed: Observation = .{ .context = Context.init(std.testing.allocator, fixture.policy, .internal_closable), .result = &out, .expected = input };
+    var observed: Observation = .{ .result = &out, .expected = input };
+    observed.reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    observed.context = observed.reference_context.borrowedContext();
     // Quiescent configuration precedes creation; no test-only production hook.
-    Context.testing.configure(&observed.context, std.math.maxInt(usize), Observation.observe);
+    Context.testing.configure(observed.context, std.math.maxInt(usize), Observation.observe);
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &observed.context, input, &h);
+    try Raw.createBorrowed(f64, i32, observed.context, input, &h);
     try equal(@as(usize, 0), observed.admitted);
     try equal(@as(usize, 0), observed.finishing);
     observed.export_phase = true;
@@ -643,12 +678,18 @@ test "raw Sparse export admission covers close through all seven committed slots
     try equal(@as(usize, 1), observed.admitted);
     try equal(@as(usize, 1), observed.finishing);
     try equal(@as(usize, 0), observed.context.snapshot().active_operations);
-    try equal(execution.context.CloseResult.waiting_resources, observed.context.tryProgressClose());
+    try equal(execution.context.CloseResult.waiting_resources, fixtureProgressClose(observed.context));
     const before = std.mem.asBytes(&out).*;
     try expectError(error.Closing, Raw.exportBorrowed(f64, i32, h, .row, out.slots()));
     try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&out));
     try equal(@as(usize, 1), observed.admitted);
     try equal(@as(usize, 1), observed.finishing);
     try Raw.destroy(h);
-    try helpers.close(&observed.context);
+    try helpers.close(observed.context);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

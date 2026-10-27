@@ -46,7 +46,7 @@ fn finish(owner: *Ctx.Context, alloc: *F.Allocations) !void {
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     _ = owner.requestClose();
-    try E.expectEqual(Ctx.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(owner));
     try E.expectEqual(alloc.stats().accepted, alloc.stats().freed);
 }
 const Recorder = struct {
@@ -78,7 +78,9 @@ test "GELS boundary query rounds upward with NULL matrices on one closing owner 
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]c_int{ 101, 102 }) |layout| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         _ = owner.requestClose();
         for ([_][4]i32{ .{ 2, 3, 2, 4 }, .{ 1, 1, 16777216, 16777217 }, .{ 0, 4, 3, 3 }, .{ 2147483647, 2147483647, 2147483647, 0 } }) |dims| {
@@ -95,7 +97,7 @@ test "GELS boundary query rounds upward with NULL matrices on one closing owner 
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -146,10 +148,12 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, is_w
     const oa = a;
     const ob = b;
     var alloc: F.Allocations = .{ .budget = 64 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     _ = owner.requestClose();
-    var rec: Recorder = .{ .owner = &owner };
+    var rec: Recorder = .{ .owner = owner };
     const args: Engine.Arguments(T) = .{ .layout = layout, .trans = if (!adjoint) 'N' else if (S.isComplex(T)) 'c' else 't', .m = @intCast(m), .n = @intCast(n), .nrhs = 2, .a = operand(raw, T, &a), .lda = @intCast(lda), .b = operand(raw, T, &b), .ldb = @intCast(ldb), .work = operand(raw, T, &work), .lwork = 4 };
     try E.expectEqual(@as(i32, 0), if (high) try Engine.highAdmitted(true, T, &op, &rec.services(), args) else try Engine.workWithDiagnosticsAdmitted(T, &op, &rec.services(), args));
     for (0..2) |j| for (0..q) |i| try near(T, x[i + j * 3], b[at(layout, i, j, ldb)]);
@@ -171,7 +175,7 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, is_w
     try E.expectEqual(@as(usize, 0), rec.count);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 test "GELS boundary typed raw high work row column N H match independent full rank and minimum norm solutions" {
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]bool{ false, true }) |high| for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |is_wide| for ([_]bool{ false, true }) |adjoint| try numeric(T, raw, high, layout, is_wide, adjoint);
@@ -180,9 +184,11 @@ test "GELS boundary typed raw high work row column N H match independent full ra
 test "GELS boundary scalar work errors preserve driver positions and diagnostic names" {
     inline for (types) |T| {
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var work = [_]T{value(T, 77, 0)};
         var args: A.Arguments(T) = .{ .layout = 99, .trans = 'X', .m = -1, .n = -1, .nrhs = -1, .lda = 0, .ldb = 0, .work = &work };
         const expected = [_]i32{ -1, -2, -3, -4, -5, -7, -9, -11 };
@@ -212,13 +218,15 @@ test "GELS boundary scalar work errors preserve driver positions and diagnostic 
         try near(T, .{ .re = 1 }, work[0]);
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     }
 }
 
 test "GELS boundary row leading dimensions precede driver errors and negative empty copies remain safe" {
     var alloc: F.Allocations = .{ .budget = 8 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var args: A.Arguments(f64) = .{ .layout = 101, .trans = 'X', .m = -2, .n = 2, .nrhs = 1, .lda = 0, .ldb = 0, .lwork = -1 };
     try E.expectEqual(@as(i32, -7), try A.workAdmitted(f64, &op, args));
@@ -236,16 +244,18 @@ test "GELS boundary row leading dimensions precede driver errors and negative em
     try E.expectEqual(@as(i32, -3), try A.workAdmitted(f64, &op, args));
     try E.expectEqual(@as(usize, 2), alloc.stats().accepted);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 
 test "GELS boundary high NaN scans A then full max rows of B with runtime compile controls" {
     inline for (types) |T| inline for (.{ false, true }) |raw| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 32 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var a = [_]T{ value(T, std.math.nan(f64), 0), value(T, 0, 0) };
         var b = [_]T{ value(T, 2, 0), value(T, std.math.nan(f64), 0) };
         var args: Engine.Arguments(T) = .{ .layout = 102, .trans = 'X', .m = 1, .n = 2, .nrhs = 1, .a = operand(raw, T, &a), .lda = 1, .b = operand(raw, T, &b), .ldb = 2 };
@@ -263,7 +273,7 @@ test "GELS boundary high NaN scans A then full max rows of B with runtime compil
         try near(T, .{ .re = 2 }, b[0]);
         try near(T, .{}, b[1]);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -274,9 +284,11 @@ test "GELS boundary all allocation budgets clean row high and native leases and 
         var successes: usize = 0;
         for (0..7) |budget| {
             var alloc: F.Allocations = .{ .budget = budget };
-            var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
             var op = try owner.begin();
-            var rec: Recorder = .{ .owner = &owner };
+            var rec: Recorder = .{ .owner = owner };
             var a = [_]T{ value(T, 2, 0), value(T, 0, 0), value(T, 0, 0), value(T, 3, 0) };
             var b = [_]T{ value(T, 4, 0), value(T, 9, 0) };
             const oa = a;
@@ -299,7 +311,7 @@ test "GELS boundary all allocation budgets clean row high and native leases and 
                 try same(T, &ob, &b);
             }
             op.end();
-            try finish(&owner, &alloc);
+            try finish(owner, &alloc);
         }
         try E.expect(failures > 0 and successes > 0);
     };
@@ -307,7 +319,9 @@ test "GELS boundary all allocation budgets clean row high and native leases and 
 
 test "GELS boundary query head access is staged and raw alignment faults allocate nothing" {
     var alloc: F.Allocations = .{ .budget = 0 };
-    var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var args: Raw.Arguments(f64) = .{ .layout = 102, .trans = 'X', .m = 2, .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .lwork = -1 };
     try E.expectEqual(@as(i32, -2), try Raw.workAdmitted(f64, &op, args));
@@ -331,14 +345,16 @@ test "GELS boundary query head access is staged and raw alignment faults allocat
     try E.expectEqual(@as(i32, 0), try A.workAdmitted(f64, &op, typed));
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner, &alloc);
+    try finish(owner, &alloc);
 }
 
 test "GELS boundary column empty calls read no A and zero all max rows with padding kept" {
     inline for (types) |T| inline for (.{ false, true }) |raw| inline for (.{ true, false }) |zero_m| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var b: [10]T = @splat(value(T, -993, 0));
         for (0..2) |j| for (0..3) |i| {
@@ -361,7 +377,7 @@ test "GELS boundary column empty calls read no A and zero all max rows with padd
         try E.expectEqual(@as(i32, 0), try Engine.workAdmitted(T, &op, args));
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -369,9 +385,11 @@ test "GELS boundary singular INFO copies back factored A and transformed RHS wit
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]bool{ false, true }) |high| for ([_]c_int{ 101, 102 }) |layout| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 16 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var a: [6]T = @splat(value(T, 0, 0));
         a[at(layout, 1, 1, if (layout == 102) 3 else 2)] = value(T, 1, 0);
         a[at(layout, 2, 1, if (layout == 102) 3 else 2)] = value(T, 1, 0);
@@ -384,24 +402,26 @@ test "GELS boundary singular INFO copies back factored A and transformed RHS wit
         try near(T, .{ .re = 1 / @sqrt(@as(f64, 2)) }, b[2]);
         try E.expectEqual(@as(usize, 0), rec.count);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
 test "GELS boundary shared managed route captures existing callbacks and rejects a closed Context" {
     inline for (types) |T| {
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
-        var rec: Recorder = .{ .owner = &owner };
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        var rec: Recorder = .{ .owner = owner };
         const callback: B.shared_services.Callback = .{ .userdata = &rec, .function = Recorder.event };
         const args: Raw.Arguments(T) = .{ .layout = 99, .trans = 'N', .m = 0, .n = 0, .nrhs = 0, .lda = 1, .ldb = 1 };
-        try E.expectEqual(@as(i32, -1), try B.Shared.gelsRawManagedWithDefaults(true, T, .high, &owner, args, .{ .lapacke = callback, .fortran_returning_test = callback }));
+        try E.expectEqual(@as(i32, -1), try B.Shared.gelsRawManagedWithDefaults(true, T, .high, owner, args, .{ .lapacke = callback, .fortran_returning_test = callback }));
         try E.expectEqual(@as(usize, 1), rec.count);
         try E.expectEqual(B.common.Entry.high, rec.events[0].entry);
         try E.expectEqual(B.common.Routine.gels, rec.events[0].routine);
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
-        try finish(&owner, &alloc);
-        try E.expectError(error.Closing, B.Shared.gelsRawManagedWithDefaults(true, T, .high, &owner, args, .{}));
+        try finish(owner, &alloc);
+        try E.expectError(error.Closing, B.Shared.gelsRawManagedWithDefaults(true, T, .high, owner, args, .{}));
     }
 }
 
@@ -409,16 +429,18 @@ test "GELS boundary high oversized upward query fails allocation cleanly before 
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]c_int{ 101, 102 }) |layout| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         const args: Engine.Arguments(T) = .{ .layout = layout, .trans = 'N', .m = 1, .n = 1, .nrhs = 2147483647, .lda = 1, .ldb = if (layout == 101) 2147483647 else 1 };
         try E.expectEqual(@as(i32, -1010), try Engine.highAdmitted(false, T, &op, &rec.services(), args));
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         try E.expectEqual(@as(usize, 1), rec.count);
         try E.expectEqual(B.common.Entry.high, rec.events[0].entry);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -426,9 +448,11 @@ test "GELS boundary scalar operation restrictions alias faults and raw data alig
     inline for (types) |T| inline for (.{ false, true }) |raw| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 0 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var work: [2]T = @splat(value(T, 77, 0));
         var a = [_]T{ value(T, 1, 0), value(T, 9, 0) };
         var b = [_]T{value(T, 3, 0)};
@@ -463,7 +487,7 @@ test "GELS boundary scalar operation restrictions alias faults and raw data alig
         try E.expectEqual(events, rec.count);
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
 }
 
@@ -471,9 +495,11 @@ test "GELS boundary short work follows row copies but precedes all column matrix
     inline for (types) |T| inline for (.{ false, true }) |raw| {
         const Engine = if (raw) Raw else A;
         var alloc: F.Allocations = .{ .budget = 8 };
-        var owner = Ctx.Context.init(alloc.allocator(), F.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var rec: Recorder = .{ .owner = &owner };
+        var rec: Recorder = .{ .owner = owner };
         var work = [_]T{value(T, 77, 0)};
         var b = [_]T{ value(T, 4, 0), value(T, 9, 0) };
         var args: Engine.Arguments(T) = .{ .layout = 102, .trans = 'N', .m = 2, .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .work = operand(raw, T, &work), .lwork = 3 };
@@ -500,6 +526,12 @@ test "GELS boundary short work follows row copies but precedes all column matrix
         try same(T, &before_a, &a);
         try same(T, &before_b, &b);
         op.end();
-        try finish(&owner, &alloc);
+        try finish(owner, &alloc);
     };
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

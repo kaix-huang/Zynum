@@ -37,7 +37,7 @@ SCHEMA_VERSION = 3
 BUILD_SCHEMA_ID = "zynum-build-inventory-v3"
 INVENTORY_PATH = "tools/test_inventory.json"
 BUILD_INVENTORY_PATH = "tools/build_inventory.json"
-HETERIS_ADAPTER_COMPILE_ID = "compile:integrations/heteris/build.zig:build:tests"
+HETERIS_ADAPTER_COMPILE_ID = "compile:build.zig:addPlatformLibrary:tests"
 HETERIS_ADAPTER_ROOT_ID = "correctness-root:heteris-adapter-package"
 SELF_TEST_PATH = "test/build/test_test_inventory.py"
 AGGREGATE_STEP_ID = "step:build.zig:build:test"
@@ -848,9 +848,9 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = 'e717be147ad3d3de8d88ddb7d524fb2e4c3278b79844fe0c0f84fc31f92846d9'
+CURRENT_TEST_INVENTORY_SHA256 = '8185512d97e8d21da3c424bbf3baa98ba54324761782919742d7502a3898d959'
 NEXT_TEST_INVENTORY_SHA256 = None
-CURRENT_NATIVE_PROJECTION_SHA256 = '3a127e1cd4c3c533e0d9e6e84edaafa204f10ca8bf7f63f114fae189aa58331a'
+CURRENT_NATIVE_PROJECTION_SHA256 = 'f25ebd580dbfcb572385fd85af4499a86ae898b644108c100ca53dada3aa5094'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 TOP_LEVEL_KEYS = {
     "schema_id",
@@ -2398,7 +2398,7 @@ def _zig_object_owners(root_symbol: str, graph: dict[str, Any]) -> set[str]:
 
 
 def _validate_heteris_adapter_package_graph(by_id: dict[str, dict[str, Any]]) -> bool:
-    ids = (HETERIS_ADAPTER_COMPILE_ID, "launch:integrations/heteris/build.zig:build:run_tests",
+    ids = (HETERIS_ADAPTER_COMPILE_ID, "launch:build.zig:addPlatformLibrary:run",
            "step:integrations/heteris/build.zig:build:test")
     if not any(identifier in by_id for identifier in ids):
         return False
@@ -2408,53 +2408,116 @@ def _validate_heteris_adapter_package_graph(by_id: dict[str, dict[str, Any]]) ->
     for identifier, category, call in zip(ids, ("compile", "launch", "step"),
                                          ("b.addTest", "b.addRunArtifact", "b.step"), strict=True):
         row = by_id.get(identifier, {})
-        reviewed = BUILD_CHECKER.HETERIS_ADAPTER_OBSERVATION_TEMPLATES[identifier]
+        reviewed = BUILD_CHECKER.INJECTION_OBSERVATION_TEMPLATES[identifier]
         if (row.get("category") != category or row.get("call") != call or
                 any(row.get(key) != value for key, value in reviewed.items())):
             raise InventoryError("separate Heteris adapter package test graph changed: " + identifier)
     return True
 
 
+def _native_source_closure(
+    zig_text: dict[str, str], public_paths: frozenset[str], context: Any,
+    root_owner: str = "adapter",
+) -> tuple[set[str], list[dict[str, Any]]]:
+    """Conservative source-only closure of the fully reviewed native graph.
+
+    Both conditional source branches are visited; this is not compiler
+    enumeration and does not claim the legacy branch executes in native mode.
+    """
+    text = _cached_text(context, "build.zig")
+    BUILD_CHECKER._reviewed_configure_projection(text)
+    masked = BUILD_CHECKER._code_mask(text)
+    modules: dict[str, str] = {}
+    imports: dict[str, dict[str, str]] = {}
+    for helper in ("configureIntegrated", "addNativeFacade", "addPlatformLibrary"):
+        match = re.search(r"\bfn\s+" + helper + r"\s*\(", masked)
+        if match is None:
+            raise InventoryError("native source helper is absent: " + helper)
+        opening = masked.find("{", match.end())
+        closing = BUILD_CHECKER._matching_brace(masked, opening)
+        body = text[opening + 1:closing]
+        # Module declarations and imports below are metadata extracted from the
+        # already whole-body-bound helpers, never a free-form helper resolver.
+        for declaration in re.finditer(r"\bconst\s+(\w+)\s*=\s*b\.(?:createModule|addModule)\s*\(", body):
+            call_open = body.index("(", declaration.start())
+            call_end = BUILD_CHECKER._matching_paren(body, call_open)
+            call = body[call_open:call_end + 1]
+            source = re.search(r'\.root_source_file\s*=\s*b\.path\("([^"]+)"\)', call)
+            if source is not None:
+                owner = declaration.group(1)
+                if owner in modules and modules[owner] != source.group(1):
+                    raise InventoryError("native source module owner collision: " + owner)
+                modules[owner] = source.group(1)
+        for receiver, alias, provider in re.findall(r'(\w+)\.addImport\("([^"]+)",\s*(?:graph\.)?(\w+)\)', body):
+            previous = imports.setdefault(receiver, {}).setdefault(alias, provider)
+            if previous != provider:
+                raise InventoryError("native source alias changes owner: " + alias)
+    expected = {"core": "src/zynum.zig", "execution": "src/numerics/execution/root.zig",
+                "resources": "src/numerics/resources.zig", "adapter": "integrations/heteris/src/root.zig",
+                "math_module": "src/native_provider_math_test.zig"}
+    if any(modules.get(owner) != path for owner, path in expected.items()):
+        raise InventoryError("native original-Core source owner binding changed")
+    if root_owner not in modules:
+        raise InventoryError("unknown native source traversal owner: " + root_owner)
+    pending = [(root_owner, modules[root_owner])]
+    visited: set[tuple[str, str]] = set()
+    receipts: list[dict[str, Any]] = []
+    receipt_keys = set()
+    while pending:
+        owner, path = pending.pop()
+        if (owner, path) in visited:
+            continue
+        if path not in public_paths or path not in zig_text:
+            raise InventoryError("native dependency source is missing: " + path)
+        visited.add((owner, path))
+        for alias in _zig_imports(zig_text[path], path):
+            provider = imports.get(owner, {}).get(alias)
+            if provider in modules:
+                candidate = modules[provider]
+                pending.append((provider, candidate))
+                key = (owner, alias)
+                if key not in receipt_keys:
+                    receipt_keys.add(key)
+                    receipts.append({"alias": alias, "path": candidate, "module": provider,
+                                     "attachment_owner": owner, "target": "requested-target",
+                                     "source_sha256": hashlib.sha256(zig_text[candidate].encode()).hexdigest(),
+                                     "build_contract_sha256": BUILD_CHECKER.INJECTION_HELPER_CONTRACT_SHA256["configureIntegrated"]})
+            elif provider in {"options_mod", "options", "provider_c", "adapter_c"}:
+                key = (owner, alias)
+                if key not in receipt_keys:
+                    receipt_keys.add(key)
+                    receipt = {"alias": alias, "source_kind": "generated-non-source",
+                                     "module": provider, "attachment_owner": owner,
+                                     "generator_observation_id": ("compile:build.zig:translateProvider:translated" if provider == "provider_c"
+                                                                  else "compile:build.zig:addPlatformLibrary:translated" if provider == "adapter_c"
+                                                                  else "reviewed original-Core shared Options module"),
+                                     "external_input": ("explicit Heteris Data SDK authoritative headers" if provider in {"provider_c", "adapter_c"}
+                                                        else "execution-profile=integrated_native; reference_compat=false"),
+                                     "build_contract_sha256": BUILD_CHECKER.INJECTION_HELPER_CONTRACT_SHA256["configureIntegrated"]}
+                    if provider == "provider_c":
+                        header = "include/zynum_native.h"
+                        receipt["input_sha256"] = {header: hashlib.sha256(
+                            BUILD_CHECKER._frozen_regular_bytes(context, header, "provider translation root")
+                        ).hexdigest()}
+                        receipt["external_include_dependencies"] = ["heteris.h", "heteris_runtime_provider.h"]
+                    receipts.append(receipt)
+            elif alias in _ZIG_NON_RELATIVE_IMPORTS:
+                continue
+            elif "/" not in alias and not alias.endswith(".zig"):
+                raise InventoryError("unreviewed adapter named dependency: " + alias)
+            else:
+                candidate = posixpath.normpath((PurePosixPath(path).parent / alias).as_posix())
+                if candidate not in public_paths:
+                    raise InventoryError("native dependency source is missing: " + candidate)
+                pending.append((owner, candidate))
+    return {path for _, path in visited}, sorted(receipts, key=lambda row: (row["attachment_owner"], row["alias"]))
+
+
 def _heteris_adapter_source_closure(
     zig_text: dict[str, str], public_paths: frozenset[str], context: Any
 ) -> tuple[set[str], list[dict[str, Any]]]:
-    """Source-only reachability for the one explicitly reviewed adapter package."""
-    aliases = {"scientific_sources": "src/scientific_platform_sources.zig"}
-    root = "integrations/heteris/src/root.zig"
-    pending = [root, *aliases.values()]
-    reached: set[str] = set()
-    while pending:
-        path = pending.pop()
-        if path in reached:
-            continue
-        if path not in public_paths or path not in zig_text:
-            raise InventoryError("adapter dependency source is missing: " + path)
-        reached.add(path)
-        for imported in _zig_imports(zig_text[path], path):
-            if imported in aliases:
-                pending.append(aliases[imported])
-            elif imported == "zynum_c" and path == "integrations/heteris/src/views.zig":
-                continue  # Explicit build-time translation, recorded below.
-            elif imported in _ZIG_NON_RELATIVE_IMPORTS:
-                continue
-            elif "/" not in imported and not imported.endswith(".zig"):
-                raise InventoryError("unreviewed adapter named dependency: " + imported)
-            else:
-                candidate = posixpath.normpath((PurePosixPath(path).parent / imported).as_posix())
-                if candidate not in public_paths:
-                    raise InventoryError("adapter dependency source is missing: " + candidate)
-                pending.append(candidate)
-    build_path = "integrations/heteris/build.zig"
-    build_digest = hashlib.sha256(BUILD_CHECKER._frozen_regular_bytes(context, build_path, "adapter build")).hexdigest()
-    header = "integrations/heteris/include/zynum.h"
-    receipts = [{"alias": alias, "path": path, "source_sha256": hashlib.sha256(zig_text[path].encode()).hexdigest(),
-                 "module": "adapter upstream", "attachment_owner": "adapter module", "target": "target",
-                 "build_contract_sha256": build_digest} for alias, path in aliases.items()]
-    receipts.append({"alias": "zynum_c", "source_kind": "generated-non-source",
-                     "generator_observation_id": "compile:integrations/heteris/build.zig:build:translated",
-                     "input_sha256": {header: hashlib.sha256(BUILD_CHECKER._frozen_regular_bytes(context, header, "adapter header")).hexdigest()},
-                     "external_input": "explicit Heteris Data SDK heteris.h", "build_contract_sha256": build_digest})
-    return reached, receipts
+    return _native_source_closure(zig_text, public_paths, context)
+
 
 
 def discover(
@@ -2492,6 +2555,7 @@ def discover(
             and item.get("id") != CHECKED_CHOLESKY_COMPILE_ID
             and item.get("id") != POSV_COMPILE_ID
             and item.get("id") != HETERIS_ADAPTER_COMPILE_ID
+            and item.get("id") != "compile:build.zig:configureIntegrated:math_tests"
         ),
         key=lambda item: item["id"],
     )
@@ -2822,7 +2886,7 @@ def discover(
     # The adapter is a separate package, whose own arithmetic test step is not
     # one of the original Core's 25 canonical roots. Admit only this exact graph.
     adapter_ids = (HETERIS_ADAPTER_COMPILE_ID,
-                   "launch:integrations/heteris/build.zig:build:run_tests",
+                   "launch:build.zig:addPlatformLibrary:run",
                    "step:integrations/heteris/build.zig:build:test")
     if _validate_heteris_adapter_package_graph(by_id):
         reached, receipts = _heteris_adapter_source_closure(zig_text, public_paths, context)
@@ -2831,7 +2895,33 @@ def discover(
             "physical_path": "integrations/heteris/src/root.zig",
             "compile_observation_id": HETERIS_ADAPTER_COMPILE_ID,
             "launch_observation_ids": [adapter_ids[1]], "selector_step_observation_id": adapter_ids[2],
-            "guard": "separate integrations/heteris package test step with explicit Heteris Data headers",
+            "guard": "root-owned integrated_native adapter test; standard bridge dependency; explicit Heteris Data headers",
+            "executor_guard_dependency": None, "process_environments": [{}],
+            "enumeration_source": "static-source-reachability-only", "native_inventory_evidence": False,
+            "source_reachability": sorted(reached), "named_dependency_sources": receipts,
+        })
+
+    # Optional Runtime-backed native tests remain outside the canonical Core
+    # protocol matrix. Source registration never creates an executed observation.
+    native_prefix = "build.zig:configureIntegrated:"
+    for symbol, owner, language, path, launch, step in (
+        ("math_tests", "math_module", "zig", "src/native_provider_math_test.zig", "anonymous", "test-native-provider-math"),
+        ("c_tests", "main", "c", "integrations/heteris/tests/native_runtime.c", "anonymous-2", "test-native-runtime-c"),
+    ):
+        ids = ("compile:" + native_prefix + symbol, "launch:" + native_prefix + launch, "step:" + native_prefix + step)
+        for identifier in ids:
+            reviewed = BUILD_CHECKER.INJECTION_OBSERVATION_TEMPLATES[identifier]
+            actual = by_id.get(identifier, {})
+            if any(actual.get(key) != value for key, value in reviewed.items()):
+                raise InventoryError("optional native test graph changed: " + identifier)
+        reached, receipts = _native_source_closure(zig_text, public_paths, context, owner)
+        if language == "c":
+            reached.add(path)
+        correctness_only_roots.append({
+            "id": "correctness-root:native-provider-" + symbol, "language": language,
+            "physical_path": path, "compile_observation_id": ids[0], "launch_observation_ids": [ids[1]],
+            "selector_step_observation_id": ids[2],
+            "guard": "integrated_native; explicit absolute formal Runtime archive; explicit named test step",
             "executor_guard_dependency": None, "process_environments": [{}],
             "enumeration_source": "static-source-reachability-only", "native_inventory_evidence": False,
             "source_reachability": sorted(reached), "named_dependency_sources": receipts,
@@ -2840,7 +2930,7 @@ def discover(
     # Track source declarations of the correctness-only root without adding native
     # protocol rows or manufacturing compiler-enumerated test names.
     for correctness_root in correctness_only_roots:
-        if correctness_root["id"] == HETERIS_ADAPTER_ROOT_ID:
+        if correctness_root["id"] == HETERIS_ADAPTER_ROOT_ID or correctness_root["id"].startswith("correctness-root:native-provider-"):
             for path in correctness_root["source_reachability"]:
                 if path in zig_declarations:
                     root_reach[path].append(correctness_root["id"])
@@ -3445,15 +3535,23 @@ def _refresh_native_gaps(inventory: dict[str, Any]) -> None:
     )
 
 
-def refresh_from_protocol(
-    root: Path, inventory_path: Path, bindings: list[tuple[str, Path]]
+def _prepare_inventory_refresh(
+    root: Path, inventory_path: Path, bindings: list[tuple[str, Path]], *,
+    source_only: bool = False, reopen_native_rows: tuple[str, ...] = (),
 ) -> RefreshedInventoryCandidate:
-    """Return a fully validated v3 inventory refreshed by native protocols."""
+    """Prepare through the existing frozen validation/publication boundary."""
+    if source_only and bindings:
+        raise InventoryError("source-only refresh forbids native protocol logs")
+    if reopen_native_rows and (source_only or bindings):
+        raise InventoryError("native reopen forbids source-only refresh and protocol logs")
+    native_slots = (CURRENT_NATIVE_PROJECTION_SHA256, NEXT_NATIVE_PROJECTION_SHA256)
     try:
         existing_snapshot = _read_regular_stable_snapshot(
             inventory_path, MAX_INVENTORY_BYTES, "inventory for refresh"
         )
-        digest_error = _reviewed_inventory_bytes_error(existing_snapshot.bytes)
+        digest_error = _reviewed_inventory_bytes_error(
+            existing_snapshot.bytes, require_current_only=bool(reopen_native_rows)
+        )
         if digest_error is not None:
             raise InventoryError(digest_error)
         existing = _strict_json_loads(existing_snapshot.bytes.decode("utf-8"))
@@ -3461,6 +3559,13 @@ def refresh_from_protocol(
         raise InventoryError(f"cannot read inventory for refresh: {exc}") from exc
     if not isinstance(existing, dict):
         raise InventoryError("existing inventory is invalid: root must be an object")
+    if reopen_native_rows:
+        # Exact CURRENT admission is distinct from the current-only CLI policy:
+        # approved NEXT slots must remain available for the pending candidate.
+        native_error = _reviewed_native_projection_error(existing, require_current_only=True)
+        if native_error is not None:
+            raise InventoryError(native_error)
+        _selected_reopen_native_rows(existing, reopen_native_rows)
     existing_errors = _validate_inventory_data(
         root,
         inventory_path,
@@ -3550,11 +3655,25 @@ def refresh_from_protocol(
             row["expectation_state"] = FROZEN_STATE
             native_bindings_by_row[row_id] = _native_observation_binding(row, set_id)
 
+    if reopen_native_rows:
+        for identifier in reopen_native_rows:
+            row = rows_by_id[identifier]
+            row["expectation_state"] = PENDING_STATE
+            row["expected_test_set_id"] = None
+            del native_bindings_by_row[identifier]
+
     referenced = {
         row["expected_test_set_id"]
         for row in refreshed["test_mode_rows"]
         if row["expected_test_set_id"] is not None
     }
+    if reopen_native_rows:
+        old_native_ids = {identifier for identifier, row in old_sets.items()
+                          if row["root_id"].startswith("zig-root:")}
+        orphaned = old_native_ids - referenced
+        if orphaned:
+            raise InventoryError("native reopen would orphan historical native sets: "
+                                 + ", ".join(sorted(orphaned)))
     refreshed["expected_test_sets"] = sorted(
         (sets_by_id[set_id] for set_id in referenced), key=lambda row: row["id"]
     )
@@ -3563,6 +3682,14 @@ def refresh_from_protocol(
     )
     _refresh_native_gaps(refreshed)
     refreshed["strict_summary"] = _section_summary(refreshed)
+    if source_only:
+        _assert_source_only_native_unchanged(existing, refreshed)
+        if native_slots != (CURRENT_NATIVE_PROJECTION_SHA256, NEXT_NATIVE_PROJECTION_SHA256):
+            raise InventoryError("source-only refresh changed reviewed native digest slots")
+    if reopen_native_rows:
+        _assert_reopened_native_unchanged(existing, refreshed, reopen_native_rows)
+        if native_slots != (CURRENT_NATIVE_PROJECTION_SHA256, NEXT_NATIVE_PROJECTION_SHA256):
+            raise InventoryError("native reopen changed reviewed native digest slots")
     candidate_bytes = _canonical_inventory_bytes(refreshed)
     candidate_errors = _validate_inventory_data(
         root,
@@ -3582,6 +3709,120 @@ def refresh_from_protocol(
         expected_snapshot=existing_snapshot,
         incomplete_count=_matrix_incomplete_count(refreshed),
     )
+
+
+def _selected_reopen_native_rows(
+    inventory: dict[str, Any], row_ids: tuple[str, ...]
+) -> set[str]:
+    """Require explicit exact frozen native rows, never an implicit selection."""
+    if not row_ids or any(not isinstance(identifier, str) or not identifier for identifier in row_ids):
+        raise InventoryError("native reopen requires nonempty exact row IDs")
+    if len(row_ids) != len(set(row_ids)):
+        raise InventoryError("native reopen rejects duplicate row IDs")
+    rows = {row["id"]: row for row in inventory["test_mode_rows"]}
+    roots = {row["id"]: row for row in inventory["test_roots"]}
+    bindings = {row["row_id"]: row for row in inventory["native_observation_bindings"]}
+    for identifier in row_ids:
+        row = rows.get(identifier)
+        if row is None:
+            raise InventoryError("unknown native reopen row ID: " + identifier)
+        root = roots.get(row["root_id"])
+        if (root is None or root["language"] != "zig"
+                or not row["root_id"].startswith("zig-root:")
+                or row["disposition"] != "execute"
+                or row["expectation_state"] != FROZEN_STATE
+                or not isinstance(row["expected_test_set_id"], str)):
+            raise InventoryError("native reopen requires a frozen executable Zig row: " + identifier)
+        if (row["enumeration_class_id"] != _enumeration_class_id("zig", row["environment_id"])
+                or bindings.get(identifier) != _native_observation_binding(row, row["expected_test_set_id"])):
+            raise InventoryError("native reopen row class or binding mismatch: " + identifier)
+    return set(row_ids)
+
+
+def _assert_reopened_native_unchanged(
+    previous: dict[str, Any], candidate: dict[str, Any], row_ids: tuple[str, ...]
+) -> None:
+    """Allow only the selected pending transitions in the historical native ledger."""
+    selected = _selected_reopen_native_rows(previous, row_ids)
+    if [row["id"] for row in previous["test_mode_rows"]] != [row["id"] for row in candidate["test_mode_rows"]]:
+        raise InventoryError("native reopen changed matrix row identities/order")
+    permitted = dict(previous)
+    permitted["test_mode_rows"] = [dict(row) for row in previous["test_mode_rows"]]
+    for row in permitted["test_mode_rows"]:
+        if row["id"] in selected:
+            row["expectation_state"] = PENDING_STATE
+            row["expected_test_set_id"] = None
+    permitted["native_observation_bindings"] = [
+        row for row in previous["native_observation_bindings"] if row["row_id"] not in selected
+    ]
+    _assert_source_only_native_unchanged(permitted, candidate)
+    for field in ("optimize_modes", "predicates", "matrix_row_contract", "workflow_mode_bindings"):
+        if previous[field] != candidate[field]:
+            raise InventoryError("native reopen changed policy field: " + field)
+
+
+def refresh_reopen_native_rows(
+    root: Path, inventory_path: Path, row_ids: tuple[str, ...]
+) -> RefreshedInventoryCandidate:
+    """Reopen reviewed frozen rows for genuine pending compiler enumeration.
+
+    This grants no new test names or execution evidence. Exact CURRENT base,
+    reviewed candidate whole/native digests and atomic publication remain required.
+    """
+    if not row_ids:
+        raise InventoryError("native reopen requires nonempty exact row IDs")
+    return _prepare_inventory_refresh(root, inventory_path, [], reopen_native_rows=row_ids)
+
+
+def _assert_source_only_native_unchanged(
+    previous: dict[str, Any], candidate: dict[str, Any]
+) -> None:
+    """Preserve historical native nameset expectations, never new qualification."""
+    for field in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings"):
+        if candidate.get(field) != previous.get(field):
+            raise InventoryError("source-only refresh changed native field: " + field)
+    if _native_projection(candidate) != _native_projection(previous):
+        raise InventoryError("source-only refresh changed the native projection")
+    old_rows = {row["id"]: row for row in previous["test_mode_rows"]}
+    new_rows = {row["id"]: row for row in candidate["test_mode_rows"]}
+    if old_rows.keys() != new_rows.keys():
+        raise InventoryError("source-only refresh changed matrix row identities")
+    for identifier, old in old_rows.items():
+        new = new_rows[identifier]
+        if old["root_id"].startswith("python-root:"):
+            # Only this foreign key is derived from actual Python declarations.
+            if {k: v for k, v in old.items() if k != "expected_test_set_id"} != {
+                k: v for k, v in new.items() if k != "expected_test_set_id"
+            }:
+                raise InventoryError("source-only refresh changed Python row semantics: " + identifier)
+        elif new != old:
+            raise InventoryError("source-only refresh changed non-Python matrix row: " + identifier)
+    old_pending = [row["id"] for row in previous["test_mode_rows"] if row["expectation_state"] == PENDING_STATE]
+    new_pending = [row["id"] for row in candidate["test_mode_rows"] if row["expectation_state"] == PENDING_STATE]
+    if old_pending != new_pending:
+        raise InventoryError("source-only refresh changed pending row identities/order")
+    for field in ("expected_test_sets",):
+        old = [row for row in previous[field] if not row["root_id"].startswith("python-root:")]
+        new = [row for row in candidate[field] if not row["root_id"].startswith("python-root:")]
+        if old != new:
+            raise InventoryError("source-only refresh changed historical native namesets/order")
+
+
+def refresh_from_protocol(
+    root: Path, inventory_path: Path, bindings: list[tuple[str, Path]]
+) -> RefreshedInventoryCandidate:
+    """Refresh with real native protocols through the existing common validator."""
+    return _prepare_inventory_refresh(root, inventory_path, bindings)
+
+
+def refresh_source_derived(root: Path, inventory_path: Path) -> RefreshedInventoryCandidate:
+    """Source metadata only; retained native namesets describe historical evidence.
+
+    Exact source migration fingerprints, reaching-declaration checks, whole-file
+    CURRENT/NEXT, native projection policy and atomic publication all remain in
+    force. No protocol is parsed and no native execution qualification is granted.
+    """
+    return _prepare_inventory_refresh(root, inventory_path, [], source_only=True)
 
 
 def _privacy_errors(value: Any, path: str = "inventory") -> list[str]:
@@ -4447,8 +4688,9 @@ def _matrix_incomplete_count(inventory: dict[str, Any]) -> int:
 
 
 HOST_ASSEMBLY_SOURCE_FIELDS = ("test_roots", "correctness_only_roots", "zig_test_files")
-HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256 = "fd03d10b73522d661e132255c72b001b82205e3b3241c2c045803d8d5a930839"
-HOST_ASSEMBLY_CURRENT_SOURCE_SHA256 = "fd0648fdb2e1de84288b32a7c053e10dc384dc8024c297cf93191ad8c5fb263b"
+HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256 = "e717be147ad3d3de8d88ddb7d524fb2e4c3278b79844fe0c0f84fc31f92846d9"
+HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256 = "fd0648fdb2e1de84288b32a7c053e10dc384dc8024c297cf93191ad8c5fb263b"
+HOST_ASSEMBLY_CURRENT_SOURCE_SHA256 = "f44f7caae9a1bbb1e5a817ae3b65794706194809b71c8c16585ba98bea668755"
 
 
 def _host_assembly_source_facts(inventory: dict[str, Any]) -> dict[str, Any]:
@@ -4458,10 +4700,12 @@ def _host_assembly_source_facts(inventory: dict[str, Any]) -> dict[str, Any]:
 def _reviewed_host_assembly_source_refresh(previous_sha256: str, current: dict[str, Any]) -> bool:
     """One exact source migration; never admits another root or dependency delta.
 
-    The reviewed pair removes the band-solve/packed auxiliary host entries and
-    their execution receipts, updates the unchanged graph's receipt digest, and
-    records the previously unregistered separate adapter and four test files.
-    Native rows, bindings, and compiler observations are outside this projection.
+    The reviewed pair binds the explicit profile/authoritative-header graph,
+    migrated reference fixtures, root-owned adapter, and two optional native
+    source-only roots. New independent E harness sources remain explicit gaps.
+    It updates source reachability and metadata receipts only. Native rows,
+    historical nameset bindings, and compiler observations are unchanged; the
+    reaching-declaration validator still checks every retained compiler name.
     """
     return (previous_sha256 == HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256 and
             _fact_digest(_host_assembly_source_facts(current)) == HOST_ASSEMBLY_CURRENT_SOURCE_SHA256)
@@ -4681,6 +4925,18 @@ def _refresh_base_compatible_discovery(
     if host_assembly_migration:
         compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
         compatible["zig_test_files"] = inventory["zig_test_files"]
+        if hashlib.sha256(_canonical_inventory_bytes(inventory)).hexdigest() != HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256:
+            raise InventoryError("source-gap refresh compatibility requires the exact historical whole-file inventory")
+        # Derive historical source gaps from the exact reviewed old source facts,
+        # never from arbitrary old known_gaps. Current non-source gaps remain
+        # untouched; the original validator reconstructs native gaps from rows.
+        source_kind = "zig-test-file-without-reaching-root"
+        compatible["known_gaps"] = sorted(
+            [gap for gap in discovered["known_gaps"] if gap["kind"] != source_kind] +
+            [{"id": row["gap_id"], "kind": source_kind, "subject_ids": [row["id"]]}
+             for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
+            key=lambda gap: gap["id"],
+        )
     compatible["python_test_modules"] = recorded_modules
     compatible["expected_test_sets"] = derived_sets
     compatible["test_mode_rows"] = inventory["test_mode_rows"]
@@ -14057,6 +14313,19 @@ def _parser() -> argparse.ArgumentParser:
         help="refresh compiler-enumerated expected sets from protocol logs",
     )
     parser.add_argument(
+        "--refresh-source-derived",
+        action="store_true",
+        help=("refresh reviewed source metadata and static Python sets only; retain historical native nameset "
+              "expectations without granting current-source native execution qualification"),
+    )
+    parser.add_argument(
+        "--reopen-native-row",
+        action="append",
+        default=[],
+        metavar="ROW_ID",
+        help="reopen one exact frozen native row for pending enumeration; repeat explicitly",
+    )
+    parser.add_argument(
         "--protocol-log",
         action="append",
         default=[],
@@ -14091,6 +14360,8 @@ def main(argv: list[str] | None = None) -> int:
             or args.structure_only
             or args.require_current_only
             or args.refresh_from_protocol
+            or args.refresh_source_derived
+            or args.reopen_native_row
             or args.protocol_log
             or args.run_python_tooling_root is not None
             or args.windows_zynum_blas_build_output is not None
@@ -14141,6 +14412,8 @@ def main(argv: list[str] | None = None) -> int:
                 (args.structure_only, "--structure-only"),
                 (args.require_current_only, "--require-current-only"),
                 (args.refresh_from_protocol, "--refresh-from-protocol"),
+                (args.refresh_source_derived, "--refresh-source-derived"),
+                (bool(args.reopen_native_row), "--reopen-native-row"),
                 (bool(args.protocol_log), "--protocol-log"),
             )
             if enabled
@@ -14221,6 +14494,15 @@ def main(argv: list[str] | None = None) -> int:
             f"unexpected_successes={summary.outcome.unexpected_successes}"
         )
         return 0
+    if args.reopen_native_row and (
+        args.refresh_from_protocol or args.refresh_source_derived
+        or args.protocol_log or args.require_current_only
+    ):
+        print("test inventory error: --reopen-native-row forbids other refresh, protocol, and current-only options", file=sys.stderr)
+        return 2
+    if args.refresh_source_derived and (args.refresh_from_protocol or args.protocol_log):
+        print("test inventory error: --refresh-source-derived forbids protocol refresh/log combinations", file=sys.stderr)
+        return 2
     if args.protocol_log and not args.refresh_from_protocol:
         print(
             "test inventory error: --protocol-log requires --refresh-from-protocol",
@@ -14229,8 +14511,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     validated_inventory: dict[str, Any] | None = None
     incomplete = 0
-    if args.refresh_from_protocol:
-        if not args.protocol_log:
+    if args.refresh_from_protocol or args.refresh_source_derived or args.reopen_native_row:
+        if args.refresh_from_protocol and not args.protocol_log:
             print(
                 "test inventory error: refresh requires at least one --protocol-log",
                 file=sys.stderr,
@@ -14247,7 +14529,12 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             bindings.append((environment_id, Path(os.path.abspath(raw_path))))
         try:
-            candidate = refresh_from_protocol(root, inventory, bindings)
+            if args.reopen_native_row:
+                candidate = refresh_reopen_native_rows(root, inventory, tuple(args.reopen_native_row))
+            elif args.refresh_source_derived:
+                candidate = refresh_source_derived(root, inventory)
+            else:
+                candidate = refresh_from_protocol(root, inventory, bindings)
             if args.require_current_only:
                 slots_error = _current_only_slots_error()
                 if slots_error is not None:
@@ -14267,6 +14554,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             validated_inventory = candidate.inventory
             incomplete = candidate.incomplete_count
+            if args.reopen_native_row:
+                print("selected native rows reopened; actual compiler enumeration remains required; "
+                      "no test bodies were executed")
+            if args.refresh_source_derived:
+                print("source metadata refreshed; retained native namesets are historical expectations; "
+                      "no current-source native execution qualification was granted")
         except InventoryPublicationIndeterminate as exc:
             print(
                 f"test inventory error: {exc}",

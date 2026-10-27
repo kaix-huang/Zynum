@@ -262,7 +262,7 @@ test "POSV one admitted operation spans callbacks staged storage and reverse cle
         defer rig.done() catch @panic("POSV cleanup");
         var a = [_]f64{ 4, 0, 0, 9 };
         var b = [_]f64{ 8, 18 };
-        try s.expectInfo(i64, if (trigger == .hook) -2 else 0, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = if (trigger == .hook) '?' else 'L', .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = if (raw) a[0..].ptr else &a, .b = if (raw) b[0..].ptr else &b }));
+        try s.expectInfo(i64, if (trigger == .hook) -2 else 0, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = if (trigger == .hook) '?' else 'L', .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = if (raw) a[0..].ptr else &a, .b = if (raw) b[0..].ptr else &b }));
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, 2), rig.x.attempts);
@@ -282,14 +282,14 @@ test "POSV one admitted operation spans callbacks staged storage and reverse cle
         try std.testing.expectEqual(@as(usize, 1), starts);
         try std.testing.expectEqual(@as(usize, 1), ends);
         if (trigger != .hook) try std.testing.expectEqualSlices(f64, &.{ 2, 2 }, &b);
-        try std.testing.expectError(error.Closing, A.callManaged(f64, i64, .work, &rig.context, undefined, undefined));
+        try std.testing.expectError(error.Closing, A.callManaged(f64, i64, .work, rig.context, undefined, undefined));
     };
     var rig: h.Rig = .{};
     rig.init();
     defer rig.done() catch @panic("POSV shared cleanup");
     var a = [_]f64{ 4, 0, 0, 9 };
     var b = [_]f64{ 8, 18 };
-    try s.expectInfo(i32, 0, try owner.Shared.posvRawManaged(false, f64, i32, .work, &rig.context, .{ .layout = 101, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr }));
+    try s.expectInfo(i32, 0, try owner.Shared.posvRawManaged(false, f64, i32, .work, rig.context, .{ .layout = 101, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 2, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr }));
     try std.testing.expectEqualSlices(f64, &.{ 2, 2 }, &b);
     try std.testing.expectEqual(@as(usize, 1), rig.max_active);
 }

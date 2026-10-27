@@ -11,6 +11,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import re
 import os
 import platform
 import shutil
@@ -74,12 +75,111 @@ def _prior_component_observation(test, row, width, count):
             "root_source": [path for path in row["root_source"] if path != root]}
 
 
+class NativeConfigureSeamSourceContractTests(unittest.TestCase):
+    """Reviewed native graph structure, never inferred native test success."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+
+    def rejects(self, changed: str) -> None:
+        self.assertNotEqual(self.source, changed, "mutation must hit a real source anchor")
+        with self.assertRaisesRegex(CHECKER.InventoryError, "reviewed native configure seam changed"):
+            CHECKER._reviewed_configure_projection(changed)
+
+    def helper_mutation(self, helper: str, old: str, new: str) -> str:
+        masked = CHECKER._code_mask(self.source)
+        match = re.search(r"\bfn\s+" + helper + r"\s*\(", masked)
+        self.assertIsNotNone(match)
+        opening = masked.find("{", match.end())
+        closing = CHECKER._matching_brace(masked, opening)
+        body = self.source[match.start():closing + 1]
+        self.assertEqual(1, body.count(old), (helper, old))
+        return self.source[:match.start()] + body.replace(old, new, 1) + self.source[closing + 1:]
+
+    def test_current_projection_is_offset_preserving_and_idempotent(self) -> None:
+        projected = CHECKER._reviewed_configure_projection(self.source)
+        self.assertEqual(len(self.source), len(projected))
+        self.assertEqual([i for i, ch in enumerate(self.source) if ch == "\n"],
+                         [i for i, ch in enumerate(projected) if ch == "\n"])
+        self.assertEqual(projected, CHECKER._reviewed_configure_projection(projected))
+        self.assertIn('b.path("src/numerics/execution/root.zig")', projected)
+        self.assertNotIn("configureIntegrated", CHECKER._code_mask(projected))
+
+    def test_profile_must_select_one_owner_graph_before_reference_construction(self) -> None:
+        for old, new in (
+            ("execution_profile == .integrated_native) return configureIntegrated", "execution_profile == .reference) return configureIntegrated"),
+            ("orelse .reference;", "orelse .integrated_native;"),
+            ("reference_compat != (execution_profile == .reference)", "false"),
+            ('if (b.modules.contains("zynum-core"))', "if (false)"),
+            (".lapacke_binding = lapacke_binding_mod,", ".lapacke_binding = undefined,"),
+            ("lapacke_binding: ?*std.Build.Module = null,", "lapacke_binding: *std.Build.Module,"),
+        ):
+            with self.subTest(old=old): self.rejects(self.source.replace(old, new, 1))
+
+    def test_no_forwarded_second_configure_or_escaped_graph_alias(self) -> None:
+        for body in ("", "_ = configure(b); _ = configure(b);", "if (true) { _ = configure(b); }",
+                     "const f = configure; _ = f(b);", "_ = configure(other);"):
+            self.rejects(self.source.replace("_ = configure(b);", body, 1))
+        self.rejects(self.source + "\nconst EscapedGraph = ImplementationGraph;\n")
+        self.rejects(self.source + "\nconst escaped = configureIntegrated;\n")
+
+    def test_native_cannot_clone_core_execution_resources_or_provider(self) -> None:
+        for helper, old, new in (
+            ("configureIntegrated", 'core.addImport("zynum-execution", execution);', 'core.addImport("zynum-execution", b.createModule(.{}));'),
+            ("configureIntegrated", 'execution.addImport("zynum-numerics-resources", resources);', 'execution.addImport("zynum-numerics-resources", b.createModule(.{}));'),
+            ("configureIntegrated", 'resources.addImport("heteris-provider-c", provider_c);', 'resources.addImport("heteris-provider-c", translateProvider(b, target, optimize, heteris_include));'),
+            ("addNativeFacade", 'native.addImport("zynum-core", core);', 'native.addImport("zynum-core", b.createModule(.{}));'),
+            ("addPlatformLibrary", 'main.addImport("zynum-core", graph.core);', 'main.addImport("zynum-core", b.createModule(.{}));'),
+            ("addPlatformLibrary", 'upstream.addImport("zynum-core", graph.core);', 'upstream.addImport("zynum-core", b.createModule(.{}));'),
+        ):
+            with self.subTest(helper=helper, old=old): self.rejects(self.helper_mutation(helper, old, new))
+
+    def test_native_default_legacy_and_second_archive_leaks_are_rejected(self) -> None:
+        for old, new in (
+            ('b.path("src/numerics/execution/root.zig")', 'b.path("src/numerics/execution/default.zig")'),
+            ('options.addOption(bool, "reference_compat", false);', 'options.addOption(bool, "reference_compat", true);'),
+            ('const library = addPlatformLibrary', 'const hidden_owner = b.createModule(.{}); _ = hidden_owner; const library = addPlatformLibrary'),
+        ):
+            self.rejects(self.helper_mutation("configureIntegrated", old, new))
+        self.rejects(self.helper_mutation("addPlatformLibrary", 'main.addImport("zynum-core", graph.core);',
+            'main.addImport("zynum-core", graph.core); main.linkLibrary(b.addLibrary(.{ .name = "second-core", .root_module = graph.core }));'))
+
+    def test_sdk_conflict_and_archive_gates_cannot_be_disabled(self) -> None:
+        self.rejects(self.helper_mutation("headerIncludePath", "normalized_option != null and normalized_inherited != null", "false"))
+        self.rejects(self.helper_mutation("normalizeHeaderPath", "!std.fs.path.isAbsolute(path)", "false"))
+        self.rejects(self.helper_mutation("configureIntegrated", 'if (!std.fs.path.isAbsolute(archive))', 'if (false)'))
+
+
+    def test_source_only_native_templates_do_not_create_protocol_evidence(self) -> None:
+        templates = CHECKER.INJECTION_OBSERVATION_TEMPLATES
+        translated = templates["compile:build.zig:translateProvider:translated"]
+        self.assertEqual(["include/zynum_native.h"], translated["root_source"])
+        self.assertEqual("zynum_native.zig", translated["output_name"])
+        self.assertEqual(["zynum_native.zig"], translated["produced_outputs"])
+        self.assertEqual(["heteris.h", "heteris_runtime_provider.h"], translated["external_include_dependencies"])
+        for suffix in ("math_tests", "c_tests"):
+            row = templates["compile:build.zig:configureIntegrated:" + suffix]
+            self.assertFalse(row["native_inventory_evidence"])
+            self.assertIn("explicit absolute heteris-runtime-archive", row["condition"])
+        for name in ("execution-profile", "reference-compat"):
+            self.assertIn("option:build.zig:configure:" + name, templates)
+        self.assertEqual("option:build.zig:build:poison-reference",
+                         next(row["source_observation"] for row in CHECKER.INJECTION_OPTION_SURFACES
+                              if row["name"] == "poison-reference"))
+        with self.assertRaisesRegex(CHECKER.InventoryError, "no reviewed template"):
+            CHECKER._new_test_inventory_observation("compile:build.zig:unreviewed:math_tests", {})
+        self.rejects(self.helper_mutation("configureIntegrated",
+            'options.addOption(bool, "poison_reference", b.option(bool, "poison-reference", "Test-only poison for actual legacy reference imports") orelse false);',
+            'options.addOption(bool, "poison_reference", false);'))
+
+
+
 class ConfigureSeamSourceContractTests(unittest.TestCase):
     """Exact source composition, never a new native-execution observation."""
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
+        cls.current_source = (REPOSITORY_ROOT / "build.zig").read_text(encoding="utf-8")
         cls.graph_type = "pub const ImplementationGraph = struct {\n" + "".join(
             f"    {field}: *std.Build.Module,\n" for field in (
                 "core", "execution", "resources", "options", "lapacke_binding", "mkl_sparse_binding")
@@ -92,8 +192,19 @@ class ConfigureSeamSourceContractTests(unittest.TestCase):
                 ("resources", "numerics_resources_mod"), ("options", "zynum_build_options_mod"),
                 ("lapacke_binding", "lapacke_binding_mod"), ("mkl_sparse_binding", "mkl_sparse_binding_mod"))
         ) + "    };"
-        # Independent exact inverse of the reviewed seam, without a private
-        # baseline directory or any imported native/metadata observation.
+        # Keep the old finite six-owner seam's negative coverage. The current
+        # native seam is checked independently below; this fixture wraps the
+        # same reviewed reference body, with no imported execution observation.
+        projected = CHECKER._reviewed_configure_projection(cls.current_source)
+        context = CHECKER._zig_build_context(projected, "build.zig")
+        signature = re.search(r"\bpub\s+fn\s+build\s*\(", CHECKER._code_mask(projected))
+        if signature is None:
+            raise AssertionError("reference projection has no build signature")
+        cls.source = (projected[:signature.start()] + cls.graph_type + "\n" + cls.thin_build + "\n" +
+                      cls.config_header + projected[context.body_start:context.body_end] +
+                      cls.return_block + "\n}" + projected[context.body_end + 1:])
+        # Independent exact inverse of the old wrapper/type/return. No private
+        # baseline checkout or copied mathematical implementation is used.
         cls.legacy = cls.source
         for old, new in ((cls.graph_type, ""), (cls.thin_build, ""),
                          (cls.config_header, "pub fn build(b: *std.Build) void {"),
@@ -522,7 +633,7 @@ class NumericsResourcesSourceContractTests(unittest.TestCase):
             source = root / CHECKER.NUMERICS_RESOURCES_PATH
             source.parent.mkdir(parents=True)
             source.write_bytes(self.resource)
-            for path in (*CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256):
+            for path in (*CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256, *CHECKER.INJECTION_SOURCE_SHA256):
                 destination = root / path
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 destination.write_bytes((REPOSITORY_ROOT / path).read_bytes())
@@ -681,7 +792,7 @@ class SharedFacadeSourceContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="shared-facade-source-") as directory:
             root = Path(directory)
             (root / "build.zig").write_text("pub fn build() void {}\n")
-            for path in (CHECKER.NUMERICS_RESOURCES_PATH, *CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256):
+            for path in (CHECKER.NUMERICS_RESOURCES_PATH, *CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256, *CHECKER.INJECTION_SOURCE_SHA256):
                 dst = root / path
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 dst.write_bytes((REPOSITORY_ROOT / path).read_bytes())
@@ -1427,6 +1538,23 @@ class SharedExecutionSourceContractTests(unittest.TestCase):
                 CHECKER._numerics_resources_build_contract(text)
 
     def test_execution_auxiliary_objects_bind_exact_consumers_and_target(self) -> None:
+        path = "src/blas/task_runtime_host_object_root.zig"
+        auxiliary = (REPOSITORY_ROOT / path).read_text()
+        self.assertEqual(
+            'comptime{_=@import("reference_cache_hook.zig");_=@import("kernels/isolated/task_runtime_host.zig");}',
+            CHECKER._compact_zig_contract(auxiliary),
+        )
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        original_read = CHECKER._frozen_regular_bytes
+        direct = '    _ = @import("reference_cache_hook.zig");'
+        for replacement in ("", '    if (@import("builtin").is_test) _ = @import("reference_cache_hook.zig");'):
+            changed = auxiliary.replace(direct, replacement, 1).encode()
+            def read_source(active, relative, label):
+                return changed if relative == path else original_read(active, relative, label)
+            with self.subTest(activation=replacement), mock.patch.object(
+                CHECKER, "_frozen_regular_bytes", side_effect=read_source
+            ), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._numerics_resources_source_contract(context)
         self.assertEqual(set(CHECKER.EXECUTION_OBJECT_CONSUMERS), set(self.graph['linked_module_entries']))
         for root, receiver in CHECKER.EXECUTION_OBJECT_CONSUMERS.items():
             row, = self.graph['linked_module_entries'][root]
@@ -1450,7 +1578,7 @@ class SharedExecutionSourceContractTests(unittest.TestCase):
         rows = {row["path"]: row for row in inventory["repository_file_classifications"]}
         for previous in previous_rows:
             self.assertEqual(previous, rows[previous["path"]])
-        paths = (CHECKER.NUMERICS_RESOURCES_PATH, *CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256)
+        paths = (CHECKER.NUMERICS_RESOURCES_PATH, *CHECKER.EVD_SOURCE_SHA256, *CHECKER.CONTROLS_SOURCE_SHA256, *CHECKER.SYGV_SOURCE_SHA256, *CHECKER.SYEV_SOURCE_SHA256, *CHECKER.CONTOUR_SOURCE_SHA256, *CHECKER.FEAST_SOURCE_SHA256, *CHECKER.FFTW_F32_SOURCE_SHA256, *CHECKER.POTRI_OWNER_SOURCE_SHA256, *CHECKER.SHARED_FACADE_SOURCE_SHA256, *CHECKER.EXECUTION_SOURCE_SHA256, *CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, *CHECKER.COMMON_CORE_SOURCE_SHA256, *CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, *CHECKER.MANAGED_SPARSE_SOURCE_SHA256, *CHECKER.UNIFIED_BLAS_SOURCE_SHA256, *CHECKER.OPERATOR_PHASE_SOURCE_SHA256, *CHECKER.GVD_SOURCE_SHA256, *CHECKER.GELS_SOURCE_SHA256, *CHECKER.GELSS_SOURCE_SHA256, *CHECKER.INJECTION_SOURCE_SHA256)
         with tempfile.TemporaryDirectory(prefix="shared-execution-source-") as directory:
             root = Path(directory)
             (root / "build.zig").write_text("pub fn build() void {}\n")
@@ -2219,6 +2347,7 @@ class BuildInventoryTests(unittest.TestCase):
         files.add(CHECKER.NUMERICS_RESOURCES_PATH)
         files.update(CHECKER.SHARED_FACADE_SOURCE_SHA256)
         files.update(CHECKER.EXECUTION_SOURCE_SHA256)
+        files.update(CHECKER.INJECTION_SOURCE_SHA256)
         files.update(CHECKER.COMMON_CORE_SOURCE_SHA256)
         files.update(CHECKER.MANAGED_LAPACKE_SOURCE_SHA256)
         files.update(CHECKER.MANAGED_SPARSE_SOURCE_SHA256)

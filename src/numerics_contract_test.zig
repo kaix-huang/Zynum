@@ -3,6 +3,8 @@
 
 //! Canonical internal contracts, separate from the public API test modules.
 comptime {
+    // The direct numerical test root owns these sources in this module.
+    _ = @import("blas/runtime.zig");
     _ = @import("numerics/residual_filter_test.zig");
     _ = @import("numerics/pattern_operator_test.zig");
     _ = @import("interop/feast_test.zig");

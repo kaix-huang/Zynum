@@ -12,6 +12,7 @@ const Operation = @import("zynum-execution").context.Operation;
 const matrix_vector_ops = @import("../matrix_vector.zig");
 const gemm_catalog = @import("../../kernels/shared/matrix_matrix/catalog.zig");
 const planner = @import("planner.zig");
+const real_scale = @import("real_scale.zig");
 
 pub const BlasInt = scalar.BlasInt;
 pub const ComplexF32 = scalar.ComplexF32;
@@ -186,14 +187,7 @@ noinline fn gemmNoTransRealShortWideTailN2048(
 fn gemmNoTransRealWithResources(comptime T: type, resources: CallResources, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, beta: T, c: [*]T, ldc: BlasInt) void {
     if (m_ <= 0 or n_ <= 0) return;
     if (k_ <= 0 or isZero(T, alpha)) {
-        const m = toUsize(m_);
-        const n = toUsize(n_);
-        for (0..n) |j| {
-            for (0..m) |i| {
-                const idxc = matIndex(ldc, i, j);
-                c[idxc] = if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]);
-            }
-        }
+        real_scale.columns(T, toUsize(m_), 0, toUsize(n_), beta, c, ldc);
         return;
     }
     if (m_ == 17 and n_ == 2048 and k_ >= 128 and k_ <= 1024) {
@@ -1691,4 +1685,10 @@ pub fn gemmWithResources(comptime T: type, resources: CallResources, transa: Ord
             c[idxc] = add(T, mul(T, alpha, sum), if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]));
         }
     }
+}
+
+/// Explicit portable-generic policy: even one-task and scaling-only writes use
+/// the injected provider. It never enters the legacy GEMV/packed fallbacks.
+pub fn gemmF64NNExplicit(operation: *const @import("zynum-execution").Operation, args: @import("../checked/operands.zig").MatrixProduct(f64), report: *@import("zynum-execution").CallReport) @import("zynum-execution").ExecutionError!void {
+    try planner.noTransF64Explicit(operation, args.output.row_count, args.output.column_count, args.left.column_count, args.product_scale, args.left.values, args.left.leading_dimension, args.right.values, args.right.leading_dimension, args.output_scale, args.output.values, args.output.leading_dimension, report);
 }

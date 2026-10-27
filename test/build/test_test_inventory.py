@@ -38,6 +38,373 @@ CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
 
 
+
+class SourceOnlyRefreshTests(unittest.TestCase):
+    """A source refresh never grants current-source native qualification."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.inventory = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+
+    def test_unchanged_historical_native_ledger_is_accepted(self) -> None:
+        CHECKER._assert_source_only_native_unchanged(self.inventory, copy.deepcopy(self.inventory))
+
+    def test_native_profiles_classes_bindings_and_namesets_are_immutable(self) -> None:
+        for field in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings"):
+            changed = copy.deepcopy(self.inventory)
+            changed[field][0]["unreviewed"] = True
+            with self.subTest(field=field), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+        changed = copy.deepcopy(self.inventory)
+        row = next(row for row in changed["expected_test_sets"] if row["root_id"].startswith("zig-root:"))
+        row["tests"] = row["tests"][1:]
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+
+    def test_all_zig_rows_and_exact_pending_id_order_are_immutable(self) -> None:
+        changed = copy.deepcopy(self.inventory)
+        row = next(row for row in changed["test_mode_rows"] if row["root_id"].startswith("zig-root:"))
+        row["unreviewed"] = True
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+        changed = copy.deepcopy(self.inventory)
+        row = next(row for row in changed["test_mode_rows"] if row["expectation_state"] == CHECKER.PENDING_STATE)
+        row["expectation_state"] = CHECKER.FROZEN_STATE
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+
+    def test_python_rows_allow_only_the_source_derived_set_foreign_key(self) -> None:
+        changed = copy.deepcopy(self.inventory)
+        row = next(row for row in changed["test_mode_rows"] if row["root_id"].startswith("python-root:"))
+        row["expected_test_set_id"] = "set:derived-from-new-static-declarations"
+        CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+        row["disposition"] = "unreviewed"
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+
+    def test_source_only_rejects_protocol_combinations_before_publication(self) -> None:
+        for arguments in (["--refresh-source-derived", "--refresh-from-protocol"],
+                          ["--refresh-source-derived", "--protocol-log", "unreviewed=/missing"]):
+            with self.subTest(arguments=arguments), contextlib.redirect_stderr(io.StringIO()):
+                with mock.patch.object(CHECKER, "_publish_inventory_atomic") as publish:
+                    self.assertEqual(2, CHECKER.main(arguments))
+                    publish.assert_not_called()
+        with self.assertRaisesRegex(CHECKER.InventoryError, "forbids native protocol"):
+            CHECKER._prepare_inventory_refresh(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json",
+                                                [("unreviewed", Path("/missing"))], source_only=True)
+
+    def test_source_only_keeps_whole_file_and_native_review_policies(self) -> None:
+        data = (REPOSITORY_ROOT / "tools/test_inventory.json").read_bytes()
+        self.assertIsNone(CHECKER._reviewed_inventory_bytes_error(data))
+        with mock.patch.object(CHECKER, "CURRENT_TEST_INVENTORY_SHA256", "0" * 64):
+            with self.assertRaisesRegex(CHECKER.InventoryError, "whole-file test inventory mismatch"):
+                CHECKER.refresh_source_derived(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json")
+        self.assertEqual(CHECKER.CURRENT_NATIVE_PROJECTION_SHA256,
+                         CHECKER._native_projection_digest(self.inventory))
+
+        # Portable controlled history: no Git HEAD or external cached inventory.
+        # Reuse the existing fixture/runner slots, with a source-only gap delta.
+        TestInventoryTests.setUpClass()
+        fixture = TestInventoryTests()
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        # New regression methods legitimately change the source-derived Python
+        # sets; prepare their reviewed fixture generation, never on-disk pins.
+        current = fixture._source_current_fixture_inventory()
+        discovered = CHECKER.discover(fixture.root, fixture.inventory_path)
+        historical = copy.deepcopy(current)
+        removed = next(row for row in historical["zig_test_files"] if row["classification"] == "current-gap")
+        historical["zig_test_files"].remove(removed)
+        historical["known_gaps"] = [gap for gap in historical["known_gaps"] if gap["id"] != removed["gap_id"]]
+        historical["strict_summary"] = CHECKER._section_summary(historical)
+        historical_digest = hashlib.sha256(CHECKER._canonical_inventory_bytes(historical)).hexdigest()
+        previous_facts = CHECKER._fact_digest(CHECKER._host_assembly_source_facts(historical))
+        current_facts = CHECKER._fact_digest(CHECKER._host_assembly_source_facts(current))
+
+        def full_errors(value, *, refresh_base=True, exact_pair=True, exact_whole=False):
+            data = CHECKER._canonical_inventory_bytes(value)
+            digest = hashlib.sha256(data).hexdigest()
+            fixture.inventory_path.write_bytes(data)
+            with (
+                fixture._reviewed_digest_slots(inventory_current=digest),
+                mock.patch.object(CHECKER, "HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256", previous_facts),
+                mock.patch.object(CHECKER, "HOST_ASSEMBLY_CURRENT_SOURCE_SHA256",
+                                  current_facts if exact_pair else "0" * 64),
+                mock.patch.object(CHECKER, "HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256",
+                                  digest if exact_whole else historical_digest),
+                mock.patch.object(CHECKER, "discover", return_value=discovered),
+            ):
+                snapshot = CHECKER._read_regular_stable_snapshot(
+                    fixture.inventory_path, CHECKER.MAX_INVENTORY_BYTES, "controlled history"
+                )
+                return CHECKER._validate_inventory_data(
+                    fixture.root, fixture.inventory_path, value, structure_only=True,
+                    inventory_bytes=data, filesystem_snapshot=snapshot, _refresh_base=refresh_base,
+                )
+
+        self.assertEqual([], full_errors(historical))
+        self.assertTrue(full_errors(historical, refresh_base=False))
+        self.assertEqual([], full_errors(current, refresh_base=False))
+        forged = copy.deepcopy(historical)
+        forged["known_gaps"].append({"id": "gap:unreviewed", "kind": "zig-test-file-without-reaching-root",
+                                    "subject_ids": ["zig-file:unreviewed.zig"]})
+        forged["strict_summary"] = CHECKER._section_summary(forged)
+        self.assertIn("exact historical whole-file", "; ".join(full_errors(forged)))
+        self.assertTrue(full_errors(historical, exact_pair=False))
+        native_gap = copy.deepcopy(historical)
+        next(gap for gap in native_gap["known_gaps"] if gap["kind"] == "native-test-enumeration-required")["subject_ids"].pop()
+        native_gap["strict_summary"] = CHECKER._section_summary(native_gap)
+        self.assertIn("known_gaps", "; ".join(full_errors(native_gap, exact_whole=True)))
+        pending = copy.deepcopy(historical)
+        next(row for row in pending["test_mode_rows"] if row["expectation_state"] == CHECKER.PENDING_STATE)["expectation_state"] = CHECKER.FROZEN_STATE
+        pending["strict_summary"] = CHECKER._section_summary(pending)
+        self.assertTrue(full_errors(pending, exact_whole=True))
+
+
+class NativeReopenTests(unittest.TestCase):
+    """Explicit pending transitions retain the existing reviewed publication gate."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        TestInventoryTests.setUpClass()
+        cls.historical = TestInventoryTests.inventory
+        cls.selected = tuple(
+            row["id"] for row in cls.historical["test_mode_rows"]
+            if row["environment_id"] == "env:x86-64-linux-gnu-baseline"
+            and row["root_id"] in {"zig-root:numerics-contract-tests", "zig-root:execution-contract-tests"}
+        )
+        assert len(cls.selected) == 6
+        cls.source_hashes = {name: hashlib.sha256((REPOSITORY_ROOT / name).read_bytes()).hexdigest()
+                             for name in TestInventoryTests.fixture_files}
+        cls.current_bytes: bytes | None = None
+        cls.current_inventory: dict[str, Any] | None = None
+
+    def _source_base(self, fixture: Any) -> dict[str, Any]:
+        # Reuse only a real source-derived base from this exact frozen source
+        # window. Every test gets separate files and a fresh mutable dictionary;
+        # the production candidate validators/publisher are never mocked here.
+        self.assertEqual(self.source_hashes,
+                         {name: hashlib.sha256((REPOSITORY_ROOT / name).read_bytes()).hexdigest()
+                          for name in TestInventoryTests.fixture_files})
+        cls = type(self)
+        if cls.current_bytes is None:
+            cls.current_inventory = fixture._source_current_fixture_inventory()
+            cls.current_bytes = fixture.inventory_path.read_bytes()
+        else:
+            fixture.inventory_path.write_bytes(cls.current_bytes)
+        return copy.deepcopy(cls.current_inventory)
+
+    def _fixture(self) -> Any:
+        fixture = TestInventoryTests()
+        fixture.setUp()
+        self.addCleanup(fixture.tearDown)
+        return fixture
+
+    def _candidate(self, base: dict[str, Any]) -> dict[str, Any]:
+        candidate = copy.deepcopy(base)
+        for row in candidate["test_mode_rows"]:
+            if row["id"] in self.selected:
+                row["expectation_state"] = CHECKER.PENDING_STATE
+                row["expected_test_set_id"] = None
+        candidate["native_observation_bindings"] = [
+            row for row in candidate["native_observation_bindings"] if row["row_id"] not in self.selected
+        ]
+        CHECKER._refresh_native_gaps(candidate)
+        candidate["strict_summary"] = CHECKER._section_summary(candidate)
+        return candidate
+
+    def _arguments(self, fixture: Any, *extra: str) -> list[str]:
+        arguments = ["--root", str(fixture.root), "--inventory", str(fixture.inventory_path), "--structure-only"]
+        for identifier in self.selected:
+            arguments.extend(("--reopen-native-row", identifier))
+        return [*arguments, *extra]
+
+    def _reviewed(self, fixture: Any, base: dict[str, Any], candidate: dict[str, Any],
+                  *, whole: bool = True, native: bool = True) -> Any:
+        return fixture._reviewed_digest_slots(
+            inventory_current=hashlib.sha256(CHECKER._canonical_inventory_bytes(base)).hexdigest(),
+            inventory_next=hashlib.sha256(CHECKER._canonical_inventory_bytes(candidate)).hexdigest() if whole else None,
+            native_current=CHECKER._native_projection_digest(base),
+            native_next=CHECKER._native_projection_digest(candidate) if native else None,
+        )
+
+    def test_exact_selection_rejects_empty_duplicate_unknown_and_nonfrozen_rows(self) -> None:
+        pending = next(row["id"] for row in self.historical["test_mode_rows"] if row["expectation_state"] == CHECKER.PENDING_STATE)
+        python = next(row["id"] for row in self.historical["test_mode_rows"] if row["root_id"].startswith("python-root:"))
+        unavailable = next(row["id"] for row in self.historical["test_mode_rows"] if row["disposition"] != "execute")
+        for identifiers in ((), ("",), (self.selected[0], self.selected[0]), (" row:unknown ",),
+                            (pending,), (python,), (unavailable,)):
+            with self.subTest(identifiers=identifiers), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._selected_reopen_native_rows(self.historical, identifiers)
+        self.assertEqual(set(self.selected), CHECKER._selected_reopen_native_rows(self.historical, self.selected))
+        for field, value in (("enumeration_class_id", "enumeration-class:unreviewed"), ("disposition", "skip")):
+            bad = copy.deepcopy(self.historical)
+            next(row for row in bad["test_mode_rows"] if row["id"] == self.selected[0])[field] = value
+            with self.subTest(field=field), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._selected_reopen_native_rows(bad, self.selected)
+        bad = copy.deepcopy(self.historical)
+        next(row for row in bad["native_observation_bindings"] if row["row_id"] == self.selected[0])["digest"] = "0" * 64
+        with self.assertRaisesRegex(CHECKER.InventoryError, "class or binding mismatch"):
+            CHECKER._selected_reopen_native_rows(bad, self.selected)
+
+    def test_mode_combinations_fail_before_snapshot_or_publication(self) -> None:
+        combinations = (["--refresh-from-protocol"], ["--refresh-source-derived"],
+                        ["--protocol-log", "unreviewed=/missing"], ["--require-current-only"],
+                        ["--run-python-tooling-root", CHECKER.PYTHON_TOOLING_ROOT_ID],
+                        ["--check-native-executors"], ["--native-executor", "qemu"])
+        for extra in combinations:
+            with (self.subTest(extra=extra), mock.patch.object(CHECKER, "_read_regular_stable_snapshot") as read,
+                  mock.patch.object(CHECKER, "_publish_inventory_atomic") as publish,
+                  contextlib.redirect_stderr(io.StringIO())):
+                self.assertEqual(2, CHECKER.main(["--reopen-native-row", self.selected[0], *extra]))
+                read.assert_not_called()
+                publish.assert_not_called()
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER.refresh_reopen_native_rows(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json", ())
+        with self.assertRaisesRegex(CHECKER.InventoryError, "forbids"):
+            CHECKER._prepare_inventory_refresh(REPOSITORY_ROOT, REPOSITORY_ROOT / "tools/test_inventory.json", [],
+                                              source_only=True, reopen_native_rows=self.selected)
+
+    def test_transition_guard_rejects_all_other_native_data_and_policy_drift(self) -> None:
+        permitted = self._candidate(self.historical)
+        CHECKER._assert_reopened_native_unchanged(self.historical, permitted, self.selected)
+        mutations = []
+        for selected in (True, False):
+            bad = copy.deepcopy(permitted)
+            row = next(row for row in bad["test_mode_rows"] if row["root_id"].startswith("zig-root:")
+                       and (row["id"] in self.selected) == selected)
+            row["raw_metadata"] = "unreviewed"
+            mutations.append(bad)
+        for section in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings"):
+            bad = copy.deepcopy(permitted); bad[section][0]["raw_metadata"] = "unreviewed"; mutations.append(bad)
+        bad = copy.deepcopy(permitted); bad["native_observation_bindings"].reverse(); mutations.append(bad)
+        bad = copy.deepcopy(permitted); bad["native_observation_bindings"].append(copy.deepcopy(bad["native_observation_bindings"][0])); mutations.append(bad)
+        bad = copy.deepcopy(permitted); bad["test_mode_rows"].reverse(); mutations.append(bad)
+        bad = copy.deepcopy(permitted)
+        frozen_indices = [i for i, row in enumerate(bad["test_mode_rows"])
+                          if row["root_id"].startswith("zig-root:") and row["expectation_state"] == CHECKER.FROZEN_STATE]
+        first, second = frozen_indices[:2]
+        bad["test_mode_rows"][first], bad["test_mode_rows"][second] = bad["test_mode_rows"][second], bad["test_mode_rows"][first]
+        mutations.append(bad)
+        bad = copy.deepcopy(permitted)
+        next(row for row in bad["expected_test_sets"] if row["root_id"].startswith("zig-root:"))["tests"].pop()
+        mutations.append(bad)
+        for field in ("optimize_modes", "predicates", "matrix_row_contract", "workflow_mode_bindings"):
+            bad = copy.deepcopy(permitted); bad[field] = {"unreviewed": True}; mutations.append(bad)
+        for number, bad in enumerate(mutations):
+            with self.subTest(number=number), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._assert_reopened_native_unchanged(self.historical, bad, self.selected)
+
+    def test_real_candidate_pipeline_retains_historical_sets_and_only_six_native_transitions(self) -> None:
+        fixture = self._fixture()
+        base = self._source_base(fixture)
+        expected = self._candidate(base)
+        before = fixture.inventory_path.read_bytes()
+        with self._reviewed(fixture, base, expected):
+            result = CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, self.selected)
+        self.assertEqual(CHECKER._canonical_inventory_bytes(expected), result.bytes)
+        self.assertEqual(before, fixture.inventory_path.read_bytes())
+        self.assertEqual(CHECKER._matrix_incomplete_count(base) + 6, result.incomplete_count)
+        self.assertEqual(len(base["native_observation_bindings"]) - 6, len(result.inventory["native_observation_bindings"]))
+        self.assertEqual([row for row in base["expected_test_sets"] if row["root_id"].startswith("zig-root:")],
+                         [row for row in result.inventory["expected_test_sets"] if row["root_id"].startswith("zig-root:")])
+        self.assertEqual(153, result.incomplete_count)
+        self.assertEqual(141, len(result.inventory["native_observation_bindings"]))
+
+    def test_real_new_python_declarations_replace_only_source_derived_sets_during_reopen(self) -> None:
+        fixture = self._fixture()
+        base = self._source_base(fixture)
+        module = fixture.root / "test/build/test_test_inventory.py"
+        text = module.read_text()
+        position = text.rfind('\nif __name__ == "__main__":')
+        self.assertGreater(position, 0)
+        added = "\nclass NativeReopenAddedFixture(unittest.TestCase):\n    def test_new_static_method(self):\n        pass\n"
+        module.write_text(text[:position] + added + text[position:])
+        discovered = CHECKER.discover(fixture.root, fixture.inventory_path)
+        expected = self._candidate(base)
+        expected["python_test_modules"] = discovered["python_test_modules"]
+        python_sets = [row for row in discovered["expected_test_sets"] if row["root_id"].startswith("python-root:")]
+        python_set_ids = {row["root_id"]: row["id"] for row in python_sets}
+        expected["expected_test_sets"] = sorted(
+            [row for row in base["expected_test_sets"] if row["root_id"].startswith("zig-root:")] + python_sets,
+            key=lambda row: row["id"],
+        )
+        for row in expected["test_mode_rows"]:
+            if row["root_id"].startswith("python-root:") and row["disposition"] == "execute":
+                row["expected_test_set_id"] = python_set_ids[row["root_id"]]
+        expected["strict_summary"] = CHECKER._section_summary(expected)
+        with self._reviewed(fixture, base, expected):
+            result = CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, self.selected)
+        self.assertEqual(CHECKER._canonical_inventory_bytes(expected), result.bytes)
+        old_python = {row["id"] for row in base["expected_test_sets"] if row["root_id"].startswith("python-root:")}
+        new_python = {row["id"] for row in result.inventory["expected_test_sets"] if row["root_id"].startswith("python-root:")}
+        self.assertTrue(old_python - new_python)
+        referenced = {row["expected_test_set_id"] for row in result.inventory["test_mode_rows"] if row["expected_test_set_id"] is not None}
+        self.assertEqual(referenced, {row["id"] for row in result.inventory["expected_test_sets"]})
+
+    def test_exact_current_base_rejects_even_a_reviewed_next_generation(self) -> None:
+        fixture = self._fixture()
+        base = copy.deepcopy(self.historical)
+        candidate = self._candidate(base)
+        before = fixture.inventory_path.read_bytes()
+        actual_digest = hashlib.sha256(before).hexdigest()
+        with (fixture._reviewed_digest_slots(inventory_current="0" * 64, inventory_next=actual_digest,
+                                            native_current=CHECKER._native_projection_digest(base)),
+              mock.patch.object(CHECKER, "_publish_inventory_atomic") as publish,
+              contextlib.redirect_stderr(io.StringIO()) as errors):
+            self.assertEqual(1, CHECKER.main(self._arguments(fixture)))
+        self.assertIn("whole-file test inventory mismatch", errors.getvalue())
+        publish.assert_not_called()
+        self.assertEqual(before, fixture.inventory_path.read_bytes())
+        with (fixture._reviewed_digest_slots(inventory_current=actual_digest,
+                                            native_current="0" * 64, native_next=CHECKER._native_projection_digest(base)),
+              self.assertRaisesRegex(CHECKER.InventoryError, "native projection mismatch")):
+            CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, self.selected)
+
+    def test_unapproved_candidate_or_native_digest_never_calls_atomic_publication(self) -> None:
+        fixture = self._fixture()
+        base = self._source_base(fixture)
+        candidate = self._candidate(base)
+        before = fixture.inventory_path.read_bytes()
+        for whole, native, message in ((False, False, "whole-file"), (True, False, "native projection")):
+            with (self.subTest(whole=whole, native=native), self._reviewed(fixture, base, candidate, whole=whole, native=native),
+                  mock.patch.object(CHECKER, "_publish_inventory_atomic") as publish,
+                  contextlib.redirect_stderr(io.StringIO()) as errors):
+                self.assertEqual(1, CHECKER.main(self._arguments(fixture)))
+                self.assertIn(message, errors.getvalue())
+                publish.assert_not_called()
+                self.assertEqual(before, fixture.inventory_path.read_bytes())
+                self.assertEqual([], list(fixture.inventory_path.parent.glob(".test_inventory.json.*.tmp")))
+
+    def test_reviewed_candidate_uses_existing_atomic_publisher_and_reports_pending_matrix(self) -> None:
+        fixture = self._fixture()
+        base = self._source_base(fixture)
+        candidate = self._candidate(base)
+        with (self._reviewed(fixture, base, candidate),
+              mock.patch.object(CHECKER, "_publish_inventory_atomic", wraps=CHECKER._publish_inventory_atomic) as publish,
+              contextlib.redirect_stdout(io.StringIO()) as output):
+            self.assertEqual(0, CHECKER.main(self._arguments(fixture)))
+        publish.assert_called_once()
+        self.assertEqual(CHECKER._canonical_inventory_bytes(candidate), fixture.inventory_path.read_bytes())
+        self.assertIn("matrix incomplete: 153 rows", output.getvalue())
+        self.assertIn("actual compiler enumeration remains required", output.getvalue())
+        with (self._reviewed(fixture, candidate, base),
+              mock.patch.object(CHECKER, "_publish_inventory_atomic") as publish,
+              contextlib.redirect_stderr(io.StringIO())):
+            self.assertEqual(1, CHECKER.main(self._arguments(fixture)))
+            publish.assert_not_called()
+
+    def test_reopening_last_historical_set_reference_is_rejected_without_dropping_it(self) -> None:
+        fixture = self._fixture()
+        base = self._source_base(fixture)
+        selected_set = next(row["expected_test_set_id"] for row in base["test_mode_rows"] if row["id"] == self.selected[0])
+        all_references = tuple(row["id"] for row in base["test_mode_rows"] if row["expected_test_set_id"] == selected_set)
+        before = fixture.inventory_path.read_bytes()
+        with (fixture._reviewed_digest_slots(inventory_current=hashlib.sha256(before).hexdigest()),
+              self.assertRaisesRegex(CHECKER.InventoryError, "orphan historical native sets")):
+            CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, all_references)
+        self.assertEqual(before, fixture.inventory_path.read_bytes())
+
+
 def _referenced_set_count(inventory: dict[str, Any]) -> int:
     return len(
         {
@@ -338,7 +705,7 @@ class SharedExecutionReachabilityTests(NumericsResourcesReachabilityTests):
         graph = {row['id']: copy.deepcopy(row) for row in source}
         self.assertTrue(CHECKER._validate_heteris_adapter_package_graph(graph))
         ids = (CHECKER.HETERIS_ADAPTER_COMPILE_ID,
-               'launch:integrations/heteris/build.zig:build:run_tests',
+               'launch:build.zig:addPlatformLibrary:run',
                'step:integrations/heteris/build.zig:build:test')
         for identifier, field, value in ((ids[0], 'root_source', ['src/zynum.zig']),
                 (ids[1], 'source_artifact', 'compile:build.zig:build:numerics_contract_tests'),
@@ -840,6 +1207,7 @@ class TestInventoryTests(unittest.TestCase):
         files.add(CHECKER.BUILD_CHECKER.NUMERICS_RESOURCES_PATH)
         files.update(CHECKER.BUILD_CHECKER.SHARED_FACADE_SOURCE_SHA256)
         files.update(CHECKER.BUILD_CHECKER.EXECUTION_SOURCE_SHA256)
+        files.update(CHECKER.BUILD_CHECKER.INJECTION_SOURCE_SHA256)
         files.update(CHECKER.BUILD_CHECKER.COMMON_CORE_SOURCE_SHA256)
         files.update(CHECKER.BUILD_CHECKER.MANAGED_LAPACKE_SOURCE_SHA256)
         files.update(CHECKER.BUILD_CHECKER.MANAGED_SPARSE_SOURCE_SHA256)

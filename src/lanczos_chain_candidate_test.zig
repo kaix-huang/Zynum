@@ -8,12 +8,13 @@ const E = N.Execution;
 const C = E.context;
 const Chain = N.LanczosChain;
 const M = Chain.Managed(E);
-fn context() C.Context {
-    return C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+fn context(storage: *FixtureReferenceContext) *C.Context {
+    storage.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    return storage.borrowedContext();
 }
 fn close(owner: *C.Context) !void {
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn value(comptime T: type, re: S.Real(T), im: S.Real(T)) T {
     return if (comptime S.isComplex(T)) .{ .re = re, .im = im } else re;
@@ -64,8 +65,9 @@ pub fn checkExactTridiagonal() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
         inline for (.{ false, true }) |phase| {
-            var owner = context();
-            defer close(&owner) catch unreachable;
+            var reference_owner: FixtureReferenceContext = undefined;
+            const owner = context(&reference_owner);
+            defer close(owner) catch unreachable;
             var backend = Backend(T){ .diagonal = &.{ 0.5, -1, 2 }, .off = &.{ 0.25, 0.5 }, .phase = phase };
             const input = [_]T{ if (phase and S.isComplex(T)) value(T, 0, 1) else value(T, 1, 0), value(T, 0, 0), value(T, 0, 0) };
             const saved = input;
@@ -73,7 +75,7 @@ pub fn checkExactTridiagonal() !void {
             var beta: [6]R = @splat(92);
             var vectors: [11]T = @splat(value(T, 77, 13));
             var real: [11]R = @splat(78);
-            const result = try M.runBorrowed(T, &owner, .{ .action = backend.action(), .initial = &input, .global_dimension = 3, .max_order = 5, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
+            const result = try M.runBorrowed(T, owner, .{ .action = backend.action(), .initial = &input, .global_dimension = 3, .max_order = 5, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
             try std.testing.expectEqual(Chain.Status.breakdown, result.status);
             try std.testing.expectEqual(@as(usize, 3), result.order);
             try std.testing.expectEqual(@as(usize, 3), result.action_count);
@@ -99,15 +101,16 @@ const Z = struct {
 pub fn checkIndependentSpectralMeasure() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var backend = Backend(T){ .diagonal = &.{ -1, 0.5, 2 } };
         const input = [_]T{ value(T, 1, 0), if (S.isComplex(T)) value(T, 0, 2) else value(T, -2, 0), value(T, -3, 0) };
         var alpha: [3]R = undefined;
         var beta: [2]R = undefined;
         var vectors: [9]T = undefined;
         var real: [5]R = undefined;
-        const result = try M.runBorrowed(T, &owner, .{ .action = backend.action(), .initial = &input, .global_dimension = 3, .max_order = 3, .breakdown_tolerance = tolerance(T), .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
+        const result = try M.runBorrowed(T, owner, .{ .action = backend.action(), .initial = &input, .global_dimension = 3, .max_order = 3, .breakdown_tolerance = tolerance(T), .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
         try std.testing.expectEqual(@as(usize, 3), result.order);
         for (0..21) |i| {
             const energy = -2 + @as(f64, @floatFromInt(i)) * 0.25;
@@ -134,8 +137,9 @@ pub fn checkIndependentSpectralMeasure() !void {
 pub fn checkStrictThresholdAndDepthOne() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var backend = Backend(T){ .diagonal = &.{ 0, 0 }, .off = &.{0.5} };
         const input = [_]T{ value(T, 1, 0), value(T, 0, 0) };
         var alpha: [3]R = @splat(91);
@@ -143,19 +147,19 @@ pub fn checkStrictThresholdAndDepthOne() !void {
         var vectors: [6]T = undefined;
         var real: [5]R = undefined;
         var request = Chain.Request(T){ .action = backend.action(), .initial = &input, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0.5, .alpha = &alpha, .beta = &beta };
-        var result = try M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real });
+        var result = try M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real });
         try std.testing.expectEqual(@as(usize, 2), result.order);
         try std.testing.expectEqual(@as(R, 0.5), beta[0]);
         alpha = @splat(91);
         beta = @splat(92);
         request.breakdown_tolerance = 0.75;
-        result = try M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real });
+        result = try M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real });
         try std.testing.expectEqual(@as(usize, 1), result.order);
         try std.testing.expectEqual(Chain.Status.breakdown, result.status);
         try std.testing.expectEqualSlices(R, &.{ 92, 92 }, &beta);
         request.breakdown_tolerance = 0;
         request.max_order = 1;
-        result = try M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real });
+        result = try M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real });
         try std.testing.expectEqual(Chain.Status.depth_limit, result.status);
         try std.testing.expectEqual(@as(R, 0.5), result.residual_norm);
         try std.testing.expectEqual(@as(R, 91), alpha[1]);
@@ -168,8 +172,9 @@ pub fn checkMixedAliasesAndTails() !void {
     const T = S.ComplexF64;
     for (0..5) |first| {
         for (first + 1..5) |second| {
-            var owner = context();
-            defer close(&owner) catch unreachable;
+            var reference_owner: FixtureReferenceContext = undefined;
+            const owner = context(&reference_owner);
+            defer close(owner) catch unreachable;
             var backend = Backend(T){ .diagonal = &.{ 1, 2 } };
             var bytes: [1024]u8 align(16) = @splat(0);
             var offsets = [_]usize{ 0, 128, 256, 384, 512 };
@@ -180,13 +185,14 @@ pub fn checkMixedAliasesAndTails() !void {
             const alpha = sliceAt(f64, &bytes, offsets[3], 2);
             const beta = sliceAt(f64, &bytes, offsets[4], 1);
             const saved = bytes;
-            try std.testing.expectError(error.AliasingNotAllowed, M.runBorrowed(T, &owner, .{ .action = backend.action(), .initial = initial, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = alpha, .beta = beta }, .{ .vectors = vectors, .real = real }));
+            try std.testing.expectError(error.AliasingNotAllowed, M.runBorrowed(T, owner, .{ .action = backend.action(), .initial = initial, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = alpha, .beta = beta }, .{ .vectors = vectors, .real = real }));
             try std.testing.expectEqual(@as(usize, 0), backend.calls);
             try std.testing.expectEqualDeep(saved, bytes);
         }
     }
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = &.{ 1, 2 } };
     var bytes: [128]u8 align(16) = @splat(0);
     const alpha = sliceAt(f64, &bytes, 0, 4);
@@ -194,20 +200,21 @@ pub fn checkMixedAliasesAndTails() !void {
     var beta: [1]f64 = @splat(92);
     var vectors: [6]T = undefined;
     var real: [3]f64 = undefined;
-    try std.testing.expectError(error.AliasingNotAllowed, M.runBorrowed(T, &owner, .{ .action = backend.action(), .initial = initial, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.AliasingNotAllowed, M.runBorrowed(T, owner, .{ .action = backend.action(), .initial = initial, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real }));
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
     // Only active workspace spans are reserved. Adjacent inactive tails may
     // serve caller coefficients without creating a hidden numerical alias.
     var real_backend = Backend(f64){ .diagonal = &.{ 0, 0 }, .off = &.{0.5} };
     var slots: [10]f64 = @splat(91);
     var rw: [3]f64 = undefined;
-    const r = try M.runBorrowed(f64, &owner, .{ .action = real_backend.action(), .initial = &.{ 1, 0 }, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = slots[6..8], .beta = slots[8..10] }, .{ .vectors = &slots, .real = &rw });
+    const r = try M.runBorrowed(f64, owner, .{ .action = real_backend.action(), .initial = &.{ 1, 0 }, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = slots[6..8], .beta = slots[8..10] }, .{ .vectors = &slots, .real = &rw });
     try std.testing.expectEqual(@as(usize, 2), r.order);
     try std.testing.expectEqualSlices(f64, &.{ 0, 0, 0.5, 91 }, slots[6..10]);
 }
 pub fn checkPreflight() !void {
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{ 1, 2 } };
     var input = [_]f64{ 1, 0 };
     var alpha = [_]f64{ 91, 91 };
@@ -217,46 +224,46 @@ pub fn checkPreflight() !void {
     const workspace = Chain.Workspace(f64){ .vectors = &vectors, .real = &real };
     var request = Chain.Request(f64){ .action = backend.action(), .initial = &input, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta };
     request.action.columns = 1;
-    try std.testing.expectError(error.DimensionMismatch, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.DimensionMismatch, M.runBorrowed(f64, owner, request, workspace));
     request.action = backend.action();
     for ([_]f64{ -1, std.math.nan(f64), std.math.inf(f64) }) |invalid| {
         request.breakdown_tolerance = invalid;
-        try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, &owner, request, workspace));
+        try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, owner, request, workspace));
         request.breakdown_tolerance = 0;
         request.hermitian_tolerance = invalid;
-        try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, &owner, request, workspace));
+        try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, owner, request, workspace));
         request.hermitian_tolerance = 0;
     }
     request.global_dimension = 0;
-    try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, owner, request, workspace));
     request.global_dimension = 3;
-    try std.testing.expectError(error.MissingGlobalReduction, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.MissingGlobalReduction, M.runBorrowed(f64, owner, request, workspace));
     request.global_dimension = 2;
     request.max_order = 0;
-    try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.InvalidOptions, M.runBorrowed(f64, owner, request, workspace));
     request.max_order = std.math.maxInt(usize);
-    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, owner, request, workspace));
     request.max_order = 2;
     request.alpha = alpha[0..1];
-    try std.testing.expectError(error.BufferTooSmall, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.BufferTooSmall, M.runBorrowed(f64, owner, request, workspace));
     request.alpha = &alpha;
     request.beta = &.{};
-    try std.testing.expectError(error.BufferTooSmall, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.BufferTooSmall, M.runBorrowed(f64, owner, request, workspace));
     request.beta = &beta;
-    try std.testing.expectError(error.WorkspaceTooSmall, M.runBorrowed(f64, &owner, request, .{ .vectors = vectors[0..5], .real = &real }));
-    try std.testing.expectError(error.WorkspaceTooSmall, M.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = real[0..2] }));
+    try std.testing.expectError(error.WorkspaceTooSmall, M.runBorrowed(f64, owner, request, .{ .vectors = vectors[0..5], .real = &real }));
+    try std.testing.expectError(error.WorkspaceTooSmall, M.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = real[0..2] }));
     input[0] = std.math.nan(f64);
-    try std.testing.expectError(error.NonFiniteInput, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.NonFiniteInput, M.runBorrowed(f64, owner, request, workspace));
     input[0] = 1;
     const overflowing: [*]f64 = @ptrFromInt(std.math.maxInt(usize) - 7);
     request.alpha = overflowing[0..2];
-    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, owner, request, workspace));
     request.alpha = &alpha;
     request.beta = @as([*]f64, @ptrFromInt(8))[0..std.math.maxInt(usize)];
-    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, owner, request, workspace));
     request.beta = &beta;
     request.action.workspace_elements = std.math.maxInt(usize);
-    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, &owner, request, workspace));
+    try std.testing.expectError(error.SizeOverflow, M.runBorrowed(f64, owner, request, workspace));
     var huge_action = backend.action();
     huge_action.rows = std.math.maxInt(usize);
     try std.testing.expectError(error.SizeOverflow, Chain.workspaceLength(f64, huge_action, 1));
@@ -266,11 +273,13 @@ pub fn checkPreflight() !void {
     try std.testing.expectEqual(@as(f64, 92), beta[0]);
     // A malformed managed request does not enter even allocator callbacks.
     var allocations = E.test_support.Allocations{ .budget = 0 };
-    var managed_owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-    defer close(&managed_owner) catch unreachable;
+    var reference_managed_owner: FixtureReferenceContext = undefined;
+    reference_managed_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const managed_owner = reference_managed_owner.borrowedContext();
+    defer close(managed_owner) catch unreachable;
     request.action = backend.action();
     request.alpha = alpha[0..1];
-    try std.testing.expectError(error.BufferTooSmall, M.runScratch(f64, &managed_owner, request));
+    try std.testing.expectError(error.BufferTooSmall, M.runScratch(f64, managed_owner, request));
     try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
     try std.testing.expectEqual(@as(usize, 0), managed_owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), managed_owner.snapshot().resource_pins);
@@ -278,8 +287,9 @@ pub fn checkPreflight() !void {
 pub fn checkLateFailureTransaction() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var backend = Backend(T){ .diagonal = &.{ 0.5, -1, 2 }, .off = &.{ 0.25, 0.5 }, .phase = true, .fail_at = 3 };
         const input = [_]T{ value(T, 1, 0), value(T, 0, 0), value(T, 0, 0) };
         var alpha: [5]R = @splat(91);
@@ -287,13 +297,13 @@ pub fn checkLateFailureTransaction() !void {
         var vectors: [9]T = undefined;
         var real: [5]R = undefined;
         const request = Chain.Request(T){ .action = backend.action(), .initial = &input, .global_dimension = 3, .max_order = 3, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta };
-        try std.testing.expectError(error.InjectedActionFailure, M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real }));
+        try std.testing.expectError(error.InjectedActionFailure, M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real }));
         for (alpha) |x| try std.testing.expectEqual(@as(R, 91), x);
         for (beta) |x| try std.testing.expectEqual(@as(R, 92), x);
         backend.calls = 0;
         backend.fail_at = 0;
         backend.nonfinite_at = 2;
-        try std.testing.expectError(error.NonFiniteResult, M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real }));
+        try std.testing.expectError(error.NonFiniteResult, M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real }));
         for (alpha) |x| try std.testing.expectEqual(@as(R, 91), x);
         for (beta) |x| try std.testing.expectEqual(@as(R, 92), x);
     }
@@ -321,8 +331,9 @@ pub fn checkReductionFailureAndHermitianThreshold() !void {
             return N.Lanczos.localNorm(T, x);
         }
     };
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = &.{ 0.5, -1, 2 }, .off = &.{ 0.25, 0.5 } };
     const initial = [_]T{ value(T, 1, 0), value(T, 0, 0), value(T, 0, 0) };
     var alpha: [4]f64 = @splat(91);
@@ -331,11 +342,11 @@ pub fn checkReductionFailureAndHermitianThreshold() !void {
     var real: [5]f64 = undefined;
     var metric = Metric{ .fail_inner = 2 };
     var request = Chain.Request(T){ .action = backend.action(), .initial = &initial, .global_dimension = 3, .max_order = 3, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta, .reduction = .{ .context = &metric, .inner_fn = Metric.inner, .norm_fn = Metric.norm } };
-    try std.testing.expectError(error.InjectedReductionFailure, M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.InjectedReductionFailure, M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real }));
     metric = .{ .fail_norm = 4 };
-    try std.testing.expectError(error.InjectedReductionFailure, M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.InjectedReductionFailure, M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real }));
     metric = .{ .imaginary = 0.5 };
-    try std.testing.expectError(error.NonHermitianAction, M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.NonHermitianAction, M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real }));
     for (alpha) |x| try std.testing.expectEqual(@as(f64, 91), x);
     for (beta) |x| try std.testing.expectEqual(@as(f64, 92), x);
     // The largest finite tolerance and imaginary projection remain accepted
@@ -343,7 +354,7 @@ pub fn checkReductionFailureAndHermitianThreshold() !void {
     request.hermitian_tolerance = std.math.floatMax(f64);
     request.max_order = 1;
     metric = .{ .imaginary = std.math.floatMax(f64) };
-    _ = try M.runBorrowed(T, &owner, request, .{ .vectors = &vectors, .real = &real });
+    _ = try M.runBorrowed(T, owner, request, .{ .vectors = &vectors, .real = &real });
     try std.testing.expectEqual(@as(f64, 0.5), alpha[0]);
 }
 pub fn checkEmptyGlobalAndDepth() !void {
@@ -365,15 +376,16 @@ pub fn checkEmptyGlobalAndDepth() !void {
             return if (self.norm_calls == 1) 1 else 0.5;
         }
     };
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{} };
     var metric = Metric{};
     var alpha: [6]f64 = @splat(91);
     var beta: [5]f64 = @splat(92);
     var real: [7]f64 = undefined;
     const request = Chain.Request(f64){ .action = backend.action(), .initial = &.{}, .global_dimension = 1, .max_order = 4, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta, .reduction = .{ .context = &metric, .inner_fn = Metric.inner, .norm_fn = Metric.norm } };
-    const result = try M.runBorrowed(f64, &owner, request, .{ .vectors = &.{}, .real = &real });
+    const result = try M.runBorrowed(f64, owner, request, .{ .vectors = &.{}, .real = &real });
     try std.testing.expectEqual(Chain.Status.depth_limit, result.status);
     try std.testing.expectEqual(@as(usize, 4), result.order);
     try std.testing.expectEqual(@as(usize, 4), backend.calls);
@@ -386,8 +398,9 @@ pub fn checkSubnormalStartsAndContinuation() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
         inline for (.{ 1, 2, 16 }) |multiple| {
-            var owner = context();
-            defer close(&owner) catch unreachable;
+            var reference_owner: FixtureReferenceContext = undefined;
+            const owner = context(&reference_owner);
+            defer close(owner) catch unreachable;
             var backend = Backend(T){ .diagonal = &.{ 1, 1 } };
             const tiny = std.math.floatTrueMin(R) * multiple;
             const initial = [_]T{ value(T, tiny, 0), if (S.isComplex(T)) value(T, 0, tiny) else value(T, -tiny, 0) };
@@ -395,7 +408,7 @@ pub fn checkSubnormalStartsAndContinuation() !void {
             var beta: [1]R = @splat(92);
             var vectors: [6]T = undefined;
             var real: [3]R = undefined;
-            const result = try M.runBorrowed(T, &owner, .{ .action = backend.action(), .initial = &initial, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = tolerance(T), .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
+            const result = try M.runBorrowed(T, owner, .{ .action = backend.action(), .initial = &initial, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = tolerance(T), .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
             try std.testing.expectEqual(@as(usize, 1), result.order);
             try std.testing.expectApproxEqAbs(@as(R, 1), alpha[0], tolerance(T));
             try std.testing.expectEqual(@as(R, 91), alpha[1]);
@@ -413,8 +426,9 @@ pub fn checkSubnormalStartsAndContinuation() !void {
                 y[2] = S.mul(T, tiny, x[0]);
             }
         };
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var star = Star{};
         const action = N.Operator(T){ .context = &star, .rows = 3, .columns = 3, .apply_fn = Star.apply };
         const initial = [_]T{ value(T, 1, 0), value(T, 0, 0), value(T, 0, 0) };
@@ -422,7 +436,7 @@ pub fn checkSubnormalStartsAndContinuation() !void {
         var beta: [1]R = @splat(92);
         var vectors: [9]T = undefined;
         var real: [3]R = undefined;
-        const result = try M.runBorrowed(T, &owner, .{ .action = action, .initial = &initial, .global_dimension = 3, .max_order = 2, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
+        const result = try M.runBorrowed(T, owner, .{ .action = action, .initial = &initial, .global_dimension = 3, .max_order = 2, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta }, .{ .vectors = &vectors, .real = &real });
         try std.testing.expectEqual(@as(usize, 2), result.order);
         try std.testing.expectEqual(@as(usize, 2), star.calls);
         try std.testing.expectEqual(std.math.floatTrueMin(R), beta[0]);
@@ -453,8 +467,9 @@ pub fn checkSubnormalMetricFailures() !void {
     };
     inline for (.{ false, true }) |continuing| {
         for ([_]?f64{ 0, std.math.nan(f64), std.math.inf(f64), null }) |invalid| {
-            var owner = context();
-            defer close(&owner) catch unreachable;
+            var reference_owner: FixtureReferenceContext = undefined;
+            const owner = context(&reference_owner);
+            defer close(owner) catch unreachable;
             var backend = Backend(f64){ .diagonal = &.{ 0, 0 }, .off = &.{if (continuing) std.math.floatTrueMin(f64) else 0}, .expected_pins = 2 };
             var metric = Metric{ .invalid = invalid, .fail = invalid == null, .continuing = continuing };
             const tiny = std.math.floatTrueMin(f64);
@@ -462,7 +477,7 @@ pub fn checkSubnormalMetricFailures() !void {
             var alpha: [3]f64 = @splat(91);
             var beta: [2]f64 = @splat(92);
             const request = Chain.Request(f64){ .action = backend.action(), .initial = &input, .global_dimension = 2, .max_order = 2, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta, .reduction = .{ .context = &metric, .inner_fn = Metric.inner, .norm_fn = Metric.norm } };
-            if (invalid == null) try std.testing.expectError(error.InjectedReductionFailure, M.runScratch(f64, &owner, request)) else try std.testing.expectError(error.NonFiniteReduction, M.runScratch(f64, &owner, request));
+            if (invalid == null) try std.testing.expectError(error.InjectedReductionFailure, M.runScratch(f64, owner, request)) else try std.testing.expectError(error.NonFiniteReduction, M.runScratch(f64, owner, request));
             try std.testing.expectEqual(@as(usize, if (continuing) 1 else 0), backend.calls);
             try std.testing.expectEqual(@as(usize, if (continuing) 3 else 2), metric.calls);
             for (alpha) |x| try std.testing.expectEqual(@as(f64, 91), x);
@@ -493,22 +508,23 @@ pub fn checkSubnormalMetricFailures() !void {
         }
     };
     for ([_]?f64{ null, 0, std.math.nan(f64), std.math.inf(f64) }) |invalid| {
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var metric = EmptyMetric{ .invalid = invalid };
         var backend = Backend(f64){ .diagonal = &.{}, .expected_pins = 2 };
         var alpha: [2]f64 = @splat(91);
         var beta: [1]f64 = @splat(92);
         const request = Chain.Request(f64){ .action = backend.action(), .initial = &.{}, .global_dimension = 1, .max_order = 1, .breakdown_tolerance = 0, .alpha = &alpha, .beta = &beta, .reduction = .{ .context = &metric, .inner_fn = EmptyMetric.inner, .norm_fn = EmptyMetric.norm } };
         if (invalid == null) {
-            const result = try M.runScratch(f64, &owner, request);
+            const result = try M.runScratch(f64, owner, request);
             try std.testing.expectEqual(@as(usize, 1), result.order);
             try std.testing.expectEqual(Chain.Status.breakdown, result.status);
             try std.testing.expectEqual(@as(f64, 2), alpha[0]);
             try std.testing.expectEqual(@as(usize, 3), metric.calls);
             try std.testing.expectEqual(@as(usize, 1), backend.calls);
         } else {
-            try std.testing.expectError(error.NonFiniteReduction, M.runScratch(f64, &owner, request));
+            try std.testing.expectError(error.NonFiniteReduction, M.runScratch(f64, owner, request));
             try std.testing.expectEqual(@as(f64, 91), alpha[0]);
             try std.testing.expectEqual(@as(usize, 2), metric.calls);
             try std.testing.expectEqual(@as(usize, 0), backend.calls);
@@ -524,7 +540,9 @@ pub fn checkAllRoutesCloseAndAllocationFailures() !void {
         const R = S.Real(T);
         for (0..5) |route| {
             var allocations = E.test_support.Allocations{ .budget = 2 };
-            var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
             var backend = Backend(T){ .diagonal = &.{ 0.5, -1, 2 }, .off = &.{ 0.25, 0.5 }, .close_at = 1, .expected_pins = if (route == 2 or route == 4) 2 else 0 };
             const initial = [_]T{ value(T, 1, 0), value(T, 0, 0), value(T, 0, 0) };
             var alpha: [3]R = @splat(91);
@@ -544,21 +562,23 @@ pub fn checkAllRoutesCloseAndAllocationFailures() !void {
                 try std.testing.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
                 try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
                 operation.end();
-            } else result = if (route == 3) try M.runBorrowed(T, &owner, request, workspace) else try M.runScratch(T, &owner, request);
+            } else result = if (route == 3) try M.runBorrowed(T, owner, request, workspace) else try M.runScratch(T, owner, request);
             try std.testing.expectEqual(@as(usize, 3), result.order);
             try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
             try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
             const stats = allocations.stats();
             try std.testing.expectEqual(@as(usize, if (route == 2 or route == 4) 2 else 0), stats.accepted);
             try std.testing.expectEqual(stats.accepted, stats.freed);
-            try std.testing.expectError(error.Closing, M.runScratch(T, &owner, request));
-            try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+            try std.testing.expectError(error.Closing, M.runScratch(T, owner, request));
+            try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
         }
         for (0..2) |budget| {
             inline for (.{ false, true }) |admitted| {
                 var allocations = E.test_support.Allocations{ .budget = budget };
-                var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-                defer close(&owner) catch unreachable;
+                var reference_owner: FixtureReferenceContext = undefined;
+                reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const owner = reference_owner.borrowedContext();
+                defer close(owner) catch unreachable;
                 var backend = Backend(T){ .diagonal = &.{ 0, 0 }, .off = &.{0.5}, .expected_pins = 2 };
                 const initial = [_]T{ value(T, 1, 0), value(T, 0, 0) };
                 var alpha: [3]R = @splat(91);
@@ -569,7 +589,7 @@ pub fn checkAllRoutesCloseAndAllocationFailures() !void {
                     try std.testing.expectError(error.OutOfMemory, M.runScratchAdmitted(T, &operation, request));
                     try std.testing.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
                     operation.end();
-                } else try std.testing.expectError(error.OutOfMemory, M.runScratch(T, &owner, request));
+                } else try std.testing.expectError(error.OutOfMemory, M.runScratch(T, owner, request));
                 try std.testing.expectEqual(@as(usize, 0), backend.calls);
                 try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
                 try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
@@ -580,11 +600,17 @@ pub fn checkAllRoutesCloseAndAllocationFailures() !void {
                 try std.testing.expectEqual(budget, stats.freed);
                 try std.testing.expectEqual(@as(usize, 1), stats.rejected);
                 allocations.budget = budget + 2;
-                _ = try M.runScratch(T, &owner, request);
+                _ = try M.runScratch(T, owner, request);
                 stats = allocations.stats();
                 try std.testing.expectEqual(budget + 2, stats.accepted);
                 try std.testing.expectEqual(stats.accepted, stats.freed);
             }
         }
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

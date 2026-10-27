@@ -49,14 +49,16 @@ pub fn success() !void {
     try checkNormalizedFilterBoundary();
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var op = try owner.begin();
         defer op.end();
-        var foreign = Foreign(T){ .owner = &owner };
+        var foreign = Foreign(T){ .owner = owner };
         const x = initial(T);
         var alpha: [6]R = @splat(91);
         var beta: [5]R = @splat(92);
@@ -82,14 +84,16 @@ pub fn success() !void {
 pub fn boundaries() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var op = try owner.begin();
         defer op.end();
-        var foreign = Foreign(T){ .owner = &owner };
+        var foreign = Foreign(T){ .owner = owner };
         var x = initial(T);
         var alpha: [8]R = @splat(91);
         var beta: [6]R = @splat(92);
@@ -143,9 +147,11 @@ pub fn boundaries() !void {
 pub fn failureAndClose() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var foreign = Foreign(T){ .owner = &owner, .fail_at = 2 };
+        var foreign = Foreign(T){ .owner = owner, .fail_at = 2 };
         const x = initial(T);
         var alpha: [5]R = @splat(91);
         var beta: [4]R = @splat(92);
@@ -164,9 +170,9 @@ pub fn failureAndClose() !void {
         r = B.lanczosChainAdmitted(T, &op, foreign.action(), null, .{ .data = &x, .length = 3 }, 3, 5, 0, 0, .{ .data = &alpha, .length = 5 }, .{ .data = &beta, .length = 4 }, &result);
         try std.testing.expectEqual(W.OK, r.status);
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-        try std.testing.expectEqual(C.CloseResult.busy, owner.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(owner));
         op.end();
-        try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
     }
 }
 
@@ -209,14 +215,16 @@ pub fn checkNormalizedFilterBoundary() !void {
     try std.testing.expectEqual(@as(usize, 40), @offsetOf(B.Panel, "layout"));
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var operation = try owner.begin();
         defer operation.end();
-        var foreign = FilterForeign(T){ .owner = &owner };
+        var foreign = FilterForeign(T){ .owner = owner };
         var data = [_]T{ value(T, 1), value(T, 0), value(T, 91), value(T, 0), value(T, 1), value(T, 92), value(T, 93) };
         const original = data;
         const x: B.ConstPanel = .{ .dense = .{ .storage = .{ .data = &data, .length = data.len }, .rows = 2, .cols = 2, .ld = 3 }, .layout = 101 };
@@ -342,14 +350,16 @@ fn SeriesSetAgreement(comptime T: type) type {
 pub fn checkSeriesSetBoundary() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| inline for (.{ N.Dense.Layout.row_major, N.Dense.Layout.column_major }) |layout| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var operation = try owner.begin();
         defer operation.end();
-        var foreign = FilterForeign(T){ .owner = &owner };
+        var foreign = FilterForeign(T){ .owner = owner };
         var coefficients: [25]T = @splat(seriesSetValue(T, std.math.nan(R), 7));
         const shape: N.Dense.PanelShape = .{ .row_count = 5, .column_count = 3, .leading_dimension = if (layout == .row_major) 5 else 7, .layout = layout };
         var counts = [_]i64{ 1, 3, 5 };
@@ -438,14 +448,16 @@ pub fn checkSeriesSetBoundary() !void {
     };
     for ([_]usize{ 0, 1 }) |budget| {
         var allocations = E.test_support.Allocations{ .budget = budget };
-        var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var operation = try owner.begin();
         defer operation.end();
-        var foreign = FilterForeign(f64){ .owner = &owner };
+        var foreign = FilterForeign(f64){ .owner = owner };
         const input = [_]f64{ 1, 0 };
         const coefficients = [_]f64{ 1, 2, 3, 4 };
         const counts = [_]i64{ 2, 2 };
@@ -493,14 +505,16 @@ pub fn checkSubspaceProjectionBoundary() !void {
     @setEvalBranchQuota(20000);
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| inline for (.{ N.Dense.Layout.row_major, N.Dense.Layout.column_major }) |yl| inline for (.{ N.Dense.Layout.row_major, N.Dense.Layout.column_major }) |zl| inline for (.{ N.Dense.Layout.row_major, N.Dense.Layout.column_major }) |hl| inline for (.{ N.Dense.Layout.row_major, N.Dense.Layout.column_major }) |sl| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var op = try owner.begin();
         defer op.end();
-        var foreign = ProjectionForeign(T){ .owner = &owner };
+        var foreign = ProjectionForeign(T){ .owner = owner };
         const reducer: B.BlockReduction = .{ .context = &foreign, .reduce = ProjectionForeign(T).reduce };
         const agreement: B.Agreement = .{ .context = &foreign, .agree = ProjectionForeign(T).agree };
         var y: [13]T = @splat(value(T, std.math.nan(R)));
@@ -658,15 +672,17 @@ pub fn checkBiCGStabBoundary() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         const Real = S.Real(T);
         const tolerance: Real = if (Real == f32) 3e-5 else 4e-12;
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var operation = try owner.begin();
         defer operation.end();
-        var foreign = BiCGForeign(T){ .owner = &owner, .matrix = .{ seriesSetValue(T, 4, -0.5), seriesSetValue(T, 1, 0.2), seriesSetValue(T, -0.25, 0), seriesSetValue(T, -2, -0.1), seriesSetValue(T, 5, 0.7), seriesSetValue(T, 1, 0), seriesSetValue(T, 0.5, 0), seriesSetValue(T, -1, 0.1), seriesSetValue(T, 3, -0.3) } };
-        var inverse = BiCGForeign(T){ .owner = &owner, .matrix = .{ value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1) } };
+        var foreign = BiCGForeign(T){ .owner = owner, .matrix = .{ seriesSetValue(T, 4, -0.5), seriesSetValue(T, 1, 0.2), seriesSetValue(T, -0.25, 0), seriesSetValue(T, -2, -0.1), seriesSetValue(T, 5, 0.7), seriesSetValue(T, 1, 0), seriesSetValue(T, 0.5, 0), seriesSetValue(T, -1, 0.1), seriesSetValue(T, 3, -0.3) } };
+        var inverse = BiCGForeign(T){ .owner = owner, .matrix = .{ value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1) } };
         var inverse_action = inverse.action();
         const reduction: B.Reduction(T) = .{ .context = &foreign, .inner = BiCGForeign(T).inner, .norm = BiCGForeign(T).norm };
         const agreement: B.Agreement = .{ .context = &foreign, .agree = BiCGForeign(T).agree };
@@ -779,15 +795,17 @@ pub fn checkRationalFilterBoundary() !void {
         const tolerance: R = if (R == f32) 4e-5 else 3e-12;
         try std.testing.expectEqual(@as(usize, 72), @sizeOf(B.RationalResult(T)));
         try std.testing.expectEqual(@as(usize, 64), @offsetOf(B.RationalResult(T), "max_residual_norm"));
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         defer {
             _ = owner.requestClose();
-            std.debug.assert(owner.tryProgressClose() == .closed);
+            std.debug.assert(fixtureProgressClose(owner) == .closed);
         }
         var operation = try owner.begin();
         defer operation.end();
-        var foreign = BiCGForeign(T){ .owner = &owner, .matrix = @splat(value(T, 0)) };
-        var inverse = BiCGForeign(T){ .owner = &owner, .matrix = .{ value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1) } };
+        var foreign = BiCGForeign(T){ .owner = owner, .matrix = @splat(value(T, 0)) };
+        var inverse = BiCGForeign(T){ .owner = owner, .matrix = .{ value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1), value(T, 0), value(T, 0), value(T, 0), value(T, 1) } };
         const inverse_action = inverse.action();
         const reduction: B.Reduction(T) = .{ .context = &foreign, .inner = BiCGForeign(T).inner, .norm = BiCGForeign(T).norm };
         const agreement: B.Agreement = .{ .context = &foreign, .agree = BiCGForeign(T).agree };
@@ -892,4 +910,10 @@ pub fn checkRationalFilterBoundary() !void {
         try std.testing.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

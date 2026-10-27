@@ -555,7 +555,7 @@ const CholeskyAdmission = struct {
     var actual: []const u8 = &.{};
     var expected: []const u8 = &.{};
     fn observe(ctx: *admission_context.Context, event: admission_context.TestEvent) void {
-        if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get()) @panic("Cholesky default owner split");
+        if (ctx != admission_execution.getContext() or fixtureExecutor(ctx) != admission_execution.get()) @panic("Cholesky default owner split");
         if (ctx.snapshot().active_operations != 1) @panic("Cholesky nested admission");
         switch (event) {
             .admitted => admitted += 1,
@@ -725,11 +725,12 @@ test "borrowed Cholesky uses one real closable operation through close and never
     Context.testing.configure(default, 0, null);
     defer Context.testing.configure(default, std.math.maxInt(usize), null);
     const Probe = struct {
-        context: Context,
+        reference_context: FixtureReferenceContext = undefined,
+        context: *Context = undefined,
         admitted: usize = 0,
         finishing: usize = 0,
         fn observe(ctx: *Context, event: admission_context.TestEvent) void {
-            const self: *@This() = @fieldParentPtr("context", ctx);
+            const self: *@This() = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", ctx)));
             if (ctx == admission_execution.getContext() or ctx.snapshot().active_operations != 1) @panic("borrowed operation identity");
             switch (event) {
                 .admitted => self.admitted += 1,
@@ -738,17 +739,19 @@ test "borrowed Cholesky uses one real closable operation through close and never
         }
     };
     inline for (.{ f32, f64, lapack.ComplexF32, lapack.ComplexF64 }) |T| {
-        var probe: Probe = .{ .context = Context.init(std.testing.allocator, admission_execution.test_support.policy, .internal_closable) };
-        Context.testing.configure(&probe.context, 1, Probe.observe);
+        var probe: Probe = .{};
+        probe.reference_context.initInPlace(std.testing.allocator, admission_execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        probe.context = probe.reference_context.borrowedContext();
+        Context.testing.configure(probe.context, 1, Probe.observe);
         var operation = try probe.context.begin();
         var ended = false;
         defer {
             if (!ended) operation.end();
             _ = probe.context.requestClose();
-            _ = probe.context.tryProgressClose();
+            _ = fixtureProgressClose(probe.context);
         }
         try std.testing.expectEqual(admission_context.RequestResult.pending, probe.context.requestClose());
-        try std.testing.expectEqual(admission_context.CloseResult.busy, probe.context.tryProgressClose());
+        try std.testing.expectEqual(admission_context.CloseResult.busy, fixtureProgressClose(probe.context));
         var a = [_]T{ admissionValue(T, 4, 0), admissionValue(T, 97, -13) };
         var b = [_]T{ admissionValue(T, 12, 4), admissionValue(T, 89, -7) };
         const expected_a = [_]T{ admissionValue(T, 2, 0), a[1] };
@@ -760,11 +763,11 @@ test "borrowed Cholesky uses one real closable operation through close and never
         try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(&expected_b), std.mem.sliceAsBytes(&b));
         try std.testing.expectEqual(@as(usize, 1), probe.admitted);
         try std.testing.expectEqual(@as(usize, 0), probe.finishing);
-        try std.testing.expectEqual(admission_context.CloseResult.busy, probe.context.tryProgressClose());
+        try std.testing.expectEqual(admission_context.CloseResult.busy, fixtureProgressClose(probe.context));
         operation.end();
         ended = true;
         try std.testing.expectEqual(@as(usize, 1), probe.finishing);
-        try std.testing.expectEqual(admission_context.CloseResult.closed, probe.context.tryProgressClose());
+        try std.testing.expectEqual(admission_context.CloseResult.closed, fixtureProgressClose(probe.context));
         try std.testing.expectError(error.Closing, probe.context.begin());
         try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(&expected_a), std.mem.sliceAsBytes(&a));
         try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(&expected_b), std.mem.sliceAsBytes(&b));
@@ -790,7 +793,7 @@ const DenseDriverAdmissionObservation = struct {
         expected = wanted;
     }
     fn call(ctx: *DenseDriverExecution.context.Context, event: DenseDriverExecution.context.TestEvent) void {
-        if (ctx != DenseDriverExecution.getContext() or &ctx.executor != DenseDriverExecution.get())
+        if (ctx != DenseDriverExecution.getContext() or fixtureExecutor(ctx) != DenseDriverExecution.get())
             @panic("dense driver duplicated the default owner");
         if (ctx.snapshot().active_operations != 1 or ctx.snapshot().resource_pins != 0)
             @panic("dense driver did not retain one allocation-free operation");
@@ -973,4 +976,16 @@ comptime {
 
 comptime {
     _ = @import("interop/complex_gelsd_rhs_scale_test.zig");
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn fixtureExecutor(ctx: *@import("zynum-execution").Context) *@import("zynum-execution").reference.owner.Executor {
+    const fixture_execution = @import("zynum-execution");
+    if (ctx == fixture_execution.reference.getContext()) return @ptrCast(@alignCast(ctx.binding.legacy.userdata));
+    const wrapper: *FixtureReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
 }

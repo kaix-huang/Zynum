@@ -24,7 +24,7 @@ const Probe = struct {
         self.alloc_snapshot = self.owner.snapshot();
         if (self.close_on_alloc) {
             _ = self.owner.requestClose();
-            if (self.owner.tryProgressClose() != .busy) @panic("Hermitian allocation is not admitted");
+            if (fixtureProgressClose(self.owner) != .busy) @panic("Hermitian allocation is not admitted");
         }
         return self.backing.allocator().rawAlloc(n, a, ret);
     }
@@ -37,13 +37,13 @@ const Probe = struct {
     fn free(raw: *anyopaque, data: []u8, a: std.mem.Alignment, ret: usize) void {
         const self = cast(raw);
         self.free_snapshot = self.owner.snapshot();
-        if (self.owner.tryProgressClose() == .closed) @panic("Hermitian close passed managed free");
+        if (fixtureProgressClose(self.owner) == .closed) @panic("Hermitian close passed managed free");
         self.backing.allocator().rawFree(data, a, ret);
     }
 };
 fn finish(owner: *context.Context) !void {
     _ = owner.requestClose();
-    try E.expectEqual(context.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.closed, fixtureProgressClose(owner));
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
 }
 fn request(a: []const C, values: []f64) facade.Request(C) {
@@ -62,7 +62,9 @@ test "generalized failed-vector recovery preserves the existing default and admi
             if (i == j) b[i + j * 4].re = roots[i] * roots[i];
         };
         var alloc: fixture.Allocations = .{ .budget = 0 };
-        var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         _ = owner.requestClose();
         var work: [64]facade.core.WorkspaceScalar(T) = undefined;
@@ -119,16 +121,20 @@ test "generalized failed-vector recovery preserves the existing default and admi
         try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         op.end();
-        try finish(&owner);
+        try finish(owner);
     }
 }
 test "Hermitian scratch uses exact shared owner through closing allocation and free" {
     var probe: Probe = .{ .close_on_alloc = true };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
-    var other = context.Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
+    var reference_other: FixtureReferenceContext = undefined;
+    reference_other.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const other = reference_other.borrowedContext();
     var values: [2]f64 = @splat(123);
-    const r = try M.runScratch(C, &owner, request(&input, &values));
+    const r = try M.runScratch(C, owner, request(&input, &values));
     try E.expectEqual(facade.core.Status.converged, r.status);
     try E.expectApproxEqAbs(@as(f64, 1), values[0], 1e-14);
     try E.expectApproxEqAbs(@as(f64, 3), values[1], 1e-14);
@@ -140,14 +146,16 @@ test "Hermitian scratch uses exact shared owner through closing allocation and f
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), other.snapshot().active_operations);
-    try E.expectError(error.Closing, M.runScratch(C, &owner, request(&input, &values)));
-    try finish(&owner);
-    try finish(&other);
+    try E.expectError(error.Closing, M.runScratch(C, owner, request(&input, &values)));
+    try finish(owner);
+    try finish(other);
 }
 test "Hermitian borrowed admitted work survives close with no nested admission or allocation" {
     var probe: Probe = .{ .backing = .{ .budget = 0 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     var op = try owner.begin();
     _ = owner.requestClose();
     var values: [2]f64 = undefined;
@@ -156,17 +164,19 @@ test "Hermitian borrowed admitted work survives close with no nested admission o
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), probe.backing.stats().attempts);
-    try E.expectError(error.Closing, M.runBorrowed(C, &owner, request(&input, &values), &work));
+    try E.expectError(error.Closing, M.runBorrowed(C, owner, request(&input, &values), &work));
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian counter limits and size overflow precede allocation and preserve caller pins" {
     var probe: Probe = .{ .backing = .{ .budget = 0 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     var values: [2]f64 = @splat(123);
     owner.test_state.limit = 0;
-    try E.expectError(error.CounterOverflow, M.runScratch(C, &owner, request(&input, &values)));
+    try E.expectError(error.CounterOverflow, M.runScratch(C, owner, request(&input, &values)));
     owner.test_state.limit = 1;
     var op = try owner.begin();
     var existing = try op.pinResource();
@@ -181,28 +191,30 @@ test "Hermitian counter limits and size overflow precede allocation and preserve
     try E.expectError(error.OutOfMemory, M.runScratchAdmitted(C, &op, request(&input, &values)));
     for (values) |v| try E.expectEqual(@as(f64, 123), v);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian numerical failure unwinds scratch and preserves outputs" {
     var probe: Probe = .{};
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     var values: [2]f64 = @splat(123);
     var a = input;
     a[1].re = std.math.nan(f64);
-    try E.expectError(error.NonFiniteInput, M.runScratch(C, &owner, request(&a, &values)));
+    try E.expectError(error.NonFiniteInput, M.runScratch(C, owner, request(&a, &values)));
     var req = request(&input, &values);
     req.options.max_sweeps = 0;
-    try E.expectEqual(facade.core.Status.iteration_limit, (try M.runScratch(C, &owner, req)).status);
+    try E.expectEqual(facade.core.Status.iteration_limit, (try M.runScratch(C, owner, req)).status);
     const bad = [_]C{ .{ .re = -1, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 1, .im = 0 } };
     req = request(&input, &values);
     req.b = request(&bad, &values).a;
-    try E.expectEqual(facade.core.Status.not_positive_definite, (try M.runScratch(C, &owner, req)).status);
+    try E.expectEqual(facade.core.Status.not_positive_definite, (try M.runScratch(C, owner, req)).status);
     for (values) |v| try E.expectEqual(@as(f64, 123), v);
     try E.expectEqual(@as(usize, 3), probe.backing.stats().freed);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian standard and all generalized problems borrow actual Core scalar identities" {
     const actual = @import("zynum-execution");
@@ -211,19 +223,21 @@ test "Hermitian standard and all generalized problems borrow actual Core scalar 
     }
     try E.expect(Execution.getContext() == actual.getContext());
     inline for (.{ Core.internal.numerics.Scalar.ComplexF32, C }) |T| {
-        var owner = context.Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         const real = @TypeOf(@as(T, undefined).re);
         const a = [_]T{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = -1 }, .{ .re = 0, .im = 1 }, .{ .re = 2, .im = 0 } };
         const b = [_]T{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 2, .im = 0 } };
         var values: [2]real = undefined;
         var vectors: [4]T = undefined;
         var req: facade.Request(T) = .{ .a = .{ .values = &a, .row_count = 2, .column_count = 2, .leading_dimension = 2 }, .eigenvalues = &values, .vectors = .{ .values = &vectors, .row_count = 2, .column_count = 2, .leading_dimension = 2 } };
-        try E.expectEqual(facade.core.Status.converged, (try M.runScratch(T, &owner, req)).status);
+        try E.expectEqual(facade.core.Status.converged, (try M.runScratch(T, owner, req)).status);
         try E.expectApproxEqAbs(@as(real, 1), values[0], 1e-6);
         req.b = .{ .values = &b, .row_count = 2, .column_count = 2, .leading_dimension = 2 };
         inline for (comptime std.meta.tags(facade.core.Problem)) |problem| {
             req.problem = problem;
-            try E.expectEqual(facade.core.Status.converged, (try M.runScratch(T, &owner, req)).status);
+            try E.expectEqual(facade.core.Status.converged, (try M.runScratch(T, owner, req)).status);
             const scale: real = if (problem == .ax_lambda_bx) 0.5 else 2;
             try E.expectApproxEqAbs(scale, values[0], 1e-6);
             try E.expectApproxEqAbs(3 * scale, values[1], 1e-6);
@@ -231,12 +245,14 @@ test "Hermitian standard and all generalized problems borrow actual Core scalar 
             for (vectors[0..2]) |z| gram += z.re * z.re + z.im * z.im;
             try E.expectApproxEqAbs(@as(real, if (problem == .bax_lambda_x) 2 else 0.5), gram, 1e-6);
         }
-        try finish(&owner);
+        try finish(owner);
     }
 }
 
 test "Hermitian range failure and invalid borrowed workspace preserve output and admission" {
-    var owner = context.Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var values: [2]f64 = @splat(123);
     var work: [16]facade.core.WorkspaceScalar(C) = undefined;
@@ -250,7 +266,7 @@ test "Hermitian range failure and invalid borrowed workspace preserve output and
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 const Worker = struct {
     owner: *context.Context,
@@ -265,13 +281,15 @@ const Worker = struct {
     }
 };
 test "Hermitian concurrent callers use isolated scratch on one shared execution context" {
-    var owner = context.Context.init(std.heap.c_allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.heap.c_allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var workers: [6]Worker = undefined;
     var threads: [6]std.Thread = undefined;
     var started: usize = 0;
     defer for (threads[0..started]) |thread| thread.join();
     for (&workers, &threads) |*worker, *thread| {
-        worker.* = .{ .owner = &owner };
+        worker.* = .{ .owner = owner };
         thread.* = try std.Thread.spawn(.{}, Worker.run, .{worker});
         started += 1;
     }
@@ -280,5 +298,11 @@ test "Hermitian concurrent callers use isolated scratch on one shared execution 
     for (workers) |worker| try E.expect(worker.passed);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-    try finish(&owner);
+    try finish(owner);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

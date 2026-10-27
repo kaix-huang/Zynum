@@ -108,7 +108,7 @@ test "GESVD raw active pointer alignment and checked endpoints fail before reads
                 const before = f;
                 var a = f.args(true, layout);
                 badField(T, &a, field, address);
-                try fault(try owner.RawGesvdAdapter.callManaged(true, T, level, &r.context, &r.services, a, .{}), if (address == .alignment) error.MisalignedPointer else error.SizeOverflow);
+                try fault(try owner.RawGesvdAdapter.callManaged(true, T, level, r.context, &r.services, a, .{}), if (address == .alignment) error.MisalignedPointer else error.SizeOverflow);
                 try f.unchanged(&before);
                 try idle(&r, true);
                 cases += 1;
@@ -131,7 +131,7 @@ test "GESVD query ignores all nonwork addresses checks WORK and unused N outputs
             var a = f.args(true, layout);
             a.lwork = -1;
             inline for ([_]Field{ .a, .singular, .u, .vt, .rwork, .superb }) |field| badField(T, &a, field, address);
-            try success(try owner.RawGesvdAdapter.callManaged(true, T, .work, &r.context, &r.services, a, .{}));
+            try success(try owner.RawGesvdAdapter.callManaged(true, T, .work, r.context, &r.services, a, .{}));
             try bytes(&before.a, &f.a);
             try bytes(&before.u, &f.u);
             try bytes(&before.vt, &f.vt);
@@ -152,7 +152,7 @@ test "GESVD query ignores all nonwork addresses checks WORK and unused N outputs
             var qa = bad_f.args(true, layout);
             qa.lwork = -1;
             badField(T, &qa, .work, address);
-            try fault(try owner.RawGesvdAdapter.callManaged(true, T, .work, &bad_r.context, &bad_r.services, qa, .{}), if (address == .alignment) error.MisalignedPointer else error.SizeOverflow);
+            try fault(try owner.RawGesvdAdapter.callManaged(true, T, .work, bad_r.context, &bad_r.services, qa, .{}), if (address == .alignment) error.MisalignedPointer else error.SizeOverflow);
             try bad_f.unchanged(&saved);
             try idle(&bad_r, true);
             queries += 1;
@@ -169,7 +169,7 @@ test "GESVD query ignores all nonwork addresses checks WORK and unused N outputs
                 na.u = bad(T, address);
                 na.vt = bad(T, address);
                 if (comptime !Core.Scalar.isComplex(T)) na.rwork = bad(R, address);
-                try success(try owner.RawGesvdAdapter.callManaged(true, T, level, &unused_r.context, &unused_r.services, na, .{}));
+                try success(try owner.RawGesvdAdapter.callManaged(true, T, level, unused_r.context, &unused_r.services, na, .{}));
                 try std.testing.expectApproxEqAbs(@as(R, 3), unused.s[0], 32 * std.math.floatEps(R));
                 try std.testing.expectApproxEqAbs(@as(R, 1), unused.s[1], 32 * std.math.floatEps(R));
                 try bytes(&saved_unused.a, &unused.a);
@@ -210,7 +210,7 @@ test "GESVD typed active capacities and high real SUPERB mixed aliases reject tr
                     .rwork => a.rwork = f.rwork[0..9],
                     .superb => a.superb = f.superb[0..0],
                 }
-                try fault(try owner.GesvdAdapter.callManaged(true, T, if (field == .superb) .high else .work, &r.context, &r.services, a, .{}), error.BufferTooSmall);
+                try fault(try owner.GesvdAdapter.callManaged(true, T, if (field == .superb) .high else .work, r.context, &r.services, a, .{}), error.BufferTooSmall);
                 try f.unchanged(&before);
                 try idle(&r, true);
                 capacities += 1;
@@ -232,7 +232,7 @@ test "GESVD typed active capacities and high real SUPERB mixed aliases reject tr
                 else => @intFromPtr(&f.vt[2]) + complex_offset,
             });
             a.superb = operand(raw, pointer[0..1]);
-            try fault(try adapter(raw).callManaged(true, T, .high, &r.context, &r.services, a, .{}), error.AliasingNotAllowed);
+            try fault(try adapter(raw).callManaged(true, T, .high, r.context, &r.services, a, .{}), error.AliasingNotAllowed);
             try f.unchanged(&before);
             try idle(&r, true);
             aliases += 1;

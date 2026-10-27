@@ -2,5 +2,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 comptime {
+    _ = @import("reference_cache_hook.zig");
     _ = @import("kernels/isolated/task_runtime_host.zig");
 }

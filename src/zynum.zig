@@ -27,6 +27,8 @@ comptime {
     _ = runtime;
 }
 pub const api = blas.api;
+/// Explicit mathematical entrypoints, sharing this original Core.
+pub const native = @import("blas/api/native_operations.zig");
 
 pub const BlasInt = blas.BlasInt;
 pub const ComplexF32 = blas.ComplexF32;
@@ -68,6 +70,11 @@ pub const matrixMultiplyWithWorkspace = blas.matrixMultiplyWithWorkspace;
 /// Internal bindings for adapters and implementation tests. Public package
 /// facades explicitly forward their unchanged allowlists, never this namespace.
 pub const internal = struct {
+    // Module-private address anchor; never mutated. var prevents constant folding.
+    var native_identity: u8 = 0;
+    pub fn nativeCoreIdentity() *const anyopaque {
+        return @ptrCast(&native_identity);
+    }
     /// Checked Sparse composition borrows the external caller's Operation.
     pub const sparse_checked = struct {
         pub const TriangularSolveContract = @import("sparse/triangular.zig").Contract;
@@ -97,6 +104,7 @@ pub const internal = struct {
         pub const Dense = @import("numerics/dense.zig");
         pub const Storage = @import("numerics/storage.zig");
         pub const Scalar = @import("blas/core/shared/scalar.zig");
+        pub const RecurrenceArithmetic = @import("numerics/recurrence_arithmetic.zig");
         pub const Resources = @import("zynum-numerics-resources");
         pub const Execution = @import("zynum-execution");
         pub const RealCholesky = @import("lapack/core/cholesky.zig");

@@ -37,21 +37,23 @@ else()
     endforeach()
 endif()
 set(ZYNUM_OPTIMIZE "$<IF:$<CONFIG:Debug>,debug,safe>")
-file(GLOB_RECURSE ZYNUM_ZIG_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.zig" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
+file(GLOB_RECURSE ZYNUM_ZIG_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.zig" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/../../src/*.zig")
 list(APPEND ZYNUM_ZIG_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../src/scientific_platform_sources.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/blas/types.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/blas/core/shared/scalar.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/numerics/recurrence_arithmetic.zig")
 add_custom_command(OUTPUT ${ZYNUM_ARTIFACTS}
     COMMAND "${CMAKE_COMMAND}" -E env "ZIG_GLOBAL_CACHE_DIR=${CMAKE_CURRENT_BINARY_DIR}/zig-global-cache/$<CONFIG>"
-            "${ZYNUM_ZIG}" build -Doptimize=${ZYNUM_OPTIMIZE}
+            "${ZYNUM_ZIG}" build platform -Dexecution-profile=integrated_native -Doptimize=${ZYNUM_OPTIMIZE}
             -Dstandalone=${ZYNUM_STANDALONE_FLAG}
             "-Dheteris-include=${HETERIS_ABI_INCLUDE_DIR}"
             --prefix "${ZYNUM_PREFIX}"
             --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-cache/$<CONFIG>"
-    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
-    DEPENDS ${ZYNUM_ZIG_SOURCES} build.zig build.zig.zon include/zynum.h include/zynum_spectral.h include/zynum_standalone.h
-            "${HETERIS_ABI_INCLUDE_DIR}/heteris.h"
+    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.."
+    DEPENDS ${ZYNUM_ZIG_SOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/../../build.zig" "${CMAKE_CURRENT_SOURCE_DIR}/../../build.zig.zon"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../include/zynum_native.h"
+            include/zynum.h include/zynum_spectral.h include/zynum_standalone.h
+            "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h"
     VERBATIM)
 add_custom_target(zynum_build ALL DEPENDS ${ZYNUM_ARTIFACTS})
 add_library(zynum STATIC IMPORTED GLOBAL)
@@ -67,7 +69,7 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
         "${CMAKE_CURRENT_BINARY_DIR}/zig/${CMAKE_BUILD_TYPE}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}zynum${CMAKE_STATIC_LIBRARY_SUFFIX}")
 endif()
 add_dependencies(zynum zynum_build)
-target_include_directories(zynum INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_include_directories(zynum INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
 target_link_libraries(zynum INTERFACE heteris_data)
 if(UNIX)
     target_link_libraries(zynum INTERFACE m)
@@ -89,6 +91,38 @@ if(ZYNUM_BUILD_STANDALONE)
 endif()
 if(BUILD_TESTING)
     add_custom_target(zynum_test_build DEPENDS zynum_build)
+    add_executable(zynum_native_context tests/native_context.c)
+    target_link_libraries(zynum_native_context PRIVATE zynum)
+    target_compile_features(zynum_native_context PRIVATE c_std_11)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        target_compile_options(zynum_native_context PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+    elseif(MSVC)
+        target_compile_options(zynum_native_context PRIVATE /UNDEBUG)
+    endif()
+    add_test(NAME zynum_native_context COMMAND zynum_native_context)
+    add_dependencies(zynum_test_build zynum_native_context)
+    # Formal Runtime tests are present only when the parent explicitly supplies
+    # its Runtime target. Header-only Zynum never finds Cargo or builds Runtime.
+    if(TARGET heteris_runtime)
+        add_executable(zynum_native_runtime tests/native_runtime.c)
+        target_link_libraries(zynum_native_runtime PRIVATE zynum heteris_runtime)
+        target_compile_features(zynum_native_runtime PRIVATE c_std_11)
+        if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+            target_compile_options(zynum_native_runtime PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+        endif()
+        add_test(NAME zynum_native_runtime COMMAND zynum_native_runtime)
+        add_dependencies(zynum_test_build zynum_native_runtime)
+        if(CMAKE_CXX_COMPILER_LOADED)
+            add_executable(zynum_native_runtime_cpp tests/native_runtime_cpp.cpp)
+            target_link_libraries(zynum_native_runtime_cpp PRIVATE zynum heteris_runtime)
+            target_compile_features(zynum_native_runtime_cpp PRIVATE cxx_std_20)
+            if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+                target_compile_options(zynum_native_runtime_cpp PRIVATE -Wall -Wextra -Werror -UNDEBUG)
+            endif()
+            add_test(NAME zynum_native_runtime_cpp COMMAND zynum_native_runtime_cpp)
+            add_dependencies(zynum_test_build zynum_native_runtime_cpp)
+        endif()
+    endif()
     if(ZYNUM_BUILD_STANDALONE)
         add_executable(zynum_standalone tests/standalone.c)
         target_link_libraries(zynum_standalone PRIVATE zynum_standalone_provider)
@@ -103,15 +137,15 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME zynum_zig_tests
         COMMAND "${CMAKE_COMMAND}" -E env "ZIG_GLOBAL_CACHE_DIR=${CMAKE_CURRENT_BINARY_DIR}/zig-global-cache/$<CONFIG>"
-            "${ZYNUM_ZIG}" build test -Doptimize=${ZYNUM_OPTIMIZE}
+            "${ZYNUM_ZIG}" build test-platform -Dexecution-profile=integrated_native -Doptimize=${ZYNUM_OPTIMIZE}
             "-Dheteris-include=${HETERIS_ABI_INCLUDE_DIR}"
             --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-test-cache/$<CONFIG>")
-    set_tests_properties(zynum_zig_tests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" TIMEOUT 180)
+    set_tests_properties(zynum_zig_tests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.." TIMEOUT 180)
 endif()
 install(FILES ${ZYNUM_ARTIFACTS} DESTINATION lib)
 if(ZYNUM_BUILD_STANDALONE)
     install(FILES include/zynum_standalone.h DESTINATION include)
 endif()
-install(FILES include/zynum.h include/zynum_spectral.h DESTINATION include)
-install(FILES "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" DESTINATION include)
+install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h DESTINATION include)
+install(FILES "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h" DESTINATION include)
 install(FILES ../../LICENSE ../../COPYING UPSTREAM.md DESTINATION share/licenses/zynum)

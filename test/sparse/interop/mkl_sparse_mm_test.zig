@@ -158,10 +158,12 @@ test "Sparse MM rectangular four scalar two width products match independent den
     const entries = [_]Entry{ .{ .row = 0, .column = 2, .re = 1, .im = 1 }, .{ .row = 0, .column = 0, .re = 1, .im = 2 }, .{ .row = 0, .column = 2, .re = 2, .im = -2 }, .{ .row = 1, .column = 1, .re = 4, .im = 2 }, .{ .row = 1, .column = 0, .re = -2, .im = 1 } };
     const dense = [_]Z{ .{ .re = 1, .im = 2 }, .{ .re = 0, .im = 0 }, .{ .re = 3, .im = -1 }, .{ .re = -2, .im = 1 }, .{ .re = 4, .im = 2 }, .{ .re = 0, .im = 0 } };
     inline for (.{ f32, f64, Core.ComplexF32, Core.ComplexF64 }) |T| inline for (.{ i32, i64 }) |I| {
-        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         for ([_]P.MajorAxis{ .row, .column }) |axis| for ([_]u32{ 0, 1 }) |base| {
             var matrix = Matrix(T, I).init(2, 3, axis, base, &entries);
-            const h = try matrix.create(&context);
+            const h = try matrix.create(context);
             defer release(h);
             const original = matrix.values;
             for ([_]Dense.Layout{ .row_major, .column_major }) |layout| for ([_]P.Operation{ .normal, .transposed, .adjoint }) |operation| {
@@ -171,7 +173,7 @@ test "Sparse MM rectangular four scalar two width products match independent den
             };
             try std.testing.expectEqualSlices(u8, std.mem.asBytes(&original), std.mem.asBytes(&matrix.values));
         };
-        try helpers.close(&context);
+        try helpers.close(context);
     };
 }
 
@@ -179,13 +181,15 @@ test "Sparse MM typed raw share the exact four configuration table cells includi
     fixture.setThreads(1);
     const semantics = [_]Typed.MatrixSemantics{ .general, .{ .symmetric = .{ .triangle = .lower, .diagonal = .stored } }, .{ .hermitian = .{ .triangle = .upper, .diagonal = .unit } }, .{ .triangular = .{ .triangle = .lower, .diagonal = .stored } }, .{ .diagonal = .unit } };
     const descriptors = [_]Raw.MatrixDescriptor{ general, .{ .matrix_type = 21, .mode = 40, .diag = 50 }, .{ .matrix_type = 22, .mode = 41, .diag = 51 }, .{ .matrix_type = 23, .mode = 40, .diag = 50 }, .{ .matrix_type = 24, .mode = 99, .diag = 51 } };
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     // Independently tabulated: base0 row broad, base0 column narrow,
     // base1 row narrow, base1 column broad.
     const broad_cells = [2][2]bool{ .{ true, false }, .{ false, true } };
     for ([_]u32{ 0, 1 }) |base| for ([_]P.MajorAxis{ .row, .column }) |axis| {
         var matrix = Matrix(f64, i32).init(2, 2, axis, base, &.{});
-        const h = try matrix.create(&context);
+        const h = try matrix.create(context);
         defer release(h);
         for ([_]Dense.Layout{ .row_major, .column_major }, 0..) |layout, li| for ([_]P.Operation{ .normal, .transposed, .adjoint }) |operation| {
             for (semantics, descriptors, 0..) |semantic, descriptor, si| for ([_]i32{ 0, 3 }) |rhs| {
@@ -203,14 +207,16 @@ test "Sparse MM typed raw share the exact four configuration table cells includi
             };
         };
     };
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MM square structured panels match independent semantic matrices for both halves and transforms" {
     @setEvalBranchQuota(20000);
     fixture.setThreads(1);
     inline for (.{ f32, f64, Core.ComplexF32, Core.ComplexF64 }) |T| inline for (.{ i32, i64 }) |I| {
-        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         for ([_]P.MajorAxis{ .row, .column }) |axis| for ([_]u32{ 0, 1 }) |base| for ([_]bool{ false, true }) |upper| {
             const layout: Dense.Layout = if (base == 0) .row_major else .column_major;
             for ([_]u32{ 21, 22, 23, 24 }) |kind| for ([_]bool{ false, true }) |unit| {
@@ -228,7 +234,7 @@ test "Sparse MM square structured panels match independent semantic matrices for
                 const di: f64 = if (unit or kind == 22) poison else 1;
                 const entries = [_]Entry{ .{ .row = if (upper) 0 else 1, .column = if (upper) 1 else 0, .re = if (kind == 24) poison else 1, .im = if (kind == 24) poison else 2 }, .{ .row = 0, .column = 0, .re = dr, .im = di }, .{ .row = 1, .column = 1, .re = if (unit) poison else 3, .im = if (unit or kind == 22) poison else -1 }, .{ .row = if (upper) 1 else 0, .column = if (upper) 0 else 1, .re = poison, .im = poison } };
                 var matrix = Matrix(T, I).init(2, 2, axis, base, &entries);
-                const h = try matrix.create(&context);
+                const h = try matrix.create(context);
                 defer release(h);
                 var dense = [_]Z{ .{ .re = if (unit) 1 else 2, .im = if (unit or kind == 22) 0 else 1 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = if (unit) 1 else 3, .im = if (unit or kind == 22) 0 else -1 } };
                 if (kind != 24) {
@@ -239,7 +245,7 @@ test "Sparse MM square structured panels match independent semantic matrices for
                 for ([_]P.Operation{ .normal, .transposed, .adjoint }) |operation| try checkNumerical(T, I, h, 2, 2, &dense, semantic, descriptor, operation, layout, 3);
             };
         };
-        try helpers.close(&context);
+        try helpers.close(context);
     };
 }
 
@@ -247,11 +253,13 @@ test "Sparse MM zero scales and empty unit storage preserve padding while metada
     @setEvalBranchQuota(12000);
     fixture.setThreads(1);
     inline for (.{ f32, f64, Core.ComplexF32, Core.ComplexF64 }) |T| inline for (.{ i32, i64 }) |I| {
-        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var starts = [_]I{ 0, 0 };
         var ends = [_]I{ 0, 0 };
         var h: ?Handles.Handle = null;
-        try Typed.createBorrowed(T, I, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &.{}, .values = &.{} }, &h);
+        try Typed.createBorrowed(T, I, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &.{}, .values = &.{} }, &h);
         {
             defer release(h);
             const x = [_]T{ number(T, 1, 2), number(T, 3, 4), number(T, 5, 6), number(T, 91, 92), number(T, 7, 8), number(T, 9, 10), number(T, 11, 12) };
@@ -280,7 +288,7 @@ test "Sparse MM zero scales and empty unit storage preserve padding while metada
         // Nonempty numerical storage must also be unread at alpha0. Then
         // finite alpha with NaN old C distinguishes beta0's no-read contract.
         var poisoned = Matrix(T, I).init(2, 2, .row, 0, &.{.{ .row = 0, .column = 0, .re = std.math.nan(f64), .im = std.math.inf(f64) }});
-        const ph = try poisoned.create(&context);
+        const ph = try poisoned.create(context);
         {
             defer release(ph);
             const nan = number(T, std.math.nan(f64), std.math.nan(f64));
@@ -301,7 +309,7 @@ test "Sparse MM zero scales and empty unit storage preserve padding while metada
             poisoned.ordinals[1] = 0;
             try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&out));
         }
-        try helpers.close(&context);
+        try helpers.close(context);
     };
 }
 
@@ -309,7 +317,9 @@ test "Sparse MM duplicate cancellation retains stored order across scalar block 
     @setEvalBranchQuota(10000);
     fixture.setThreads(1);
     inline for (.{ f32, f64, Core.ComplexF32, Core.ComplexF64 }) |T| {
-        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         for ([_]P.MajorAxis{ .row, .column }) |axis| {
             var starts = [_]i64{0};
             var ends = [_]i64{3};
@@ -317,7 +327,7 @@ test "Sparse MM duplicate cancellation retains stored order across scalar block 
             const huge: f64 = if (T == f32 or T == Core.ComplexF32) 0x1p30 else 0x1p60;
             var values = [_]T{ number(T, huge, 0), number(T, -huge, 0), number(T, 1, 0) };
             var h: ?Handles.Handle = null;
-            try Typed.createBorrowed(T, i64, &context, .{ .base = 0, .rows = 1, .columns = 1, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+            try Typed.createBorrowed(T, i64, context, .{ .base = 0, .rows = 1, .columns = 1, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
             defer release(h);
             const input = [_]T{ number(T, 1, 0), number(T, 1, 0), number(T, 1, 0) };
             for ([_]P.Operation{ .normal, .transposed, .adjoint }) |op| {
@@ -327,15 +337,17 @@ test "Sparse MM duplicate cancellation retains stored order across scalar block 
                 try near(T, z(T, number(T, 19, 23)), out[3]);
             }
         }
-        try helpers.close(&context);
+        try helpers.close(context);
     }
 }
 
 test "Sparse MM typed capacities signed parameters descriptors and metadata failures preserve complete output" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var matrix = Matrix(f64, i32).init(2, 3, .row, 0, &.{ .{ .row = 0, .column = 0, .re = 2, .im = 0 }, .{ .row = 1, .column = 2, .re = 3, .im = 0 } });
-    const h = try matrix.create(&context);
+    const h = try matrix.create(context);
     {
         defer release(h);
         var out = [_]f64{ 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61 };
@@ -371,17 +383,19 @@ test "Sparse MM typed capacities signed parameters descriptors and metadata fail
         try Raw.mm(f64, i32, h, 10, general, 101, 1, &input, 3, 4, 0, &out, 4);
         try std.testing.expectEqualSlices(f64, &.{ 2, 4, 6, 29, 21, 24, 27, 43, 47, 53, 59, 61 }, &out);
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MM empty prefixes zero K and zero M retain geometry and pointer arrival rules" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var bytes: [32]u8 align(16) = @splat(0xab);
     const unaligned: Raw.Pointer(f64) = @ptrCast(bytes[1..].ptr);
     for ([_]P.MajorAxis{ .row, .column }) |axis| {
         var matrix = Matrix(f64, i64).init(2, 0, axis, 0, &.{});
-        const h = try matrix.create(&context);
+        const h = try matrix.create(context);
         defer release(h);
         var out = [_]f64{ 1, 2, 3, 71, 4, 5, 6, 73 };
         try Raw.mm(f64, i64, h, 10, general, 101, std.math.inf(f64), unaligned, 3, std.math.maxInt(i64), -2, &out, 4);
@@ -391,14 +405,16 @@ test "Sparse MM empty prefixes zero K and zero M retain geometry and pointer arr
         try expectError(error.NullInput, Raw.mm(f64, i64, h, 11, general, 101, 0, null, 3, 3, 0, unaligned, 0));
         try expectError(error.InvalidAlignment, Raw.mm(f64, i64, h, 10, general, 101, 0, null, 3, 0, 0, unaligned, 3));
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MM wide stride and checked byte overflow precede raw pointee access" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var matrix = Matrix(f64, i64).init(1, 1, .row, 0, &.{.{ .row = 0, .column = 0, .re = 2, .im = 0 }});
-    const h = try matrix.create(&context);
+    const h = try matrix.create(context);
     {
         defer release(h);
         var out = [_]f64{ 17, 19 };
@@ -423,7 +439,7 @@ test "Sparse MM wide stride and checked byte overflow precede raw pointee access
     // would wrap must fail before a huge slice is formed; no fictitious pointer.
     var wide_handle: ?Handles.Handle = null;
     const huge_k: i64 = @intCast(std.math.maxInt(usize) / @sizeOf(f64));
-    try Typed.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = 0, .columns = huge_k, .axis = .row, .starts = &.{}, .ends = &.{}, .ordinals = &.{}, .values = &.{} }, &wide_handle);
+    try Typed.createBorrowed(f64, i64, context, .{ .base = 0, .rows = 0, .columns = huge_k, .axis = .row, .starts = &.{}, .ends = &.{}, .ordinals = &.{}, .values = &.{} }, &wide_handle);
     {
         defer release(wide_handle);
         const live: f64 = 3;
@@ -431,18 +447,20 @@ test "Sparse MM wide stride and checked byte overflow precede raw pointee access
         try expectError(error.SizeOverflow, Raw.mm(f64, i64, wide_handle, 10, general, 101, 0, @ptrCast(&live), 1, 1, 0, &canary, 0));
         try std.testing.expectEqualSlices(f64, &.{ 17, 19 }, &canary);
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MM rejects partial dense padding sparse metadata and owner aliases before any write" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var starts: [8]i64 align(@alignOf(f64)) = .{ 0, 1, 13, 17, 19, 23, 29, 31 };
     var ends: [8]i64 align(@alignOf(f64)) = .{ 1, 2, 13, 17, 19, 23, 29, 31 };
     var ordinals: [8]i64 align(@alignOf(f64)) = .{ 0, 1, 13, 17, 19, 23, 29, 31 };
     var values = [_]f64{ 2, 3, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53 };
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = starts[0..2], .ends = ends[0..2], .ordinals = ordinals[0..2], .values = &values }, &h);
+    try Typed.createBorrowed(f64, i64, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = starts[0..2], .ends = ends[0..2], .ordinals = ordinals[0..2], .values = &values }, &h);
     {
         defer release(h);
         var shared = [_]f64{ 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53 };
@@ -479,25 +497,26 @@ test "Sparse MM rejects partial dense padding sparse metadata and owner aliases 
         try std.testing.expectEqualSlices(f64, &.{ 4, 9 }, &result);
     }
     var gapped = Matrix(f64, i64).init(1, 1, .row, 0, &.{.{ .row = 0, .column = 0, .re = 2, .im = 0 }});
-    const gap_handle = try gapped.create(&context);
+    const gap_handle = try gapped.create(context);
     {
         defer release(gap_handle);
         const before = std.mem.asBytes(&gapped.values).*;
         try expectError(error.BufferOverlap, Raw.mm(f64, i64, gap_handle, 10, general, 101, 0, &[_]f64{3}, 1, 1, 0, &gapped.values, 1));
         try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&gapped.values));
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MM source admission covers every odd RHS store through closing without allocations" {
     const Observed = struct {
-        context: Context,
+        reference_context: FixtureReferenceContext = undefined,
+        context: *Context = undefined,
         enabled: bool = false,
         admitted: usize = 0,
         finishing: usize = 0,
         output: [23]f64 = @splat(71),
         fn observe(context: *Context, event: execution.context.TestEvent) void {
-            const self: *@This() = @fieldParentPtr("context", context);
+            const self: *@This() = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", context)));
             if (!self.enabled) return;
             const state = context.snapshot();
             if (state.active_operations != 1 or state.resource_pins != 1) @panic("MM lost original operation/control pin");
@@ -515,21 +534,23 @@ test "Sparse MM source admission covers every odd RHS store through closing with
                     }
                 },
             }
-            if (context.tryProgressClose() != .busy) @panic("MM operation did not cover closing");
+            if (fixtureProgressClose(context) != .busy) @panic("MM operation did not cover closing");
         }
     };
     fixture.setThreads(1);
     for ([_]bool{ false, true }) |raw| {
         var spy: helpers.Spy = .{};
-        var observation: Observed = .{ .context = Context.init(spy.allocator(), fixture.policy, .internal_closable) };
-        spy.ctx = &observation.context;
-        Context.testing.configure(&observation.context, 1, Observed.observe);
+        var observation: Observed = .{};
+        observation.reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        observation.context = observation.reference_context.borrowedContext();
+        spy.ctx = observation.context;
+        Context.testing.configure(observation.context, 1, Observed.observe);
         var starts = [_]i32{ 0, 1 };
         var ends = [_]i32{ 1, 2 };
         var ordinals = [_]i32{ 0, 1 };
         var values = [_]f64{ 2, 4 };
         var h: ?Handles.Handle = null;
-        try Typed.createBorrowed(f64, i32, &observation.context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+        try Typed.createBorrowed(f64, i32, observation.context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
         try expect(try Handles.borrowedContext(h.?) != execution.getContext());
         const attempts = spy.attempts;
         const accepted = spy.accepted;
@@ -549,25 +570,27 @@ test "Sparse MM source admission covers every odd RHS store through closing with
         try equal(accepted, spy.accepted);
         try equal(freed, spy.freed);
         try equal(@as(usize, 0), observation.context.snapshot().active_operations);
-        try equal(execution.context.CloseResult.waiting_resources, observation.context.tryProgressClose());
+        try equal(execution.context.CloseResult.waiting_resources, fixtureProgressClose(observation.context));
         const saved = observation.output;
         try expectError(error.Closing, Raw.mm(f64, i32, h, 99, general, 999, 0, null, -1, -1, 0, &observation.output, -1));
         try expectError(error.Closing, Typed.mm(f64, i32, h, .normal, .general, .row_major, 0, &.{}, -1, -1, 0, &observation.output, -1));
         try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&observation.output));
         try Typed.destroy(h);
         try spy.balanced();
-        try helpers.close(&observation.context);
+        try helpers.close(observation.context);
     }
 }
 
 test "Sparse MM admission overflow wrong Context seams and retained control preserve one resource lifecycle" {
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
-    Context.testing.configure(&context, 1, null);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
+    Context.testing.configure(context, 1, null);
     var matrix = Matrix(f64, i32).init(1, 1, .row, 0, &.{.{ .row = 0, .column = 0, .re = 2, .im = 0 }});
-    const h = try matrix.create(&context);
+    const h = try matrix.create(context);
     const control = try Handles.testing.retainControl(f64, i32, h);
     try equal(@as(usize, 1), context.snapshot().resource_pins);
     var operation = try context.begin();
@@ -577,12 +600,14 @@ test "Sparse MM admission overflow wrong Context seams and retained control pres
     try expectError(error.CounterOverflow, Raw.mm(f64, i32, h, 99, general, 999, 0, null, -1, -1, 0, &out, -1));
     try expectError(error.CounterOverflow, Typed.mm(f64, i32, h, .normal, .general, .row_major, 0, &.{}, -1, -1, 0, &out, -1));
     const prepared = try Typed.prepareMmAdmitted(f64, i32, &operation, h, .normal, .general, .row_major, 3, 3, 3);
-    var other_context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_other_context: FixtureReferenceContext = undefined;
+    reference_other_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const other_context = reference_other_context.borrowedContext();
     var other = try other_context.begin();
     try expectError(error.ContextMismatch, Typed.prepareMmAdmitted(f64, i32, &other, h, .normal, .general, .row_major, -1, -1, -1));
     try expectError(error.ContextMismatch, Typed.executeMmAdmitted(f64, i32, &other, h, prepared, 0, &.{}, 0, &out));
     other.end();
-    try helpers.close(&other_context);
+    try helpers.close(other_context);
     try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&out));
     try Typed.executeMmAdmitted(f64, i32, &operation, h, prepared, 1, &.{ 1, 2, 3 }, 0, &out);
     try std.testing.expectEqualSlices(f64, &.{ 2, 4, 6 }, &out);
@@ -592,23 +617,25 @@ test "Sparse MM admission overflow wrong Context seams and retained control pres
     try Typed.destroy(h);
     try equal(@as(usize, 1), control.references);
     try equal(@as(usize, 1), context.snapshot().resource_pins);
-    try equal(execution.context.CloseResult.waiting_resources, context.tryProgressClose());
+    try equal(execution.context.CloseResult.waiting_resources, fixtureProgressClose(context));
     control.release();
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "checked shared handle solve CSR CSC bases both layouts complex alpha and padding" {
     inline for (.{ f32, f64, Core.sparse.ComplexF32, Core.sparse.ComplexF64 }) |T| inline for (.{ i32, i64 }) |I| {
         const complex = comptime isComplex(T);
         for ([_]P.MajorAxis{ .row, .column }) |axis| for ([_]I{ 0, 1 }) |base| for ([_]Dense.Layout{ .row_major, .column_major }) |layout| for ([_]P.Operation{ .normal, .transposed, .adjoint }) |op| {
-            var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
             var starts = [_]I{ base, 3 + base };
             var ends = [_]I{ 1 + base, 4 + base };
             var ord = [_]I{ base, -99, -99, 1 + base };
             var values = [_]T{ number(T, 2, 1), number(T, 777, 7), number(T, 777, 7), number(T, 3, -1) };
             var h: ?Handles.Handle = null;
-            try Typed.createBorrowed(T, I, &ctx, .{ .base = @intCast(base), .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+            try Typed.createBorrowed(T, I, ctx, .{ .base = @intCast(base), .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
             var x: [6]T = @splat(number(T, 77, 9));
             var y = x;
             const alpha = number(T, 0.5, 0.25);
@@ -636,7 +663,7 @@ test "checked shared handle solve CSR CSC bases both layouts complex alpha and p
             try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().resource_pins);
             try Typed.destroy(h);
             _ = ctx.requestClose();
-            try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+            try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
         };
     };
 }
@@ -644,13 +671,15 @@ test "checked shared handle solve CSR CSC bases both layouts complex alpha and p
 test "checked shared handle admitted solve finishes after close and permits staged in-place panel" {
     const T = Core.sparse.ComplexF64;
     const I = i32;
-    var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var starts = [_]I{0};
     var ends = [_]I{1};
     var ord = [_]I{0};
     var values = [_]T{number(T, 2, 1)};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(T, I, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(T, I, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     var operation = try ctx.begin();
     _ = ctx.requestClose();
     const prepared = try binding.Solve.prepareAdmitted(T, I, &operation, h.?, .normal, .lower, .non_unit, .column_major, 1, 1, 1);
@@ -663,7 +692,7 @@ test "checked shared handle admitted solve finishes after close and permits stag
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().resource_pins);
     operation.end();
     try Typed.destroy(h);
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "checked handle solve normalizes off diagonal CSC CSR and commits only numerical success" {
@@ -671,7 +700,9 @@ test "checked handle solve normalizes off diagonal CSC CSR and commits only nume
     const I = i64;
     const M = binding.Provider.Scalar;
     for ([_]P.MajorAxis{ .row, .column }) |axis| for ([_]P.Operation{ .normal, .transposed, .adjoint }) |op| {
-        var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var starts = [_]I{ 0, if (axis == .row) 2 else 3 };
         var ends = [_]I{ if (axis == .row) 1 else 2, 4 };
         var ord = [_]I{ 0, if (axis == .row) -99 else 1, if (axis == .row) 0 else -99, 1 };
@@ -680,7 +711,7 @@ test "checked handle solve normalizes off diagonal CSC CSR and commits only nume
         const c = number(T, 1, 0.5);
         var values = [_]T{ d0, if (axis == .row) number(T, 777, 9) else c, if (axis == .row) c else number(T, 777, 9), d1 };
         var h: ?Handles.Handle = null;
-        try Typed.createBorrowed(T, I, &ctx, .{ .base = 0, .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+        try Typed.createBorrowed(T, I, ctx, .{ .base = 0, .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
         const want = [_]T{ number(T, 1, 2), number(T, 3, -0.5) };
         const coeff0 = if (op == .adjoint) M.maybeConjugate(T, d0, true) else d0;
         const coeff1 = if (op == .adjoint) M.maybeConjugate(T, d1, true) else d1;
@@ -700,20 +731,22 @@ test "checked handle solve normalizes off diagonal CSC CSR and commits only nume
         try std.testing.expectEqualSlices(T, &before, &y);
         try Typed.destroy(h);
         _ = ctx.requestClose();
-        try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+        try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     };
 }
 
 test "checked handle solve all allocation failure points leave output and release earlier scratch" {
     for (0..5) |allocation| {
         var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-        var ctx = Context.init(allocator.allocator(), fixture.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocator.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var starts = [_]i32{0};
         var ends = [_]i32{1};
         var ord = [_]i32{0};
         var values = [_]f64{2};
         var h: ?Handles.Handle = null;
-        try Typed.createBorrowed(f64, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+        try Typed.createBorrowed(f64, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
         allocator.fail_index = allocator.alloc_index + allocation;
         const x = [_]f64{4};
         var y = [_]f64{99};
@@ -724,7 +757,7 @@ test "checked handle solve all allocation failure points leave output and releas
         try Typed.destroy(h);
         try equal(allocator.allocated_bytes, allocator.freed_bytes);
         _ = ctx.requestClose();
-        try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+        try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -733,13 +766,15 @@ test "checked raw TRSV TRSM four scalars both formats bases N T H and documented
     inline for (.{ f32, f64, Core.sparse.ComplexF32, Core.sparse.ComplexF64 }) |T| inline for (.{ i32, i64 }) |I| {
         const complex = comptime isComplex(T);
         for ([_]P.MajorAxis{ .row, .column }) |axis| for ([_]I{ 0, 1 }) |base| for ([_]P.Operation{ .normal, .transposed, .adjoint }) |op| {
-            var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
             var starts = [_]I{ base, 1 + base };
             var ends = [_]I{ 1 + base, 2 + base };
             var ord = [_]I{ base, 1 + base };
             var values = [_]T{ number(T, 2, 1), number(T, 3, -1) };
             var h: ?Handles.Handle = null;
-            try Typed.createBorrowed(T, I, &ctx, .{ .base = @intCast(base), .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+            try Typed.createBorrowed(T, I, ctx, .{ .base = @intCast(base), .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
             const descriptor: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
             var input: [2]T = undefined;
             var output: [2]T = undefined;
@@ -781,20 +816,22 @@ test "checked raw TRSV TRSM four scalars both formats bases N T H and documented
             try equal(number(T, 77, 9), y[5]);
             try Typed.destroy(h);
             _ = ctx.requestClose();
-            try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+            try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
         };
     };
 }
 
 test "checked raw diagonal descriptor ignores mode and off diagonal NaN without treating as triangular" {
     const T = Core.sparse.ComplexF64;
-    var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var starts = [_]i32{ 0, 2 };
     var ends = [_]i32{ 2, 4 };
     var ord = [_]i32{ 0, 1, 0, 1 };
     var values = [_]T{ number(T, 2, 1), number(T, std.math.nan(f64), std.math.inf(f64)), number(T, std.math.nan(f64), std.math.inf(f64)), number(T, 3, -1) };
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(T, i32, &ctx, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(T, i32, ctx, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     const input = [_]T{ number(T, 3, 4), number(T, 3, -1) };
     var output: [2]T = undefined;
     const descriptor: binding.RawSolve.Descriptor = .{ .matrix_type = 24, .mode = 0xfedcba98, .diag = 50 };
@@ -805,17 +842,19 @@ test "checked raw diagonal descriptor ignores mode and off diagonal NaN without 
     try std.testing.expectApproxEqAbs(@as(f64, 1), output[1].re, 3e-12);
     try Typed.destroy(h);
     _ = ctx.requestClose();
-    try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "checked raw solve enum geometry alignment aliases and closing precedence are explicit" {
-    var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var starts = [_]i32{0};
     var ends = [_]i32{1};
     var ord = [_]i32{0};
     var values = [_]f64{2};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
     try expectError(error.NullHandle, binding.RawSolve.vector(f64, i32, null, 99, d, 1, null, null));
     try expectError(error.InvalidOperation, binding.RawSolve.vector(f64, i32, h, 99, d, 1, null, null));
@@ -841,18 +880,20 @@ test "checked raw solve enum geometry alignment aliases and closing precedence a
     try equal(@as(f64, 2), y[0]);
     op.end();
     try Typed.destroy(h);
-    try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "raw solve zero columns has no dense prefix or scratch and failed solve leaves output" {
     var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    var ctx = Context.init(allocator.allocator(), fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocator.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var starts = [_]i32{0};
     var ends = [_]i32{1};
     var ord = [_]i32{0};
     var values = [_]f64{std.math.nan(f64)};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     allocator.fail_index = allocator.alloc_index;
     const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
     const zero = try binding.RawSolve.panel(f64, i32, h, 10, d, 101, 1, null, 0, 0, null, 0);
@@ -869,19 +910,21 @@ test "raw solve zero columns has no dense prefix or scratch and failed solve lea
     try Typed.destroy(h);
     try equal(allocator.allocated_bytes, allocator.freed_bytes);
     _ = ctx.requestClose();
-    try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "raw solve resource pin overflow cleans previous same operation leases" {
     var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    var ctx = Context.init(allocator.allocator(), fixture.policy, .internal_closable);
-    Context.testing.configure(&ctx, 2, null);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocator.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Context.testing.configure(ctx, 2, null);
     var starts = [_]i32{0};
     var ends = [_]i32{1};
     var ord = [_]i32{0};
     var values = [_]f64{2};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
     const x = [_]f64{4};
     var y = [_]f64{99};
@@ -892,19 +935,21 @@ test "raw solve resource pin overflow cleans previous same operation leases" {
     try Typed.destroy(h);
     try equal(allocator.allocated_bytes, allocator.freed_bytes);
     _ = ctx.requestClose();
-    try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "solve IEEE permits NaN Inf while checked failure preserves output all scalar families" {
     inline for (.{ f32, f64, Core.sparse.ComplexF32, Core.sparse.ComplexF64 }) |T| {
         const R = if (T == f32 or T == Core.sparse.ComplexF32) f32 else f64;
-        var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var starts = [_]i32{0};
         var ends = [_]i32{1};
         var ord = [_]i32{0};
         var values = [_]T{number(T, 2, 0)};
         var h: ?Handles.Handle = null;
-        try Typed.createBorrowed(T, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+        try Typed.createBorrowed(T, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
         const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
         for ([_]R{ std.math.nan(R), std.math.inf(R) }) |bad| {
             const x = [_]T{number(T, bad, 0)};
@@ -924,19 +969,21 @@ test "solve IEEE permits NaN Inf while checked failure preserves output all scal
         try expect(std.math.isNan(if (comptime isComplex(T)) y[0].re else y[0]));
         try Typed.destroy(h);
         _ = ctx.requestClose();
-        try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+        try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
 test "solve IEEE zero scale skips singular nonfinite numbers and scratch but retains raw prefixes" {
     var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    var ctx = Context.init(allocator.allocator(), fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocator.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var starts = [_]i32{0};
     var ends = [_]i32{1};
     var ord = [_]i32{0};
     var values = [_]f64{0};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     allocator.fail_index = allocator.alloc_index;
     const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
     const x = [_]f64{std.math.nan(f64)};
@@ -949,19 +996,21 @@ test "solve IEEE zero scale skips singular nonfinite numbers and scratch but ret
     try Typed.destroy(h);
     try equal(allocator.allocated_bytes, allocator.freed_bytes);
     _ = ctx.requestClose();
-    try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "solve IEEE complex unit no division preserves Inf and ignored diagonal N T H" {
     inline for (.{ Core.sparse.ComplexF32, Core.sparse.ComplexF64 }) |T| {
         const R = @TypeOf(@as(T, undefined).re);
-        var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var starts = [_]i32{0};
         var ends = [_]i32{1};
         var ord = [_]i32{0};
         var values = [_]T{number(T, std.math.nan(R), std.math.nan(R))};
         var h: ?Handles.Handle = null;
-        try Typed.createBorrowed(T, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+        try Typed.createBorrowed(T, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
         const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 51 };
         const x = [_]T{number(T, std.math.inf(R), 0)};
         for ([_]u32{ 10, 11, 12 }) |op| {
@@ -973,18 +1022,20 @@ test "solve IEEE complex unit no division preserves Inf and ignored diagonal N T
         }
         try Typed.destroy(h);
         _ = ctx.requestClose();
-        try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+        try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
 test "solve IEEE finite scaling overflow propagates and zero diagonal still returns numerical failure" {
-    var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var starts = [_]i32{0};
     var ends = [_]i32{1};
     var ord = [_]i32{0};
     var values = [_]f64{1};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, ctx, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ord, .values = &values }, &h);
     const d: binding.RawSolve.Descriptor = .{ .matrix_type = 23, .mode = 40, .diag = 50 };
     const x = [_]f64{2};
     var y = [_]f64{99};
@@ -1000,5 +1051,11 @@ test "solve IEEE finite scaling overflow propagates and zero diagonal still retu
     try equal(@as(f64, 99), y[0]);
     try Typed.destroy(h);
     _ = ctx.requestClose();
-    try equal(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

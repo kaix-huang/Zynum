@@ -21,7 +21,7 @@ fn close(owner: *E.context.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
 }
 const Fixture = struct {
     matrix: [6]T = undefined,
@@ -116,36 +116,40 @@ test "FEAST typed LP64 parameter initialization defaults and reviewed error boun
     var unsupported = fpm;
     unsupported[15] = 2;
     try std.testing.expectEqual(Proto.Parameters.unsupported, Proto.Parameters.decode(&unsupported).invalid);
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var f: Fixture = undefined;
     f.init('F', false);
     var q = f.args();
     q.uplo = 'Z';
-    try std.testing.expectEqual(@as(i32, -101), (try A.solve(&owner, q)).info);
+    try std.testing.expectEqual(@as(i32, -101), (try A.solve(owner, q)).info);
     q.uplo = 'F';
     q.dimension = 0;
-    try std.testing.expectEqual(@as(i32, -102), (try A.solve(&owner, q)).info);
+    try std.testing.expectEqual(@as(i32, -102), (try A.solve(owner, q)).info);
     q = f.args();
     q.capacity = 0;
-    try std.testing.expectEqual(@as(i32, 201), (try A.solve(&owner, q)).info);
+    try std.testing.expectEqual(@as(i32, 201), (try A.solve(owner, q)).info);
     q.capacity = 1;
-    try std.testing.expectEqual(@as(i32, 201), (try A.solve(&owner, q)).info);
+    try std.testing.expectEqual(@as(i32, 201), (try A.solve(owner, q)).info);
     q.capacity = 5;
-    try std.testing.expectEqual(@as(i32, 201), (try A.solve(&owner, q)).info);
+    try std.testing.expectEqual(@as(i32, 201), (try A.solve(owner, q)).info);
     q = f.args();
     q.lower = 4;
-    try std.testing.expectEqual(@as(i32, 200), (try A.solve(&owner, q)).info);
+    try std.testing.expectEqual(@as(i32, 200), (try A.solve(owner, q)).info);
     for (f.values) |v| try std.testing.expectEqual(@as(f64, 91), v);
 }
 test "FEAST typed LP64 full lower upper CSR random and supplied starts recover Hermitian spectrum" {
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     for ([_]u8{ 'F', 'L', 'U' }) |uplo| for ([_]bool{ false, true }) |reuse| {
         var f: Fixture = undefined;
         f.init(uplo, reuse);
         const before = f.matrix;
-        const result = try A.solve(&owner, f.args());
+        const result = try A.solve(owner, f.args());
         try std.testing.expectEqual(@as(i32, 0), result.info);
         try verify(&f, result.found.?);
         try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before), std.mem.asBytes(&f.matrix));
@@ -158,12 +162,14 @@ test "FEAST typed LP64 full lower upper CSR random and supplied starts recover H
     };
 }
 test "FEAST typed LP64 trace stopping finite budget capacity warning and empty interval" {
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var f: Fixture = undefined;
     f.init('F', true);
     f.fpm[5] = 0;
-    const trace = try A.solve(&owner, f.args());
+    const trace = try A.solve(owner, f.args());
     try std.testing.expectEqual(@as(i32, 0), trace.info);
     try std.testing.expect(trace.loop.? >= 1);
     try std.testing.expect(trace.epsout.? < 1e-12);
@@ -171,18 +177,18 @@ test "FEAST typed LP64 trace stopping finite budget capacity warning and empty i
     f.init('F', false);
     f.fpm[3] = 0;
     f.fpm[45] = 1;
-    const limited = try A.solve(&owner, f.args());
+    const limited = try A.solve(owner, f.args());
     try std.testing.expectEqual(@as(i32, 2), limited.info);
     try std.testing.expectEqual(@as(usize, 0), limited.loop.?);
     try std.testing.expect(limited.native.?.published > 0);
     f.init('F', false);
     f.fpm[45] = 0;
-    const zero_inner = try A.solve(&owner, f.args());
+    const zero_inner = try A.solve(owner, f.args());
     try std.testing.expectEqual(@as(i32, 0), zero_inner.info);
     try verify(&f, zero_inner.found.?);
     f.init('F', true);
     f.capacity = 2;
-    const capacity = try A.solve(&owner, f.args());
+    const capacity = try A.solve(owner, f.args());
     try std.testing.expectEqual(@as(i32, 3), capacity.info);
     try std.testing.expectEqual(@as(usize, 2), capacity.found.?);
     // A filled M0=N subspace is complete, including with no refinement budget.
@@ -195,7 +201,7 @@ test "FEAST typed LP64 trace stopping finite budget capacity warning and empty i
         var full_args = f.args();
         full_args.lower = -10;
         full_args.upper = 10;
-        const full = try A.solve(&owner, full_args);
+        const full = try A.solve(owner, full_args);
         try std.testing.expectEqual(@as(i32, 0), full.info);
         try std.testing.expectEqual(@as(usize, 4), full.found.?);
         try std.testing.expectEqual(@as(usize, if (trace_stopping) 1 else 0), full.loop.?);
@@ -223,50 +229,56 @@ test "FEAST typed LP64 trace stopping finite budget capacity warning and empty i
     var q = f.args();
     q.lower = 9;
     q.upper = 10;
-    const empty = try A.solve(&owner, q);
+    const empty = try A.solve(owner, q);
     try std.testing.expectEqual(@as(i32, 1), empty.info);
     try std.testing.expectEqual(@as(usize, 0), empty.found.?);
 }
 test "FEAST typed LP64 invalid CSR finite values capacity and byte aliases are transactional" {
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var f: Fixture = undefined;
     f.init('F', false);
     const before = f;
     f.rows[0] = 0;
-    try std.testing.expectEqual(@as(i32, -104), (try A.solve(&owner, f.args())).info);
+    try std.testing.expectEqual(@as(i32, -104), (try A.solve(owner, f.args())).info);
     f.rows = before.rows;
     f.columns[0] = 5;
-    try std.testing.expectEqual(@as(i32, -105), (try A.solve(&owner, f.args())).info);
+    try std.testing.expectEqual(@as(i32, -105), (try A.solve(owner, f.args())).info);
     f.columns = before.columns;
     f.matrix[0].re = std.math.nan(f64);
-    try std.testing.expectEqual(@as(i32, -103), (try A.solve(&owner, f.args())).info);
+    try std.testing.expectEqual(@as(i32, -103), (try A.solve(owner, f.args())).info);
     f.matrix = before.matrix;
     var q = f.args();
     q.vectors = f.vectors[0..11];
-    try std.testing.expectError(error.BufferTooSmall, A.solve(&owner, q));
+    try std.testing.expectError(error.BufferTooSmall, A.solve(owner, q));
     q = f.args();
     q.residuals = q.eigenvalues;
-    try std.testing.expectError(error.AliasingNotAllowed, A.solve(&owner, q));
+    try std.testing.expectError(error.AliasingNotAllowed, A.solve(owner, q));
     try std.testing.expectEqualDeep(before, f);
 }
 test "FEAST typed LP64 seven scratch allocation rollback and captured closing operation" {
     for (0..7) |budget| {
         var allocations = E.test_support.Allocations{ .budget = budget };
-        var owner = E.context.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var f: Fixture = undefined;
         f.init('F', false);
         const before = f;
-        try std.testing.expectError(error.OutOfMemory, A.solve(&owner, f.args()));
+        try std.testing.expectError(error.OutOfMemory, A.solve(owner, f.args()));
         try std.testing.expectEqualDeep(before, f);
         try std.testing.expectEqual(budget, allocations.stats().accepted);
         try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
     }
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.busy, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.busy, fixtureProgressClose(owner));
     var f: Fixture = undefined;
     f.init('F', false);
     const result = try A.solveAdmitted(&op, f.args());
@@ -274,5 +286,11 @@ test "FEAST typed LP64 seven scratch allocation rollback and captured closing op
     try verify(&f, result.found.?);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     op.end();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

@@ -24,7 +24,9 @@ const Callback = struct {
     }
 };
 test "CSR and matrix-free operators borrow one admission through close" {
-    var ctx = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var operation = try ctx.begin();
     const offsets = [_]i64{ 0, 2, 3 };
     const indices = [_]i32{ 0, 1, 1 };
@@ -73,10 +75,12 @@ test "CSR and matrix-free operators borrow one admission through close" {
     try panelNumerics(&operation, csr, callback, &calls);
     operation.end();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 test "operator preflight rejects before callback and propagates backend error" {
-    var ctx = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var operation = try ctx.begin();
     var calls: usize = 0;
     const backend = Callback{ .calls = &calls, .fail = true };
@@ -111,7 +115,7 @@ test "operator preflight rejects before callback and propagates backend error" {
     try panelFailures(&operation, callback, &calls);
     operation.end();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "CSR operator revalidates borrowed metadata and preserves output on rejection" {
@@ -310,7 +314,9 @@ test "unified inverse triangular operator mixed complex N T H scalar panel and c
             const x: [2]T = if (transform == .normal) .{ V.value(4, 0), V.value(11, 0) } else .{ V.value(7, 0), V.value(9, 0) };
             var y = [_]T{ V.value(99, 0), V.value(99, 0) };
             var workspace: [4]T = undefined;
-            var ctx = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
             var op = try ctx.begin();
             _ = ctx.requestClose();
             try inverse.applyAdmitted(&op, &x, &y, &workspace);
@@ -334,7 +340,7 @@ test "unified inverse triangular operator mixed complex N T H scalar panel and c
             try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
             try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
             op.end();
-            try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+            try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
         }
     }
 }
@@ -348,7 +354,9 @@ test "inverse triangular operator failure leaves output and protects borrowed ma
     const Backend = core.internal.sparse_checked.operator.TriangularInverseBackend(Matrix);
     var state: Backend = .{ .matrix = .{ .values = &values, .row_offsets = &offsets, .column_indices = &columns, .row_count = 2, .column_count = 2 }, .triangle = .lower, .diagonal = .non_unit };
     const inverse = try state.borrow();
-    var ctx = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     const x = [_]f64{ 4, 11 };
     var y = [_]f64{ 99, 99 };
@@ -360,5 +368,11 @@ test "inverse triangular operator failure leaves output and protects borrowed ma
     try std.testing.expectEqualSlices(f64, &before, &values);
     op.end();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

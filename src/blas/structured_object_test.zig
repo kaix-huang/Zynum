@@ -157,10 +157,12 @@ test "isolated SYMM borrows operation allocator and finishes during close" {
     const fixture = execution.test_support;
     fixture.setThreads(4);
     var allocations: fixture.Allocations = .{ .budget = 0 };
-    var ctx = execution.context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     defer {
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     const n = 128;
     const ld = 131;
@@ -186,7 +188,7 @@ test "isolated SYMM borrows operation allocator and finishes during close" {
     try std.testing.expect(allocations.stats().rejected > 0);
     allocations.budget = std.math.maxInt(usize);
     try std.testing.expectEqual(execution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     try std.testing.expectError(error.Closing, ctx.begin());
     try std.testing.expect(bridge.trySymmWithResources(f64, resources, .left, .upper, n, n, 1, a.ptr, ld, b.ptr, ld, 0, c.ptr, ld, false));
     for (0..n) |column| {
@@ -197,6 +199,12 @@ test "isolated SYMM borrows operation allocator and finishes during close" {
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
     operation.end();
     ended = true;
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

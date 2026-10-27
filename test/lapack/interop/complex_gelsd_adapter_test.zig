@@ -138,7 +138,7 @@ fn finite(comptime C: type, comptime I: type, comptime raw: bool, comptime scan:
     const work = try std.testing.allocator.alloc(C, count + 1);
     defer std.testing.allocator.free(work);
     @memset(work, value(C, 81, -21));
-    try info(try adapter(raw, scan).callManaged(C, I, level, &r.context, &r.services, f.args(raw, scan, work[0..count], @intCast(count))), 0);
+    try info(try adapter(raw, scan).callManaged(C, I, level, r.context, &r.services, f.args(raw, scan, work[0..count], @intCast(count))), 0);
     try f.verify(&before);
     try std.testing.expectEqualDeep(value(C, 81, -21), work[count]);
     const expected_allocations: usize = if (level == .high) (if (layout == 101) 5 else 3) else @as(usize, if (layout == 101) 2 else 0) + @intFromBool(minimum);
@@ -206,7 +206,7 @@ test "complex GELSD adapter work query writes three metadata slots without numer
         args.column.singular = null;
         args.column.rank = null;
         args.column.rcond = std.math.nan(R);
-        try info(try adapter(raw, true).callManaged(C, I, .work, &r.context, &r.services, args), 0);
+        try info(try adapter(raw, true).callManaged(C, I, .work, r.context, &r.services, args), 0);
         const plan = try owner.complex_gelsd_workspace.Planner(Core).make(C, I, f.m, f.n, 1);
         try std.testing.expectEqual(@as(R, @floatFromInt(plan.work)), work[0].re);
         try std.testing.expectEqual(@as(R, 0), work[0].im);
@@ -244,7 +244,7 @@ test "complex GELSD high NaN A then extended B tail then rcond order follows lay
             if (scenario == 2) f.b[pos(layout, 2, 0, f.ldb)].im = 0;
             if (scenario == 3) args.layout = 777;
             const before = f;
-            try info(try adapter(raw, true).callManaged(C, i32, .high, &r.context, &r.services, args), @as(i32, if (scenario == 3) -1 else if (scenario == 0) -5 else if (scenario == 1) -7 else -10));
+            try info(try adapter(raw, true).callManaged(C, i32, .high, r.context, &r.services, args), @as(i32, if (scenario == 3) -1 else if (scenario == 0) -5 else if (scenario == 1) -7 else -10));
             try bytes(&before.a, &f.a);
             try bytes(&before.b, &f.b);
             try bytes(&before.s, &f.s);
@@ -285,7 +285,7 @@ test "complex GELSD row preflight rejects mixed outputs aliased into original A 
             else => unreachable,
         }
         const before = f;
-        const result = try adapter(raw, true).callManaged(C, i32, .work, &r.context, &r.services, args);
+        const result = try adapter(raw, true).callManaged(C, i32, .work, r.context, &r.services, args);
         switch (result) {
             .admission_fault => |err| try std.testing.expectEqual(error.AliasingNotAllowed, err),
             else => return error.TestUnexpectedResult,
@@ -320,7 +320,7 @@ test "complex GELSD OOM at every high staging and minimum fallback allocation re
             const work = try std.testing.allocator.alloc(C, @intCast(minimum));
             defer std.testing.allocator.free(work);
             @memset(work, value(C, 95, -26));
-            const result = try adapter(false, true).callManaged(C, I, level, &r.context, &r.services, f.args(false, true, work, minimum));
+            const result = try adapter(false, true).callManaged(C, I, level, r.context, &r.services, f.args(false, true, work, minimum));
             const expected: i32 = if (level == .high) (if (failed < 3) -1010 else -1011) else (if (layout == 101 and failed < 2) -1011 else -1010);
             try info(result, expected);
             try bytes(&before.a, &f.a);
@@ -358,7 +358,7 @@ test "complex GELSD already admitted call continues during close and releases fi
         var leased = true;
         defer if (leased) lease.deinit();
         try std.testing.expectEqual(Ctx.RequestResult.pending, r.context.requestClose());
-        try std.testing.expectEqual(Ctx.CloseResult.busy, r.context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.busy, fixtureProgressClose(r.context));
         var f = Fixture(C, i32).init(101, false);
         const before = f;
         const minimum = try owner.complex_gelsd_policy.minimumWork(i32, 3, 2, 1);
@@ -367,7 +367,7 @@ test "complex GELSD already admitted call continues during close and releases fi
         const args = f.args(raw, true, work, minimum);
         const reads = r.reads;
         var unusable: Core.Services = undefined;
-        try std.testing.expectError(error.Closing, adapter(raw, true).callManaged(C, i32, level, &r.context, &unusable, args));
+        try std.testing.expectError(error.Closing, adapter(raw, true).callManaged(C, i32, level, r.context, &unusable, args));
         try std.testing.expectEqual(reads, r.reads);
         try info(try adapter(raw, true).callAdmitted(C, i32, level, &operation, &r.services, args), 0);
         try f.verify(&before);
@@ -378,10 +378,10 @@ test "complex GELSD already admitted call continues during close and releases fi
         try std.testing.expectEqual(@as(usize, 1), r.context.snapshot().resource_pins);
         try std.testing.expectEqual(@as(usize, 1), r.x.live);
         operation.end();
-        try std.testing.expectEqual(Ctx.CloseResult.waiting_resources, r.context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.waiting_resources, fixtureProgressClose(r.context));
         lease.deinit();
         leased = false;
-        try std.testing.expectEqual(Ctx.CloseResult.closed, r.context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(r.context));
         try std.testing.expectEqual(@as(usize, 1), counts(&r, .finishing));
         try std.testing.expectEqual(r.x.attempts, r.x.frees);
         try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().resource_pins);
@@ -419,7 +419,7 @@ test "complex GELSD selected zero RHS behavior distinguishes zero matrix from fi
         defer std.testing.allocator.free(work);
         var args = f.args(raw, true, work, plan.work);
         args.column.nrhs = 0;
-        try info(try adapter(raw, true).callManaged(C, i32, level, &r.context, &r.services, args), @as(i32, if (zero) 0 else -5));
+        try info(try adapter(raw, true).callManaged(C, i32, level, r.context, &r.services, args), @as(i32, if (zero) 0 else -5));
         try bytes(&before.a, &f.a);
         try bytes(&before.b, &f.b);
         for (f.s[2..], before.s[2..]) |x, y| try std.testing.expectEqual(y, x);
@@ -447,4 +447,9 @@ test "complex GELSD selected zero RHS behavior distinguishes zero matrix from fi
         allocations += r.x.attempts;
     };
     std.debug.print("ZERO_RHS configs={d} admissions={d} finishes={d} allocs=frees={d} closes={d}\n", .{ cases, cases, cases, allocations, cases });
+}
+
+fn fixtureProgressClose(ctx: *@import("managed_support.zig").Core.Execution.Context) @import("managed_support.zig").Core.Execution.CloseResult {
+    var report: @import("managed_support.zig").Core.Execution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

@@ -63,7 +63,7 @@ test "STEV managed lifetime ends after all scratch frees" {
     var d = [_]f64{ 2, 2 };
     var e = [_]f64{-1};
     var z: [4]f64 = undefined;
-    try s.expectInfo(i32, 0, try owner.StevAdapter.callManaged(f64, i32, .high, &rig.context, &rig.services, .{ .layout = 101, .jobz = 'V', .n = 2, .d = &d, .e = &e, .z = &z, .ldz = 2, .work = null }));
+    try s.expectInfo(i32, 0, try owner.StevAdapter.callManaged(f64, i32, .high, rig.context, &rig.services, .{ .layout = 101, .jobz = 'V', .n = 2, .d = &d, .e = &e, .z = &z, .ldz = 2, .work = null }));
     var starts: usize = 0;
     var ends: usize = 0;
     var frees: usize = 0;
@@ -81,7 +81,7 @@ test "STEV managed lifetime ends after all scratch frees" {
     try std.testing.expectEqual(@as(usize, 1), starts);
     try std.testing.expectEqual(@as(usize, 1), ends);
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.StevAdapter.callManaged(f64, i32, .high, &rig.context, &rig.services, undefined));
+    try std.testing.expectError(error.Closing, owner.StevAdapter.callManaged(f64, i32, .high, rig.context, &rig.services, undefined));
 }
 test "STEV scalar validation order and diagnostic translation" {
     inline for (.{ i32, i64 }) |I| {
@@ -129,7 +129,7 @@ test "STEV shared raw route uses single existing owner admission" {
     var e = [_]f64{-1};
     var z: [4]f64 = undefined;
     var work: [2]f64 = undefined;
-    try s.expectInfo(i64, 0, try owner.Shared.stevRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 101, .jobz = 'V', .n = 2, .d = d[0..].ptr, .e = e[0..].ptr, .z = z[0..].ptr, .ldz = 2, .work = work[0..].ptr }));
+    try s.expectInfo(i64, 0, try owner.Shared.stevRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 101, .jobz = 'V', .n = 2, .d = d[0..].ptr, .e = e[0..].ptr, .z = z[0..].ptr, .ldz = 2, .work = work[0..].ptr }));
     var starts: usize = 0;
     var ends: usize = 0;
     for (rig.events[0..rig.count]) |ev| {
@@ -139,7 +139,7 @@ test "STEV shared raw route uses single existing owner admission" {
     try std.testing.expectEqual(@as(usize, 1), starts);
     try std.testing.expectEqual(@as(usize, 1), ends);
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.stevRawManaged(false, f64, i64, .work, &rig.context, undefined));
+    try std.testing.expectError(error.Closing, owner.Shared.stevRawManaged(false, f64, i64, .work, rig.context, undefined));
 }
 test "STEV closing from callbacks retains scratch until operation completes" {
     for ([_]@FieldType(h.Rig, "trigger"){ .getter, .alloc, .hook, .free }) |trigger| {
@@ -151,7 +151,7 @@ test "STEV closing from callbacks retains scratch until operation completes" {
         var d = [_]f64{ 2, 2 };
         var e = [_]f64{-1};
         var z: [4]f64 = undefined;
-        try s.expectInfo(i32, if (trigger == .hook) -3 else 0, try owner.StevAdapter.callManaged(f64, i32, .high, &rig.context, &rig.services, .{ .layout = 101, .jobz = 'V', .n = if (trigger == .hook) -1 else 2, .d = &d, .e = &e, .z = &z, .ldz = 2, .work = null }));
+        try s.expectInfo(i32, if (trigger == .hook) -3 else 0, try owner.StevAdapter.callManaged(f64, i32, .high, rig.context, &rig.services, .{ .layout = 101, .jobz = 'V', .n = if (trigger == .hook) -1 else 2, .d = &d, .e = &e, .z = &z, .ldz = 2, .work = null }));
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         var frees: usize = 0;
         var ends: usize = 0;

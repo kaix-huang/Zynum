@@ -25,7 +25,7 @@ fn unchanged(comptime T: type, before: []const T, after: []const T) !void {
 }
 fn finish(owner: *C.Context) void {
     _ = owner.requestClose();
-    equal(C.CloseResult.closed, owner.tryProgressClose()) catch unreachable;
+    equal(C.CloseResult.closed, fixtureProgressClose(owner)) catch unreachable;
 }
 fn prohibitDefaultAdmission() void {
     C.Context.testing.configure(E.getContext(), 0, null);
@@ -41,9 +41,11 @@ pub fn checkClosingCaller() !void {
         const tolerance: f64 = if (T == f32) 3e-5 else 1e-12;
         for ([_]S.Triangle{ .lower, .upper }) |triangle| {
             var spy: E.test_support.Allocations = .{ .budget = 0 };
-            var owner = C.Context.init(spy.allocator(), E.test_support.policy, .internal_closable);
-            defer finish(&owner);
-            C.Context.testing.configure(&owner, 1, null);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(spy.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
+            defer finish(owner);
+            C.Context.testing.configure(owner, 1, null);
             var operation = try owner.begin();
             defer operation.end();
             try equal(C.RequestResult.pending, owner.requestClose());
@@ -95,8 +97,10 @@ pub fn checkArgumentPreservation() !void {
     defer restoreDefaultAdmission();
     inline for (.{ f32, f64 }) |T| {
         var spy: E.test_support.Allocations = .{ .budget = 0 };
-        var owner = C.Context.init(spy.allocator(), E.test_support.policy, .internal_closable);
-        defer finish(&owner);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(spy.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer finish(owner);
         var operation = try owner.begin();
         defer operation.end();
         _ = owner.requestClose();
@@ -129,8 +133,10 @@ pub fn checkControlledStops() !void {
     prohibitDefaultAdmission();
     defer restoreDefaultAdmission();
     inline for (.{ f32, f64 }) |T| {
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer finish(&owner);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer finish(owner);
         var operation = try owner.begin();
         defer operation.end();
         _ = owner.requestClose();
@@ -160,4 +166,10 @@ pub fn checkControlledStops() !void {
 
 test "symmetric admitted candidate controlled stops zero size and scalar keep the caller admission" {
     try checkControlledStops();
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

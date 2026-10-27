@@ -12,18 +12,20 @@ test "Rational filter explicit inexact iteration limit matches independent one s
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const m = matrix(T);
         var backend = Backend(T){ .matrix = &m, .rows = 3 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const input = [_]T{ v(T, 1, 0.2), v(T, -0.3, 0.5), v(T, 2, -1) };
         var output: [5]T = @splat(v(T, 77, -33));
         const nodes = [_]T{v(T, 5, 0.8)};
         const weights = [_]T{v(T, 1, 0)};
         var q = F.Request(T){ .action = backend.action(), .input = .{ .values = &input, .shape = .{ .row_count = 3, .column_count = 1, .leading_dimension = 3, .layout = .column_major } }, .output = .{ .values = &output, .shape = .{ .row_count = 3, .column_count = 1, .leading_dimension = 3, .layout = .column_major } }, .nodes = &nodes, .weights = &weights, .global_dimension = 3, .max_iterations = 1, .relative_tolerance = 0 };
-        try std.testing.expectEqual(F.Status.linear_stop, (try F.Managed(E).runScratch(T, &owner, q)).status);
+        try std.testing.expectEqual(F.Status.linear_stop, (try F.Managed(E).runScratch(T, owner, q)).status);
         for (output) |value| try std.testing.expectEqualDeep(v(T, 77, -33), value);
         q.linear_policy = .finite_iteration_limit;
         backend.calls = 0;
-        const result = try F.Managed(E).runScratch(T, &owner, q);
+        const result = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(@as(usize, 1), result.inexact_systems);
         try std.testing.expectEqual(@as(usize, 1), result.completed_systems);
@@ -36,7 +38,7 @@ test "Rational filter explicit inexact iteration limit matches independent one s
         backend.calls = 0;
         backend.fail_at = last;
         @memset(&output, v(T, 77, -33));
-        try std.testing.expectError(error.InjectedRationalAction, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.InjectedRationalAction, F.Managed(E).runScratch(T, owner, q));
         for (output) |value| try std.testing.expectEqualDeep(v(T, 77, -33), value);
     }
 }
@@ -47,7 +49,7 @@ fn done(owner: *C.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn Backend(comptime T: type) type {
     return struct {
@@ -66,7 +68,7 @@ fn Backend(comptime T: type) type {
             try std.testing.expectEqual(@as(usize, 1), op.borrowedContext().snapshot().active_operations);
             if (self.close_at == self.calls) {
                 _ = op.borrowedContext().requestClose();
-                try std.testing.expectEqual(C.CloseResult.busy, op.borrowedContext().tryProgressClose());
+                try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(op.borrowedContext()));
             }
             for (y, 0..) |*out, row| {
                 out.* = S.zero(T);
@@ -101,8 +103,10 @@ test "Rational filter complex two precisions multi-RHS independent triangular or
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const m = matrix(T);
         var backend = Backend(T){ .matrix = &m, .rows = 3 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const nodes = [_]T{ v(T, 2, 0.75), v(T, 5, -0.5), v(T, 1, 0) };
         const weights = [_]T{ v(T, 0.3, 0.1), v(T, -0.2, 0.25), v(T, 0, 0) };
         for ([_]D.Layout{ .column_major, .row_major }) |il| for ([_]D.Layout{ .column_major, .row_major }) |ol| {
@@ -115,7 +119,7 @@ test "Rational filter complex two precisions multi-RHS independent triangular or
             };
             const before = input;
             backend.calls = 0;
-            const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = ild, .layout = il } }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &output, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = old, .layout = ol } }, .global_dimension = 3, .max_iterations = 32, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
+            const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = ild, .layout = il } }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &output, .shape = .{ .row_count = 3, .column_count = 2, .leading_dimension = old, .layout = ol } }, .global_dimension = 3, .max_iterations = 32, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
             try std.testing.expectEqual(F.Status.success, result.status);
             try std.testing.expectEqual(@as(usize, 4), result.completed_systems);
             try std.testing.expectEqual(backend.calls, result.action_count);
@@ -139,8 +143,10 @@ test "Rational filter input output alias stages every RHS before publication" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const m = matrix(T);
         var backend = Backend(T){ .matrix = &m, .rows = 3 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const nodes = [_]T{v(T, 3, 1)};
         const weights = [_]T{v(T, 0.5, 0.25)};
         for ([_]D.Layout{ .column_major, .row_major }) |layout| {
@@ -150,7 +156,7 @@ test "Rational filter input output alias stages every RHS before publication" {
                 data[position(layout, ld, row, col)] = rhs(T, row, col);
             };
             const shape: D.PanelShape = .{ .row_count = 3, .column_count = 2, .leading_dimension = ld, .layout = layout };
-            const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &data, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &data, .shape = shape }, .global_dimension = 3, .max_iterations = 32, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
+            const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &data, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &data, .shape = shape }, .global_dimension = 3, .max_iterations = 32, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
             try std.testing.expectEqual(F.Status.success, result.status);
             for (0..2) |col| {
                 const expected = inverseOracle(T, nodes[0], col);
@@ -163,15 +169,17 @@ test "Rational filter widened sums cancel individually overflowing weighted solu
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const zero = [_]T{v(T, 0, 0)};
         var backend = Backend(T){ .matrix = &zero, .rows = 1 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const nodes = [_]T{ v(T, 1, 0), v(T, 1, 0), v(T, 1, 0), v(T, 1, 0), v(T, 1, 0) };
         const big = std.math.floatMax(S.Real(T));
         const weights = [_]T{ v(T, big, 0), v(T, big, 0), v(T, -big, 0), v(T, -big, 0), v(T, 1, 0) };
         const b = [_]T{v(T, 2, -1)};
         var out = [_]T{ v(T, 77, -33), v(T, 78, -34) };
         const shape: D.PanelShape = .{ .row_count = 1, .column_count = 1, .leading_dimension = 1, .layout = .column_major };
-        const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &b, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &out, .shape = shape }, .global_dimension = 1, .max_iterations = 4, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
+        const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &b, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &out, .shape = shape }, .global_dimension = 1, .max_iterations = 4, .relative_tolerance = if (S.Real(T) == f32) 1e-6 else 1e-14 });
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(@as(usize, 5), result.completed_systems);
         try expectValue(T, b[0], out[0]);
@@ -182,8 +190,10 @@ test "Rational filter zero coefficients empty sum and empty geometry ignore unus
     const T = S.ComplexF64;
     const m = matrix(T);
     var backend = Backend(T){ .matrix = &m, .rows = 3, .fail_at = 1 };
-    var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer done(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer done(owner) catch unreachable;
     const b = [_]T{ v(T, std.math.nan(f64), 0), v(T, std.math.nan(f64), 0), v(T, std.math.nan(f64), 0) };
     const nodes = [_]T{v(T, 1, 0)};
     const weights = [_]T{v(T, 0, 0)};
@@ -195,7 +205,7 @@ test "Rational filter zero coefficients empty sum and empty geometry ignore unus
             q.nodes = &.{};
             q.weights = &.{};
         }
-        const result = try F.Managed(E).runScratch(T, &owner, q);
+        const result = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(@as(usize, 0), result.completed_systems);
         for (out[0..3]) |value| try std.testing.expectEqualDeep(v(T, 0, 0), value);
@@ -208,7 +218,7 @@ test "Rational filter zero coefficients empty sum and empty geometry ignore unus
     q.output = .{ .values = &out, .shape = q.input.shape };
     q.nodes = &nodes;
     q.weights = &[_]T{v(T, 1, 0)};
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.success, result.status);
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
 }
@@ -228,15 +238,17 @@ test "Rational filter controlled stops after earlier systems preserve the entire
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const m = [_]T{v(T, 0, 0)};
         var backend = Backend(T){ .matrix = &m, .rows = 1 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const input = [_]T{ v(T, 2, -1), v(T, -1, 1) };
         var output: [4]T = @splat(v(T, 77, -33));
         const before = output;
         var nodes = [_]T{ v(T, 1, 0), v(T, 0, 0) };
         const weights = [_]T{ v(T, 1, 0), v(T, 1, 0) };
         var q = scalarRequest(T, &backend, &input, &output, &nodes, &weights);
-        const stopped = try F.Managed(E).runScratch(T, &owner, q);
+        const stopped = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.linear_stop, stopped.status);
         try std.testing.expectEqual(@as(usize, 2), stopped.completed_systems);
         try std.testing.expectEqual(@as(?usize, 1), stopped.stopped_node);
@@ -244,10 +256,10 @@ test "Rational filter controlled stops after earlier systems preserve the entire
         try std.testing.expectEqual(@as(?B.Status, .alpha_breakdown), stopped.linear_status);
         try std.testing.expect(stopped.max_residual_norm > 1);
         try std.testing.expectEqualDeep(before, output);
-        try released(&owner);
+        try released(owner);
         // Retry after replacing the pole; successful publication is simultaneous.
         nodes[1] = v(T, 2, 0);
-        const result = try F.Managed(E).runScratch(T, &owner, q);
+        const result = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(@as(usize, 4), result.completed_systems);
         for (input, output[0..2]) |x, y| try expectValue(T, S.mul(T, v(T, 1.5, 0), x), y);
@@ -256,7 +268,7 @@ test "Rational filter controlled stops after earlier systems preserve the entire
         output = before;
         q.input.values = &partly_zero;
         q.max_iterations = 0;
-        const limited = try F.Managed(E).runScratch(T, &owner, q);
+        const limited = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.linear_stop, limited.status);
         try std.testing.expectEqual(@as(usize, 1), limited.completed_systems);
         try std.testing.expectEqual(@as(?usize, 0), limited.stopped_node);
@@ -269,8 +281,10 @@ test "Rational filter late action nonfinite and final narrowing errors roll back
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const m = [_]T{v(T, 0, 0)};
         var backend = Backend(T){ .matrix = &m, .rows = 1 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const input = [_]T{ v(T, 2, -1), v(T, -1, 1) };
         var output: [4]T = @splat(v(T, 77, -33));
         const before = output;
@@ -278,22 +292,22 @@ test "Rational filter late action nonfinite and final narrowing errors roll back
         var weights = [_]T{ v(T, 1, 0), v(T, 1, 0) };
         const q = scalarRequest(T, &backend, &input, &output, &nodes, &weights);
         backend.fail_at = 5;
-        try std.testing.expectError(error.InjectedRationalAction, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.InjectedRationalAction, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(before, output);
-        try released(&owner);
+        try released(owner);
         backend.fail_at = 0;
         backend.nan_at = 5;
         backend.calls = 0;
-        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(before, output);
-        try released(&owner);
+        try released(owner);
         backend.nan_at = 0;
         weights[0] = v(T, std.math.floatMax(S.Real(T)), 0);
-        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(before, output);
-        try released(&owner);
+        try released(owner);
         weights[0] = v(T, 1, 0);
-        try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runScratch(T, &owner, q)).status);
+        try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runScratch(T, owner, q)).status);
         for (input, output[0..2]) |x, y| try expectValue(T, S.mul(T, v(T, 1.5, 0), x), y);
     }
 }
@@ -319,8 +333,10 @@ test "Rational filter remote final commit rejection preserves all systems and sh
     const m = [_]T{v(T, 0, 0)};
     var backend = Backend(T){ .matrix = &m, .rows = 1 };
     var observer = Observer{ .reject = .rational_commit };
-    var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer done(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer done(owner) catch unreachable;
     const input = [_]T{ v(T, 2, -1), v(T, -1, 1) };
     var output: [4]T = @splat(v(T, 77, -33));
     const before = output;
@@ -328,18 +344,18 @@ test "Rational filter remote final commit rejection preserves all systems and sh
     const weights = [_]T{ v(T, 1, 0), v(T, 1, 0) };
     var q = scalarRequest(T, &backend, &input, &output, &nodes, &weights);
     q.action.synchronization = observer.descriptor();
-    try std.testing.expectError(error.RemoteRationalFailure, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.RemoteRationalFailure, F.Managed(E).runScratch(T, owner, q));
     try std.testing.expectEqualDeep(before, output);
     try std.testing.expectEqual(@as(usize, 4), observer.inner_entries);
     try std.testing.expectEqual(@as(usize, 1), observer.commits);
-    try released(&owner);
+    try released(owner);
     observer.reject = .rational_column;
     observer.index = 1;
-    try std.testing.expectError(error.RemoteRationalFailure, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.RemoteRationalFailure, F.Managed(E).runScratch(T, owner, q));
     try std.testing.expectEqualDeep(before, output);
-    try released(&owner);
+    try released(owner);
     observer.reject = null;
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.success, result.status);
     for (input, output[0..2]) |x, y| try expectValue(T, S.mul(T, v(T, 1.5, 0), x), y);
 }
@@ -347,19 +363,21 @@ test "Rational filter closing owner continues all admitted nodes and RHS" {
     const T = S.ComplexF64;
     const m = [_]T{v(T, 0, 0)};
     var backend = Backend(T){ .matrix = &m, .rows = 1, .close_at = 1 };
-    var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer done(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer done(owner) catch unreachable;
     const input = [_]T{ v(T, 2, -1), v(T, -1, 1) };
     var output: [4]T = @splat(v(T, 77, -33));
     const nodes = [_]T{ v(T, 1, 0), v(T, 2, 0) };
     const weights = [_]T{ v(T, 1, 0), v(T, 1, 0) };
     const q = scalarRequest(T, &backend, &input, &output, &nodes, &weights);
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.success, result.status);
     try std.testing.expectEqual(@as(usize, 4), result.completed_systems);
     try std.testing.expectEqual(backend.calls, result.action_count);
     try std.testing.expectError(error.Closing, owner.begin());
-    try released(&owner);
+    try released(owner);
 }
 test "Rational filter allocation failures release earlier leases before retry" {
     const T = S.ComplexF64;
@@ -373,19 +391,21 @@ test "Rational filter allocation failures release earlier leases before retry" {
     const q = scalarRequest(T, &backend, &input, &output, &nodes, &weights);
     for (0..2) |budget| {
         var allocations = E.test_support.Allocations{ .budget = budget };
-        var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
-        try std.testing.expectError(error.OutOfMemory, F.Managed(E).runScratch(T, &owner, q));
-        try released(&owner);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
+        try std.testing.expectError(error.OutOfMemory, F.Managed(E).runScratch(T, owner, q));
+        try released(owner);
         try std.testing.expectEqualDeep(before, output);
         try std.testing.expectEqual(@as(usize, 0), backend.calls);
         const failed = allocations.stats();
         try std.testing.expectEqual(budget, failed.accepted);
         try std.testing.expectEqual(failed.accepted, failed.freed);
         allocations.budget = 100;
-        try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runScratch(T, &owner, q)).status);
+        try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runScratch(T, owner, q)).status);
         try expectValue(T, input[0], output[0]);
-        try released(&owner);
+        try released(owner);
         const retried = allocations.stats();
         try std.testing.expectEqual(retried.accepted, retried.freed);
         output = before;
@@ -397,8 +417,10 @@ test "Rational filter borrowed workspace capacities byte aliases options and ove
     const W = F.Wide(T);
     const m = [_]T{v(T, 0, 0)};
     var backend = Backend(T){ .matrix = &m, .rows = 1 };
-    var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer done(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer done(owner) catch unreachable;
     var input = [_]T{v(T, 2, -1)};
     var output: [2]T = @splat(v(T, 77, -33));
     var nodes = [_]T{v(T, 1, 0)};
@@ -409,33 +431,33 @@ test "Rational filter borrowed workspace capacities byte aliases options and ove
     var wide: [8]W = undefined;
     @memset(&work, v(T, 66, -22));
     @memset(&wide, 55);
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, work[0 .. length.elements - 1], &wide));
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, &work, wide[0 .. length.wide_elements - 1]));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, work[0 .. length.elements - 1], &wide));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, &work, wide[0 .. length.wide_elements - 1]));
     const alias_wide: [*]W = @ptrCast(&work);
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, &owner, q, &work, alias_wide[0..length.wide_elements]));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, owner, q, &work, alias_wide[0..length.wide_elements]));
     q.nodes = work[0..1];
     work[0] = v(T, 1, 0);
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, &owner, q, &work, &wide));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, owner, q, &work, &wide));
     q.nodes = &nodes;
     q.output.values = &weights;
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runScratch(T, owner, q));
     q.output.values = &output;
     q.relative_tolerance = -1;
-    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runScratch(T, owner, q));
     q.relative_tolerance = 1e-14;
     q.global_dimension = 2;
-    try std.testing.expectError(error.MissingGlobalReduction, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.MissingGlobalReduction, F.Managed(E).runScratch(T, owner, q));
     q.global_dimension = 1;
     nodes[0] = v(T, std.math.nan(f64), 0);
     weights[0] = v(T, 0, 0);
-    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runScratch(T, owner, q));
     nodes[0] = v(T, 1, 0);
     weights[0] = v(T, 1, 0);
     q.weights = &.{};
-    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runScratch(T, owner, q));
     q.weights = &weights;
     q.input.shape.leading_dimension = 0;
-    try std.testing.expectError(error.InvalidLeadingDimension, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.InvalidLeadingDimension, F.Managed(E).runScratch(T, owner, q));
     q.input.shape.leading_dimension = 1;
     var excessive = q;
     excessive.action.rows = std.math.maxInt(usize);
@@ -447,8 +469,8 @@ test "Rational filter borrowed workspace capacities byte aliases options and ove
     excessive.input.shape.column_count = std.math.maxInt(usize) / 16;
     try std.testing.expectError(error.SizeOverflow, F.workspaceLength(T, excessive));
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
-    try released(&owner);
-    try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runBorrowed(T, &owner, q, &work, &wide)).status);
+    try released(owner);
+    try std.testing.expectEqual(F.Status.success, (try F.Managed(E).runBorrowed(T, owner, q, &work, &wide)).status);
     for (work[length.elements..]) |x| try std.testing.expectEqualDeep(v(T, 66, -22), x);
     for (wide[length.wide_elements..]) |x| try std.testing.expectEqual(@as(W, 55), x);
     try expectValue(T, input[0], output[0]);
@@ -495,8 +517,10 @@ test "Rational filter shared reductions and preconditioner errors preserve outpu
         var backend = Backend(T){ .matrix = &m, .rows = 1 };
         var inverse = Backend(T){ .matrix = &identity, .rows = 1, .fail_at = 2 };
         var reductions = ReductionBackend(T){};
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         const input = [_]T{ v(T, 2, -1), v(T, -1, 1) };
         var output: [4]T = @splat(v(T, 77, -33));
         const before = output;
@@ -505,21 +529,21 @@ test "Rational filter shared reductions and preconditioner errors preserve outpu
         var q = scalarRequest(T, &backend, &input, &output, &nodes, &weights);
         q.preconditioner = inverse.action();
         q.reduction = reductions.descriptor();
-        try std.testing.expectError(error.InjectedRationalAction, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.InjectedRationalAction, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(before, output);
-        try released(&owner);
+        try released(owner);
         inverse.fail_at = 0;
         reductions.fail_norm_at = reductions.norms + 1;
-        try std.testing.expectError(error.RationalReductionFailure, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.RationalReductionFailure, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(before, output);
         reductions.fail_norm_at = 0;
         reductions.nan_inner_at = reductions.inners + 1;
-        try std.testing.expectError(error.NonFiniteReduction, F.Managed(E).runScratch(T, &owner, q));
+        try std.testing.expectError(error.NonFiniteReduction, F.Managed(E).runScratch(T, owner, q));
         try std.testing.expectEqualDeep(before, output);
         reductions.nan_inner_at = 0;
         backend.calls = 0;
         inverse.calls = 0;
-        const result = try F.Managed(E).runScratch(T, &owner, q);
+        const result = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(backend.calls, result.action_count);
         try std.testing.expectEqual(inverse.calls, result.preconditioner_count);
@@ -531,13 +555,15 @@ test "Rational filter empty local shard participates in global solves and cannot
     const T = S.ComplexF64;
     var backend = Backend(T){ .matrix = &.{}, .rows = 0 };
     var reductions = ReductionBackend(T){ .empty_global = true };
-    var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer done(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer done(owner) catch unreachable;
     const nodes = [_]T{v(T, 1, 0)};
     const weights = [_]T{v(T, 1, 0)};
     var output = [_]T{v(T, 77, -33)};
     const shape: D.PanelShape = .{ .row_count = 0, .column_count = 2, .leading_dimension = std.math.maxInt(usize), .layout = .column_major };
-    const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &.{}, .shape = shape }, .output = .{ .values = &output, .shape = shape }, .nodes = &nodes, .weights = &weights, .global_dimension = 2, .max_iterations = 1, .relative_tolerance = 0, .reduction = reductions.descriptor() });
+    const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &.{}, .shape = shape }, .output = .{ .values = &output, .shape = shape }, .nodes = &nodes, .weights = &weights, .global_dimension = 2, .max_iterations = 1, .relative_tolerance = 0, .reduction = reductions.descriptor() });
     try std.testing.expectEqual(F.Status.linear_stop, result.status);
     try std.testing.expectEqual(@as(?B.Status, .iteration_limit), result.linear_status);
     try std.testing.expectEqual(@as(usize, 0), result.completed_systems);
@@ -553,8 +579,10 @@ test "Rational filter full circular contour recovers complex Hermitian spectral 
         const R = S.Real(T);
         const m = [_]T{ v(T, 2, 0), v(T, 0, 1), v(T, 0, -1), v(T, 2, 0) };
         var backend = Backend(T){ .matrix = &m, .rows = 2 };
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer done(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer done(owner) catch unreachable;
         var nodes: [32]T = undefined;
         var weights: [32]T = undefined;
         for (&nodes, &weights, 0..) |*node, *weight, j| {
@@ -566,7 +594,7 @@ test "Rational filter full circular contour recovers complex Hermitian spectral 
         const input = [_]T{ v(T, 1, 0.25), v(T, -0.5, 1), v(T, -1, -2), v(T, 0.75, -0.25) };
         var output: [6]T = @splat(v(T, 77, -33));
         const shape: D.PanelShape = .{ .row_count = 2, .column_count = 2, .leading_dimension = 2, .layout = .column_major };
-        const result = try F.Managed(E).runScratch(T, &owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &output, .shape = shape }, .global_dimension = 2, .max_iterations = 12, .relative_tolerance = if (R == f32) 1e-6 else 1e-14 });
+        const result = try F.Managed(E).runScratch(T, owner, .{ .action = backend.action(), .input = .{ .values = &input, .shape = shape }, .nodes = &nodes, .weights = &weights, .output = .{ .values = &output, .shape = shape }, .global_dimension = 2, .max_iterations = 12, .relative_tolerance = if (R == f32) 1e-6 else 1e-14 });
         try std.testing.expectEqual(F.Status.success, result.status);
         try std.testing.expectEqual(@as(usize, 64), result.completed_systems);
         try std.testing.expectEqual(backend.calls, result.action_count);
@@ -579,4 +607,10 @@ test "Rational filter full circular contour recovers complex Hermitian spectral 
         try std.testing.expectEqualDeep(v(T, 77, -33), output[4]);
         try std.testing.expectEqualDeep(v(T, 77, -33), output[5]);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

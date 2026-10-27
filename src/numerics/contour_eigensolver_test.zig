@@ -17,7 +17,7 @@ fn close(owner: *E.context.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn Backend(comptime T: type) type {
     return struct {
@@ -37,7 +37,7 @@ fn Backend(comptime T: type) type {
             try std.testing.expectEqual(@as(usize, 1), op.borrowedContext().snapshot().active_operations);
             if (self.close_at == self.calls) {
                 _ = op.borrowedContext().requestClose();
-                try std.testing.expectEqual(E.context.CloseResult.busy, op.borrowedContext().tryProgressClose());
+                try std.testing.expectEqual(E.context.CloseResult.busy, fixtureProgressClose(op.borrowedContext()));
             }
             if (self.diagonal) {
                 const eigenvalues = [_]S.Real(T){ 1, if (self.repeated) 1 else 2, 4, 8 };
@@ -114,13 +114,15 @@ fn physical(comptime T: type, f: *Fixture(T), columns: usize) !void {
 }
 test "Contour eigensolver two precisions both panels recover complex independent projectors" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| for ([_]D.Layout{ .column_major, .row_major }) |layout| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var backend = Backend(T){};
         var f: Fixture(T) = undefined;
         f.init(layout, 3, false);
         const before = f.input;
-        const result = try F.Managed(E).runScratch(T, &owner, f.request(&backend));
+        const result = try F.Managed(E).runScratch(T, owner, f.request(&backend));
         try std.testing.expectEqual(F.Status.converged, result.status);
         try std.testing.expectEqual(@as(usize, 2), result.found);
         try std.testing.expectEqual(@as(usize, 2), result.converged_pairs);
@@ -131,8 +133,10 @@ test "Contour eigensolver two precisions both panels recover complex independent
 }
 test "Contour eigensolver overlapping initial output publishes only selected columns" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){};
     var f: Fixture(T) = undefined;
     f.init(.row_major, 3, false);
@@ -140,7 +144,7 @@ test "Contour eigensolver overlapping initial output publishes only selected col
     const before = f.output;
     var q = f.request(&backend);
     q.initial.values = &f.output;
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, result.status);
     try std.testing.expectEqual(@as(usize, 2), result.found);
     for (0..24) |i| {
@@ -153,14 +157,16 @@ test "Contour eigensolver overlapping initial output publishes only selected col
 }
 test "Contour eigensolver capacity warning and closed endpoint multiplicity preserve semantics" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 2, true);
     var q = f.request(&backend);
     q.contour.upper = 2.5;
-    const full = try F.Managed(E).runScratch(T, &owner, q);
+    const full = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.capacity_limit, full.status);
     try std.testing.expectEqual(@as(usize, 2), full.found);
     try f.untouched();
@@ -169,7 +175,7 @@ test "Contour eigensolver capacity warning and closed endpoint multiplicity pres
     q = f.request(&backend);
     q.contour.lower = 1;
     q.contour.upper = 2;
-    const boundary = try F.Managed(E).runScratch(T, &owner, q);
+    const boundary = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, boundary.status);
     try std.testing.expectEqual(@as(usize, 2), boundary.found);
     try std.testing.expectEqual(@as(f64, 1), f.values[0]);
@@ -178,27 +184,29 @@ test "Contour eigensolver capacity warning and closed endpoint multiplicity pres
 }
 test "Contour eigensolver zero space absent interval and zero budget never certify missing spectrum" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, true);
     var q = f.request(&backend);
     q.max_iterations = 0;
     f.input = @splat(z(T, std.math.nan(f64), 0));
-    try std.testing.expectEqual(F.Status.iteration_limit, (try F.Managed(E).runScratch(T, &owner, q)).status);
+    try std.testing.expectEqual(F.Status.iteration_limit, (try F.Managed(E).runScratch(T, owner, q)).status);
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
     try f.untouched();
     f.input = @splat(z(T, 0, 0));
     q.max_iterations = 2;
-    try std.testing.expectEqual(F.Status.empty_subspace, (try F.Managed(E).runScratch(T, &owner, q)).status);
+    try std.testing.expectEqual(F.Status.empty_subspace, (try F.Managed(E).runScratch(T, owner, q)).status);
     try f.untouched();
     f.init(.column_major, 4, true);
     q = f.request(&backend);
     q.contour.lower = 9;
     q.contour.upper = 10;
     q.max_iterations = 2;
-    const absent = try F.Managed(E).runScratch(T, &owner, q);
+    const absent = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.iteration_limit, absent.status);
     try std.testing.expectEqual(@as(usize, 0), absent.found);
     try std.testing.expectEqual(@as(usize, 2), absent.iterations);
@@ -206,62 +214,68 @@ test "Contour eigensolver zero space absent interval and zero budget never certi
 }
 test "Contour eigensolver linear and reduced solver stops retain full output and diagnostics" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){};
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, false);
     var q = f.request(&backend);
     q.linear_max_iterations = 0;
-    const linear = try F.Managed(E).runScratch(T, &owner, q);
+    const linear = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.linear_stop, linear.status);
     try std.testing.expect(linear.linear.?.status == .linear_stop);
     try f.untouched();
     q = f.request(&backend);
     q.eigen_options.max_sweeps = 0;
-    const ritz = try F.Managed(E).runScratch(T, &owner, q);
+    const ritz = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.ritz_stop, ritz.status);
     try std.testing.expect(ritz.ritz.?.status != .converged);
     try f.untouched();
 }
 test "Contour eigensolver late action failure nonfinite final action and retry are transactional" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, true);
     const q = f.request(&backend);
-    const baseline = try F.Managed(E).runScratch(T, &owner, q);
+    const baseline = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, baseline.status);
     const last = backend.calls;
     try std.testing.expect(last > baseline.completed_systems);
     f.reset();
     backend.calls = 0;
     backend.fail_at = last;
-    try std.testing.expectError(error.InjectedContourAction, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.InjectedContourAction, F.Managed(E).runScratch(T, owner, q));
     try f.untouched();
     backend.calls = 0;
     backend.fail_at = 0;
     backend.nan_at = last;
-    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, owner, q));
     try f.untouched();
     backend.calls = 0;
     backend.nan_at = 0;
-    try std.testing.expectEqual(F.Status.converged, (try F.Managed(E).runScratch(T, &owner, q)).status);
+    try std.testing.expectEqual(F.Status.converged, (try F.Managed(E).runScratch(T, owner, q)).status);
     // A finite perturbation only on fresh final A*x must prevent convergence.
     f.reset();
     backend.calls = 0;
     backend.distort_at = last - 2;
     var single = q;
     single.max_iterations = 1;
-    try std.testing.expectEqual(F.Status.iteration_limit, (try F.Managed(E).runScratch(T, &owner, single)).status);
+    try std.testing.expectEqual(F.Status.iteration_limit, (try F.Managed(E).runScratch(T, owner, single)).status);
     try f.untouched();
 }
 test "Contour eigensolver borrowed capacity aliases options overflow and scratch tails" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, true);
@@ -279,22 +293,22 @@ test "Contour eigensolver borrowed capacity aliases options overflow and scratch
     const d = try std.testing.allocator.alloc(H.WorkspaceScalar(T), w.complex_elements + 1);
     defer std.testing.allocator.free(d);
     @memset(d, .{ .re = 33, .im = -11 });
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, a[0 .. w.elements - 1], b, c, d));
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, a, b[0 .. w.real_elements - 1], c, d));
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, a, b, c[0 .. w.wide_elements - 1], d));
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, &owner, q, a, b, c, d[0 .. w.complex_elements - 1]));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, a[0 .. w.elements - 1], b, c, d));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, a, b[0 .. w.real_elements - 1], c, d));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, a, b, c[0 .. w.wide_elements - 1], d));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(T, owner, q, a, b, c, d[0 .. w.complex_elements - 1]));
     q.rank_relative_tolerance = 1;
-    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runBorrowed(T, &owner, q, a, b, c, d));
+    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runBorrowed(T, owner, q, a, b, c, d));
     q.rank_relative_tolerance = null;
     q.residuals = q.eigenvalues;
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, &owner, q, a, b, c, d));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(T, owner, q, a, b, c, d));
     q.residuals = &f.errors;
     q.initial.shape.column_count = std.math.maxInt(usize);
     try std.testing.expectError(error.SizeOverflow, F.workspaceLength(T, q));
     q.initial.shape.column_count = 3;
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
     try f.untouched();
-    try std.testing.expectEqual(F.Status.converged, (try F.Managed(E).runBorrowed(T, &owner, q, a, b, c, d)).status);
+    try std.testing.expectEqual(F.Status.converged, (try F.Managed(E).runBorrowed(T, owner, q, a, b, c, d)).status);
     try std.testing.expectEqualDeep(z(T, 66, -22), a[w.elements]);
     try std.testing.expectEqual(@as(f64, 55), b[w.real_elements]);
     try std.testing.expectEqual(@as(f128, 44), c[w.wide_elements]);
@@ -308,9 +322,11 @@ test "Contour eigensolver allocation rollback closing operation and synchronizat
     var q = f.request(&backend);
     for (0..4) |budget| {
         var allocations = E.test_support.Allocations{ .budget = budget };
-        var owner = E.context.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
-        try std.testing.expectError(error.OutOfMemory, F.Managed(E).runScratch(T, &owner, q));
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
+        try std.testing.expectError(error.OutOfMemory, F.Managed(E).runScratch(T, owner, q));
         try f.untouched();
         try std.testing.expectEqual(budget, allocations.stats().accepted);
         try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
@@ -322,17 +338,19 @@ test "Contour eigensolver allocation rollback closing operation and synchronizat
             if (point.stage == .contour_control and point.index == 4) return error.InjectedContourControl;
         }
     };
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     q.action.synchronization = .{ .context = &backend, .agree_fn = Agreement.agree };
-    try std.testing.expectError(error.InjectedContourControl, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.InjectedContourControl, F.Managed(E).runScratch(T, owner, q));
     try f.untouched();
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
     q.action.synchronization = null;
     backend.close_at = 1;
-    try std.testing.expectEqual(F.Status.converged, (try F.Managed(E).runScratch(T, &owner, q)).status);
+    try std.testing.expectEqual(F.Status.converged, (try F.Managed(E).runScratch(T, owner, q)).status);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
 }
 
 test "Contour eigensolver twelve dimensional Fourier oracle resolves interior zero multiplicity" {
@@ -363,8 +381,10 @@ test "Contour eigensolver twelve dimensional Fourier oracle resolves interior ze
         }
     };
     var token: u8 = 0;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var input: [n * m]T = undefined;
     for (0..m) |column| for (0..n) |row| {
         const a: f64 = @floatFromInt((row + 1) * (column + 2));
@@ -373,7 +393,7 @@ test "Contour eigensolver twelve dimensional Fourier oracle resolves interior ze
     var output: [n * m + 2]T = @splat(z(T, 77, -33));
     var values: [m + 2]f64 = @splat(91);
     var errors: [m + 2]f64 = @splat(92);
-    const result = try F.Managed(E).runScratch(T, &owner, .{ .action = .{ .context = &token, .rows = n, .columns = n, .apply_fn = Oracle.apply }, .global_dimension = n, .initial = .{ .values = &input, .shape = .{ .row_count = n, .column_count = m, .leading_dimension = n, .layout = .column_major } }, .vectors = .{ .values = &output, .shape = .{ .row_count = n, .column_count = m, .leading_dimension = n, .layout = .column_major } }, .eigenvalues = &values, .residuals = &errors, .contour = .{ .lower = -0.5, .upper = 2.5, .half_nodes = 12, .rule = .gauss_legendre }, .max_iterations = 12, .relative_tolerance = 3e-9, .linear_max_iterations = 192, .linear_relative_tolerance = 3e-13 });
+    const result = try F.Managed(E).runScratch(T, owner, .{ .action = .{ .context = &token, .rows = n, .columns = n, .apply_fn = Oracle.apply }, .global_dimension = n, .initial = .{ .values = &input, .shape = .{ .row_count = n, .column_count = m, .leading_dimension = n, .layout = .column_major } }, .vectors = .{ .values = &output, .shape = .{ .row_count = n, .column_count = m, .leading_dimension = n, .layout = .column_major } }, .eigenvalues = &values, .residuals = &errors, .contour = .{ .lower = -0.5, .upper = 2.5, .half_nodes = 12, .rule = .gauss_legendre }, .max_iterations = 12, .relative_tolerance = 3e-9, .linear_max_iterations = 192, .linear_relative_tolerance = 3e-13 });
     try std.testing.expectEqual(F.Status.converged, result.status);
     try std.testing.expectEqual(@as(usize, 4), result.found);
     for ([_]f64{ 0, 0, 1, 2 }, values[0..4], errors[0..4]) |expected, value, residual_norm| {
@@ -466,8 +486,10 @@ test "Contour eigensolver empty local shard replays global reductions and all ba
         }
     };
     var record = Record{};
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, true);
@@ -477,7 +499,7 @@ test "Contour eigensolver empty local shard replays global reductions and all ba
     q.trace_tolerance = 1e-12;
     q.reduction = Red.Reduction(T){ .context = &record, .inner_fn = Record.inner, .norm_fn = Record.norm };
     q.projection_reduction = Projection.Reduction(T){ .context = &record, .reduce_fn = Record.project };
-    const reference = try F.Managed(E).runScratch(T, &owner, q);
+    const reference = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, reference.status);
     const values = f.values;
     const errors = f.errors;
@@ -486,7 +508,7 @@ test "Contour eigensolver empty local shard replays global reductions and all ba
     q.action = .{ .context = &record, .rows = 0, .columns = 0, .apply_fn = Record.emptyApply };
     q.initial = .{ .values = &.{}, .shape = .{ .row_count = 0, .column_count = 3, .leading_dimension = 0, .layout = .row_major } };
     q.vectors = .{ .values = &.{}, .shape = q.initial.shape };
-    const empty = try F.Managed(E).runScratch(T, &owner, q);
+    const empty = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqualDeep(reference, empty);
     try std.testing.expectEqualDeep(values, f.values);
     try std.testing.expectEqualDeep(errors, f.errors);
@@ -496,21 +518,23 @@ test "Contour eigensolver empty local shard replays global reductions and all ba
     try std.testing.expectEqual(backend.calls, record.actions);
     // A scalar reduction alone cannot replace the packed global Gram reduction.
     q.projection_reduction = null;
-    try std.testing.expectError(error.MissingGlobalReduction, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.MissingGlobalReduction, F.Managed(E).runScratch(T, owner, q));
     try std.testing.expectEqual(backend.calls, record.actions);
 }
 
 test "Contour eigensolver globally empty geometry and zero iterations use no scratch allocation" {
     const T = S.ComplexF64;
     var allocations = E.test_support.Allocations{ .budget = 0 };
-    var owner = E.context.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){};
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, false);
     var q = f.request(&backend);
     q.max_iterations = 0;
-    try std.testing.expectEqual(F.Status.iteration_limit, (try F.Managed(E).runScratch(T, &owner, q)).status);
+    try std.testing.expectEqual(F.Status.iteration_limit, (try F.Managed(E).runScratch(T, owner, q)).status);
     try f.untouched();
     q.global_dimension = 0;
     q.action.rows = 0;
@@ -518,7 +542,7 @@ test "Contour eigensolver globally empty geometry and zero iterations use no scr
     q.max_iterations = 4;
     q.initial = .{ .values = &.{}, .shape = .{ .row_count = 0, .column_count = 0, .leading_dimension = std.math.maxInt(usize), .layout = .column_major } };
     q.vectors = .{ .values = &.{}, .shape = q.initial.shape };
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, result.status);
     try std.testing.expectEqual(@as(usize, 0), result.found);
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
@@ -528,8 +552,10 @@ test "Contour eigensolver globally empty geometry and zero iterations use no scr
 
 test "Contour eigensolver all Ritz candidates place selected pairs first and preserve unused tails" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 4, true);
@@ -537,7 +563,7 @@ test "Contour eigensolver all Ritz candidates place selected pairs first and pre
     q.output_selection = .all_ritz;
     q.contour.lower = 1.5;
     q.contour.upper = 4.5;
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, result.status);
     try std.testing.expectEqual(@as(usize, 2), result.found);
     try std.testing.expectEqual(@as(usize, 4), result.published);
@@ -556,8 +582,10 @@ test "Contour eigensolver all Ritz candidates place selected pairs first and pre
 
 test "Contour eigensolver explicit finite stop publication retains error rollback and capacity diagnostics" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){ .diagonal = true };
     var f: Fixture(T) = undefined;
     f.init(.column_major, 4, true);
@@ -567,7 +595,7 @@ test "Contour eigensolver explicit finite stop publication retains error rollbac
     q.max_iterations = 1;
     q.contour.lower = 9;
     q.contour.upper = 10;
-    const absent = try F.Managed(E).runScratch(T, &owner, q);
+    const absent = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.iteration_limit, absent.status);
     try std.testing.expectEqual(@as(usize, 0), absent.found);
     try std.testing.expectEqual(@as(usize, 4), absent.published);
@@ -578,7 +606,7 @@ test "Contour eigensolver explicit finite stop publication retains error rollbac
     q.publish_finite_stops = true;
     q.contour.upper = 2.5;
     backend.calls = 0;
-    const full = try F.Managed(E).runScratch(T, &owner, q);
+    const full = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.capacity_limit, full.status);
     try std.testing.expectEqual(@as(usize, 2), full.found);
     try std.testing.expectEqual(@as(usize, 2), full.published);
@@ -586,19 +614,21 @@ test "Contour eigensolver explicit finite stop publication retains error rollbac
     f.reset();
     backend.calls = 0;
     backend.fail_at = last;
-    try std.testing.expectError(error.InjectedContourAction, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.InjectedContourAction, F.Managed(E).runScratch(T, owner, q));
     try f.untouched();
     backend.calls = 0;
     backend.fail_at = 0;
     backend.nan_at = last;
-    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, &owner, q));
+    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, owner, q));
     try f.untouched();
 }
 
 test "Contour eigensolver inexact residual scaled solves converge through finite inner limits" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(T){};
     var f: Fixture(T) = undefined;
     f.init(.column_major, 3, false);
@@ -608,7 +638,7 @@ test "Contour eigensolver inexact residual scaled solves converge through finite
     q.linear_max_iterations = 2;
     q.allow_inexact_iteration_limit = true;
     q.max_iterations = 32;
-    const result = try F.Managed(E).runScratch(T, &owner, q);
+    const result = try F.Managed(E).runScratch(T, owner, q);
     try std.testing.expectEqual(F.Status.converged, result.status);
     try std.testing.expect(result.inexact_systems > 0);
     try std.testing.expect(result.iterations > 1);
@@ -618,8 +648,10 @@ test "Contour eigensolver inexact residual scaled solves converge through finite
 
 test "Contour eigensolver residual inverse two precisions converge with one step inner budgets" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var backend = Backend(T){};
         var f: Fixture(T) = undefined;
         f.init(.column_major, 3, false);
@@ -630,11 +662,17 @@ test "Contour eigensolver residual inverse two precisions converge with one step
         q.linear_max_iterations = 1;
         q.allow_inexact_iteration_limit = true;
         q.max_iterations = 32;
-        const result = try F.Managed(E).runScratch(T, &owner, q);
+        const result = try F.Managed(E).runScratch(T, owner, q);
         try std.testing.expectEqual(F.Status.converged, result.status);
         try std.testing.expect(result.inexact_systems > 0);
         try std.testing.expect(result.iterations > 1);
         try std.testing.expectEqual(backend.calls, result.action_count);
         try physical(T, &f, 2);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

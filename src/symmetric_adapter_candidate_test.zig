@@ -34,7 +34,7 @@ const Log = struct {
 };
 fn finish(owner: *C.Context) void {
     _ = owner.requestClose();
-    equal(C.CloseResult.closed, owner.tryProgressClose()) catch unreachable;
+    equal(C.CloseResult.closed, fixtureProgressClose(owner)) catch unreachable;
 }
 fn prohibitDefault() void {
     C.Context.testing.configure(E.getContext(), 0, null);
@@ -55,12 +55,14 @@ pub fn checkFiniteOracle() !void {
     inline for (.{ f32, f64 }) |T| {
         const tol: f64 = if (T == f32) 5e-5 else 2e-12;
         for ([_]c_int{ 101, 102 }) |layout| for ([_]u8{ 'U', 'L' }) |uplo| for ([_]u8{ 'N', 'V' }) |job| for ([_]bool{ false, true }) |high| {
-            var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-            defer finish(&owner);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
+            defer finish(owner);
             var operation = try owner.begin();
             defer operation.end();
             _ = owner.requestClose();
-            var log: Log = .{ .owner = &owner };
+            var log: Log = .{ .owner = owner };
             const services = log.services();
             const original = [_]T{ 2, 1, 0, 0, 1, 2, 0, 0, 0, 0, 5, 2, 0, 0, 2, 5 };
             var a: [28]T = @splat(std.math.nan(T));
@@ -110,12 +112,14 @@ pub fn checkQueryAndScalar() !void {
     defer restoreDefault();
     inline for (.{ f32, f64 }) |T| {
         var spy: E.test_support.Allocations = .{ .budget = 0 };
-        var owner = C.Context.init(spy.allocator(), E.test_support.policy, .internal_closable);
-        defer finish(&owner);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(spy.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer finish(owner);
         var operation = try owner.begin();
         defer operation.end();
         _ = owner.requestClose();
-        var log: Log = .{ .owner = &owner };
+        var log: Log = .{ .owner = owner };
         const services = log.services();
         var query = [_]T{-7};
         for ([_]c_int{ 101, 102 }) |layout| {
@@ -157,11 +161,13 @@ pub fn checkNanAndDiagnosticOrder() !void {
     prohibitDefault();
     defer restoreDefault();
     var spy: E.test_support.Allocations = .{ .budget = 0 };
-    var owner = C.Context.init(spy.allocator(), E.test_support.policy, .internal_closable);
-    defer finish(&owner);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(spy.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer finish(owner);
     var operation = try owner.begin();
     defer operation.end();
-    var log: Log = .{ .owner = &owner, .close_on_event = true };
+    var log: Log = .{ .owner = owner, .close_on_event = true };
     const services = log.services();
     try equal(@as(i32, -1), try A.highAdmitted(true, f64, &operation, &services, .{ .layout = 7, .jobz = 'V', .uplo = 'U', .n = 2, .lda = 2 }));
     try equal(@as(usize, 0), log.nan_calls);
@@ -196,11 +202,13 @@ pub fn checkAllocationFailures() !void {
         const required: usize = if (layout == 101) 3 else 2;
         for (0..required + 1) |budget| {
             var spy: E.test_support.Allocations = .{ .budget = budget };
-            var owner = C.Context.init(spy.allocator(), E.test_support.policy, .internal_closable);
-            defer finish(&owner);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(spy.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
+            defer finish(owner);
             var operation = try owner.begin();
             defer operation.end();
-            var log: Log = .{ .owner = &owner, .close_on_event = true };
+            var log: Log = .{ .owner = owner, .close_on_event = true };
             const services = log.services();
             var a = [_]f64{ 2, 1, 1, 2 };
             const before = a;
@@ -234,12 +242,14 @@ pub fn checkPositiveInfo() !void {
     prohibitDefault();
     defer restoreDefault();
     inline for (.{ f32, f64 }) |T| for ([_]c_int{ 101, 102 }) |layout| {
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer finish(&owner);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer finish(owner);
         var operation = try owner.begin();
         defer operation.end();
         _ = owner.requestClose();
-        var log: Log = .{ .owner = &owner };
+        var log: Log = .{ .owner = owner };
         const services = log.services();
         var a = [_]T{ 2, 1, 0, 1, 3, 1, 0, 1, 4 };
         var values: [3]T = @splat(-9);
@@ -258,12 +268,14 @@ test "syev adapter candidate positive INFO counts actual native tridiagonal edge
 pub fn checkRawAndClosingOwner() !void {
     prohibitDefault();
     defer restoreDefault();
-    var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    defer finish(&owner);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer finish(owner);
     {
         var operation = try owner.begin();
         defer operation.end();
-        var log: Log = .{ .owner = &owner };
+        var log: Log = .{ .owner = owner };
         const services = log.services();
         var query = [_]f64{-7};
         const probe: Raw.Arguments(f64) = .{ .layout = 101, .jobz = 'V', .uplo = 'U', .n = 4, .a = @ptrFromInt(1), .lda = 4, .w = @ptrFromInt(1), .work = @ptrCast(&query), .lwork = -1 };
@@ -277,11 +289,11 @@ pub fn checkRawAndClosingOwner() !void {
         invalid.jobz = 'V';
         try std.testing.expectError(error.MisalignedPointer, Raw.workWithDiagnosticsAdmitted(f64, &operation, &services, invalid));
     }
-    C.Context.testing.configure(&owner, 1, null);
+    C.Context.testing.configure(owner, 1, null);
     B.shared_services.testing.reset();
     defer B.shared_services.testing.reset();
-    var log: Log = .{ .owner = &owner, .close_on_event = true };
-    const info = try B.Shared.symmetricRawManagedWithDefaults(false, f64, .work, &owner, .{ .layout = 102, .jobz = '?', .uplo = 'U', .n = 4, .lda = 4 }, .{ .fortran_returning_test = .{ .userdata = &log, .function = Log.record } });
+    var log: Log = .{ .owner = owner, .close_on_event = true };
+    const info = try B.Shared.symmetricRawManagedWithDefaults(false, f64, .work, owner, .{ .layout = 102, .jobz = '?', .uplo = 'U', .n = 4, .lda = 4 }, .{ .fortran_returning_test = .{ .userdata = &log, .function = Log.record } });
     try equal(@as(i32, -2), info);
     try equal(@as(usize, 1), log.count);
     try equal(B.common.Routine.syev, log.events[0].routine);
@@ -305,12 +317,14 @@ pub fn checkExtremeScales() !void {
         // tridiagonal reduction, iterations, and eigenvector sign choices.
         const original = [_]T{ 3.75, -1.25, -2.25, 0.75, -1.25, 3.75, 0.75, -2.25, -2.25, 0.75, 3.75, -1.25, 0.75, -2.25, -1.25, 3.75 };
         for (exponents) |exponent| for ([_]c_int{ 101, 102 }) |layout| for ([_]u8{ 'U', 'L' }) |uplo| for ([_]bool{ false, true }) |high| {
-            var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-            defer finish(&owner);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
+            defer finish(owner);
             var operation = try owner.begin();
             defer operation.end();
             _ = owner.requestClose();
-            var log: Log = .{ .owner = &owner };
+            var log: Log = .{ .owner = owner };
             const services = log.services();
             const scale = std.math.ldexp(@as(T, 1), exponent);
             try expect(scale > 0 and std.math.isFinite(scale));
@@ -376,4 +390,10 @@ pub fn checkDiagnosticNames() !void {
 
 test "syev component diagnostics preserve LAPACKE and Fortran names signs and argument positions" {
     try checkDiagnosticNames();
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

@@ -5,6 +5,16 @@ Zynum BLAS (`zynum-blas`). Zynum `0.0.1-beta` is suitable for evaluation and
 integration but is not a stable 1.0 contract. Depend on public modules and APIs,
 not internal source layout or dispatch thresholds.
 
+## Native RuntimeProvider SDK (in development)
+
+The new explicit execution profiles and native C interface are described in
+[Native RuntimeProvider SDK](native_runtime_provider.md). Root `zig build`
+requires an explicit absolute Heteris header-only SDK path. Pass the same path
+as `-Dheteris-include` and `ZYNUM_HETERIS_INCLUDE` when commands or nested
+build probes are involved; conflicting paths fail. The quick-build example
+below passes this input explicitly. Other historical command snippets require
+this SDK environment before use and are not current qualification evidence.
+
 ## Local Setup
 
 Use Zig 0.17.0 or newer in the 0.17 series and Python 3.10 or newer. Repository
@@ -15,11 +25,17 @@ validation rejects inherited environment variables whose names start with
 For a quick local build and dynamic-dispatch correctness check:
 
 ```sh
+SDK=/absolute/path/to/heteris/abi/include
+OUT=/absolute/path/to/external-smoke
 env -i HOME="$HOME" PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+  ZYNUM_HETERIS_INCLUDE="$SDK" ZYNUM_SMOKE_OUT="$OUT" \
+  ZIG_LOCAL_CACHE_DIR="$OUT/child-cache" ZIG_GLOBAL_CACHE_DIR="$OUT/global-cache" \
   sh <<'ZYNUM_SMOKE'
 set -eu
-zig build test --summary failures
-zig build --summary failures
+zig build test --summary failures --cache-dir "$ZYNUM_SMOKE_OUT/cache" \
+  --prefix "$ZYNUM_SMOKE_OUT/install"
+zig build --summary failures --cache-dir "$ZYNUM_SMOKE_OUT/cache" \
+  --prefix "$ZYNUM_SMOKE_OUT/install"
 ZYNUM_SMOKE
 ```
 
@@ -101,6 +117,21 @@ native-evidence joins. Official Zig test runners validate it before executing
 test bodies. A row without native evidence remains pending; cross-compilation,
 emulation, and observations from another target class cannot fill it.
 
+When reviewed source changes require new compiler observations, the controlled
+`--reopen-native-row ROW_ID` operation moves an exact frozen native row back to
+pending; repeat the option explicitly for each reviewed row. Start from exact
+CURRENT inventory, review the exact whole-file and native-projection NEXT
+pins, and synchronize the runner before publication. Do not combine reopening
+with source-only refresh, protocol refresh/log input or CURRENT-only checking.
+Other native observations and historical native sets are retained.
+
+Then run the official `test-inventory` enumerators on the applicable native
+machine and modes to capture real V2 protocol blocks. Pending rows emit their
+protocol and intentionally return nonzero with `NativeEnumerationRequired`;
+this is not a passing mathematical test. Register the reviewed real names, close
+CURRENT/NEXT through the reviewed publication process, and run the complete
+qualification gates afterward.
+
 For a declared foreign target, compile the enumerator graph without claiming
 native execution:
 
@@ -119,8 +150,11 @@ step that omits the POSIX structure checker and executes no inventory runner or
 test body. It does not provide inventory certification, native enumeration, or
 correctness evidence.
 
-Zig 0.17 requires fresh compiler observations for each target. The current
-baseline matrix counts one row per logical Zig test root and optimization mode:
+Zig 0.17 requires fresh compiler observations for each target. The following historical
+baseline matrix records the earlier documentation snapshot, not the current
+managed inventory. Consult `tools/check_test_inventory.py` and its current
+reviewed data for present status; do not infer current counts from this table.
+It counts one row per logical Zig test root and optimization mode:
 
 | Target | Observed | Pending | Inapplicable | CI coverage |
 | --- | ---: | ---: | ---: | --- |
@@ -130,11 +164,11 @@ baseline matrix counts one row per logical Zig test root and optimization mode:
 | x86_64 Windows GNU | 0 | 69 | 0 | Compatibility compile/link; installed DLL smoke checks |
 
 The three inapplicable rows on each AArch64 target belong to the x86-only
-structured-object test root. There are 204 pending rows overall. Restoring
+structured-object test root. The historical snapshot had 204 pending rows. Restoring or updating
 inventory certification requires reviewing native Zig 0.17 protocol logs;
 Zig 0.16 records cannot certify the new compiler. The Linux release artifact
-job retains its baseline native inventory gate, so its artifacts remain blocked
-until those Zig 0.17 observations have been collected and reviewed.
+job retains its baseline native inventory gate; consult the current guard and
+reviewed native observations before making an artifact qualification claim.
 
 The checker without `--structure-only` is the full native-matrix gate. It exits
 nonzero while applicable rows remain pending. Inventory checkers use bounded,

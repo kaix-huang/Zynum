@@ -153,7 +153,9 @@ test "mixed CSR alias preflight uses actual offset and ordinal byte widths" {
 test "mixed SpMM borrows one admission and finishes while context closes" {
     const Core = @import("zynum-core");
     const execution = @import("zynum-execution");
-    var ctx = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var operation = try ctx.begin();
     try std.testing.expectEqual(execution.context.RequestResult.pending, ctx.requestClose());
     const offsets = [_]i64{ 0, 1, 2 };
@@ -170,5 +172,11 @@ test "mixed SpMM borrows one admission and finishes while context closes" {
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectError(error.Closing, ctx.begin());
     operation.end();
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(ctx));
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

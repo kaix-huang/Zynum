@@ -14,7 +14,7 @@ fn finish(owner: *context.Context, allocations: *fixture.Allocations) !void {
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(allocations.stats().accepted, allocations.stats().freed);
     _ = owner.requestClose();
-    try E.expectEqual(context.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn same(comptime T: type, a: []const T, b: []const T) !void {
     try E.expectEqualSlices(u8, std.mem.sliceAsBytes(a), std.mem.sliceAsBytes(b));
@@ -54,7 +54,9 @@ test "SYGV queries preserve scalar and row dimension precedence without allocati
     }
     inline for (.{ f32, f64 }) |T| {
         var allocations: fixture.Allocations = .{ .budget = 0 };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var operation = try owner.begin();
         _ = owner.requestClose();
         var work = [_]T{999};
@@ -85,7 +87,7 @@ test "SYGV queries preserve scalar and row dimension precedence without allocati
         try E.expectEqual(@as(usize, 0), allocations.stats().attempts);
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         operation.end();
-        try finish(&owner, &allocations);
+        try finish(owner, &allocations);
     }
 }
 
@@ -95,10 +97,12 @@ test "SYGV all three equations satisfy analytic eigenvalues residuals metric nor
     const inverse_b = [2][2]f64{ .{ 2.0 / 5.75, -0.5 / 5.75 }, .{ -0.5 / 5.75, 3.0 / 5.75 } };
     inline for (.{ f32, f64 }) |T| for ([_]c_int{ 101, 102 }) |layout| for ("UL") |uplo| for ([_]i32{ 1, 2, 3 }) |itype| for ("VN") |jobz| for ([_]bool{ false, true }) |high| {
         var allocations: fixture.Allocations = .{ .budget = 20 };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var operation = try owner.begin();
         _ = owner.requestClose();
-        var recorder: Recorder = .{ .owner = &owner };
+        var recorder: Recorder = .{ .owner = owner };
         var a: [8]T = @splat(std.math.nan(T));
         var b: [8]T = @splat(std.math.nan(T));
         var values: [4]T = @splat(std.math.nan(T));
@@ -158,14 +162,16 @@ test "SYGV all three equations satisfy analytic eigenvalues residuals metric nor
         try E.expect(std.math.isNan(values[2]) and std.math.isNan(values[3]));
         if (!high) for (work[5..]) |value| try E.expect(std.math.isNan(value));
         operation.end();
-        try finish(&owner, &allocations);
+        try finish(owner, &allocations);
     };
 }
 
 test "SYGV B failure reports n plus the exact minor without touching absent column A or eigenvalues" {
     inline for (.{ f32, f64 }) |T| for ([_]c_int{ 101, 102 }) |layout| for ([_]usize{ 0, 1 }) |bad| {
         var allocations: fixture.Allocations = .{ .budget = 20 };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var operation = try owner.begin();
         var a = [_]T{ 4, 1, 1, 3 };
         const before = a;
@@ -176,14 +182,16 @@ test "SYGV B failure reports n plus the exact minor without touching absent colu
         try E.expectEqual(@as(i32, @intCast(3 + bad)), try A.workAdmitted(T, &operation, args));
         try same(T, &before, &a);
         operation.end();
-        try finish(&owner, &allocations);
+        try finish(owner, &allocations);
     };
 }
 
 test "SYGV row full-matrix conversion occurs before scalar validation and releases both transpose leases" {
     for ([_]usize{ 0, 1, 2 }) |budget| {
         var allocations: fixture.Allocations = .{ .budget = budget };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var operation = try owner.begin();
         var a = [_]f64{ 4, std.math.nan(f64), 1, 3 };
         var b = [_]f64{ 3, std.math.nan(f64), 0.5, 2 };
@@ -202,13 +210,15 @@ test "SYGV row full-matrix conversion occurs before scalar validation and releas
             try E.expectError(error.BufferTooSmall, A.workAdmitted(f64, &operation, args));
         }
         operation.end();
-        try finish(&owner, &allocations);
+        try finish(owner, &allocations);
     }
 }
 
 test "SYGV raw query skips poison matrices while real access checks alignment and aliases" {
     var allocations: fixture.Allocations = .{ .budget = 20 };
-    var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var operation = try owner.begin();
     var work: [5]f64 = undefined;
     var args: Raw.Arguments(f64) = .{ .layout = 102, .jobz = 'V', .uplo = 'L', .n = 2, .a = @ptrFromInt(1), .lda = 2, .b = @ptrFromInt(1), .ldb = 2, .w = @ptrFromInt(1), .work = @ptrCast(&work), .lwork = -1 };
@@ -223,14 +233,16 @@ test "SYGV raw query skips poison matrices while real access checks alignment an
     args.w = @ptrCast(&a);
     try E.expectError(error.AliasingNotAllowed, Raw.workAdmitted(f64, &operation, args));
     operation.end();
-    try finish(&owner, &allocations);
+    try finish(owner, &allocations);
 }
 
 test "SYGV high scan precedes invalid itype and diagnostics use exact SYGV channels and signs" {
     var allocations: fixture.Allocations = .{ .budget = 20 };
-    var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var operation = try owner.begin();
-    var recorder: Recorder = .{ .owner = &owner };
+    var recorder: Recorder = .{ .owner = owner };
     const services = recorder.services();
     var a = [_]f64{ std.math.nan(f64), 0, 0, 1 };
     var b = [_]f64{ std.math.nan(f64), 0, 0, 1 };
@@ -253,16 +265,18 @@ test "SYGV high scan precedes invalid itype and diagnostics use exact SYGV chann
     try E.expectEqual(Owner.common.Entry.work, recorder.events[1].entry);
     try E.expectEqual(@as(i32, -7), recorder.events[1].argument);
     operation.end();
-    try finish(&owner, &allocations);
+    try finish(owner, &allocations);
 }
 
 test "SYGV allocation failures retain one admission release every lease and emit one memory diagnostic" {
     for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |high| for (0..7) |budget| {
         var allocations: fixture.Allocations = .{ .budget = budget };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var operation = try owner.begin();
         _ = owner.requestClose();
-        var recorder: Recorder = .{ .owner = &owner };
+        var recorder: Recorder = .{ .owner = owner };
         const services = recorder.services();
         var a = [_]f64{ 4, 1, 1, 3 };
         var b = [_]f64{ 3, 0.5, 0.5, 2 };
@@ -274,14 +288,16 @@ test "SYGV allocation failures retain one admission release every lease and emit
         try E.expectEqual(@as(usize, if (info == 0) 0 else 1), recorder.count);
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         operation.end();
-        try finish(&owner, &allocations);
+        try finish(owner, &allocations);
     };
 }
 
 test "SYGV IEEE driver reports two actual unconverged tridiagonal edges" {
     inline for (.{ f32, f64 }) |T| for ([_]c_int{ 101, 102 }) |layout| {
         var allocations: fixture.Allocations = .{ .budget = 20 };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var operation = try owner.begin();
         var a = [_]T{ 4, 1, 0, 1, 3, 1, 0, 1, 2 };
         var b = [_]T{ 1, 0, 0, 0, 1, 0, 0, 0, 1 };
@@ -290,7 +306,7 @@ test "SYGV IEEE driver reports two actual unconverged tridiagonal edges" {
         const args: A.Arguments(T) = .{ .layout = layout, .jobz = 'V', .uplo = 'L', .n = 3, .a = &a, .lda = 3, .b = &b, .ldb = 3, .w = &w, .work = &work, .lwork = 8, .native_options = .{ .max_sweeps = 0 } };
         try E.expectEqual(@as(i32, 2), try A.workAdmitted(T, &operation, args));
         operation.end();
-        try finish(&owner, &allocations);
+        try finish(owner, &allocations);
     };
 }
 
@@ -311,7 +327,7 @@ const Probe = struct {
         self.alloc_snapshot = self.owner.snapshot();
         if (self.close_on_alloc) {
             _ = self.owner.requestClose();
-            if (self.owner.tryProgressClose() != .busy) @panic("SYGV allocation is not admitted");
+            if (fixtureProgressClose(self.owner) != .busy) @panic("SYGV allocation is not admitted");
         }
         return self.backing.allocator().rawAlloc(n, a, ret);
     }
@@ -324,20 +340,24 @@ const Probe = struct {
     fn free(raw: *anyopaque, data: []u8, a: std.mem.Alignment, ret: usize) void {
         const self = cast(raw);
         self.free_snapshot = self.owner.snapshot();
-        if (self.owner.tryProgressClose() == .closed) @panic("SYGV close passed managed free");
+        if (fixtureProgressClose(self.owner) == .closed) @panic("SYGV close passed managed free");
         self.backing.allocator().rawFree(data, a, ret);
     }
 };
 test "SYGV configured Shared entry holds exactly one operation through closing allocations and frees" {
     var probe: Probe = .{ .close_on_alloc = true };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
-    var other = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
+    var reference_other: FixtureReferenceContext = undefined;
+    reference_other.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const other = reference_other.borrowedContext();
     var a = [_]f64{ 4, 1, 1, 3 };
     var b = [_]f64{ 3, 0.5, 0.5, 2 };
     var w: [2]f64 = undefined;
     const args: Raw.Arguments(f64) = .{ .layout = 101, .jobz = 'V', .uplo = 'L', .n = 2, .a = @ptrCast(&a), .lda = 2, .b = @ptrCast(&b), .ldb = 2, .w = @ptrCast(&w) };
-    try E.expectEqual(@as(i32, 0), try Owner.Shared.generalizedSymmetricRawManagedWithDefaults(true, f64, .high, &owner, args, .{}));
+    try E.expectEqual(@as(i32, 0), try Owner.Shared.generalizedSymmetricRawManagedWithDefaults(true, f64, .high, owner, args, .{}));
     try near((16 - @sqrt(@as(f64, 3))) / 11.5, w[0], 1e-12);
     try E.expectEqual(@as(usize, 1), probe.alloc_snapshot.?.active_operations);
     try E.expectEqual(@as(usize, 1), probe.free_snapshot.?.active_operations);
@@ -345,7 +365,13 @@ test "SYGV configured Shared entry holds exactly one operation through closing a
     try E.expectEqual(@as(usize, 0), other.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), other.snapshot().resource_pins);
     try E.expectError(error.Closing, owner.begin());
-    try finish(&owner, &probe.backing);
+    try finish(owner, &probe.backing);
     _ = other.requestClose();
-    try E.expectEqual(context.CloseResult.closed, other.tryProgressClose());
+    try E.expectEqual(context.CloseResult.closed, fixtureProgressClose(other));
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

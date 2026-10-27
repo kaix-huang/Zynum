@@ -10,11 +10,13 @@ const C = Core.internal.numerics.Scalar.ComplexF64;
 fn finish(owner: *context.Context) !void {
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try E.expectEqual(context.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.closed, fixtureProgressClose(owner));
 }
 test "Hermitian query validates scalar precedence and reads no matrices after close" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var work: [1]C = .{.{ .re = 999, .im = 33 }};
     var args: A.Arguments(C) = .{ .layout = 102, .jobz = 'V', .uplo = 'L', .n = 7, .lda = 7, .ldb = 7, .work = &work, .lwork = -1 };
@@ -42,11 +44,13 @@ test "Hermitian query validates scalar precedence and reads no matrices after cl
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian scalar quick return preserves IEEE and ignores diagonal imaginary and RWORK" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var input: [1]C = .{.{ .re = std.math.inf(f64), .im = std.math.nan(f64) }};
     var values: [1]f64 = undefined;
@@ -58,7 +62,7 @@ test "Hermitian scalar quick return preserves IEEE and ignores diagonal imaginar
     try E.expectEqual(@as(f64, 0), input[0].im);
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 fn at(layout: c_int, i: usize, j: usize) usize {
     return if (layout == 102) i + j * 3 else i * 3 + j;
@@ -67,7 +71,9 @@ fn finiteCases(comptime T: type) !void {
     const R = Core.internal.numerics.Scalar.Real(T);
     const tol: R = if (R == f32) 2e-5 else 2e-14;
     for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |upper| for ([_]u8{ 'N', 'V' }) |job| for (0..4) |problem| {
-        var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var input: [6]T = @splat(.{ .re = 321, .im = 432 });
         var b: [6]T = input;
@@ -114,7 +120,7 @@ fn finiteCases(comptime T: type) !void {
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
         op.end();
-        try finish(&owner);
+        try finish(owner);
     };
 }
 test "Hermitian work finite residuals both precisions layouts triangles jobs and generalized types" {
@@ -122,7 +128,9 @@ test "Hermitian work finite residuals both precisions layouts triangles jobs and
     try finiteCases(C);
 }
 test "Hermitian work SPD failure retains partial B factor and preserves A and eigenvalues" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var input: [4]C = @splat(.{ .re = 2, .im = 0 });
     const before = input;
@@ -138,11 +146,13 @@ test "Hermitian work SPD failure retains partial B factor and preserves A and ei
     try E.expectEqualSlices(C, &before, &input);
     try E.expectEqual(@as(f64, 888), values[0]);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian staging OOM releases pins and does not overwrite matrices" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var input: [4]C = @splat(.{ .re = 0, .im = 0 });
     var values: [2]f64 = @splat(99);
@@ -154,7 +164,7 @@ test "Hermitian staging OOM releases pins and does not overwrite matrices" {
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 
 const Probe = struct {
@@ -174,7 +184,7 @@ const Probe = struct {
         self.alloc_snapshot = self.owner.snapshot();
         if (self.close_on_alloc) {
             _ = self.owner.requestClose();
-            if (self.owner.tryProgressClose() != .busy) @panic("Hermitian allocation is not admitted");
+            if (fixtureProgressClose(self.owner) != .busy) @panic("Hermitian allocation is not admitted");
         }
         return self.backing.allocator().rawAlloc(n, a, ret);
     }
@@ -187,7 +197,7 @@ const Probe = struct {
     fn free(raw: *anyopaque, data: []u8, a: std.mem.Alignment, ret: usize) void {
         const self = cast(raw);
         self.free_snapshot = self.owner.snapshot();
-        if (self.owner.tryProgressClose() == .closed) @panic("Hermitian close passed managed free");
+        if (fixtureProgressClose(self.owner) == .closed) @panic("Hermitian close passed managed free");
         self.backing.allocator().rawFree(data, a, ret);
     }
 };
@@ -195,9 +205,13 @@ const Probe = struct {
 test "Hermitian generalized allocation stages retain B overwrite and exact shared operation through close" {
     for (0..4) |budget| {
         var probe: Probe = .{ .backing = .{ .budget = budget }, .close_on_alloc = true };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-        probe.owner = &owner;
-        var other = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        probe.owner = owner;
+        var reference_other: FixtureReferenceContext = undefined;
+        reference_other.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const other = reference_other.borrowedContext();
         var op = try owner.begin();
         var input = [_]C{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = -1 }, .{ .re = 0, .im = 1 }, .{ .re = 2, .im = 0 } };
         const original = input;
@@ -225,13 +239,15 @@ test "Hermitian generalized allocation stages retain B overwrite and exact share
         try E.expectEqual(@as(usize, @min(budget, 3)), probe.backing.stats().freed);
         try E.expectError(error.Closing, owner.begin());
         op.end();
-        try finish(&owner);
-        try finish(&other);
+        try finish(owner);
+        try finish(other);
     }
 }
 test "Hermitian typed capacity and alias faults precede allocation" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var input: [4]C = @splat(.{ .re = 0, .im = 0 });
     var values: [2]f64 = @splat(99);
@@ -254,13 +270,15 @@ test "Hermitian typed capacity and alias faults precede allocation" {
     try E.expectError(error.BufferTooSmall, A.workAdmitted(.heev, C, &op, args));
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 fn nonScalarMetric(comptime T: type) !void {
     const R = Core.internal.numerics.Scalar.Real(T);
     const tol: R = if (R == f32) 3e-5 else 4e-13;
     for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |upper| for (1..4) |problem| {
-        var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var input: [6]T = @splat(.{ .re = 99, .im = 33 });
         var b: [6]T = input;
@@ -298,7 +316,7 @@ fn nonScalarMetric(comptime T: type) !void {
         try E.expectEqual(@as(R, 2), b[0].re);
         try E.expectEqual(@as(R, 3), b[4].re);
         op.end();
-        try finish(&owner);
+        try finish(owner);
     };
 }
 test "Hermitian generalized non scalar B verifies original equations and metric normalization" {
@@ -308,7 +326,9 @@ test "Hermitian generalized non scalar B verifies original equations and metric 
 test "Hermitian query single precision rounds up and LP64 workspace overflow is explicit" {
     const F = Core.internal.numerics.Scalar.ComplexF32;
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var work: [1]F = undefined;
     var args: A.Arguments(F) = .{ .layout = 102, .jobz = 'N', .uplo = 'U', .n = 8388609, .lda = 8388609, .work = &work, .lwork = -1 };
@@ -319,7 +339,7 @@ test "Hermitian query single precision rounds up and LP64 workspace overflow is 
     try E.expectError(error.IntegerNotRepresentable, A.workAdmitted(.heev, F, &op, args));
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 
 const Owner = @import("numerical-owner");
@@ -349,7 +369,9 @@ const ServiceProbe = struct {
 };
 test "Hermitian raw queries do not access invalid matrix addresses and report alignment faults" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var query: [1]C = undefined;
     var args: Raw.Arguments(C) = .{ .layout = 102, .jobz = 'V', .uplo = 'L', .n = 2, .lda = 2, .ldb = 2, .a = @ptrFromInt(1), .b = @ptrFromInt(1), .w = @ptrFromInt(1), .rwork = @ptrFromInt(1), .work = @ptrCast(&query), .lwork = -1 };
@@ -360,13 +382,15 @@ test "Hermitian raw queries do not access invalid matrix addresses and report al
     try E.expectError(error.MissingBuffer, Raw.workAdmitted(.heev, C, &op, args));
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian high NaN order includes diagonal imaginary and ignores opposite triangle" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
-    var probe: ServiceProbe = .{ .owner = &owner };
+    var probe: ServiceProbe = .{ .owner = owner };
     var services = probe.services();
     var input = [_]C{ .{ .re = 2, .im = std.math.nan(f64) }, .{ .re = 0, .im = 0 }, .{ .re = std.math.nan(f64), .im = 0 }, .{ .re = 2, .im = 0 } };
     var b = [_]C{ .{ .re = 1, .im = std.math.nan(f64) }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 1, .im = 0 } };
@@ -392,12 +416,14 @@ test "Hermitian high NaN order includes diagonal imaginary and ignores opposite 
     try E.expectEqual(@as(i32, -1010), try A.highAdmitted(false, .heev, C, &op, &services, args));
     try E.expectEqual(@as(usize, 4), probe.nan_calls);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian work diagnostics preserve Fortran argument and row-major LAPACKE channel" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
-    var probe: ServiceProbe = .{ .owner = &owner };
+    var probe: ServiceProbe = .{ .owner = owner };
     var services = probe.services();
     var work: [1]C = undefined;
     var args: A.Arguments(C) = .{ .layout = 102, .itype = 0, .jobz = '?', .uplo = 'L', .n = 2, .lda = 2, .ldb = 2, .work = &work, .lwork = -1 };
@@ -412,12 +438,14 @@ test "Hermitian work diagnostics preserve Fortran argument and row-major LAPACKE
     try E.expectEqual(Owner.protocol.Entry.work, probe.events[1].entry);
     try E.expectEqual(@as(i32, -7), probe.events[1].argument);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian raw high finite solve owns one operation and preserves caller padding" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
-    var probe: ServiceProbe = .{ .owner = &owner };
+    var probe: ServiceProbe = .{ .owner = owner };
     var services = probe.services();
     var input = [_]C{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = 1 }, .{ .re = 77, .im = 88 }, .{ .re = 0, .im = -1 }, .{ .re = 2, .im = 0 }, .{ .re = 77, .im = 88 } };
     var b = [_]C{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 77, .im = 88 }, .{ .re = 0, .im = 0 }, .{ .re = 2, .im = 0 }, .{ .re = 77, .im = 88 } };
@@ -432,14 +460,16 @@ test "Hermitian raw high finite solve owns one operation and preserves caller pa
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), probe.count);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian high OOM cleans all nested scratch before diagnostic callback" {
     for (0..6) |budget| {
         var alloc: fixture.Allocations = .{ .budget = budget };
-        var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
-        var probe: ServiceProbe = .{ .owner = &owner };
+        var probe: ServiceProbe = .{ .owner = owner };
         var services = probe.services();
         var input = [_]C{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = -1 }, .{ .re = 0, .im = 1 }, .{ .re = 2, .im = 0 } };
         const original = input;
@@ -459,7 +489,7 @@ test "Hermitian high OOM cleans all nested scratch before diagnostic callback" {
         try E.expectEqual(@as(usize, @min(budget, 5)), alloc.stats().freed);
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
         op.end();
-        try finish(&owner);
+        try finish(owner);
     }
 }
 
@@ -467,7 +497,9 @@ fn allEntryFiniteCases(comptime T: type, comptime variant: u8) !void {
     const R = Core.internal.numerics.Scalar.Real(T);
     const tol: R = if (R == f32) 2e-5 else 2e-14;
     for ([_]c_int{ 101, 102 }) |layout| for ([_]bool{ false, true }) |upper| for ([_]u8{ 'N', 'V' }) |job| for (0..4) |problem| {
-        var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var op = try owner.begin();
         var input: [6]T = @splat(.{ .re = 321, .im = 432 });
         var b: [6]T = input;
@@ -485,7 +517,7 @@ fn allEntryFiniteCases(comptime T: type, comptime variant: u8) !void {
         var rw: [4]R = undefined;
         var values: [2]R = undefined;
         const args: A.Arguments(T) = .{ .layout = layout, .itype = @intCast(@max(1, problem)), .jobz = job, .uplo = if (upper) 'U' else 'L', .n = 2, .a = &input, .lda = 3, .b = &b, .ldb = 3, .w = &values, .work = &work, .lwork = 3, .rwork = &rw };
-        var service_probe: ServiceProbe = .{ .owner = &owner, .enabled = false };
+        var service_probe: ServiceProbe = .{ .owner = owner, .enabled = false };
         var services = service_probe.services();
         const raw_args: Raw.Arguments(T) = .{ .layout = layout, .itype = args.itype, .jobz = job, .uplo = args.uplo, .n = 2, .a = @ptrCast(&input), .lda = 3, .b = @ptrCast(&b), .ldb = 3, .w = @ptrCast(&values), .work = @ptrCast(&work), .lwork = 3, .rwork = @ptrCast(&rw) };
         const info = if (variant == 1)
@@ -524,7 +556,7 @@ fn allEntryFiniteCases(comptime T: type, comptime variant: u8) !void {
         try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
         op.end();
-        try finish(&owner);
+        try finish(owner);
     };
 }
 
@@ -547,10 +579,12 @@ test "Hermitian new diagnostic routine names and integer signs are exact" {
 }
 test "Hermitian high solve survives closing allocations and frees with exact shared owner" {
     var probe: Probe = .{ .backing = .{ .budget = 5 }, .close_on_alloc = true };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     var op = try owner.begin();
-    var services_probe: ServiceProbe = .{ .owner = &owner };
+    var services_probe: ServiceProbe = .{ .owner = owner };
     var services = services_probe.services();
     var input = [_]C{ .{ .re = 2, .im = 0 }, .{ .re = 0, .im = -1 }, .{ .re = 0, .im = 1 }, .{ .re = 2, .im = 0 } };
     var b = [_]C{ .{ .re = 4, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 4, .im = 0 } };
@@ -564,13 +598,15 @@ test "Hermitian high solve survives closing allocations and frees with exact sha
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectError(error.Closing, owner.begin());
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 fn overflowContract(comptime T: type) !void {
     const R = Core.internal.numerics.Scalar.Real(T);
     const Herm = Core.internal.numerics.Hermitian;
     const K = Herm.core;
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     for ([_]bool{ false, true }) |generalized| {
         var input: [4]T = @splat(.{ .re = std.math.floatMax(R), .im = 0 });
@@ -594,7 +630,7 @@ fn overflowContract(comptime T: type) !void {
         try E.expectEqual(@as(R, 99), checked_values[0]);
     }
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian LAPACK finite output overflow succeeds while checked contract remains transactional" {
     try overflowContract(Core.internal.numerics.Scalar.ComplexF32);
@@ -624,7 +660,9 @@ test "Hermitian nonconvergence counts actual tridiagonal edges and commits parti
     try E.expectEqual(@as(f64, 99), values[0]);
 }
 test "Hermitian work permits nonfinite selected values and bounds real tridiagonal iterations" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var input = [_]C{ .{ .re = 1, .im = 0 }, .{ .re = std.math.nan(f64), .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 2, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 3, .im = 0 } };
     var values: [3]f64 = undefined;
@@ -636,7 +674,7 @@ test "Hermitian work permits nonfinite selected values and bounds real tridiagon
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian generalized unfinished iteration backtransforms only documented converged prefix" {
     const K = Core.internal.numerics.Hermitian.core;
@@ -658,7 +696,9 @@ test "Hermitian generalized unfinished iteration backtransforms only documented 
 }
 fn scalarGeneralized(comptime T: type) !void {
     const R = Core.internal.numerics.Scalar.Real(T);
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     for ([_]c_int{ 101, 102 }) |layout| for ([_]u8{ 'L', 'U' }) |uplo| for ([_]u8{ 'N', 'V' }) |job| for (1..4) |kind| {
         var a = [_]T{.{ .re = 8, .im = std.math.nan(R) }};
@@ -673,14 +713,16 @@ fn scalarGeneralized(comptime T: type) !void {
         try E.expectEqual(@as(R, 1), work[0].re);
     };
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian generalized scalar has no RWORK reads in both precisions layouts and problem kinds" {
     try scalarGeneralized(Core.internal.numerics.Scalar.ComplexF32);
     try scalarGeneralized(C);
 }
 test "Hermitian column-major nonpositive B precedes all A W RWORK storage access" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     for ([_]u8{ 'L', 'U' }) |uplo| for ([_]usize{ 1, 2 }) |pivot| {
         var b = [_]C{ .{ .re = 4, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 4, .im = 0 } };
@@ -695,11 +737,13 @@ test "Hermitian column-major nonpositive B precedes all A W RWORK storage access
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     };
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian row-major conversion still requires A before nonpositive B factorization" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var b = [_]C{ .{ .re = -1, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 0, .im = 0 }, .{ .re = 4, .im = 0 } };
     var work: [3]C = undefined;
@@ -707,24 +751,32 @@ test "Hermitian row-major conversion still requires A before nonpositive B facto
     try E.expectError(error.MissingBuffer, A.workAdmitted(.hegv, C, &op, args));
     try E.expectEqual(@as(usize, 0), alloc.stats().attempts);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "Hermitian production binding borrows configured callbacks and ends its one operation after cleanup" {
     var alloc: fixture.Allocations = .{ .budget = 0 };
-    var owner = context.Context.init(alloc.allocator(), fixture.policy, .internal_closable);
-    var probe: ServiceProbe = .{ .owner = &owner };
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(alloc.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    var probe: ServiceProbe = .{ .owner = owner };
     const defaults: Owner.shared_services.Callbacks = .{ .lapacke = .{ .userdata = &probe, .function = ServiceProbe.event }, .fortran_returning_test = .{ .userdata = &probe, .function = ServiceProbe.event } };
     const bad: Raw.Arguments(C) = .{ .layout = 0, .jobz = 'V', .uplo = 'L', .n = 0, .lda = 1 };
-    try E.expectEqual(@as(i32, -1), try Owner.Shared.hermitianRawManagedWithDefaults(false, C, .hegv, .high, &owner, bad, defaults));
+    try E.expectEqual(@as(i32, -1), try Owner.Shared.hermitianRawManagedWithDefaults(false, C, .hegv, .high, owner, bad, defaults));
     try E.expectEqual(@as(usize, 1), probe.count);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     const empty: Raw.Arguments(C) = .{ .layout = 102, .jobz = 'V', .uplo = 'L', .n = 0, .lda = 1 };
-    try E.expectEqual(@as(i32, -1010), try Owner.Shared.hermitianRawManagedWithDefaults(false, C, .hegv, .high, &owner, empty, defaults));
+    try E.expectEqual(@as(i32, -1010), try Owner.Shared.hermitianRawManagedWithDefaults(false, C, .hegv, .high, owner, empty, defaults));
     try E.expectEqual(@as(usize, 2), probe.count);
     try E.expectEqual(@as(usize, 0), probe.pin_snapshot);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     _ = owner.requestClose();
-    try E.expectError(error.Closing, Owner.Shared.hermitianRawManagedWithDefaults(false, C, .hegv, .high, &owner, bad, defaults));
+    try E.expectError(error.Closing, Owner.Shared.hermitianRawManagedWithDefaults(false, C, .hegv, .high, owner, bad, defaults));
     try E.expectEqual(@as(usize, 2), probe.count);
-    try finish(&owner);
+    try finish(owner);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

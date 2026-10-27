@@ -60,7 +60,7 @@ const Spy = struct {
             if (record.ptr == bytes.ptr) {
                 if (record.len != bytes.len or record.alignment != alignment) @panic("free provenance mismatch");
                 if (self.pause_id == record.id) {
-                    if (self.ctx.tryProgressClose() != .waiting_resources) @panic("closed while inside control free");
+                    if (fixtureProgressClose(self.ctx) != .waiting_resources) @panic("closed while inside control free");
                     self.entered.store(true, .release);
                     fixture.wait(&self.release_free);
                     self.checkPin();
@@ -82,7 +82,7 @@ const Spy = struct {
 };
 fn close(ctx: *Context) !void {
     _ = ctx.requestClose();
-    try equal(execution.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "managed object shares injected operation pin and scalar identities with explicit unmanaged separation" {
@@ -108,8 +108,8 @@ test "managed object shares injected operation pin and scalar identities with ex
     }
     // Address identity is within this artifact; never close or reset the default.
     try expect(execution_default.getContext() == actual_execution.getContext());
-    try expect(execution_default.get() == &actual_execution.getContext().executor);
-    try equal(actual_execution.context.Lifetime.immortal_default, execution_default.getContext().lifetime);
+    try expect(execution_default.get() == fixtureExecutor(actual_execution.getContext()));
+    try equal(actual_execution.reference.LegacyLifetime.immortal_default, execution_default.getContext().binding.legacy.lifetime);
     fixture.setThreads(1);
     try expect(execution.Operation == actual_execution.context.Operation);
     try expect(execution.ResourcePin == actual_execution.context.ResourcePin);
@@ -119,8 +119,10 @@ test "managed object shares injected operation pin and scalar identities with ex
     var spy: Spy = .{};
     var replacement: Spy = .{};
     var binding = spy.allocator();
-    var ctx = Context.init(binding, fixture.policy, .internal_closable);
-    spy.ctx = &ctx;
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(binding, fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    spy.ctx = ctx;
     var op = try ctx.begin();
     const borrowed = try Managed.borrow(&op, shape, &numbers);
     binding = replacement.allocator();
@@ -143,18 +145,18 @@ test "managed object shares injected operation pin and scalar identities with ex
     try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(&numbers), std.mem.sliceAsBytes(copied_view.values));
     op.end();
     _ = ctx.requestClose();
-    try equal(execution.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try equal(execution.CloseResult.waiting_resources, fixtureProgressClose(ctx));
     // References may be extended while drained, without new operation/pin.
     const late_alias = try borrowed.retain();
     borrowed.release();
     late_alias.release();
     spy.expected_pins = 1;
-    try equal(execution.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try equal(execution.CloseResult.waiting_resources, fixtureProgressClose(ctx));
     copied.release();
     try spy.released();
     try equal(@as(usize, 0), replacement.attempts);
     try equal(@as(usize, 0), replacement.freed);
-    try close(&ctx);
+    try close(ctx);
 }
 
 test "managed snapshot scalar bits bases mixed widths split gaps overlap and empty beyond values are preserved" {
@@ -177,7 +179,9 @@ test "managed snapshot scalar bits bases mixed widths split gaps overlap and emp
                     for (real, 1..) |v, k| values[k] = if (T == f32 or T == f64) v else .{ .re = v, .im = -v };
                     for ([_]pattern.MajorAxis{ .row, .column }) |axis| {
                         const s: pattern.Pattern(O, I) = .{ .ranges = .{ .split = .{ .starts = &starts, .ends = &ends } }, .ordinals = &indices, .row_count = if (axis == .row) 3 else 2, .column_count = if (axis == .row) 2 else 3, .index_base = base, .major_axis = axis };
-                        var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                        var reference_ctx: FixtureReferenceContext = undefined;
+                        reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+                        const ctx = reference_ctx.borrowedContext();
                         var op = try ctx.begin();
                         const C = object.ManagedMatrixControl(execution, T, O, I);
                         const c = try C.snapshot(&op, s, &values);
@@ -192,7 +196,7 @@ test "managed snapshot scalar bits bases mixed widths split gaps overlap and emp
                         for ([_]usize{ 0, 4, 5, 6, 7, 8 }) |k| try equal(@as(I, 0), view.structure.ordinals[k]);
                         c.release();
                         op.end();
-                        try close(&ctx);
+                        try close(ctx);
                     }
                 }
             }
@@ -210,8 +214,10 @@ test "managed allocation failure at every borrowed contiguous split and deep-cop
         const total: usize = if (kind == 0) 1 else if (kind == 1) 4 else 5;
         for (0..total) |fail_at| {
             var spy: Spy = .{ .fail_at = fail_at };
-            var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-            spy.ctx = &ctx;
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+            const ctx = reference_ctx.borrowedContext();
+            spy.ctx = ctx;
             var op = try ctx.begin();
             const result = if (kind == 0) Managed.borrow(&op, shape, &numbers) else Managed.snapshot(&op, if (kind == 1) shape else split, &numbers);
             try std.testing.expectError(error.OutOfMemory, result);
@@ -220,13 +226,15 @@ test "managed allocation failure at every borrowed contiguous split and deep-cop
             try spy.released();
             for (0..fail_at) |i| try equal(fail_at - i - 1, spy.free_order[i]);
             op.end();
-            try close(&ctx);
+            try close(ctx);
         }
     }
     for (0..5) |stage| {
         var spy: Spy = .{};
-        var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-        spy.ctx = &ctx;
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+        const ctx = reference_ctx.borrowedContext();
+        spy.ctx = ctx;
         var op = try ctx.begin();
         const source = try Managed.borrow(&op, split, &numbers);
         spy.fail_at = spy.attempts + stage;
@@ -239,16 +247,18 @@ test "managed allocation failure at every borrowed contiguous split and deep-cop
         source.release();
         try spy.released();
         op.end();
-        try close(&ctx);
+        try close(ctx);
     }
 }
 
 test "managed malformed preflight precedes pin overflow and valid pin overflow precedes allocation" {
     fixture.setThreads(1);
     var spy: Spy = .{ .fail_at = 0 };
-    var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &ctx;
-    Context.testing.configure(&ctx, 1, null);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    spy.ctx = ctx;
+    Context.testing.configure(ctx, 1, null);
     var op = try ctx.begin();
     var held = try op.pinResource();
     var invalid = shape;
@@ -260,15 +270,19 @@ test "managed malformed preflight precedes pin overflow and valid pin overflow p
     try equal(@as(usize, 0), spy.attempts);
     held.releaseAfterResourceFree();
     op.end();
-    try close(&ctx);
+    try close(ctx);
 }
 
 test "managed context mismatch rejects before borrowed validation allocation or reference mutation" {
     fixture.setThreads(1);
     var spy: Spy = .{};
-    var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &ctx;
-    var other = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    spy.ctx = ctx;
+    var reference_other: FixtureReferenceContext = undefined;
+    reference_other.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const other = reference_other.borrowedContext();
     var op = try ctx.begin();
     var wrong = try other.begin();
     var indices = ordinals;
@@ -288,13 +302,15 @@ test "managed context mismatch rejects before borrowed validation allocation or 
     try spy.released();
     op.end();
     wrong.end();
-    try close(&ctx);
-    try close(&other);
+    try close(ctx);
+    try close(other);
 }
 
 test "managed admitted operation may create after close while new work is refused and retain stays nonallocating" {
     fixture.setThreads(1);
-    var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     _ = ctx.requestClose();
     try std.testing.expectError(error.Closing, ctx.begin());
@@ -303,17 +319,19 @@ test "managed admitted operation may create after close while new work is refuse
     _ = try c.exportView(&op, .row);
     try equal(@as(usize, 2), ctx.snapshot().resource_pins);
     op.end();
-    try equal(execution.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try equal(execution.CloseResult.waiting_resources, fixtureProgressClose(ctx));
     const alias = try c.retain();
     c.release();
     alias.release();
     d.release();
-    try close(&ctx);
+    try close(ctx);
 }
 
 test "managed empty controls still hold one pin and snapshot honors empty physical intervals" {
     fixture.setThreads(1);
-    var ctx = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     const empty: pattern.Pattern(i64, u32) = .{ .ranges = .{ .contiguous = &.{0} }, .ordinals = &.{}, .row_count = 0, .column_count = 0 };
     const c = try Managed.snapshot(&op, empty, &.{});
@@ -326,14 +344,16 @@ test "managed empty controls still hold one pin and snapshot honors empty physic
     c.references = 1;
     c.release();
     op.end();
-    try close(&ctx);
+    try close(ctx);
 }
 
 test "managed last release waits through every free and paused control destroy before unpin" {
     fixture.setThreads(1);
     var spy: Spy = .{ .pause_id = 0 };
-    var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &ctx;
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    spy.ctx = ctx;
     var op = try ctx.begin();
     const c = try Managed.snapshot(&op, shape, &numbers);
     op.end();
@@ -346,7 +366,7 @@ test "managed last release waits through every free and paused control destroy b
     }
     fixture.wait(&spy.entered);
     try equal(@as(usize, 1), ctx.snapshot().resource_pins);
-    try equal(execution.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try equal(execution.CloseResult.waiting_resources, fixtureProgressClose(ctx));
     try expect(!spy.returned.load(.acquire));
     spy.release_free.store(true, .release);
     thread.join();
@@ -354,14 +374,14 @@ test "managed last release waits through every free and paused control destroy b
     try expect(spy.returned.load(.acquire));
     try std.testing.expectEqualSlices(usize, &.{ 3, 2, 1, 0 }, spy.free_order[0..spy.freed]);
     try spy.released();
-    try close(&ctx);
+    try close(ctx);
 }
 
 const Cached = struct { control: *Managed, ctx: *Context, cleaned: *std.atomic.Value(bool) };
 threadlocal var cached: ?Cached = null;
 fn releaseCached() void {
     if (cached) |entry| {
-        if (entry.ctx.tryProgressClose() != .busy) @panic("drain must stay outside Context gate");
+        if (fixtureProgressClose(entry.ctx) != .busy) @panic("drain must stay outside Context gate");
         if (entry.control.references != 1 or entry.ctx.snapshot().resource_pins != 1) @panic("worker did not own last reference/pin");
         entry.control.release();
         cached = null;
@@ -372,8 +392,10 @@ fn releaseCached() void {
 test "managed persistent worker cache retains last control and close drains its owning worker before closed" {
     fixture.setThreads(2);
     var allocations: fixture.Allocations = .{ .budget = 100 };
-    var ctx = Context.init(allocations.allocator(), fixture.policy, .internal_closable);
-    defer ctx.executor.drainAndReset();
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    defer reference_ctx.executor.drainAndReset();
     var op = try ctx.begin();
     const c = try Managed.snapshot(&op, shape, &numbers);
     const Work = struct {
@@ -386,22 +408,34 @@ test "managed persistent worker cache retains last control and close drains its 
         }
     };
     var cleaned: std.atomic.Value(bool) = .init(false);
-    var work: Work = .{ .entry = .{ .control = try c.retain(), .ctx = &ctx, .cleaned = &cleaned } };
+    var work: Work = .{ .entry = .{ .control = try c.retain(), .ctx = ctx, .cleaned = &cleaned } };
     const domain: execution_default.owner.WorkerCacheDomain = .{ .release_current_worker = releaseCached };
-    const ran = ctx.executor.runLowLatency(.{ .task_fn = Work.task, .tasks = &work, .count = 2, .cache_domain = &domain });
+    const ran = reference_ctx.executor.runLowLatency(.{ .task_fn = Work.task, .tasks = &work, .count = 2, .cache_domain = &domain });
     if (!ran) {
         work.entry.control.release();
         c.release();
         op.end();
     }
     try expect(ran);
-    try equal(@as(u8, 2), ctx.executor.persistent_init_state.load(.acquire));
+    try equal(@as(u8, 2), reference_ctx.executor.persistent_init_state.load(.acquire));
     c.release(); // Publication/batch completion serializes main and worker use.
     try equal(@as(usize, 1), ctx.snapshot().resource_pins);
     try expect(!cleaned.load(.acquire));
     op.end();
     _ = ctx.requestClose();
-    try equal(execution.CloseResult.closed, ctx.tryProgressClose());
+    try equal(execution.CloseResult.closed, fixtureProgressClose(ctx));
     try expect(cleaned.load(.acquire));
     try equal(allocations.stats().accepted, allocations.stats().freed);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn fixtureExecutor(ctx: *@import("zynum-execution").Context) *@import("zynum-execution").reference.owner.Executor {
+    const fixture_execution = @import("zynum-execution");
+    if (ctx == fixture_execution.reference.getContext()) return @ptrCast(@alignCast(ctx.binding.legacy.userdata));
+    const wrapper: *FixtureReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
 }

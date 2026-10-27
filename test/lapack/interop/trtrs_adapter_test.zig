@@ -58,7 +58,7 @@ fn numerical(comptime T: type, comptime I: type, comptime raw: bool, managed: bo
     if (managed) {
         var rig: h.Rig = .{};
         rig.init();
-        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, &rig.context, &rig.services, args));
+        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, rig.context, &rig.services, args));
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, if (level == .high) 1 else 0), rig.reads);
         try std.testing.expectEqual(@as(usize, if (layout == 101) 2 else 0), rig.x.attempts);
@@ -179,7 +179,7 @@ test "TRTRS actual managed owner close and rebind during getter allocation and f
         var b = [_]f64{ 20, -900, 70 };
         rig.b = &b;
         rig.expect_copyback = true;
-        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .trans = 'N', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 3, .b = &b, .ldb = 2 }));
+        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = 'L', .trans = 'N', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 3, .b = &b, .ldb = 2 }));
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, 2), rig.x.frees);
@@ -197,7 +197,7 @@ test "TRTRS row OOM releases prior pins before diagnostic and raw storage faults
         rig.x.fail_at = fail_at;
         const a = [_]f64{ 2, 1, 0, 3 };
         var b = [_]f64{ 2, 7 };
-        try s.expectInfo(i64, -1011, try A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .trans = '?', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 2, .b = &b, .ldb = 1 }));
+        try s.expectInfo(i64, -1011, try A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .trans = '?', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 2, .b = &b, .ldb = 1 }));
         try std.testing.expectEqual(fail_at, rig.x.frees);
         try std.testing.expectEqual(@as(usize, 1), rig.hooks);
         for (rig.events[0..rig.count]) |event| if (event.tag == .hook) {
@@ -218,7 +218,7 @@ test "TRTRS shared routes use the actual configured owner and reject closed admi
     var rig: h.Rig = .{};
     rig.init();
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.trtrsRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .uplo = 'U', .trans = 'N', .diag = 'U', .n = 1, .nrhs = 1, .a = null, .lda = 1, .b = null, .ldb = 1 }));
+    try std.testing.expectError(error.Closing, owner.Shared.trtrsRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .uplo = 'U', .trans = 'N', .diag = 'U', .n = 1, .nrhs = 1, .a = null, .lda = 1, .b = null, .ldb = 1 }));
     try std.testing.expectEqual(@as(usize, 0), rig.count);
     try rig.done();
     var b = [_]f64{19};
@@ -258,8 +258,8 @@ test "TRTRS alias address capacity and admitted pin overflow preserve outputs wi
     for ([_]usize{ 0, 1 }) |limit| {
         var rig: h.Rig = .{};
         rig.init();
-        h.C.Context.testing.configure(&rig.context, limit, null);
-        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .trans = '?', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 2, .b = &b, .ldb = 1 }));
+        h.C.Context.testing.configure(rig.context, limit, null);
+        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .trans = '?', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 2, .b = &b, .ldb = 1 }));
         try std.testing.expectEqual(limit, rig.x.attempts);
         try std.testing.expectEqual(limit, rig.x.frees);
         try std.testing.expectEqual(@as(usize, 0), rig.hooks);
@@ -278,7 +278,7 @@ test "TRTRS returning Fortran hook keeps one operation through callback replacem
     var b = [_]f64{ 10, -777, 20 };
     rig.b = &b;
     rig.expect_copyback = true;
-    try s.expectInfo(i64, -3, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .trans = '?', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 3, .b = &b, .ldb = 2 }));
+    try s.expectInfo(i64, -3, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .uplo = 'U', .trans = '?', .diag = 'N', .n = 2, .nrhs = 1, .a = &a, .lda = 3, .b = &b, .ldb = 2 }));
     try std.testing.expectEqual(error.Closing, rig.nested_error.?);
     try std.testing.expectEqual(@as(usize, 1), rig.hooks);
     try std.testing.expectEqual(@as(usize, 1), rig.reads);
@@ -298,7 +298,7 @@ test "TRTRS concurrent close waits for real paused scratch free after logical RH
         result: ?A.Result(i64) = null,
         failure: ?anyerror = null,
         fn run(self: *@This()) void {
-            self.result = A.callManaged(f64, i64, .work, &self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = 'L', .trans = 'N', .diag = 'N', .n = 2, .nrhs = 1, .a = self.a, .lda = 3, .b = self.b, .ldb = 2 }) catch |err| {
+            self.result = A.callManaged(f64, i64, .work, self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = 'L', .trans = 'N', .diag = 'N', .n = 2, .nrhs = 1, .a = self.a, .lda = 3, .b = self.b, .ldb = 2 }) catch |err| {
                 self.failure = err;
                 return;
             };
@@ -320,14 +320,19 @@ test "TRTRS concurrent close waits for real paused scratch free after logical RH
         }
         h.execution.test_support.wait(&rig.paused);
         try std.testing.expectEqual(h.C.RequestResult.pending, rig.context.requestClose());
-        try std.testing.expectEqual(h.C.CloseResult.busy, rig.context.tryProgressClose());
+        try std.testing.expectEqual(h.C.CloseResult.busy, fixtureProgressClose(rig.context));
         const snapshot = rig.context.snapshot();
         try std.testing.expectEqual(@as(usize, 1), snapshot.active_operations);
         try std.testing.expectEqual(@as(usize, 2), snapshot.resource_pins);
         try std.testing.expectEqualSlices(f64, &.{ 10, -900, 20 }, &b);
-        try std.testing.expectError(error.Closing, owner.Shared.trtrsRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .uplo = 'U', .trans = 'N', .diag = 'U', .n = 0, .nrhs = 0, .a = null, .lda = 1, .b = null, .ldb = 1 }));
+        try std.testing.expectError(error.Closing, owner.Shared.trtrsRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .uplo = 'U', .trans = 'N', .diag = 'U', .n = 0, .nrhs = 0, .a = null, .lda = 1, .b = null, .ldb = 1 }));
     }
     try std.testing.expect(call.failure == null);
     try s.expectInfo(i64, 0, call.result.?);
     try rig.done();
+}
+
+fn fixtureProgressClose(ctx: *@import("managed_support.zig").Core.Execution.Context) @import("managed_support.zig").Core.Execution.CloseResult {
+    var report: @import("managed_support.zig").Core.Execution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

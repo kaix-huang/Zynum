@@ -5,6 +5,15 @@ const std = @import("std");
 const common = @import("context.zig");
 const fixture = @import("test_support.zig");
 const Context = common.Context;
+const ReferenceContext = @import("legacy_adapter.zig").ReferenceContext;
+fn progress(ctx: *Context) common.CloseResult {
+    var report: @import("results.zig").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn executor(ctx: *Context) *@import("owner.zig").Executor {
+    const wrapper: *ReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
+}
 const ContextScratch = common.ContextScratch;
 
 /// Real allocator vtable backed by the existing counted c_allocator fixture.
@@ -33,7 +42,7 @@ const ProbeAllocator = struct {
             const snapshot = self.ctx.snapshot();
             if (snapshot.resource_pins != 1 or snapshot.active_operations != 1)
                 @panic("managed allocation must begin after pin, within its live operation");
-            if (self.ctx.tryProgressClose() != .busy) @panic("allocation callback cannot close its active operation");
+            if (progress(self.ctx) != .busy) @panic("allocation callback cannot close its active operation");
             self.allocation_observed.store(true, .release);
         }
         return self.backing.allocator().rawAlloc(n, a, ret);
@@ -48,7 +57,7 @@ const ProbeAllocator = struct {
         const self = cast(raw);
         if (memory.len == self.watch_bytes) {
             if (self.ctx.snapshot().resource_pins != 1) @panic("managed free entered without its pin");
-            self.close_during_free = self.ctx.tryProgressClose();
+            self.close_during_free = progress(self.ctx);
             if (self.close_during_free == .closed) @panic("close passed a live managed free");
             self.free_entered.store(true, .release);
             if (self.pause_free.load(.acquire)) fixture.wait(&self.allow_free);
@@ -61,15 +70,17 @@ const ProbeAllocator = struct {
 
 fn finish(ctx: *Context) !void {
     _ = ctx.requestClose();
-    try std.testing.expectEqual(common.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.closed, progress(ctx));
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
 }
 
 test "ContextScratch captures original allocator and pins before real allocation" {
     var probe: ProbeAllocator = .{ .watch_bytes = 6 * @sizeOf(f64) };
     var binding = probe.allocator();
-    var ctx = Context.init(binding, fixture.policy, .internal_closable);
-    probe.ctx = &ctx;
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(binding, fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    probe.ctx = ctx;
     var op = try ctx.begin();
     var scratch = try ContextScratch(f64).acquire(&op, 6);
     var replacement: fixture.Allocations = .{ .budget = 0 };
@@ -86,7 +97,7 @@ test "ContextScratch captures original allocator and pins before real allocation
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 1), probe.backing.stats().freed);
     op.end();
-    try finish(&ctx);
+    try finish(ctx);
     try std.testing.expectEqual(fixture.Allocations.Stats{
         .attempts = 0,
         .accepted = 0,
@@ -97,8 +108,10 @@ test "ContextScratch captures original allocator and pins before real allocation
 
 test "ContextScratch real allocation rejection rolls back pin without ending operation" {
     var probe: ProbeAllocator = .{ .watch_bytes = 47, .backing = .{ .budget = 0 } };
-    var ctx = Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.ctx = &ctx;
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(probe.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    probe.ctx = ctx;
     var op = try ctx.begin();
     _ = ctx.requestClose();
     try std.testing.expectError(error.OutOfMemory, ContextScratch(u8).acquire(&op, 47));
@@ -107,26 +120,30 @@ test "ContextScratch real allocation rejection rolls back pin without ending ope
     try std.testing.expectEqual(@as(usize, 0), probe.backing.stats().freed);
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
-    try std.testing.expectEqual(common.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.busy, progress(ctx));
     op.end();
-    try finish(&ctx);
+    try finish(ctx);
 }
 
 test "ContextScratch byte extent overflow rolls back pin before allocator entry" {
     var spy: fixture.Allocations = .{ .budget = 0 };
-    var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     try std.testing.expectError(error.OutOfMemory, ContextScratch(f64).acquire(&op, std.math.maxInt(usize)));
     try std.testing.expectEqual(@as(usize, 0), spy.stats().attempts);
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     op.end();
-    try finish(&ctx);
+    try finish(ctx);
 }
 
 test "ContextScratch resource counter overflow refuses positive and zero counts before allocation" {
     var spy: fixture.Allocations = .{ .budget = 100 };
-    var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    Context.testing.configure(&ctx, 1, null);
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    Context.testing.configure(ctx, 1, null);
     var op = try ctx.begin();
     var existing_pin = try op.pinResource();
     try std.testing.expectError(error.CounterOverflow, ContextScratch(u8).acquire(&op, 13));
@@ -135,12 +152,14 @@ test "ContextScratch resource counter overflow refuses positive and zero counts 
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().resource_pins);
     existing_pin.releaseAfterResourceFree();
     op.end();
-    try finish(&ctx);
+    try finish(ctx);
 }
 
 test "ContextScratch zero length and zero-sized elements preserve allocator semantics and lifetime" {
     var spy: fixture.Allocations = .{ .budget = 0 };
-    var ctx = Context.init(spy.allocator(), fixture.policy, .internal_closable);
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(spy.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     var empty = try ContextScratch(u64).acquire(&op, 0);
     var zero_size = try ContextScratch(struct {}).acquire(&op, 7);
@@ -150,35 +169,39 @@ test "ContextScratch zero length and zero-sized elements preserve allocator sema
     try std.testing.expectEqual(@as(usize, 2), ctx.snapshot().resource_pins);
     op.end();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(common.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.waiting_resources, progress(ctx));
     empty.deinit();
-    try std.testing.expectEqual(common.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.waiting_resources, progress(ctx));
     zero_size.deinit();
     try std.testing.expectEqual(@as(usize, 0), spy.stats().freed);
-    try finish(&ctx);
+    try finish(ctx);
 }
 
 test "ContextScratch acquired after close request survives operation end until lease release" {
     var probe: ProbeAllocator = .{ .watch_bytes = 41 };
-    var ctx = Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.ctx = &ctx;
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(probe.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    probe.ctx = ctx;
     var op = try ctx.begin();
     _ = ctx.requestClose();
     var scratch = try ContextScratch(u8).acquire(&op, 41);
     @memset(scratch.lease.values, 0xa7);
     op.end();
-    try std.testing.expectEqual(common.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.waiting_resources, progress(ctx));
     try std.testing.expectError(error.Closing, ctx.begin());
     for (scratch.lease.values) |v| try std.testing.expectEqual(@as(u8, 0xa7), v);
     scratch.deinit();
     try std.testing.expectEqual(common.CloseResult.waiting_resources, probe.close_during_free);
-    try finish(&ctx);
+    try finish(ctx);
 }
 
 test "ContextScratch paused real free and callback reentry cannot publish closed" {
     var probe: ProbeAllocator = .{ .watch_bytes = 43, .pause_free = .init(true) };
-    var ctx = Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.ctx = &ctx;
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(probe.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    probe.ctx = ctx;
     var op = try ctx.begin();
     var scratch = try ContextScratch(u8).acquire(&op, 43);
     op.end();
@@ -195,7 +218,7 @@ test "ContextScratch paused real free and callback reentry cannot publish closed
         if (!joined) thread.join();
     }
     fixture.wait(&probe.free_entered);
-    try std.testing.expectEqual(common.CloseResult.waiting_resources, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.waiting_resources, progress(ctx));
     try std.testing.expectEqual(common.Phase.drained, ctx.snapshot().phase);
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().resource_pins);
     try std.testing.expect(!probe.free_completed.load(.acquire));
@@ -205,7 +228,7 @@ test "ContextScratch paused real free and callback reentry cannot publish closed
     joined = true;
     try std.testing.expect(probe.free_completed.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), probe.backing.stats().freed);
-    try finish(&ctx);
+    try finish(ctx);
 }
 
 const WorkerResource = struct {
@@ -216,7 +239,7 @@ const WorkerResource = struct {
 threadlocal var worker_resource: ?WorkerResource = null;
 fn releaseWorkerResource() void {
     if (worker_resource) |*resource| {
-        if (resource.ctx.tryProgressClose() != .busy) @panic("worker cleanup must not reenter finalizer");
+        if (progress(resource.ctx) != .busy) @panic("worker cleanup must not reenter finalizer");
         for (resource.scratch.lease.values) |v| if (v != 0xa5) @panic("worker scratch contents changed");
         resource.scratch.deinit();
         resource.cleaned.store(true, .release);
@@ -227,9 +250,11 @@ fn releaseWorkerResource() void {
 test "ContextScratch worker-held last lease is released by drain before closed" {
     fixture.setThreads(2);
     var probe: ProbeAllocator = .{ .watch_bytes = 37, .pause_free = .init(true) };
-    var ctx = Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.ctx = &ctx;
-    defer ctx.executor.drainAndReset();
+    var reference_ctx: ReferenceContext = undefined;
+    reference_ctx.initInPlace(probe.allocator(), fixture.policy, .owned_closable, null);
+    const ctx = reference_ctx.borrowedContext();
+    probe.ctx = ctx;
+    defer executor(ctx).drainAndReset();
     var op = try ctx.begin();
     const Work = struct {
         op: *const common.Operation,
@@ -244,7 +269,7 @@ test "ContextScratch worker-held last lease is released by drain before closed" 
     };
     var work: Work = .{ .op = &op };
     const domain: @import("owner.zig").WorkerCacheDomain = .{ .release_current_worker = releaseWorkerResource };
-    try std.testing.expect(ctx.executor.runLowLatency(.{ .task_fn = Work.task, .tasks = &work, .count = 2, .cache_domain = &domain }));
+    try std.testing.expect(executor(ctx).runLowLatency(.{ .task_fn = Work.task, .tasks = &work, .count = 2, .cache_domain = &domain }));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().resource_pins);
     try std.testing.expect(!work.cleaned.load(.acquire));
     op.end();
@@ -254,11 +279,11 @@ test "ContextScratch worker-held last lease is released by drain before closed" 
         result: common.CloseResult = undefined,
         done: std.atomic.Value(bool) = .init(false),
         fn run(self: *@This()) void {
-            self.result = self.ctx.tryProgressClose();
+            self.result = progress(self.ctx);
             self.done.store(true, .release);
         }
     };
-    var finalizer: Finalize = .{ .ctx = &ctx };
+    var finalizer: Finalize = .{ .ctx = ctx };
     const thread = try std.Thread.spawn(.{}, Finalize.run, .{&finalizer});
     var joined = false;
     defer {
@@ -267,7 +292,7 @@ test "ContextScratch worker-held last lease is released by drain before closed" 
     }
     fixture.wait(&probe.free_entered);
     try std.testing.expectEqual(common.Phase.draining, ctx.snapshot().phase);
-    try std.testing.expectEqual(common.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(common.CloseResult.busy, progress(ctx));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().resource_pins);
     try std.testing.expect(!finalizer.done.load(.acquire));
     try std.testing.expect(!work.cleaned.load(.acquire));

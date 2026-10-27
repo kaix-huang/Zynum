@@ -280,7 +280,7 @@ class PolicyTests(unittest.TestCase):
 class SourceTests(unittest.TestCase):
     def test_real_repository_counts_and_cross_map(self) -> None:
         declarations = observer.scan_zig_exports(ROOT / "src", ROOT)
-        self.assertEqual(475, len(declarations))
+        self.assertEqual(476, len(declarations))
         self.assertEqual(
             161,
             sum(
@@ -303,10 +303,26 @@ class SourceTests(unittest.TestCase):
             ),
         )
         self.assertEqual(
-            15, sum(item["visibility"] == "hidden" for item in declarations)
+            16, sum(item["visibility"] == "hidden" for item in declarations)
         )
         self.assertEqual(140, sum(item["category"] == "separate_checked_interface" for item in declarations))
         self.assertEqual(1, sum(item["category"] == "test_probe" for item in declarations))
+        self.assertEqual(
+            [{
+                "source_path": "src/blas/reference_cache_hook.zig",
+                "line": 16,
+                "source_target": "releaseWorkerCaches",
+                "exported_name": "zynum_internal_reference_release_worker_caches",
+                "callconv": "c",
+                "visibility": "hidden",
+                "declaration_kind": "at_export",
+                "category": "internal_bridge",
+            }],
+            [
+                item for item in declarations
+                if item["exported_name"] == "zynum_internal_reference_release_worker_caches"
+            ],
+        )
         public, hidden = observer.artifact_source_symbol_sets(declarations)
         self.assertNotIn("main", public)
         self.assertFalse(any(name.startswith("zynum_checked_") for name in public | hidden))

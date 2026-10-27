@@ -154,9 +154,11 @@ test "Sparse MV typed and raw rectangular real complex products match independen
                         var matrix = MatrixFixture(T, I).init(axis, base, encoding);
                         const matrix_values = std.mem.asBytes(&matrix.values).*;
                         const matrix_ordinals = matrix.ordinals;
-                        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                        var reference_context: FixtureReferenceContext = undefined;
+                        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                        const context = reference_context.borrowedContext();
                         var handle: ?Handles.Handle = null;
-                        try Raw.createBorrowed(T, I, &context, matrix.raw(), &handle);
+                        try Raw.createBorrowed(T, I, context, matrix.raw(), &handle);
                         {
                             defer release(handle);
                             for ([_]P.Operation{ .normal, .transposed, .adjoint }) |operation| {
@@ -181,7 +183,7 @@ test "Sparse MV typed and raw rectangular real complex products match independen
                             try std.testing.expectEqualSlices(u8, &matrix_values, std.mem.asBytes(&matrix.values));
                             try std.testing.expectEqualSlices(I, &matrix_ordinals, &matrix.ordinals);
                         }
-                        try helpers.close(&context);
+                        try helpers.close(context);
                     }
                 }
             }
@@ -199,9 +201,11 @@ test "Sparse MV duplicate cancellation follows stored order for every scalar wid
             var ordinals = [_]I{ 0, 0, 0 };
             var values = [_]T{ number(T, large, 0), number(T, -large, 0), number(T, 1, 0) };
             for ([_]P.MajorAxis{ .row, .column }) |axis| {
-                var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                var reference_context: FixtureReferenceContext = undefined;
+                reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const context = reference_context.borrowedContext();
                 var h: ?Handles.Handle = null;
-                try Typed.createBorrowed(T, I, &context, .{ .base = 0, .rows = 1, .columns = 1, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+                try Typed.createBorrowed(T, I, context, .{ .base = 0, .rows = 1, .columns = 1, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
                 {
                     defer release(h);
                     for ([_]P.Operation{ .normal, .transposed, .adjoint }) |op| {
@@ -210,7 +214,7 @@ test "Sparse MV duplicate cancellation follows stored order for every scalar wid
                         try expectNumeric(T, .{ .re = 1, .im = 0 }, output[0]);
                     }
                 }
-                try helpers.close(&context);
+                try helpers.close(context);
             }
         }
     }
@@ -227,9 +231,11 @@ test "Sparse MV zero scales avoid unused NaN Inf values but still validate struc
             var values = [_]T{ number(T, std.math.nan(f64), std.math.inf(f64)), number(T, std.math.inf(f64), std.math.nan(f64)) };
             const poison = [_]T{ number(T, std.math.nan(f64), std.math.nan(f64)), number(T, std.math.nan(f64), std.math.nan(f64)) };
             for ([_]P.MajorAxis{ .row, .column }) |axis| {
-                var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                var reference_context: FixtureReferenceContext = undefined;
+                reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const context = reference_context.borrowedContext();
                 var h: ?Handles.Handle = null;
-                try Typed.createBorrowed(T, I, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+                try Typed.createBorrowed(T, I, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
                 {
                     defer release(h);
                     for ([_]P.Operation{ .normal, .transposed, .adjoint }) |op| {
@@ -258,7 +264,7 @@ test "Sparse MV zero scales avoid unused NaN Inf values but still validate struc
                     try expectNumeric(T, asC(T, number(T, 10, 14)), canary[0]);
                     try expectNumeric(T, asC(T, number(T, -6, 9)), canary[1]);
                 }
-                try helpers.close(&context);
+                try helpers.close(context);
                 values = .{ number(T, std.math.nan(f64), std.math.inf(f64)), number(T, std.math.inf(f64), std.math.nan(f64)) };
             }
         }
@@ -268,9 +274,11 @@ test "Sparse MV zero scales avoid unused NaN Inf values but still validate struc
 test "Sparse MV descriptor type mismatch and CSC metadata faults leave nonzero complete outputs unchanged" {
     fixture.setThreads(1);
     var matrix = MatrixFixture(f64, i32).init(.column, 1, .split);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, matrix.raw(), &h);
+    try Raw.createBorrowed(f64, i32, context, matrix.raw(), &h);
     {
         defer release(h);
         var output = [_]f64{ 31, 37, 41, 43 };
@@ -304,18 +312,20 @@ test "Sparse MV descriptor type mismatch and CSC metadata faults leave nonzero c
         matrix.ends[1] = 6;
         try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&output));
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MV rejects partial vector array shell and control aliases while allowing unused capacity and readonly sharing" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var starts: [2]i64 align(@alignOf(f64)) = .{ 0, 1 };
     var ends: [2]i64 align(@alignOf(f64)) = .{ 1, 2 };
     var ordinals: [2]i64 align(@alignOf(f64)) = .{ 0, 1 };
     var values = [_]f64{ 2, 3, 17, 19 };
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i64, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
     {
         defer release(h);
         var shared = [_]f64{ 23, 29, 31 };
@@ -347,7 +357,7 @@ test "Sparse MV rejects partial vector array shell and control aliases while all
         try Typed.matrixVectorMultiply(f64, i64, h, .normal, 1, values[0..2], 0, &result);
         try std.testing.expectEqualSlices(f64, &.{ 4, 9 }, &result);
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MV empty raw prefixes avoid alignment casts and native byte overflow precedes access" {
@@ -357,10 +367,12 @@ test "Sparse MV empty raw prefixes avoid alignment casts and native byte overflo
     const unaligned_output: Raw.Pointer(f64) = @ptrCast(&bytes[1]);
     const before = bytes;
     for ([_]P.MajorAxis{ .row, .column }) |axis| {
-        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var offsets = [_]i64{ 0, 0, 0, 0 };
         var h: ?Handles.Handle = null;
-        try Raw.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = 0, .columns = 3, .axis = axis, .starts = if (axis == .row) null else &offsets, .ends = null, .ordinals = null, .values = null }, &h);
+        try Raw.createBorrowed(f64, i64, context, .{ .base = 0, .rows = 0, .columns = 3, .axis = axis, .starts = if (axis == .row) null else &offsets, .ends = null, .ordinals = null, .values = null }, &h);
         {
             defer release(h);
             const x = [_]f64{ 2, 3, 5 };
@@ -373,13 +385,15 @@ test "Sparse MV empty raw prefixes avoid alignment casts and native byte overflo
             try expectError(error.InvalidAlignment, Raw.matrixVectorMultiply(f64, i64, h, 10, general, 0, unaligned_input, 0, null));
             try expectError(error.InvalidAlignment, Raw.matrixVectorMultiply(f64, i64, h, 11, general, 0, null, 0, unaligned_output));
         }
-        try helpers.close(&context);
+        try helpers.close(context);
     }
     try std.testing.expectEqualSlices(u8, &before, &bytes);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     const too_many: i64 = @intCast(std.math.maxInt(usize) / @sizeOf(f64) + 1);
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = 0, .columns = too_many, .axis = .row, .starts = null, .ends = null, .ordinals = null, .values = null }, &h);
+    try Raw.createBorrowed(f64, i64, context, .{ .base = 0, .rows = 0, .columns = too_many, .axis = .row, .starts = null, .ends = null, .ordinals = null, .values = null }, &h);
     {
         defer release(h);
         const live_input: f64 = 7;
@@ -387,18 +401,19 @@ test "Sparse MV empty raw prefixes avoid alignment casts and native byte overflo
         // or numerical access could be formed. No giant allocation is claimed.
         try expectError(error.SizeOverflow, Raw.matrixVectorMultiply(f64, i64, h, 10, general, 0, @ptrCast(&live_input), 0, null));
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse MV one source Context admission covers closing computation and complete output with no allocation" {
     const Observation = struct {
-        context: Context,
+        reference_context: FixtureReferenceContext = undefined,
+        context: *Context = undefined,
         enabled: bool = false,
         admitted: usize = 0,
         finishing: usize = 0,
         output: [4]f64 = .{ 41, 7, 11, 43 },
         fn observe(context: *Context, event: execution.context.TestEvent) void {
-            const self: *@This() = @fieldParentPtr("context", context);
+            const self: *@This() = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", context)));
             if (!self.enabled) return;
             const snapshot = context.snapshot();
             if (snapshot.active_operations != 1 or snapshot.resource_pins != 1) @panic("MV lost single source admission/control pin");
@@ -413,22 +428,24 @@ test "Sparse MV one source Context admission covers closing computation and comp
                     if (!std.mem.eql(f64, &self.output, &.{ 41, 6, 20, 43 })) @panic("MV admission ended before full output/padding commit");
                 },
             }
-            if (context.tryProgressClose() != .busy) @panic("MV close escaped active operation");
+            if (fixtureProgressClose(context) != .busy) @panic("MV close escaped active operation");
         }
     };
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var observed: Observation = .{ .context = Context.init(spy.allocator(), fixture.policy, .internal_closable) };
-    spy.ctx = &observed.context;
-    Context.testing.configure(&observed.context, 1, Observation.observe);
+    var observed: Observation = .{};
+    observed.reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    observed.context = observed.reference_context.borrowedContext();
+    spy.ctx = observed.context;
+    Context.testing.configure(observed.context, 1, Observation.observe);
     var starts = [_]i32{ 0, 1 };
     var ends = [_]i32{ 1, 2 };
     var indices = [_]i32{ 0, 1 };
     var values = [_]f64{ 2, 4 };
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &observed.context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &indices, .values = &values }, &h);
-    try expect(try Handles.borrowedContext(h.?) == &observed.context);
-    try expect(execution.getContext() != &observed.context);
+    try Typed.createBorrowed(f64, i32, observed.context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &indices, .values = &values }, &h);
+    try expect(try Handles.borrowedContext(h.?) == observed.context);
+    try expect(execution.getContext() != observed.context);
     observed.enabled = true;
     const attempts = spy.attempts;
     const x = [_]f64{ 3, 5 };
@@ -437,28 +454,30 @@ test "Sparse MV one source Context admission covers closing computation and comp
     try equal(@as(usize, 1), observed.finishing);
     try equal(attempts, spy.attempts);
     try equal(@as(usize, 0), observed.context.snapshot().active_operations);
-    try equal(execution.context.CloseResult.waiting_resources, observed.context.tryProgressClose());
+    try equal(execution.context.CloseResult.waiting_resources, fixtureProgressClose(observed.context));
     const before = std.mem.asBytes(&observed.output).*;
     try expectError(error.Closing, Raw.matrixVectorMultiply(f64, i32, h, 99, general, 0, null, 0, &observed.output));
     try expectError(error.Closing, Typed.matrixVectorMultiply(f64, i32, h, .normal, 0, &.{}, 0, &observed.output));
     try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&observed.output));
     try Typed.destroy(h);
     try spy.balanced();
-    try helpers.close(&observed.context);
+    try helpers.close(observed.context);
 }
 
 test "Sparse MV admission overflow and foreign admitted seams preserve output without allocator fallback" {
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
-    Context.testing.configure(&context, 1, null);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
+    Context.testing.configure(context, 1, null);
     var starts = [_]i32{0};
     var ends = [_]i32{1};
     var indices = [_]i32{0};
     var values = [_]f64{2};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &context, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &indices, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, context, .{ .base = 0, .rows = 1, .columns = 1, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &indices, .values = &values }, &h);
     {
         defer release(h);
         var source_op = try context.begin();
@@ -468,20 +487,22 @@ test "Sparse MV admission overflow and foreign admitted seams preserve output wi
         try expectError(error.CounterOverflow, Typed.matrixVectorMultiply(f64, i32, h, .normal, 0, &.{}, 0, output[1..2]));
         try expectError(error.CounterOverflow, Raw.matrixVectorMultiply(f64, i32, h, 99, general, 0, null, 0, output[1..].ptr));
         const exported = try Typed.matrixAdmitted(f64, i32, &source_op, h.?);
-        var foreign = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_foreign: FixtureReferenceContext = undefined;
+        reference_foreign.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const foreign = reference_foreign.borrowedContext();
         var foreign_op = try foreign.begin();
         try expectError(error.ContextMismatch, Typed.matrixAdmitted(f64, i32, &foreign_op, h.?));
         try expectError(error.ContextMismatch, Typed.productAdmitted(f64, i32, &foreign_op, h.?, exported, .normal, 1, &.{3}, 0, output[1..2]));
         foreign_op.end();
         source_op.end();
-        try helpers.close(&foreign);
+        try helpers.close(foreign);
         try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&output));
         try equal(attempts, spy.attempts);
         try equal(@as(usize, 1), context.snapshot().resource_pins);
         try equal(@as(usize, 0), context.snapshot().active_operations);
     }
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 fn structureView(kind: u32, lower: bool, unit: bool) Typed.MatrixSemantics {
@@ -537,9 +558,11 @@ test "Sparse structured MV typed raw paths match independent square dense produc
                 var ordinals = [_]I{ -99, base + 1, base, -99, base + 1, base };
                 const poison = number(T, std.math.nan(f64), std.math.nan(f64));
                 var values = [_]T{ poison, if (axis == .row) number(T, 2, 3) else number(T, 2, -3), number(T, 1, 7), poison, number(T, 4, -2), if (axis == .row) number(T, 2, -3) else number(T, 2, 3) };
-                var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+                var reference_context: FixtureReferenceContext = undefined;
+                reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const context = reference_context.borrowedContext();
                 var handle: ?Handles.Handle = null;
-                try Typed.createBorrowed(T, I, &context, .{ .base = @intCast(base), .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &handle);
+                try Typed.createBorrowed(T, I, context, .{ .base = @intCast(base), .rows = 2, .columns = 2, .axis = axis, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &handle);
                 {
                     defer release(handle);
                     const storage_before = std.mem.asBytes(&values).*;
@@ -563,7 +586,7 @@ test "Sparse structured MV typed raw paths match independent square dense produc
                     };
                     try std.testing.expectEqualSlices(u8, &storage_before, std.mem.asBytes(&values));
                 }
-                try helpers.close(&context);
+                try helpers.close(context);
             };
         }
     }
@@ -571,11 +594,13 @@ test "Sparse structured MV typed raw paths match independent square dense produc
 
 test "Sparse structured MV empty stored unit matrices and zero length raw prefixes preserve their distinct meanings" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var starts = [_]i64{ 0, 0 };
     var ends = starts;
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(Core.ComplexF64, i64, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &.{}, .values = &.{} }, &h);
+    try Typed.createBorrowed(Core.ComplexF64, i64, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .column, .starts = &starts, .ends = &ends, .ordinals = &.{}, .values = &.{} }, &h);
     {
         defer release(h);
         const T = Core.ComplexF64;
@@ -591,7 +616,7 @@ test "Sparse structured MV empty stored unit matrices and zero length raw prefix
         };
     }
     var empty: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, .{ .base = 1, .rows = 0, .columns = 0, .axis = .row, .starts = null, .ends = null, .ordinals = null, .values = null }, &empty);
+    try Raw.createBorrowed(f64, i32, context, .{ .base = 1, .rows = 0, .columns = 0, .axis = .row, .starts = null, .ends = null, .ordinals = null, .values = null }, &empty);
     {
         defer release(empty);
         var bytes: [17]u8 align(16) = @splat(0xa5);
@@ -602,7 +627,7 @@ test "Sparse structured MV empty stored unit matrices and zero length raw prefix
         }
         try std.testing.expectEqualSlices(u8, &before, &bytes);
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse structured MV ignored numerical entries retain full metadata capacities and scale checks" {
@@ -613,9 +638,11 @@ test "Sparse structured MV ignored numerical entries retain full metadata capaci
     var ends = [_]i32{ 2, 4 };
     var ordinals = [_]i32{ 0, 1, 0, 1 };
     var values = [_]T{ number(T, 1, nan), number(T, 2, 3), number(T, nan, nan), number(T, 4, nan) };
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(T, i32, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+    try Typed.createBorrowed(T, i32, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
     {
         defer release(h);
         const x = [_]T{ number(T, 1, 1), number(T, 2, -1) };
@@ -643,15 +670,17 @@ test "Sparse structured MV ignored numerical entries retain full metadata capaci
             try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&y));
         }
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse structured descriptor decoding distinguishes unsupported domains from invalid subordinate fields" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var matrix = MatrixFixture(f64, i32).init(.row, 0, .split);
     var h: ?Handles.Handle = null;
-    try Raw.createBorrowed(f64, i32, &context, matrix.raw(), &h);
+    try Raw.createBorrowed(f64, i32, context, matrix.raw(), &h);
     {
         defer release(h);
         var y = [_]f64{ 31, 37, 41, 43 };
@@ -678,18 +707,20 @@ test "Sparse structured descriptor decoding distinguishes unsupported domains fr
         for ([_]u32{ 25, 26 }) |kind| try expectError(error.UnsupportedDescriptor, Raw.matrixVectorMultiply(f64, i32, h, 10, .{ .matrix_type = kind, .mode = 99, .diag = 99 }, 0, null, 0, &y));
         try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&y));
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse structured unit output rejects partial vector and ignored data shell control aliases before mutation" {
     fixture.setThreads(1);
-    var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var starts: [2]i64 align(@alignOf(f64)) = .{ 0, 1 };
     var ends: [2]i64 align(@alignOf(f64)) = .{ 1, 2 };
     var ordinals: [2]i64 align(@alignOf(f64)) = .{ 0, 1 };
     var values = [_]f64{ std.math.nan(f64), std.math.inf(f64), 17 };
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i64, &context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i64, context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
     {
         defer release(h);
         const desc: Raw.MatrixDescriptor = .{ .matrix_type = 24, .mode = 0xffffffff, .diag = 51 };
@@ -711,18 +742,19 @@ test "Sparse structured unit output rejects partial vector and ignored data shel
         try std.testing.expectEqualSlices(i64, &arrays_before[2], &ordinals);
         try std.testing.expectEqualSlices(u8, &arrays_before[3], std.mem.asBytes(&values));
     }
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse structured MV source admission survives close through final output without allocating" {
     const Observation = struct {
-        context: Context,
+        reference_context: FixtureReferenceContext = undefined,
+        context: *Context = undefined,
         enabled: bool = false,
         admitted: usize = 0,
         finishing: usize = 0,
         output: [4]f64 = .{ 41, 7, 11, 43 },
         fn observe(context: *Context, event: execution.context.TestEvent) void {
-            const self: *@This() = @fieldParentPtr("context", context);
+            const self: *@This() = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", context)));
             if (!self.enabled) return;
             const snapshot = context.snapshot();
             if (snapshot.active_operations != 1 or snapshot.resource_pins != 1) @panic("structured MV lost its admitted owner");
@@ -737,20 +769,22 @@ test "Sparse structured MV source admission survives close through final output 
                     if (!std.mem.eql(f64, &self.output, &.{ 41, 13, 11, 43 })) @panic("structured MV ended before complete output");
                 },
             }
-            if (context.tryProgressClose() != .busy) @panic("structured MV prematurely closed");
+            if (fixtureProgressClose(context) != .busy) @panic("structured MV prematurely closed");
         }
     };
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var observed: Observation = .{ .context = Context.init(spy.allocator(), fixture.policy, .internal_closable) };
-    spy.ctx = &observed.context;
-    Context.testing.configure(&observed.context, 1, Observation.observe);
+    var observed: Observation = .{};
+    observed.reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    observed.context = observed.reference_context.borrowedContext();
+    spy.ctx = observed.context;
+    Context.testing.configure(observed.context, 1, Observation.observe);
     var starts = [_]i32{ 0, 1 };
     var ends = [_]i32{ 1, 1 };
     var ordinals = [_]i32{1};
     var values = [_]f64{2};
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &observed.context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
+    try Typed.createBorrowed(f64, i32, observed.context, .{ .base = 0, .rows = 2, .columns = 2, .axis = .row, .starts = &starts, .ends = &ends, .ordinals = &ordinals, .values = &values }, &h);
     observed.enabled = true;
     const attempts = spy.attempts;
     const x = [_]f64{ 3, 5 };
@@ -765,17 +799,19 @@ test "Sparse structured MV source admission survives close through final output 
     try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&observed.output));
     try Typed.destroy(h);
     try spy.balanced();
-    try helpers.close(&observed.context);
+    try helpers.close(observed.context);
 }
 
 test "Sparse structured admission overflow and foreign operations reject before output and descriptor access" {
     fixture.setThreads(1);
     var spy: helpers.Spy = .{};
-    var context = Context.init(spy.allocator(), fixture.policy, .internal_closable);
-    spy.ctx = &context;
-    Context.testing.configure(&context, 1, null);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(spy.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
+    spy.ctx = context;
+    Context.testing.configure(context, 1, null);
     var h: ?Handles.Handle = null;
-    try Typed.createBorrowed(f64, i32, &context, .{ .base = 0, .rows = 0, .columns = 0, .axis = .row, .starts = &.{}, .ends = &.{}, .ordinals = &.{}, .values = &.{} }, &h);
+    try Typed.createBorrowed(f64, i32, context, .{ .base = 0, .rows = 0, .columns = 0, .axis = .row, .starts = &.{}, .ends = &.{}, .ordinals = &.{}, .values = &.{} }, &h);
     {
         defer release(h);
         var operation = try context.begin();
@@ -785,17 +821,19 @@ test "Sparse structured admission overflow and foreign operations reject before 
         try expectError(error.CounterOverflow, Typed.structuredMatrixVectorMultiply(f64, i32, h, .normal, .{ .diagonal = .unit }, 0, &.{}, 0, &y));
         try expectError(error.CounterOverflow, Raw.matrixVectorMultiply(f64, i32, h, 99, .{ .matrix_type = 21, .mode = 99, .diag = 99 }, 0, null, 0, &y));
         const exported = try Typed.matrixAdmitted(f64, i32, &operation, h.?);
-        var foreign = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_foreign: FixtureReferenceContext = undefined;
+        reference_foreign.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const foreign = reference_foreign.borrowedContext();
         var other = try foreign.begin();
         try expectError(error.ContextMismatch, Typed.structuredProductAdmitted(f64, i32, &other, h.?, exported, .normal, .{ .diagonal = .unit }, 1, &.{}, 0, &y));
         other.end();
         operation.end();
-        try helpers.close(&foreign);
+        try helpers.close(foreign);
         try equal(attempts, spy.attempts);
         try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&y));
     }
     try spy.balanced();
-    try helpers.close(&context);
+    try helpers.close(context);
 }
 
 test "Sparse structured general entry delegates without changing status or complete numerical bytes" {
@@ -803,9 +841,11 @@ test "Sparse structured general entry delegates without changing status or compl
     fixture.setThreads(1);
     inline for (.{ f32, f64, Core.ComplexF32, Core.ComplexF64 }) |T| {
         var matrix = MatrixFixture(T, i64).init(.column, 1, .split);
-        var context = Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var h: ?Handles.Handle = null;
-        try Raw.createBorrowed(T, i64, &context, matrix.raw(), &h);
+        try Raw.createBorrowed(T, i64, context, matrix.raw(), &h);
         {
             defer release(h);
             const nan = number(T, std.math.nan(f64), std.math.nan(f64));
@@ -830,6 +870,12 @@ test "Sparse structured general entry delegates without changing status or compl
             try expectError(error.DimensionMismatch, new_error);
             try std.testing.expectEqualSlices(u8, &before, std.mem.asBytes(&output));
         }
-        try helpers.close(&context);
+        try helpers.close(context);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

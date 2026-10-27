@@ -1125,6 +1125,15 @@ test "cblas real rank updates conjugate transpose independent reference" {
 // The build injects the existing Core's exact test Execution Module.
 const admission_execution = @import("zynum-execution");
 
+// Reference-only fixture: recover the actual Executor bound to the supplied
+// Context. The legacy adapter stores its Executor directly in userdata.
+fn referenceExecutor(ctx: *admission_execution.context.Context) *admission_execution.owner.Executor {
+    return switch (ctx.binding) {
+        .legacy => |services| @ptrCast(@alignCast(services.userdata)),
+        .integrated => @panic("reference executor fixture requires legacy Context"),
+    };
+}
+
 const CblasAdmissionObservation = struct {
     var entries: usize = 0;
     var finishes: usize = 0;
@@ -1144,7 +1153,7 @@ const CblasAdmissionObservation = struct {
         expected = std.mem.sliceAsBytes(wanted);
     }
     fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
-        if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+        if (ctx != admission_execution.getContext() or referenceExecutor(ctx) != admission_execution.get())
             @panic("CBLAS ABI used a different default owner");
         if (ctx.snapshot().active_operations != 1) @panic("CBLAS ABI did not retain one operation");
         switch (event) {
@@ -1345,9 +1354,9 @@ test "CBLAS scaling retains one operation through real busy executor fallback" {
         var finishes: usize = 0;
         var observed_values: []const f64 = &.{};
         fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
-            if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+            if (ctx != admission_execution.getContext() or referenceExecutor(ctx) != admission_execution.get())
                 @panic("legacy fallback used a different default owner");
-            if (ctx.snapshot().active_operations != 1 or ctx.executor.io_busy.load(.acquire) != 1)
+            if (ctx.snapshot().active_operations != 1 or referenceExecutor(ctx).io_busy.load(.acquire) != 1)
                 @panic("legacy fallback escaped its operation or busy batch");
             switch (event) {
                 .admitted => entries += 1,
@@ -1394,7 +1403,7 @@ test "two actual CBLAS callers hold separate operations on the same default" {
         var finishes: std.atomic.Value(usize) = .init(0);
         var release: [2]std.atomic.Value(bool) = .{ .init(false), .init(false) };
         fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
-            if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+            if (ctx != admission_execution.getContext() or referenceExecutor(ctx) != admission_execution.get())
                 @panic("concurrent CBLAS call used a different default owner");
             const active = ctx.snapshot().active_operations;
             if (active == 0 or active > 2) @panic("invalid concurrent CBLAS operation count");

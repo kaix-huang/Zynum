@@ -1,79 +1,21 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 const std = @import("std");
-
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
-    const standalone = b.option(bool, "standalone", "Build the explicit standalone provider (default: false)") orelse false;
-    const shared = b.option(bool, "shared", "Build shared libraries (default: static)") orelse false;
-    const heteris_include = b.option([]const u8, "heteris-include", "Absolute Heteris Data SDK include directory") orelse
-        @panic("Supply -Dheteris-include=/path/to/heteris/include");
-    const upstream = b.createModule(.{
-        .root_source_file = b.path("../../src/scientific_platform_sources.zig"),
+    const target = b.standardTargetOptions(.{ .default_target = .{ .cpu_model = .baseline } });
+    const optimize = b.option(std.lang.Optimize, "optimize", "Explicit optimization mode") orelse b.standardOptimizeOption(.{});
+    const include = b.option([]const u8, "heteris-include", "Explicit absolute header-only Heteris SDK include directory") orelse @panic("Supply -Dheteris-include");
+    const dependency = b.dependency("original_zynum", .{
         .target = target,
         .optimize = optimize,
+        .@"execution-profile" = .integrated_native,
+        .@"heteris-include" = include,
+        .standalone = b.option(bool, "standalone", "Separate explicit standalone adapter provider") orelse false,
+        .shared = b.option(bool, "shared", "One shared main libzynum") orelse false,
     });
-    const module = b.createModule(.{
-        .root_source_file = b.path("src/root.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-        .pic = true,
-    });
-    module.addIncludePath(b.path("include"));
-    module.addIncludePath(.{ .cwd_relative = heteris_include });
-    module.addImport("scientific_sources", upstream);
-    // Zig 0.17 moves C translation into the build graph. Generate the binding
-    // from the authoritative C headers instead of maintaining duplicate layouts.
-    const translated = b.addTranslateC(.{
-        .root_source_file = b.path("include/zynum.h"),
-        .target = target,
-        .optimize = optimize,
-    });
-    translated.addIncludePath(.{ .cwd_relative = heteris_include });
-    module.addImport("zynum_c", translated.createModule());
-    // Compile the authoritative C inline validator as C: Zig 0.16 translate-c
-    // mishandles array member subscripts inside this particular inline function.
-    module.addCSourceFile(.{ .file = b.path("src/descriptor.c"), .flags = &.{"-std=c11"} });
-    const library = b.addLibrary(.{
-        .name = "zynum",
-        .root_module = module,
-        .use_lld = true,
-        .use_llvm = true,
-        .linkage = if (shared) .dynamic else .static,
-    });
-    // Plain C/C++ linkers must receive Zig stack probes and C sanitizer runtime
-    // inside the archive; the consumer does not invoke the Zig driver.
-    library.bundle_compiler_rt = true;
-    library.bundle_ubsan_rt = true;
-    b.installArtifact(library);
-    if (standalone) {
-        const provider_module = b.createModule(.{
-            .root_source_file = b.path("src/standalone.zig"),
-            .target = target,
-            .optimize = optimize,
-            .link_libc = true,
-            .pic = true,
-        });
-        provider_module.addImport("zynum_c", translated.createModule());
-        const provider = b.addLibrary(.{
-            .name = "zynum-standalone",
-            .root_module = provider_module,
-            .use_lld = true,
-            .use_llvm = true,
-            .linkage = if (shared) .dynamic else .static,
-        });
-        provider.bundle_compiler_rt = true;
-        provider.bundle_ubsan_rt = true;
-        b.installArtifact(provider);
-        b.installFile("include/zynum_standalone.h", "include/zynum_standalone.h");
-    }
-    b.installFile("include/zynum.h", "include/zynum.h");
-    b.installFile("include/zynum_spectral.h", "include/zynum_spectral.h");
-    b.getInstallStep().dependOn(&b.addInstallFileWithDir(.{
-        .cwd_relative = b.pathJoin(&.{ heteris_include, "heteris.h" }),
-    }, .header, "heteris.h").step);
-    const tests = b.addTest(.{ .root_module = module, .use_lld = true, .use_llvm = true });
-    const run_tests = b.addRunArtifact(tests);
-    b.step("test", "Run CPU arithmetic, ABI, stride, and validation tests").dependOn(&run_tests.step);
+    const main = dependency.artifact("zynum");
+    if (main.root_module.import_table.get("zynum-core") != dependency.module("zynum-core"))
+        @panic("main library does not use the original dependency Core");
+    b.getInstallStep().dependOn(dependency.builder.getInstallStep());
+    const tests = dependency.builder.top_level_steps.get("test-platform") orelse @panic("original graph lacks adapter tests");
+    b.step("test", "Run the existing adapter tests in the original root graph").dependOn(&tests.step);
 }

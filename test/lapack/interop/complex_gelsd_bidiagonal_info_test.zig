@@ -33,7 +33,7 @@ test "GELSD shared backend returns the actual two unfinished bidiagonal edges" {
         const p = try owner.complex_gelsd_workspace.Planner(owner.Provider).make(C, i32, 3, 3, 1);
         const work = try std.testing.allocator.alloc(C, @intCast(p.work));
         defer std.testing.allocator.free(work);
-        const legacy = try owner.RawComplexGelsdColumnWork.callManaged(C, i32, &rig.context, &rig.services, .{
+        const legacy = try owner.RawComplexGelsdColumnWork.callManaged(C, i32, rig.context, &rig.services, .{
             .m = 3,
             .n = 3,
             .nrhs = 1,
@@ -62,7 +62,7 @@ test "GELSD shared backend returns the actual two unfinished bidiagonal edges" {
         var sigma: [3]R = @splat(-14);
         var v: [9]C = @splat(.{ .re = -15, .im = 0 });
         const rhs = [_]C{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 0 }, .{ .re = 3, .im = 0 } };
-        const result = try N.SvdLeastSquares.solveManaged(&rig.context, C, .{ .values = &original, .row_count = 3, .column_count = 3, .leading_dimension = 3 }, .{ .values = &rhs, .row_count = 3, .column_count = 1, .leading_dimension = 3 }, .{ .solution = .{ .values = &x, .row_count = 3, .column_count = 1, .leading_dimension = 3 }, .singular = &sigma, .right_vectors = .{ .values = &v, .row_count = 3, .column_count = 3, .leading_dimension = 3 }, .residual = .{ .values = &.{}, .row_count = 0, .column_count = 1, .leading_dimension = 0 } }, .{ .relative = std.math.floatEps(R) / 2, .absolute = 0 }, .{ .max_steps = 0 });
+        const result = try N.SvdLeastSquares.solveManaged(rig.context, C, .{ .values = &original, .row_count = 3, .column_count = 3, .leading_dimension = 3 }, .{ .values = &rhs, .row_count = 3, .column_count = 1, .leading_dimension = 3 }, .{ .solution = .{ .values = &x, .row_count = 3, .column_count = 1, .leading_dimension = 3 }, .singular = &sigma, .right_vectors = .{ .values = &v, .row_count = 3, .column_count = 3, .leading_dimension = 3 }, .residual = .{ .values = &.{}, .row_count = 0, .column_count = 1, .leading_dimension = 0 } }, .{ .relative = std.math.floatEps(R) / 2, .absolute = 0 }, .{ .max_steps = 0 });
         try std.testing.expectEqual(N.SvdLeastSquares.Status.no_convergence, result.status);
         try std.testing.expectEqual(@as(usize, 2), result.unconverged);
         for (x) |z| try std.testing.expect(z.re == -13 and z.im == 0);

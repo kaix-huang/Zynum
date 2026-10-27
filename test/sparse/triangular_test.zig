@@ -488,7 +488,9 @@ test "complex triangular admitted solve completes after close without extra admi
     const Core = @import("zynum-core");
     const E = Core.internal.numerics.Execution;
     inline for (.{ sparse.ComplexF32, sparse.ComplexF64 }) |T| {
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var op = try ctx.begin();
         _ = ctx.requestClose();
         const offsets = [_]i64{ 0, 1 };
@@ -503,7 +505,7 @@ test "complex triangular admitted solve completes after close without extra admi
         try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         try std.testing.expectError(error.Closing, ctx.begin());
         op.end();
-        try std.testing.expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -604,4 +606,10 @@ test "mixed offset byte spans reject RHS alias into wide offsets before any nume
         try std.testing.expectError(error.AliasingNotAllowed, sparse.triangularSolveInPlace(.{ .matrix = a, .triangle = sparse.Triangle.lower, .diagonal = sparse.Diagonal.non_unit, .rhs = sparse.Matrix(T){ .values = out[0..1], .row_count = 1, .column_count = 1, .leading_dimension = 1 }, .workspace = &work }));
         try std.testing.expectEqualSlices(i64, &before, &offsets);
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

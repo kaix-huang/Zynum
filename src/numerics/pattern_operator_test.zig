@@ -13,7 +13,7 @@ fn close(owner: *E.context.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn near(comptime T: type, expected: T, actual: T) !void {
     const tolerance: S.Real(T) = if (S.Real(T) == f32) 3e-5 else 1e-13;
@@ -22,8 +22,10 @@ fn near(comptime T: type, expected: T, actual: T) !void {
 }
 test "Pattern operator mixed indices two bases CSR CSC half Hermitian transforms and both panels" {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var op = try owner.begin();
         defer op.end();
         for ([_]P.IndexBase{ .zero, .one }) |base| for ([_]P.MajorAxis{ .row, .column }) |axis| for ([_]Product.StoredTriangle{ .lower, .upper }) |triangle| for ([_]P.Operation{ .normal, .transposed, .adjoint }) |transform| {
@@ -53,7 +55,9 @@ test "Pattern operator mixed indices two bases CSR CSC half Hermitian transforms
 }
 test "Pattern operator revalidates metadata byte aliases and borrowed closing operation" {
     const T = S.ComplexF64;
-    var owner = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var op = try owner.begin();
     var rows = [_]i64{ 0, 1, 2, 91 };
     var columns = [_]i32{ 0, 1 };
@@ -74,10 +78,16 @@ test "Pattern operator revalidates metadata byte aliases and borrowed closing op
     try std.testing.expectError(error.AliasingNotAllowed, action.applyAdmitted(&op, &x, raw[0..2], &.{}));
     try std.testing.expectEqualDeep(before, rows);
     _ = owner.requestClose();
-    try std.testing.expectEqual(E.context.CloseResult.busy, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.busy, fixtureProgressClose(owner));
     try action.applyAdmitted(&op, &x, &y, &.{});
     try near(T, z(T, 2, 4), y[0]);
     try near(T, z(T, 9, -3), y[1]);
     op.end();
-    try std.testing.expectEqual(E.context.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(owner));
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

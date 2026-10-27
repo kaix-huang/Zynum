@@ -10,6 +10,9 @@ const gemm_kernels = @import("../../kernels/dispatch/matrix_matrix.zig");
 const catalog = gemm_kernels.catalog;
 const packing = @import("../../kernels/shared/matrix_matrix/packing.zig");
 const tuning = @import("../../kernels/shared/matrix_matrix/tuning.zig");
+const execution_api = @import("zynum-execution");
+const generic = @import("../../kernels/shared/matrix_matrix/generic.zig");
+const real_scale = @import("real_scale.zig");
 
 const BlasInt = types.BlasInt;
 const parallel_work_threshold: usize = 192 * 192 * 192;
@@ -49,12 +52,19 @@ inline fn matIndex(lda: BlasInt, row: usize, col: usize) usize {
     return row + col * toUsize(lda);
 }
 
+// The wider intermediate preserves the original floor(index * extent / count)
+// partition without overflowing usize. Callers provide index <= count != 0.
+fn partitionPoint(extent: usize, index: usize, count: usize) usize {
+    const Wide = @Int(.unsigned, @bitSizeOf(usize) * 2);
+    return @intCast(@as(Wide, extent) * @as(Wide, index) / @as(Wide, count));
+}
+
 fn alignedColumnSplit(n: usize, task_index: usize, task_count: usize, column_block: usize) ColumnSplit {
     const block = @max(@as(usize, 1), column_block);
     if (block == 1) {
         return .{
-            .n0 = task_index * n / task_count,
-            .n1 = (task_index + 1) * n / task_count,
+            .n0 = partitionPoint(n, task_index, task_count),
+            .n1 = partitionPoint(n, task_index + 1, task_count),
         };
     }
 
@@ -62,8 +72,8 @@ fn alignedColumnSplit(n: usize, task_index: usize, task_count: usize, column_blo
     // block so each worker can run whole packed-B panels.  Splitting
     // through a panel would increase tail work and repeat packing.
     const panels = @divCeil(n, block);
-    const p0 = task_index * panels / task_count;
-    const p1 = (task_index + 1) * panels / task_count;
+    const p0 = partitionPoint(panels, task_index, task_count);
+    const p1 = partitionPoint(panels, task_index + 1, task_count);
     return .{
         .n0 = @min(n, p0 * block),
         .n1 = @min(n, p1 * block),
@@ -72,8 +82,8 @@ fn alignedColumnSplit(n: usize, task_index: usize, task_count: usize, column_blo
 
 fn splitRows(m: usize, task_index: usize, task_count: usize) RowSplit {
     return .{
-        .m0 = task_index * m / task_count,
-        .m1 = (task_index + 1) * m / task_count,
+        .m0 = partitionPoint(m, task_index, task_count),
+        .m1 = partitionPoint(m, task_index + 1, task_count),
     };
 }
 
@@ -265,6 +275,24 @@ fn makeTask(comptime T: type, resources: CallResources, plan: Plan, m: usize, n0
         execution.amx_partial_n16 = false;
         execution.b_pack = .dynamic;
     }
+    return taskFromParts(T, m, n0, n1, k, alpha, a, lda, b, ldb, b_layout, beta, c, ldc, .{
+        .allow_direct = plan.allow_direct_kernel,
+        .kernel = plan.kernel.kernel,
+        .execution = execution,
+        .scratch_allocator = resources.scratchAllocator(),
+    });
+}
+
+const TaskOptions = struct {
+    allow_direct: bool = false,
+    kernel: catalog.KernelId,
+    execution: gemm_kernels.ExecutionPlan,
+    scratch_allocator: ?std.mem.Allocator = null,
+};
+
+// One pure constructor is shared by reference planning and explicit-provider
+// planning. Resource ownership and policy selection stay with their callers.
+fn taskFromParts(comptime T: type, m: usize, n0: usize, n1: usize, k: usize, alpha: T, a: [*]const T, lda: BlasInt, b: [*]const T, ldb: BlasInt, b_layout: gemm_kernels.BLayout, beta: T, c: [*]T, ldc: BlasInt, options: TaskOptions) gemm_kernels.Task(T) {
     return .{
         .m = m,
         .n0 = n0,
@@ -279,10 +307,10 @@ fn makeTask(comptime T: type, resources: CallResources, plan: Plan, m: usize, n0
         .beta = beta,
         .c = c,
         .ldc = ldc,
-        .allow_sme = plan.allow_direct_kernel,
-        .kernel = plan.kernel.kernel,
-        .execution = execution,
-        .scratch_allocator = resources.scratchAllocator(),
+        .allow_sme = options.allow_direct,
+        .kernel = options.kernel,
+        .execution = options.execution,
+        .scratch_allocator = options.scratch_allocator,
     };
 }
 
@@ -338,10 +366,7 @@ fn noTransRealWithBLayout(comptime T: type, resources: CallResources, m_: BlasIn
     const n = toUsize(n_);
     const k = toUsize(k_);
     if (k == 0 or alpha == 0) {
-        for (0..n) |j| for (0..m) |i| {
-            const idxc = matIndex(ldc, i, j);
-            c[idxc] = if (beta == 0) 0 else beta * c[idxc];
-        };
+        real_scale.columns(T, m, 0, n, beta, c, ldc);
         return true;
     }
     if (comptime T == f32) {
@@ -389,4 +414,47 @@ pub fn transposedAReal(comptime T: type, resources: CallResources, m_: BlasInt, 
     packing.packTransposedA(T, m, k, a, lda, a_pack);
     runPlannedTasks(T, resources, plan, m, n, k, alpha, a_pack.ptr, m_, b, ldb, b_layout, beta, c, ldc);
     return true;
+}
+
+fn runExplicitF64Task(raw: *const anyopaque, index: usize) void {
+    // The operation-owned lease establishes alignment, extent and lifetime;
+    // execution's trampoline validates each provider range before indexing.
+    const tasks: [*]const gemm_kernels.Task(f64) = @ptrCast(@alignCast(raw));
+    const task = tasks[index];
+    if (task.k == 0 or task.alpha == 0) {
+        real_scale.columns(f64, task.m, task.n0, task.n1, task.beta, task.c, task.ldc);
+    } else {
+        generic.noTransRealF64(task);
+    }
+}
+
+/// Called only after the public checked views have validated all pointer
+/// extents. All metadata is leased before submit; a failed submit is never
+/// retried, replayed, or converted into a serial mathematical fallback.
+pub fn noTransF64Explicit(operation: *const execution_api.Operation, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: f64, a: [*]const f64, lda: BlasInt, b: [*]const f64, ldb: BlasInt, beta: f64, c: [*]f64, ldc: BlasInt, report: *execution_api.CallReport) execution_api.ExecutionError!void {
+    if (m_ < 0 or n_ < 0 or k_ < 0) return error.ExtentOverflow;
+    const resources = execution_api.admittedResources(operation);
+    const limit = @min(resources.maxThreads(), execution_api.max_tasks);
+    if (limit == 0) return error.Unsupported;
+    if (m_ == 0 or n_ == 0) return;
+    const m: usize = @intCast(m_);
+    const n: usize = @intCast(n_);
+    const k: usize = @intCast(k_);
+    const column_tasks = @min(n, limit);
+    const row_tasks = @min(m, limit / column_tasks);
+    const task_count = std.math.mul(usize, column_tasks, row_tasks) catch return error.ExtentOverflow;
+    var tasks = try resources.acquireScratch(gemm_kernels.Task(f64), task_count, report);
+    defer tasks.release(report);
+    for (tasks.values, 0..) |*task, index| {
+        const rows = splitRows(m, index / column_tasks, row_tasks);
+        const columns = alignedColumnSplit(n, index % column_tasks, column_tasks, 1);
+        // Scaling-only calls may have empty A/B storage. Do not derive even an
+        // unused offset pointer from that storage.
+        const task_a = if (k == 0 or alpha == 0) a else a + rows.m0;
+        task.* = taskFromParts(f64, rows.m1 - rows.m0, columns.n0, columns.n1, k, alpha, task_a, lda, b, ldb, .no_trans, beta, c + rows.m0, ldc, .{
+            .kernel = .generic_f64_4x4,
+            .execution = .{ .selected_kernel = .generic_f64_4x4, .fallback_kernel = .generic_f64_4x4 },
+        });
+    }
+    try resources.runChecked(runExplicitF64Task, @ptrCast(tasks.values.ptr), tasks.values.len, report);
 }

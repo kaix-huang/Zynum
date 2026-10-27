@@ -3,7 +3,7 @@
     .version = "0.1.0",
     .fingerprint = 0x314f3dd66f040b5,
     .minimum_zig_version = "0.17.0",
-    .dependencies = .{},
+    .dependencies = .{ .original_zynum = .{ .path = "../.." } },
     // Build this adapter from its containing Zynum checkout; original sources
     // and licenses live at the repository root and are not duplicated here.
     .paths = .{ "build.zig", "build.zig.zon", "src", "include", "tests", "README.md", "UPSTREAM.md" },

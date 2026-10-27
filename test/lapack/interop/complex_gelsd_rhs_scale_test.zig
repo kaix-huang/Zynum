@@ -44,7 +44,7 @@ test "GELSD RHS scaling retains reference residual units with original solution 
                 const work = try std.testing.allocator.alloc(C, count + 2);
                 defer std.testing.allocator.free(work);
                 @memset(work, .{ .re = -89, .im = 9 });
-                const result = try owner.RawComplexGelsdAdapter.callManaged(C, I, if (mode == 0) .high else .work, &rig.context, &rig.services, .{
+                const result = try owner.RawComplexGelsdAdapter.callManaged(C, I, if (mode == 0) .high else .work, rig.context, &rig.services, .{
                     .layout = layout,
                     .column = .{ .m = 2, .n = 1, .nrhs = 1, .a = raw(C, &a), .lda = @intCast(lda), .b = raw(C, &b), .ldb = @intCast(ldb), .singular = raw(R, &singular), .rcond = -1, .rank = raw(I, &rank), .work = raw(C, work), .lwork = @intCast(count), .rwork = raw(R, &rw), .iwork = raw(I, &iw) },
                 });

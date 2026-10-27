@@ -5,28 +5,21 @@
 //! This is restartable reset, not an operation-wide close or unload barrier.
 const std = @import("std");
 
-pub const max_tasks = 64;
-pub const TaskFn = *const fn (*const anyopaque, usize) void;
+const contracts = @import("contracts.zig");
+pub const max_tasks = contracts.max_tasks;
+pub const TaskFn = contracts.TaskFn;
 const persistent_spin_iters: u32 = 500_000;
 const persistent_done_spin_iters: u32 = 100_000;
-pub const Policy = struct {
-    max_threads: *const fn () usize,
-    helper_count: *const fn (usize) usize,
-    configure_thread: *const fn (?usize) void,
-    worker_stack_size: usize,
-};
+pub const Policy = contracts.Policy;
 /// Static descriptor and code must outlive every worker. Release is worker-local.
-pub const WorkerCacheDomain = struct { release_current_worker: *const fn () void };
-pub const Batch = struct {
-    task_fn: TaskFn,
-    tasks: *const anyopaque,
-    count: usize,
-    cache_domain: ?*const WorkerCacheDomain = null,
-};
+pub const WorkerCacheDomain = contracts.WorkerCacheDomain;
+pub const Batch = contracts.Batch;
 
 pub const Executor = struct {
     allocator: std.mem.Allocator,
     policy: Policy,
+    // Immutable after reference binding initialization, before any worker use.
+    default_cache_domain: ?*const WorkerCacheDomain = null,
     persistent_cache_domain: ?*const WorkerCacheDomain = null,
     io_init_state: std.atomic.Value(u8) = .init(0),
     io_busy: std.atomic.Value(u8) = .init(0),

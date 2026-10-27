@@ -324,7 +324,9 @@ test "GELS smallest subnormal scalar equations solve in original units for real 
 
 test "GELS all four branches finish on one admitted operation after Context begins closing" {
     inline for (scalars) |T| inline for (.{ false, true }) |is_lq| inline for (.{ gels.Operation.normal, gels.Operation.adjoint }) |problem| {
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         const m: usize = if (is_lq) 2 else 3;
@@ -342,7 +344,7 @@ test "GELS all four branches finish on one admitted operation after Context begi
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         try std.testing.expectError(error.Closing, context.begin());
         operation.end();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 
@@ -354,7 +356,9 @@ test "GELS checked unrepresentable rescale remains explicit while IEEE returns n
         const failure = try gels.solve(T, mat(T, &a, 1, 1, 1), mat(T, &b, 1, 1, 1), .normal, &work);
         try std.testing.expectEqualDeep(gels.Result{ .info = 1, .failure = .arithmetic, .stage = .rescaling, .rhs_column = 1 }, failure);
         try std.testing.expect(std.math.isFinite(wide(T, b[0]).re));
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         a[0] = val(T, .{ .re = smallest(T) });
         b[0] = val(T, .{ .re = 1 });
@@ -362,13 +366,15 @@ test "GELS checked unrepresentable rescale remains explicit while IEEE returns n
         try std.testing.expect(std.math.isInf(wide(T, b[0]).re));
         operation.end();
         _ = context.requestClose();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     }
 }
 
 test "GELS IEEE nonfinite real complex N H paths execute without numerical readmission or invented INFO" {
     inline for (scalars) |T| inline for (.{ gels.Operation.normal, gels.Operation.adjoint }) |problem| {
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         var a = [2]T{ nan(T), val(T, .{ .re = 1 }) };
@@ -378,6 +384,12 @@ test "GELS IEEE nonfinite real complex N H paths execute without numerical readm
         try std.testing.expectEqual(@as(usize, 1), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     };
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

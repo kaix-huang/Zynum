@@ -35,7 +35,7 @@ test "GESVD shared raw high work query captures one original owner and rejects c
             args.vt = null;
             args.rwork = null;
         }
-        try info(try owner.Shared.gesvdRawManaged(true, T, level, &r.context, args), 0);
+        try info(try owner.Shared.gesvdRawManaged(true, T, level, r.context, args), 0);
         if (entry != 2) try f.verify(&before, level) else {
             try bytes(&before.a, &f.a);
             try bytes(&before.s, &f.s);
@@ -52,7 +52,7 @@ test "GESVD shared raw high work query captures one original owner and rejects c
         try std.testing.expectEqual(@as(usize, 0), r.y.attempts);
         try std.testing.expectEqual(@as(usize, 0), r.z.attempts);
         try r.done();
-        try std.testing.expectError(error.Closing, owner.Shared.gesvdRawManaged(true, T, .high, &r.context, undefined));
+        try std.testing.expectError(error.Closing, owner.Shared.gesvdRawManaged(true, T, .high, r.context, undefined));
         try std.testing.expectEqual(state.captures, cfg.testing.snapshot().captures);
         cases += 1;
     };
@@ -74,7 +74,7 @@ test "GESVD shared profile defaults preserve captured diagnostic channel and con
             if (self.close) {
                 _ = cfg.setCallbacks(.{});
                 std.debug.assert(self.context.requestClose() == .pending);
-                std.debug.assert(self.context.tryProgressClose() == .busy);
+                std.debug.assert(fixtureProgressClose(self.context) == .busy);
             }
         }
     };
@@ -85,8 +85,8 @@ test "GESVD shared profile defaults preserve captured diagnostic channel and con
         cfg.setNancheck(1);
         var r: h.Rig = .{};
         r.init();
-        var fallback: Recorder = .{ .context = &r.context, .close = true };
-        var replacement: Recorder = .{ .context = &r.context, .close = true };
+        var fallback: Recorder = .{ .context = r.context, .close = true };
+        var replacement: Recorder = .{ .context = r.context, .close = true };
         const defaults: cfg.Callbacks = .{ .lapacke = .{ .userdata = &fallback, .function = Recorder.callback }, .fortran_returning_test = .{ .userdata = &fallback, .function = Recorder.callback } };
         if (configured) _ = cfg.setCallbacks(.{ .lapacke = .{ .userdata = &replacement, .function = Recorder.callback }, .fortran_returning_test = .{ .userdata = &replacement, .function = Recorder.callback } });
         var f = Fixture(T).init(if (which == 1) 101 else 102, true, 'S', 'S', 0);
@@ -94,7 +94,7 @@ test "GESVD shared profile defaults preserve captured diagnostic channel and con
         var args = f.args(true);
         if (which == 0) args.layout = 0 else if (which == 1) args.ldu = 1 else args.jobu = 'X';
         const level: owner.common.Level = if (which == 0) .high else .work;
-        try info(try owner.Shared.gesvdRawManagedWithDefaults(true, T, level, &r.context, args, defaults), if (which == 0) -1 else if (which == 1) -10 else -2);
+        try info(try owner.Shared.gesvdRawManagedWithDefaults(true, T, level, r.context, args, defaults), if (which == 0) -1 else if (which == 1) -10 else -2);
         try std.testing.expectEqual(@as(usize, if (configured) 0 else 1), fallback.calls);
         try std.testing.expectEqual(@as(usize, if (configured) 1 else 0), replacement.calls);
         const selected = if (configured) &replacement else &fallback;
@@ -141,7 +141,7 @@ test "GESVD allocation replacement and close still dispatch captured defaults af
             const self: *@This() = @ptrCast(@alignCast(p));
             _ = cfg.setCallbacks(.{ .lapacke = .{ .userdata = self.next, .function = Counter.callback } });
             std.debug.assert(self.rig.context.requestClose() == .pending);
-            std.debug.assert(self.rig.context.tryProgressClose() == .busy);
+            std.debug.assert(fixtureProgressClose(self.rig.context) == .busy);
             return self.rig.x.allocator().rawAlloc(n, a, ret);
         }
         fn resize(_: *anyopaque, _: []u8, _: std.mem.Alignment, _: usize, _: usize) bool {
@@ -154,7 +154,7 @@ test "GESVD allocation replacement and close still dispatch captured defaults af
             @panic("OOM allocator must never return storage");
         }
         fn observe(ctx: *Core.Execution.context.Context, e: Core.Execution.context.TestEvent) void {
-            const r: *h.Rig = @fieldParentPtr("context", ctx);
+            const r: *h.Rig = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", ctx)));
             r.record(if (e == .admitted) .admitted else .finishing, 0);
         }
     };
@@ -169,12 +169,15 @@ test "GESVD allocation replacement and close still dispatch captured defaults af
         var original: Counter = .{};
         var next: Counter = .{};
         var wrapped: ReplacingAllocator = .{ .rig = &r, .next = &next };
-        r.context = Core.Execution.context.Context.init(wrapped.allocator(), Core.Execution.test_support.policy, .internal_closable);
-        Core.Execution.context.Context.testing.configure(&r.context, std.math.maxInt(usize), ReplacingAllocator.observe);
+        _ = r.context.requestClose();
+        try std.testing.expectEqual(@import("zynum-execution").CloseResult.closed, fixtureProgressClose(r.context));
+        r.reference_context.initInPlace(wrapped.allocator(), Core.Execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        r.context = r.reference_context.borrowedContext();
+        Core.Execution.context.Context.testing.configure(r.context, std.math.maxInt(usize), ReplacingAllocator.observe);
         var f = Fixture(T).init(layout, true, 'A', 'A', 0);
         const before = f;
         const expected: i32 = if (level == .work and layout == 101) -1011 else -1010;
-        try info(try owner.Shared.gesvdRawManagedWithDefaults(true, T, level, &r.context, f.args(true), .{ .lapacke = .{ .userdata = &original, .function = Counter.callback } }), expected);
+        try info(try owner.Shared.gesvdRawManagedWithDefaults(true, T, level, r.context, f.args(true), .{ .lapacke = .{ .userdata = &original, .function = Counter.callback } }), expected);
         try std.testing.expectEqual(@as(usize, 1), original.calls);
         try std.testing.expectEqual(expected, original.info);
         try std.testing.expectEqual(@as(usize, 0), next.calls);
@@ -188,7 +191,7 @@ test "GESVD allocation replacement and close still dispatch captured defaults af
         try bytes(&before.superb, &f.superb);
         try std.testing.expectEqual(@as(usize, 1), cfg.testing.snapshot().captures);
         try r.done();
-        try std.testing.expectError(error.Closing, owner.Shared.gesvdRawManaged(true, T, level, &r.context, undefined));
+        try std.testing.expectError(error.Closing, owner.Shared.gesvdRawManaged(true, T, level, r.context, undefined));
         try std.testing.expectEqual(@as(usize, 1), cfg.testing.snapshot().captures);
         cases += 1;
     };
@@ -382,7 +385,7 @@ test "GESVD four scalar full thin overwrite and values-only jobs preserve geomet
                 r.init();
                 var f = Fixture(T).init(layout, tall, ju, jv, variant);
                 const saved = f;
-                try info(try adapter(raw).callManaged(true, T, level, &r.context, &r.services, f.args(raw), .{}), 0);
+                try info(try adapter(raw).callManaged(true, T, level, r.context, &r.services, f.args(raw), .{}), 0);
                 try f.verify(&saved, level);
                 try std.testing.expectEqual(@as(usize, 1), r.max_active);
                 try std.testing.expectEqual(r.x.attempts, r.x.frees);
@@ -402,18 +405,18 @@ test "GESVD workspace query compressed paths single rounding and scalar errors h
             r.init();
             var w = [_]T{ z(T, 81, 82), z(T, 83, 84) };
             var a: adapter(raw).Arguments(T) = .{ .layout = layout, .jobu = if (tall and compressed) 'N' else 'A', .jobvt = if (!tall and compressed) 'N' else 'A', .m = if (tall) 14 else 3, .n = if (tall) 3 else 14, .lda = 16, .ldu = 16, .ldvt = 16, .work = operand(T, raw, &w), .lwork = -1 };
-            try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), 0);
+            try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), 0);
             const expected: f64 = if (comptime Core.Scalar.isComplex(T)) (if (compressed) 9 else 20) else (if (compressed) 15 else 23);
             try std.testing.expectEqual(expected, wide(T, w[0]).re);
             try bytes(&[_]T{z(T, 83, 84)}, w[1..]);
             a.lwork = @intFromFloat(expected - 1);
-            try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), -14);
+            try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), -14);
             a.lwork = -1;
             a.jobu = 'X';
-            try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), -2);
+            try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), -2);
             a.jobu = 'O';
             a.jobvt = 'O';
-            try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), -3);
+            try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), -3);
             try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
             try r.done();
             cases += 1;
@@ -424,7 +427,7 @@ test "GESVD workspace query compressed paths single rounding and scalar errors h
         r.init();
         var w: [1]T = undefined;
         const args: owner.GesvdAdapter.Arguments(T) = .{ .layout = 102, .jobu = 'A', .jobvt = 'N', .m = 16777216, .n = 1, .lda = 16777216, .ldu = 16777216, .ldvt = 1, .work = &w, .lwork = -1 };
-        try info(try owner.GesvdAdapter.callManaged(true, T, .work, &r.context, &r.services, args, .{}), 0);
+        try info(try owner.GesvdAdapter.callManaged(true, T, .work, r.context, &r.services, args, .{}), 0);
         const expected: f64 = if (T == f32) 16777220 else (if (T == C32 or T == C64) 16777218 else 16777219);
         try std.testing.expectEqual(expected, wide(T, w[0]).re);
         try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
@@ -440,7 +443,7 @@ test "GESVD every allocation failure is transactional and shared Context release
             var control: h.Rig = .{};
             control.init();
             var valid = Fixture(T).init(layout, tall, 'A', 'A', 0);
-            try info(try adapter(raw).callManaged(true, T, level, &control.context, &control.services, valid.args(raw), .{}), 0);
+            try info(try adapter(raw).callManaged(true, T, level, control.context, &control.services, valid.args(raw), .{}), 0);
             const count_a = control.x.attempts;
             try control.done();
             for (0..count_a) |fail| {
@@ -449,7 +452,7 @@ test "GESVD every allocation failure is transactional and shared Context release
                 r.x.fail_at = fail;
                 var f = Fixture(T).init(layout, tall, 'A', 'A', 0);
                 const saved = f;
-                const result = try adapter(raw).callManaged(true, T, level, &r.context, &r.services, f.args(raw), .{});
+                const result = try adapter(raw).callManaged(true, T, level, r.context, &r.services, f.args(raw), .{});
                 try std.testing.expect(result == .lapacke_info);
                 try std.testing.expect(result.lapacke_info == -1010 or result.lapacke_info == -1011);
                 try bytes(&saved.a, &f.a);
@@ -477,15 +480,15 @@ test "GESVD admitted work finishes during close and partial exhaustion preserves
             r.action = .close;
             var f = Fixture(T).init(101, true, 'A', 'A', 0);
             const saved = f;
-            try info(try adapter(raw).callManaged(true, T, level, &r.context, &r.services, f.args(raw), .{}), 0);
+            try info(try adapter(raw).callManaged(true, T, level, r.context, &r.services, f.args(raw), .{}), 0);
             try f.verify(&saved, level);
             try r.done();
-            try std.testing.expectError(error.Closing, adapter(raw).callManaged(true, T, level, &r.context, &r.services, f.args(raw), .{}));
+            try std.testing.expectError(error.Closing, adapter(raw).callManaged(true, T, level, r.context, &r.services, f.args(raw), .{}));
             var other: h.Rig = .{};
             other.init();
             var bad = Fixture(T).init(102, false, 'A', 'A', 0);
             const b0 = bad;
-            const result = try adapter(raw).callManaged(true, T, level, &other.context, &other.services, bad.args(raw), .{ .max_sweeps = 0 });
+            const result = try adapter(raw).callManaged(true, T, level, other.context, &other.services, bad.args(raw), .{ .max_sweeps = 0 });
             try info(result, 1);
             try bad.verifyPartial(&b0, level);
             try std.testing.expectEqual(@as(usize, 1), other.max_active);
@@ -496,7 +499,7 @@ test "GESVD admitted work finishes during close and partial exhaustion preserves
             var broken = Fixture(T).init(102, false, 'A', 'A', 0);
             broken.a[0] = z(T, std.math.inf(f64), 0);
             const fault_before = broken;
-            const fault = try adapter(raw).callManaged(false, T, level, &fault_rig.context, &fault_rig.services, broken.args(raw), .{});
+            const fault = try adapter(raw).callManaged(false, T, level, fault_rig.context, &fault_rig.services, broken.args(raw), .{});
             try std.testing.expect(fault == .numerical_fault and fault.numerical_fault == error.NonFiniteInput);
             try bytes(&fault_before.a, &broken.a);
             try bytes(&fault_before.s, &broken.s);
@@ -534,7 +537,7 @@ test "GESVD admitted work finishes during close and partial exhaustion preserves
             const ww = work;
             const rr = real_work;
             const ee = superb;
-            try info(try adapter(raw).callManaged(true, T, level, &r.context, &r.services, .{ .layout = layout, .jobu = 'N', .jobvt = 'N', .m = 3, .n = 3, .lda = 5, .ldu = 1, .ldvt = 1, .a = operand(T, raw, &a), .singular = operand(R, raw, &singular), .work = operand(T, raw, &work), .lwork = 32, .rwork = operand(R, raw, &real_work), .superb = operand(R, raw, &superb) }, .{ .max_sweeps = 0 }), 2);
+            try info(try adapter(raw).callManaged(true, T, level, r.context, &r.services, .{ .layout = layout, .jobu = 'N', .jobvt = 'N', .m = 3, .n = 3, .lda = 5, .ldu = 1, .ldvt = 1, .a = operand(T, raw, &a), .singular = operand(R, raw, &singular), .work = operand(T, raw, &work), .lwork = 32, .rwork = operand(R, raw, &real_work), .superb = operand(R, raw, &superb) }, .{ .max_sweeps = 0 }), 2);
             try bytes(&aa, &a);
             var returned_energy: f64 = 0;
             for (singular[0..3]) |s| returned_energy += @as(f64, s) * s;
@@ -587,7 +590,7 @@ test "GESVD empty extents NaN priority mixed byte aliases and unused outputs ret
                     .work = operand(T, raw, &work),
                     .lwork = 1,
                 };
-                try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), 0);
+                try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), 0);
                 try std.testing.expectEqual(@as(f64, 1), wide(T, work[0]).re);
                 try bytes(&[_]T{z(T, 93, 94)}, work[1..]);
                 try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
@@ -602,9 +605,9 @@ test "GESVD empty extents NaN priority mixed byte aliases and unused outputs ret
                 const saved = f;
                 var a = f.args(raw);
                 a.jobu = 'X';
-                try info(try adapter(raw).callManaged(true, T, .high, &r.context, &r.services, a, .{}), -6);
+                try info(try adapter(raw).callManaged(true, T, .high, r.context, &r.services, a, .{}), -6);
                 a.lwork = -1;
-                try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), -2);
+                try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), -2);
                 try bytes(&saved.a, &f.a);
                 try bytes(&saved.s, &f.s);
                 try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
@@ -619,7 +622,7 @@ test "GESVD empty extents NaN priority mixed byte aliases and unused outputs ret
                 var a = f.args(raw);
                 const singular: [*]R = @ptrCast(&f.a);
                 a.singular = operand(R, raw, singular[0..2]);
-                const result = try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{});
+                const result = try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{});
                 try std.testing.expect(result == .admission_fault);
                 try std.testing.expectEqual(error.AliasingNotAllowed, result.admission_fault);
                 try bytes(&saved.a, &f.a);
@@ -638,7 +641,7 @@ test "GESVD empty extents NaN priority mixed byte aliases and unused outputs ret
                 a.vt = null;
                 a.ldu = 1;
                 a.ldvt = 1;
-                try info(try adapter(raw).callManaged(true, T, .work, &r.context, &r.services, a, .{}), 0);
+                try info(try adapter(raw).callManaged(true, T, .work, r.context, &r.services, a, .{}), 0);
                 try r.done();
                 cases += 1;
             }
@@ -650,7 +653,7 @@ test "GESVD empty extents NaN priority mixed byte aliases and unused outputs ret
                 var a = f.args(raw);
                 a.jobu = 's';
                 a.jobvt = 's';
-                try info(try adapter(raw).callManaged(true, T, .high, &r.context, &r.services, a, .{}), 0);
+                try info(try adapter(raw).callManaged(true, T, .high, r.context, &r.services, a, .{}), 0);
                 try f.verify(&saved, .high);
                 try r.done();
                 cases += 1;
@@ -658,4 +661,10 @@ test "GESVD empty extents NaN priority mixed byte aliases and unused outputs ret
         }
     };
     std.debug.print("GESVD empty/preflight/alias/unused/case-fold controls={d}\n", .{cases});
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

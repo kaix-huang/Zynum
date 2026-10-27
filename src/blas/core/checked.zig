@@ -42,4 +42,5 @@ pub const multiplyMatrixVector = operations.multiplyMatrixVector;
 pub const multiplyMatrixVectorAdmitted = operations.multiplyMatrixVectorAdmitted;
 pub const multiplyMatrices = operations.multiplyMatrices;
 pub const multiplyRealMatricesAdmitted = operations.multiplyRealMatricesAdmitted;
+pub const multiplyF64NNExplicit = operations.multiplyF64NNExplicit;
 pub const multiplyComplexMatricesAdmitted = operations.multiplyComplexMatricesAdmitted;

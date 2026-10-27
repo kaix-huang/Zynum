@@ -546,11 +546,13 @@ test "QR admitted composition completes after local close without second admissi
     const checked = Core.internal.lapack_checked;
     inline for (.{ f32, f64, qr.ComplexF32, qr.ComplexF64 }) |T| {
         const complex = T == qr.ComplexF32 or T == qr.ComplexF64;
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var operation = try ctx.begin();
         try expectEqual(E.context.RequestResult.pending, ctx.requestClose());
         try expectError(error.Closing, ctx.begin());
-        try expectEqual(E.context.CloseResult.busy, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.busy, fixtureProgressClose(ctx));
         var a: [2]T = if (complex) .{ .{ .re = 1, .im = 2 }, .{ .re = 3, .im = -4 } } else .{ 1, 3 };
         const before = a;
         var tau: [1]T = undefined;
@@ -569,7 +571,7 @@ test "QR admitted composition completes after local close without second admissi
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         operation.end();
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -598,9 +600,11 @@ test "GEQRF typed and raw query has no matrix tau access allocation or extra adm
     const E = @import("zynum-execution");
     inline for (.{ f32, f64, qr.ComplexF32, qr.ComplexF64 }) |T| {
         var query_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-        var ctx = E.context.Context.init(query_allocator.allocator(), E.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(query_allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var op = try ctx.begin();
-        const services = QrProbe.services(&ctx);
+        const services = QrProbe.services(ctx);
         for ([_]c_int{ 101, 102 }) |layout| {
             var work: [1]T = undefined;
             const args: B.QrAdapter.Arguments(T) = .{ .layout = layout, .m = 3, .n = 2, .lda = if (layout == 101) 2 else 3, .work = &work, .lwork = -1 };
@@ -622,7 +626,7 @@ test "GEQRF typed and raw query has no matrix tau access allocation or extra adm
         op.end();
         try expectEqual(@as(usize, 0), query_allocator.allocated_bytes);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -645,9 +649,11 @@ test "GEQRF high and work row column layouts share four scalar factor and tau id
                 const original = a;
                 var tau: [2]T = undefined;
                 var work: [2]T = undefined;
-                var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-                const services = QrProbe.services(&ctx);
-                try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(true, T, level, &ctx, &services, .{ .layout = layout, .m = 3, .n = 2, .a = &a, .lda = 4, .tau = &tau, .work = &work, .lwork = 2 }));
+                var reference_ctx: FixtureReferenceContext = undefined;
+                reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const ctx = reference_ctx.borrowedContext();
+                const services = QrProbe.services(ctx);
+                try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(true, T, level, ctx, &services, .{ .layout = layout, .m = 3, .n = 2, .a = &a, .lda = 4, .tau = &tau, .work = &work, .lwork = 2 }));
                 for (0..3) |i| for (0..2) |j| {
                     const actual = a[if (layout == 101) i * 4 + j else i + j * 4];
                     if (complex) try cnear(T, expected[i + j * 3], actual, 0) else try expectEqual(expected[i + j * 3], actual);
@@ -660,7 +666,7 @@ test "GEQRF high and work row column layouts share four scalar factor and tau id
                 try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
                 try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
                 _ = ctx.requestClose();
-                try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+                try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
             }
         }
     }
@@ -669,39 +675,43 @@ test "GEQRF high and work row column layouts share four scalar factor and tau id
 test "GEQRF scalar error order capacity and IEEE numerical outcomes are distinct" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     var work = [_]f64{99};
-    try expectEqual(@as(i32, -1), try B.QrAdapter.callManaged(true, f64, .work, &ctx, &services, .{ .layout = 999, .m = -1, .n = -1, .lda = 0 }));
-    try expectEqual(@as(i32, -5), try B.QrAdapter.callManaged(true, f64, .work, &ctx, &services, .{ .layout = 101, .m = -1, .n = 2, .lda = 1, .work = &work, .lwork = -1 }));
-    try expectEqual(@as(i32, -2), try B.QrAdapter.callManaged(true, f64, .work, &ctx, &services, .{ .layout = 102, .m = -1, .n = 2, .lda = 1, .work = &work, .lwork = -1 }));
+    try expectEqual(@as(i32, -1), try B.QrAdapter.callManaged(true, f64, .work, ctx, &services, .{ .layout = 999, .m = -1, .n = -1, .lda = 0 }));
+    try expectEqual(@as(i32, -5), try B.QrAdapter.callManaged(true, f64, .work, ctx, &services, .{ .layout = 101, .m = -1, .n = 2, .lda = 1, .work = &work, .lwork = -1 }));
+    try expectEqual(@as(i32, -2), try B.QrAdapter.callManaged(true, f64, .work, ctx, &services, .{ .layout = 102, .m = -1, .n = 2, .lda = 1, .work = &work, .lwork = -1 }));
     try expectEqual(@as(f64, 99), work[0]);
-    try expectError(error.MissingBuffer, B.QrAdapter.callManaged(true, f64, .work, &ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .lda = 2, .lwork = -1 }));
+    try expectError(error.MissingBuffer, B.QrAdapter.callManaged(true, f64, .work, ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .lda = 2, .lwork = -1 }));
     var a = [_]f64{ std.math.nan(f64), 1 };
     var tau: [1]f64 = undefined;
-    try expectEqual(@as(i32, -4), try B.QrAdapter.callManaged(true, f64, .high, &ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .a = &a, .lda = 2, .tau = &tau }));
-    try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(false, f64, .work, &ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .a = &a, .lda = 2, .tau = &tau, .work = &work, .lwork = 1 }));
+    try expectEqual(@as(i32, -4), try B.QrAdapter.callManaged(true, f64, .high, ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .a = &a, .lda = 2, .tau = &tau }));
+    try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(false, f64, .work, ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .a = &a, .lda = 2, .tau = &tau, .work = &work, .lwork = 1 }));
     try expect(std.math.isNan(a[0]));
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "GEQRF row high allocator and NaN callbacks stay inside admission across close" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     QrProbe.close_on_scan = true;
     defer QrProbe.close_on_scan = false;
     var a = [_]qr.ComplexF64{ .{ .re = 1, .im = 2 }, .{ .re = 3, .im = 4 } };
     var tau: [1]qr.ComplexF64 = undefined;
-    try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(true, qr.ComplexF64, .high, &ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .a = &a, .lda = 1, .tau = &tau }));
-    try expectError(error.Closing, B.QrAdapter.callManaged(true, qr.ComplexF64, .high, &ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .lda = 1 }));
+    try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(true, qr.ComplexF64, .high, ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .a = &a, .lda = 1, .tau = &tau }));
+    try expectError(error.Closing, B.QrAdapter.callManaged(true, qr.ComplexF64, .high, ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .lda = 1 }));
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "GEQRF workspace and row staging OOM plus resource counter failure release captured leases" {
@@ -709,13 +719,15 @@ test "GEQRF workspace and row staging OOM plus resource counter failure release 
     const E = @import("zynum-execution");
     for ([_]usize{ 0, 1 }) |fail| {
         var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = fail });
-        var ctx = E.context.Context.init(allocator.allocator(), E.test_support.policy, .internal_closable);
-        const services = QrProbe.services(&ctx);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        const services = QrProbe.services(ctx);
         var a = [_]f64{ 1, 3 };
         const before = a;
         var tau = [_]f64{999};
         QrProbe.events = 0;
-        try expectEqual(@as(i32, if (fail == 0) -1010 else -1011), try B.QrAdapter.callManaged(true, f64, .high, &ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .a = &a, .lda = 1, .tau = &tau }));
+        try expectEqual(@as(i32, if (fail == 0) -1010 else -1011), try B.QrAdapter.callManaged(true, f64, .high, ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .a = &a, .lda = 1, .tau = &tau }));
         try same(f64, &before, &a);
         try expectEqual(@as(f64, 999), tau[0]);
         try expectEqual(@as(usize, 1), QrProbe.events);
@@ -723,22 +735,24 @@ test "GEQRF workspace and row staging OOM plus resource counter failure release 
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
     var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    var ctx = E.context.Context.init(allocator.allocator(), E.test_support.policy, .internal_closable);
-    E.context.Context.testing.configure(&ctx, 1, null);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    E.context.Context.testing.configure(ctx, 1, null);
+    const services = QrProbe.services(ctx);
     var a = [_]f64{ 1, 3 };
     const before = a;
     var tau = [_]f64{999};
-    try expectError(error.CounterOverflow, B.QrAdapter.callManaged(true, f64, .high, &ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .a = &a, .lda = 1, .tau = &tau }));
+    try expectError(error.CounterOverflow, B.QrAdapter.callManaged(true, f64, .high, ctx, &services, .{ .layout = 101, .m = 2, .n = 1, .a = &a, .lda = 1, .tau = &tau }));
     try same(f64, &before, &a);
     try expectEqual(allocator.allocated_bytes, allocator.freed_bytes);
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "GEQRF raw column high uses actual owner arrays and does not create parallel resources" {
@@ -751,15 +765,17 @@ test "GEQRF raw column high uses actual owner arrays and does not create paralle
         var tau: [1]T = undefined;
         var et: [1]T = undefined;
         try expectEqual(@as(usize, 0), try qr.qrFactorize(T, matrix(T, &expected, 2, 1, 2), &et));
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        const services = QrProbe.services(&ctx);
-        try expectEqual(@as(i32, 0), try B.RawQrAdapter.callManaged(true, T, .high, &ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .a = @ptrCast(&a), .lda = 2, .tau = @ptrCast(&tau) }));
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        const services = QrProbe.services(ctx);
+        try expectEqual(@as(i32, 0), try B.RawQrAdapter.callManaged(true, T, .high, ctx, &services, .{ .layout = 102, .m = 2, .n = 1, .a = @ptrCast(&a), .lda = 2, .tau = @ptrCast(&tau) }));
         try same(T, &expected, &a);
         try same(T, &et, &tau);
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -815,7 +831,9 @@ test "right Q validates empty row targets and completes borrowed operations afte
     try expectError(error.NonFiniteInput, qr.qrApplyQSide(qr.ComplexF64, factor, &tau, matrix(qr.ComplexF64, &empty, 0, 2, 0), .right, .normal));
     tau[0] = saved;
     try expectError(error.DimensionMismatch, qr.qrApplyQSide(qr.ComplexF64, factor, &tau, matrix(qr.ComplexF64, &empty, 0, 3, 0), .right, .normal));
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     _ = ctx.requestClose();
     var b = [_]qr.ComplexF64{ .{ .re = 1, .im = 0 }, .{ .re = 0, .im = 1 } };
@@ -824,7 +842,7 @@ test "right Q validates empty row targets and completes borrowed operations afte
     try expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     op.end();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "ORMQR UNMQR query validates scalar order without matrix tau target reads" {
@@ -832,9 +850,11 @@ test "ORMQR UNMQR query validates scalar order without matrix tau target reads" 
     const E = @import("zynum-execution");
     inline for (.{ f32, f64, qr.ComplexF32, qr.ComplexF64 }) |T| {
         var query_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-        var ctx = E.context.Context.init(query_allocator.allocator(), E.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(query_allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var op = try ctx.begin();
-        const services = QrProbe.services(&ctx);
+        const services = QrProbe.services(ctx);
         for ([_]c_int{ 101, 102 }) |layout| for ("LR") |side| {
             var work: [1]T = undefined;
             const args: B.QApplyAdapter.Arguments(T) = .{ .layout = layout, .side = side, .trans = 'n', .m = 3, .n = 2, .k = 1, .lda = if (layout == 101) 1 else 3, .ldc = if (layout == 101) 2 else 3, .work = &work, .lwork = -1 };
@@ -862,7 +882,7 @@ test "ORMQR UNMQR query validates scalar order without matrix tau target reads" 
         op.end();
         try expectEqual(@as(usize, 0), query_allocator.allocated_bytes);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -896,9 +916,11 @@ test "ORMQR UNMQR finite high work row column left right produce identical owner
                 const tf = tau;
                 try expectEqual(@as(usize, 0), try qr.qrApplyQSide(T, matrix(T, &factor, 3, 2, 3).asConst(), &tau, matrix(T, &expected, m, n, m), if (side == 'L') .left else .right, op));
                 var work: [3]T = undefined;
-                var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-                const services = QrProbe.services(&ctx);
-                try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, T, level, &ctx, &services, .{ .layout = layout, .side = side, .trans = if (op == .normal) 'N' else if (complex) 'C' else 'T', .m = @intCast(m), .n = @intCast(n), .k = 2, .a = &a, .lda = if (layout == 101) 3 else 4, .tau = &tau, .c = &c, .ldc = 4, .work = &work, .lwork = 3 }));
+                var reference_ctx: FixtureReferenceContext = undefined;
+                reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const ctx = reference_ctx.borrowedContext();
+                const services = QrProbe.services(ctx);
+                try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, T, level, ctx, &services, .{ .layout = layout, .side = side, .trans = if (op == .normal) 'N' else if (complex) 'C' else 'T', .m = @intCast(m), .n = @intCast(n), .k = 2, .a = &a, .lda = if (layout == 101) 3 else 4, .tau = &tau, .c = &c, .ldc = 4, .work = &work, .lwork = 3 }));
                 for (0..m) |i| for (0..n) |j| {
                     const z = c[if (layout == 101) i * 4 + j else i + j * 4];
                     if (complex) try cnear(T, expected[i + j * m], z, 0) else try expectEqual(expected[i + j * m], z);
@@ -912,7 +934,7 @@ test "ORMQR UNMQR finite high work row column left right produce identical owner
                 try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
                 try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
                 _ = ctx.requestClose();
-                try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+                try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
             };
         };
     }
@@ -921,8 +943,10 @@ test "ORMQR UNMQR finite high work row column left right produce identical owner
 test "ORMQR UNMQR high scan precedence and work ignored R remain distinct" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     var a = [_]f64{ 1, 3 };
     var tau: [1]f64 = undefined;
     try expectEqual(@as(usize, 0), try qr.qrFactorize(f64, matrix(f64, &a, 2, 1, 2), &tau));
@@ -933,18 +957,18 @@ test "ORMQR UNMQR high scan precedence and work ignored R remain distinct" {
     c[0] = std.math.nan(f64);
     const ts = tau[0];
     tau[0] = std.math.nan(f64);
-    try expectEqual(@as(i32, -7), try B.QApplyAdapter.callManaged(true, f64, .high, &ctx, &services, args));
+    try expectEqual(@as(i32, -7), try B.QApplyAdapter.callManaged(true, f64, .high, ctx, &services, args));
     a[0] = 0;
-    try expectEqual(@as(i32, -10), try B.QApplyAdapter.callManaged(true, f64, .high, &ctx, &services, args));
+    try expectEqual(@as(i32, -10), try B.QApplyAdapter.callManaged(true, f64, .high, ctx, &services, args));
     c[0] = 1;
-    try expectEqual(@as(i32, -9), try B.QApplyAdapter.callManaged(true, f64, .high, &ctx, &services, args));
+    try expectEqual(@as(i32, -9), try B.QApplyAdapter.callManaged(true, f64, .high, ctx, &services, args));
     tau[0] = ts;
     a[0] = std.math.nan(f64);
-    try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "ORMQR UNMQR three allocation failures and closing scan callbacks release all leases" {
@@ -955,64 +979,70 @@ test "ORMQR UNMQR three allocation failures and closing scan callbacks release a
     try expectEqual(@as(usize, 0), try qr.qrFactorize(f64, matrix(f64, &a, 2, 1, 2), &tau));
     for ([_]usize{ 0, 1, 2 }) |fail| {
         var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = fail });
-        var ctx = E.context.Context.init(allocator.allocator(), E.test_support.policy, .internal_closable);
-        const services = QrProbe.services(&ctx);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        const services = QrProbe.services(ctx);
         var c = [_]f64{ 1, 2 };
         const before = c;
-        try expectEqual(@as(i32, if (fail == 0) -1010 else -1011), try B.QApplyAdapter.callManaged(true, f64, .high, &ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 1, .tau = &tau, .c = &c, .ldc = 1 }));
+        try expectEqual(@as(i32, if (fail == 0) -1010 else -1011), try B.QApplyAdapter.callManaged(true, f64, .high, ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 1, .tau = &tau, .c = &c, .ldc = 1 }));
         try same(f64, &before, &c);
         try expectEqual(allocator.allocated_bytes, allocator.freed_bytes);
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     var c = [_]f64{ 1, 2 };
     QrProbe.close_on_scan = true;
     defer QrProbe.close_on_scan = false;
-    try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, f64, .high, &ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 1, .tau = &tau, .c = &c, .ldc = 1 }));
+    try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, f64, .high, ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 1, .tau = &tau, .c = &c, .ldc = 1 }));
     try expectError(error.Closing, ctx.begin());
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "ORMQR UNMQR scalar errors precede query writes and quick returns preserve data nonreads" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     var work = [_]f64{ 999, 888, 777 };
     var args: B.QApplyAdapter.Arguments(f64) = .{ .layout = 102, .side = 'L', .trans = 'N', .m = 2, .n = 3, .k = 1, .lda = 2, .ldc = 2, .work = &work, .lwork = -1 };
     args.side = 'X';
-    try expectEqual(@as(i32, -2), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -2), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.side = 'L';
     args.k = 3;
-    try expectEqual(@as(i32, -6), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -6), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.k = 1;
     args.lda = 1;
-    try expectEqual(@as(i32, -8), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -8), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.lda = 2;
     args.ldc = 1;
-    try expectEqual(@as(i32, -11), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -11), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.ldc = 2;
     args.lwork = 2;
-    try expectEqual(@as(i32, -13), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -13), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     try expectEqual(@as(f64, 999), work[0]);
     args.k = 0;
     args.lwork = 3;
-    try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     try expectEqual(@as(f64, 1), work[0]);
     args.layout = 101;
     args.lda = 0;
     args.ldc = 3;
-    try expectError(error.MissingBuffer, B.QApplyAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectError(error.MissingBuffer, B.QApplyAdapter.callManaged(true, f64, .work, ctx, &services, args));
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "ORMQR UNMQR raw execution uses captured owner in both layouts" {
@@ -1027,14 +1057,16 @@ test "ORMQR UNMQR raw execution uses captured owner in both layouts" {
             var c: [2]T = if (complex) .{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 1 } } else .{ 1, 2 };
             var expected = c;
             try expectEqual(@as(usize, 0), try qr.qrApplyQSide(T, matrix(T, &a, 2, 1, 2).asConst(), &tau, matrix(T, &expected, 1, 2, 1), .right, .normal));
-            var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-            const services = QrProbe.services(&ctx);
-            try expectEqual(@as(i32, 0), try B.RawQApplyAdapter.callManaged(true, T, .high, &ctx, &services, .{ .layout = layout, .side = 'R', .trans = 'N', .m = 1, .n = 2, .k = 1, .a = @ptrCast(&a), .lda = if (layout == 101) 1 else 2, .tau = @ptrCast(&tau), .c = @ptrCast(&c), .ldc = if (layout == 101) 2 else 1 }));
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
+            const services = QrProbe.services(ctx);
+            try expectEqual(@as(i32, 0), try B.RawQApplyAdapter.callManaged(true, T, .high, ctx, &services, .{ .layout = layout, .side = 'R', .trans = 'N', .m = 1, .n = 2, .k = 1, .a = @ptrCast(&a), .lda = if (layout == 101) 1 else 2, .tau = @ptrCast(&tau), .c = @ptrCast(&c), .ldc = if (layout == 101) 2 else 1 }));
             try same(T, &expected, &c);
             try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
             try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
             _ = ctx.requestClose();
-            try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+            try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
         }
     }
 }
@@ -1043,37 +1075,41 @@ test "ORMQR UNMQR third resource pin rejection cleans earlier captured allocatio
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
     var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    var ctx = E.context.Context.init(allocator.allocator(), E.test_support.policy, .internal_closable);
-    E.context.Context.testing.configure(&ctx, 2, null);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    E.context.Context.testing.configure(ctx, 2, null);
+    const services = QrProbe.services(ctx);
     var a = [_]f64{ 1, 3 };
     var tau: [1]f64 = undefined;
     try expectEqual(@as(usize, 0), try qr.qrFactorize(f64, matrix(f64, &a, 2, 1, 2), &tau));
     var c = [_]f64{ 1, 2 };
     const before = c;
-    try expectError(error.CounterOverflow, B.QApplyAdapter.callManaged(true, f64, .high, &ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 1, .tau = &tau, .c = &c, .ldc = 1 }));
+    try expectError(error.CounterOverflow, B.QApplyAdapter.callManaged(true, f64, .high, ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 1, .tau = &tau, .c = &c, .ldc = 1 }));
     try same(f64, &before, &c);
     try expectEqual(allocator.allocated_bytes, allocator.freed_bytes);
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "QR ABI row staging byte overflow is not OOM and never attempts allocation or array access" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
     var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-    var ctx = E.context.Context.init(allocator.allocator(), E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     const huge = std.math.maxInt(i32);
-    try expectError(error.SizeOverflow, B.QrAdapter.callManaged(false, qr.ComplexF64, .work, &ctx, &services, .{ .layout = 101, .m = huge, .n = huge, .lda = huge, .lwork = huge }));
-    try expectError(error.SizeOverflow, B.QApplyAdapter.callManaged(false, qr.ComplexF64, .work, &ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = huge, .n = huge, .k = huge, .lda = huge, .ldc = huge, .lwork = huge }));
+    try expectError(error.SizeOverflow, B.QrAdapter.callManaged(false, qr.ComplexF64, .work, ctx, &services, .{ .layout = 101, .m = huge, .n = huge, .lda = huge, .lwork = huge }));
+    try expectError(error.SizeOverflow, B.QApplyAdapter.callManaged(false, qr.ComplexF64, .work, ctx, &services, .{ .layout = 101, .side = 'L', .trans = 'N', .m = huge, .n = huge, .k = huge, .lda = huge, .ldc = huge, .lwork = huge }));
     try expectEqual(@as(usize, 0), allocator.alloc_index);
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "GEQRF IEEE work accepts NaN Inf and finite unrepresentable norms without positive INFO" {
@@ -1088,9 +1124,11 @@ test "GEQRF IEEE work accepts NaN Inf and finite unrepresentable norms without p
                 const before = a;
                 var tau: [1]T = undefined;
                 var work: [1]T = undefined;
-                var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-                const services = QrProbe.services(&ctx);
-                try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(false, T, .work, &ctx, &services, .{ .layout = layout, .m = 2, .n = 1, .a = &a, .lda = if (layout == 101) 1 else 2, .tau = &tau, .work = &work, .lwork = 1 }));
+                var reference_ctx: FixtureReferenceContext = undefined;
+                reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const ctx = reference_ctx.borrowedContext();
+                const services = QrProbe.services(ctx);
+                try expectEqual(@as(i32, 0), try B.QrAdapter.callManaged(false, T, .work, ctx, &services, .{ .layout = layout, .m = 2, .n = 1, .a = &a, .lda = if (layout == 101) 1 else 2, .tau = &tau, .work = &work, .lwork = 1 }));
                 const diag = if (complex) a[0].re else a[0];
                 try expect(!std.math.isFinite(diag));
                 var checked = before;
@@ -1100,7 +1138,7 @@ test "GEQRF IEEE work accepts NaN Inf and finite unrepresentable norms without p
                 try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
                 try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
                 _ = ctx.requestClose();
-                try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+                try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
             }
         }
     }
@@ -1116,27 +1154,29 @@ test "Q application IEEE work permits unchecked coefficients and preserves zero 
         var tau: [1]T = if (complex) .{.{ .re = 3, .im = 0 }} else .{3};
         var c: [2]T = if (complex) .{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 0 } } else .{ 1, 2 };
         var work: [1]T = undefined;
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        const services = QrProbe.services(&ctx);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        const services = QrProbe.services(ctx);
         const args: B.QApplyAdapter.Arguments(T) = .{ .layout = 102, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 2, .tau = &tau, .c = &c, .ldc = 2, .work = &work, .lwork = 1 };
         var checked = c;
         try expectError(error.InvalidReflector, qr.qrApplyQ(T, matrix(T, &a, 2, 1, 2).asConst(), &tau, matrix(T, &checked, 2, 1, 2), .normal));
-        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, &ctx, &services, args));
+        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, ctx, &services, args));
         try expectEqual(@as(R, -8), if (complex) c[0].re else c[0]);
         try expectEqual(@as(R, -7), if (complex) c[1].re else c[1]);
         tau[0] = if (complex) .{ .re = 0, .im = 0 } else 0;
         c[0] = if (complex) .{ .re = std.math.nan(R), .im = std.math.inf(R) } else std.math.nan(R);
         const before = c;
-        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, &ctx, &services, args));
+        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, ctx, &services, args));
         try same(T, &before, &c);
         tau[0] = if (complex) .{ .re = std.math.nan(R), .im = 0 } else std.math.nan(R);
         c[0] = if (complex) .{ .re = 1, .im = 0 } else 1;
-        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, &ctx, &services, args));
+        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, ctx, &services, args));
         try expect(std.math.isNan(if (complex) c[0].re else c[0]));
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -1151,17 +1191,19 @@ test "Q IEEE finite unrepresentable outputs project to infinity while checked ca
         var c: [2]T = if (complex) .{ .{ .re = std.math.floatMax(R), .im = 0 }, .{ .re = std.math.floatMax(R), .im = 0 } } else .{ std.math.floatMax(R), std.math.floatMax(R) };
         var checked = c;
         try expectEqual(@as(usize, 1), try qr.qrApplyQ(T, matrix(T, &a, 2, 1, 2).asConst(), &tau, matrix(T, &checked, 2, 1, 2), .normal));
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        const services = QrProbe.services(&ctx);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        const services = QrProbe.services(ctx);
         var work: [1]T = undefined;
-        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, &ctx, &services, .{ .layout = 102, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 2, .tau = &tau, .c = &c, .ldc = 2, .work = &work, .lwork = 1 }));
+        try expectEqual(@as(i32, 0), try B.QApplyAdapter.callManaged(false, T, .work, ctx, &services, .{ .layout = 102, .side = 'L', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = &a, .lda = 2, .tau = &tau, .c = &c, .ldc = 2, .work = &work, .lwork = 1 }));
         const value = if (complex) c[0].re else c[0];
         try expect(std.math.isInf(value));
         try expect(value < 0);
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -1173,8 +1215,10 @@ test "raw GEQRF IEEE admitted NaN work completes after close and high enabled sc
         const R = if (complex) @TypeOf(@as(T, undefined).re) else T;
         var a: [2]T = if (complex) .{ .{ .re = std.math.nan(R), .im = 0 }, .{ .re = 1, .im = 0 } } else .{ std.math.nan(R), 1 };
         var tau: [1]T = undefined;
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        const services = QrProbe.services(&ctx);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        const services = QrProbe.services(ctx);
         var op = try ctx.begin();
         _ = ctx.requestClose();
         const args: B.RawQrAdapter.Arguments(T) = .{ .layout = 101, .m = 2, .n = 1, .a = @ptrCast(&a), .lda = 1, .tau = @ptrCast(&tau) };
@@ -1185,7 +1229,7 @@ test "raw GEQRF IEEE admitted NaN work completes after close and high enabled sc
         try expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         op.end();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -1208,20 +1252,22 @@ test "generated QR shared raw bridges capture diagnostics and cleanup before end
         }
     };
     for ([_]bool{ false, true }) |apply| {
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        var probe = Probe{ .ctx = &ctx };
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        var probe = Probe{ .ctx = ctx };
         const callbacks: B.shared_services.Callbacks = .{ .fortran_returning_test = .{ .userdata = &probe, .function = Probe.event } };
         var a = [_]f64{0};
         var c = [_]f64{ 1, 2 };
         var work = [_]f64{ 0, 0 };
-        const info = if (apply) try B.Shared.qApplyRawManagedWithDefaults(false, f64, .work, &ctx, .{ .layout = 101, .side = 'X', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = @ptrCast(&a), .lda = 1, .c = @ptrCast(&c), .ldc = 1, .work = @ptrCast(&work), .lwork = 2 }, callbacks) else try B.Shared.qrRawManagedWithDefaults(false, f64, .work, &ctx, .{ .layout = 101, .m = -1, .n = 2, .lda = 2, .work = @ptrCast(&work), .lwork = 2 }, callbacks);
+        const info = if (apply) try B.Shared.qApplyRawManagedWithDefaults(false, f64, .work, ctx, .{ .layout = 101, .side = 'X', .trans = 'N', .m = 2, .n = 1, .k = 1, .a = @ptrCast(&a), .lda = 1, .c = @ptrCast(&c), .ldc = 1, .work = @ptrCast(&work), .lwork = 2 }, callbacks) else try B.Shared.qrRawManagedWithDefaults(false, f64, .work, ctx, .{ .layout = 101, .m = -1, .n = 2, .lda = 2, .work = @ptrCast(&work), .lwork = 2 }, callbacks);
         try expectEqual(@as(i32, -2), info);
         try expectEqual(@as(usize, 1), probe.calls);
         try expectEqual(@as(usize, 1), probe.ops);
         try expectEqual(@as(usize, if (apply) 2 else 1), probe.pins);
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -1304,7 +1350,9 @@ test "explicit Q generation completes after local close with one operation and n
         try expectEqual(@as(usize, 0), try qr.qrFactorize(T, matrix(T, &a, 2, 1, 2), &tau));
         var expected: [2]T = if (complex) .{ .{ .re = 1, .im = 0 }, .{ .re = 0, .im = 0 } } else .{ 1, 0 };
         try expectEqual(@as(usize, 0), try qr.qrApplyQ(T, matrix(T, &a, 2, 1, 2).asConst(), &tau, matrix(T, &expected, 2, 1, 2), .normal));
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var op = try ctx.begin();
         _ = ctx.requestClose();
         try expectEqual(@as(usize, 0), try Core.internal.lapack_checked.qrGenerateQWithContractAdmitted(&op, T, matrix(T, &a, 2, 1, 2), &tau, 1, .checked));
@@ -1316,7 +1364,7 @@ test "explicit Q generation completes after local close with one operation and n
         try expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         op.end();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -1328,14 +1376,16 @@ test "explicit Q generation IEEE policy accepts unchecked NaN coefficients witho
     var tau = [_]qr.ComplexF64{.{ .re = std.math.nan(f64), .im = 0 }};
     try expectError(error.NonFiniteInput, qr.qrGenerateQ(qr.ComplexF64, matrix(qr.ComplexF64, &a, 2, 1, 2), &tau, 1));
     try same(qr.ComplexF64, &before, &a);
-    var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     var op = try ctx.begin();
     try expectEqual(@as(usize, 0), try Core.internal.lapack_checked.qrGenerateQWithContractAdmitted(&op, qr.ComplexF64, matrix(qr.ComplexF64, &a, 2, 1, 2), &tau, 1, .lapack_ieee_v1));
     try expect(std.math.isNan(a[0].re));
     try expect(std.math.isNan(a[1].re));
     op.end();
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "ORGQR UNGQR typed high work and raw high preserve layout padding" {
@@ -1356,9 +1406,11 @@ test "ORGQR UNGQR typed high work and raw high preserve layout padding" {
                 };
                 const before = a;
                 var work: [2]T = undefined;
-                var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-                const services = QrProbe.services(&ctx);
-                const info = if (route == 2) try B.RawQGenerateAdapter.callManaged(true, T, .high, &ctx, &services, .{ .layout = layout, .m = 3, .n = 2, .k = 2, .a = @ptrCast(&a), .lda = 4, .tau = @ptrCast(&tau) }) else try B.QGenerateAdapter.callManaged(true, T, if (route == 0) .high else .work, &ctx, &services, .{ .layout = layout, .m = 3, .n = 2, .k = 2, .a = &a, .lda = 4, .tau = &tau, .work = &work, .lwork = 2 });
+                var reference_ctx: FixtureReferenceContext = undefined;
+                reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const ctx = reference_ctx.borrowedContext();
+                const services = QrProbe.services(ctx);
+                const info = if (route == 2) try B.RawQGenerateAdapter.callManaged(true, T, .high, ctx, &services, .{ .layout = layout, .m = 3, .n = 2, .k = 2, .a = @ptrCast(&a), .lda = 4, .tau = @ptrCast(&tau) }) else try B.QGenerateAdapter.callManaged(true, T, if (route == 0) .high else .work, ctx, &services, .{ .layout = layout, .m = 3, .n = 2, .k = 2, .a = &a, .lda = 4, .tau = &tau, .work = &work, .lwork = 2 });
                 try expectEqual(@as(i32, 0), info);
                 for (0..3) |i| for (0..2) |j| {
                     try same(T, expected[i + j * 3 ..][0..1], a[if (layout == 101) i * 4 + j else i + j * 4..][0..1]);
@@ -1370,7 +1422,7 @@ test "ORGQR UNGQR typed high work and raw high preserve layout padding" {
                 try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
                 try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
                 _ = ctx.requestClose();
-                try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+                try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
             }
         }
     }
@@ -1380,60 +1432,64 @@ test "ORGQR UNGQR query scalar errors and high NaN precedence" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
     var query_allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-    var ctx = E.context.Context.init(query_allocator.allocator(), E.test_support.policy, .internal_closable);
-    const services = QrProbe.services(&ctx);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(query_allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    const services = QrProbe.services(ctx);
     var work = [_]f64{99};
     var args: B.QGenerateAdapter.Arguments(f64) = .{ .layout = 102, .m = 3, .n = 2, .k = 1, .lda = 3, .work = &work, .lwork = -1 };
-    try expectEqual(@as(i32, 0), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, 0), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     try expectEqual(@as(f64, 2), work[0]);
     inline for (.{ f32, f64, qr.ComplexF32, qr.ComplexF64 }) |T| {
         for (query_boundaries) |n| for ([_]c_int{ 101, 102 }) |layout| {
             var values: [1]T = undefined;
-            try expectEqual(@as(i32, 0), try B.QGenerateAdapter.callManaged(true, T, .work, &ctx, &services, .{ .layout = layout, .m = n, .n = n, .k = 0, .lda = n, .work = &values, .lwork = -1 }));
+            try expectEqual(@as(i32, 0), try B.QGenerateAdapter.callManaged(true, T, .work, ctx, &services, .{ .layout = layout, .m = n, .n = n, .k = 0, .lda = n, .work = &values, .lwork = -1 }));
             try expectQueryMinimum(T, values[0], n);
-            try expectEqual(@as(i32, 0), try B.RawQGenerateAdapter.callManaged(true, T, .work, &ctx, &services, .{ .layout = layout, .m = n, .n = n, .k = 0, .lda = n, .work = @ptrCast(&values), .lwork = -1 }));
+            try expectEqual(@as(i32, 0), try B.RawQGenerateAdapter.callManaged(true, T, .work, ctx, &services, .{ .layout = layout, .m = n, .n = n, .k = 0, .lda = n, .work = @ptrCast(&values), .lwork = -1 }));
             try expectQueryMinimum(T, values[0], n);
         };
     }
     try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     args.m = -1;
-    try expectEqual(@as(i32, -2), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -2), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.m = 1;
-    try expectEqual(@as(i32, -3), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -3), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.m = 3;
     args.k = 3;
-    try expectEqual(@as(i32, -4), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -4), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.k = 1;
     args.lda = 2;
-    try expectEqual(@as(i32, -6), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -6), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.lda = 3;
     args.lwork = 1;
-    try expectEqual(@as(i32, -9), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -9), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     args.layout = 101;
     args.lda = 1;
-    try expectEqual(@as(i32, -6), try B.QGenerateAdapter.callManaged(true, f64, .work, &ctx, &services, args));
+    try expectEqual(@as(i32, -6), try B.QGenerateAdapter.callManaged(true, f64, .work, ctx, &services, args));
     var a = [_]f64{ std.math.nan(f64), 0, 0, 0, 0, 0 };
     var tau = [_]f64{std.math.nan(f64)};
     args.layout = 102;
     args.lda = 3;
     args.a = &a;
     args.tau = &tau;
-    try expectEqual(@as(i32, -5), try B.QGenerateAdapter.callManaged(true, f64, .high, &ctx, &services, args));
+    try expectEqual(@as(i32, -5), try B.QGenerateAdapter.callManaged(true, f64, .high, ctx, &services, args));
     a[0] = 0;
-    try expectEqual(@as(i32, -7), try B.QGenerateAdapter.callManaged(true, f64, .high, &ctx, &services, args));
+    try expectEqual(@as(i32, -7), try B.QGenerateAdapter.callManaged(true, f64, .high, ctx, &services, args));
     try expectEqual(@as(usize, 0), query_allocator.allocated_bytes);
     _ = ctx.requestClose();
-    try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+    try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
 }
 
 test "ORGQR UNGQR admitted row high survives closing and releases both scratch leases" {
     const B = @import("numerical-owner");
     const E = @import("zynum-execution");
     inline for (.{ f32, f64, qr.ComplexF32, qr.ComplexF64 }) |T| {
-        var ctx = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var op = try ctx.begin();
-        const services = QrProbe.services(&ctx);
+        const services = QrProbe.services(ctx);
         _ = ctx.requestClose();
         var a: [4]T = @splat(if (T == qr.ComplexF32 or T == qr.ComplexF64) .{ .re = 99, .im = 1 } else 99);
         try expectEqual(@as(i32, 0), try B.RawQGenerateAdapter.highAdmitted(false, T, &op, &services, .{ .layout = 101, .m = 2, .n = 2, .k = 0, .a = @ptrCast(&a), .lda = 2 }));
@@ -1447,7 +1503,7 @@ test "ORGQR UNGQR admitted row high survives closing and releases both scratch l
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         try expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
         op.end();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -1456,18 +1512,26 @@ test "ORGQR UNGQR allocation failures and pin overflow release captured resource
     const E = @import("zynum-execution");
     inline for (.{ 0, 1, 2 }) |failure| {
         var allocator = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = if (failure == 2) 99 else failure });
-        var ctx = E.context.Context.init(allocator.allocator(), E.test_support.policy, .internal_closable);
-        if (failure == 2) E.context.Context.testing.configure(&ctx, 1, null);
-        const services = QrProbe.services(&ctx);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocator.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        if (failure == 2) E.context.Context.testing.configure(ctx, 1, null);
+        const services = QrProbe.services(ctx);
         var a = [_]f64{ 77, 77, 77, 77 };
         const before = a;
         const args: B.QGenerateAdapter.Arguments(f64) = .{ .layout = 101, .m = 2, .n = 2, .k = 0, .a = &a, .lda = 2 };
-        if (failure == 2) try expectError(error.CounterOverflow, B.QGenerateAdapter.callManaged(false, f64, .high, &ctx, &services, args)) else try expectEqual(@as(i32, if (failure == 0) -1010 else -1011), try B.QGenerateAdapter.callManaged(false, f64, .high, &ctx, &services, args));
+        if (failure == 2) try expectError(error.CounterOverflow, B.QGenerateAdapter.callManaged(false, f64, .high, ctx, &services, args)) else try expectEqual(@as(i32, if (failure == 0) -1010 else -1011), try B.QGenerateAdapter.callManaged(false, f64, .high, ctx, &services, args));
         try same(f64, &before, &a);
         try expectEqual(allocator.allocated_bytes, allocator.freed_bytes);
         try expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
         try expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
         _ = ctx.requestClose();
-        try expectEqual(E.context.CloseResult.closed, ctx.tryProgressClose());
+        try expectEqual(E.context.CloseResult.closed, fixtureProgressClose(ctx));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

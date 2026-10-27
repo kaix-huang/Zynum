@@ -12,15 +12,16 @@ pub const ContourChecks = @import("contour_binding_candidate_test.zig");
 pub const ChainChecks = @import("lanczos_chain_candidate_test.zig");
 pub const OperatorChainChecks = @import("operator_chain_boundary_test.zig");
 pub const PhaseChecks = @import("operator_phase_candidate_test.zig");
-fn context() C.Context {
-    return C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+fn context(storage: *FixtureReferenceContext) *C.Context {
+    storage.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    return storage.borrowedContext();
 }
 fn value(comptime T: type, re: S.Real(T), im: S.Real(T)) T {
     return if (comptime S.isComplex(T)) .{ .re = re, .im = im } else re;
 }
 fn expectClose(owner: *C.Context) !void {
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn Backend(comptime T: type) type {
     return struct {
@@ -53,8 +54,9 @@ pub fn checkCase0() !void {
         const R = S.Real(T);
         const diag = [_]R{ -1, -0.7, 0, 0.3, 1 };
         var backend = Backend(T){ .diagonal = &diag };
-        var owner = context();
-        defer expectClose(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer expectClose(owner) catch unreachable;
         var input: [5]T = undefined;
         for (&input, 0..) |*x, i| x.* = value(T, @floatFromInt(i + 1), 0.25);
         const saved = input;
@@ -62,7 +64,7 @@ pub fn checkCase0() !void {
         var coefficients: [34]T = undefined;
         for (&coefficients, 0..) |*c, k| c.* = value(T, 1 / (@as(R, @floatFromInt(k)) + 1), if (k % 2 == 0) 0.02 else -0.03);
         var work: [23]T = @splat(value(T, 77, 19));
-        try Managed.runBorrowed(T, &owner, .{ .action = backend.borrow(), .input = &input, .coefficients = &coefficients, .output = &output }, &work);
+        try Managed.runBorrowed(T, owner, .{ .action = backend.borrow(), .input = &input, .coefficients = &coefficients, .output = &output }, &work);
         try std.testing.expectEqual(@as(usize, 33), backend.calls.load(.acquire));
         try std.testing.expectEqualDeep(saved, input);
         for (diag, input, output) |d, x, actual| {
@@ -88,8 +90,9 @@ pub fn checkCase1() !void {
         const R = S.Real(T);
         const diag = [_]R{1};
         var backend = Backend(T){ .diagonal = &diag };
-        var owner = context();
-        defer expectClose(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer expectClose(owner) catch unreachable;
         var operation = try owner.begin();
         defer operation.end();
         const previous = [_]T{value(T, std.math.floatMax(R), 0)};
@@ -108,50 +111,52 @@ pub fn checkCase1() !void {
 pub fn checkCase2() !void {
     const diag = [_]f64{ 0.5, -0.25 };
     var backend = Backend(f64){ .diagonal = &diag, .fail_at = 3 };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     const input = [_]f64{ 2, 3 };
     const coeff = [_]f64{ 1, 2, 3, 4, 5 };
     var output = [_]f64{ 91, 92 };
     var work: [10]f64 = @splat(77);
     const request = Cheb.Request(f64){ .action = backend.borrow(), .input = &input, .coefficients = &coeff, .output = &output };
-    try std.testing.expectError(error.InjectedActionFailure, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.InjectedActionFailure, Managed.runBorrowed(f64, owner, request, &work));
     try std.testing.expectEqualSlices(f64, &.{ 91, 92 }, &output);
     try std.testing.expectEqualSlices(f64, &.{ 77, 77 }, work[8..]);
     backend.fail_at = 0;
     backend.calls.store(0, .release);
     backend.nonfinite_at = 2;
-    try std.testing.expectError(error.NonFiniteResult, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.NonFiniteResult, Managed.runBorrowed(f64, owner, request, &work));
     try std.testing.expectEqualSlices(f64, &.{ 91, 92 }, &output);
     backend.calls.store(0, .release);
     backend.nonfinite_at = 0;
-    try Managed.runBorrowed(f64, &owner, request, &work);
+    try Managed.runBorrowed(f64, owner, request, &work);
 }
 pub fn checkCase3() !void {
     const diag = [_]f64{ 0.5, 0.2 };
     var backend = Backend(f64){ .diagonal = &diag };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     var input = [_]f64{ 2, 3 };
     var output = [_]f64{ 91, 92 };
     const coeff = [_]f64{ 1, 2 };
     var work: [8]f64 = undefined;
     var request = Cheb.Request(f64){ .action = backend.borrow(), .input = &input, .coefficients = &coeff, .output = &output };
-    try std.testing.expectError(error.WorkspaceTooSmall, Managed.runBorrowed(f64, &owner, request, work[0..7]));
+    try std.testing.expectError(error.WorkspaceTooSmall, Managed.runBorrowed(f64, owner, request, work[0..7]));
     request.output = &input;
-    try std.testing.expectError(error.AliasingNotAllowed, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.AliasingNotAllowed, Managed.runBorrowed(f64, owner, request, &work));
     request.output = &output;
     request.input = work[0..2];
-    try std.testing.expectError(error.AliasingNotAllowed, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.AliasingNotAllowed, Managed.runBorrowed(f64, owner, request, &work));
     request.input = &input;
     request.action.columns = 3;
-    try std.testing.expectError(error.DimensionMismatch, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.DimensionMismatch, Managed.runBorrowed(f64, owner, request, &work));
     request.action = backend.borrow();
     input[0] = std.math.inf(f64);
-    try std.testing.expectError(error.NonFiniteInput, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.NonFiniteInput, Managed.runBorrowed(f64, owner, request, &work));
     input[0] = 2;
     request.coefficients = &.{};
-    try std.testing.expectError(error.InvalidOptions, Managed.runBorrowed(f64, &owner, request, &work));
+    try std.testing.expectError(error.InvalidOptions, Managed.runBorrowed(f64, owner, request, &work));
     try std.testing.expectEqual(@as(usize, 0), backend.calls.load(.acquire));
     try std.testing.expectEqualSlices(f64, &.{ 91, 92 }, &output);
     var huge = backend.borrow();
@@ -160,33 +165,35 @@ pub fn checkCase3() !void {
 }
 pub fn checkCase4() !void {
     var backend = Backend(f64){ .diagonal = &.{} };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     var empty: [0]f64 = .{};
-    try Managed.runBorrowed(f64, &owner, .{ .action = backend.borrow(), .input = &empty, .coefficients = &.{ 1, 2, 3, 4 }, .output = &empty }, &empty);
+    try Managed.runBorrowed(f64, owner, .{ .action = backend.borrow(), .input = &empty, .coefficients = &.{ 1, 2, 3, 4 }, .output = &empty }, &empty);
     try std.testing.expectEqual(@as(usize, 3), backend.calls.load(.acquire));
     const diag = [_]f64{0.2};
     var constant = Backend(f64){ .diagonal = &diag };
     const input = [_]f64{3};
     var output = [_]f64{91};
     var work: [4]f64 = undefined;
-    try Managed.runBorrowed(f64, &owner, .{ .action = constant.borrow(), .input = &input, .coefficients = &.{2}, .output = &output }, &work);
+    try Managed.runBorrowed(f64, owner, .{ .action = constant.borrow(), .input = &input, .coefficients = &.{2}, .output = &output }, &work);
     try std.testing.expectEqual(@as(usize, 0), constant.calls.load(.acquire));
     try std.testing.expectEqual(@as(f64, 6), output[0]);
 }
 pub fn checkCase5() !void {
     const diag = [_]f64{0.5};
     var backend = Backend(f64){ .diagonal = &diag, .expected_pins = 1, .close_at = 1 };
-    var owner = context();
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
     const input = [_]f64{3};
     var output = [_]f64{91};
-    try Managed.runScratch(f64, &owner, .{ .action = backend.borrow(), .input = &input, .coefficients = &.{ 1, 2, 3, 4 }, .output = &output });
+    try Managed.runScratch(f64, owner, .{ .action = backend.borrow(), .input = &input, .coefficients = &.{ 1, 2, 3, 4 }, .output = &output });
     try std.testing.expectEqual(@as(usize, 3), backend.calls.load(.acquire));
     const state = owner.snapshot();
     try std.testing.expectEqual(@as(usize, 0), state.active_operations);
     try std.testing.expectEqual(@as(usize, 0), state.resource_pins);
-    try std.testing.expectError(error.Closing, Managed.runScratch(f64, &owner, .{ .action = backend.borrow(), .input = &input, .coefficients = &.{1}, .output = &output }));
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectError(error.Closing, Managed.runScratch(f64, owner, .{ .action = backend.borrow(), .input = &input, .coefficients = &.{1}, .output = &output }));
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 pub fn checkCase6() !void {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
@@ -196,32 +203,35 @@ pub fn checkCase6() !void {
         const entries = [_]T{ value(T, 0, 0.5), value(T, 0, -0.5) };
         const matrix = Matrix{ .row_offsets = &offsets, .column_indices = &indices, .values = &entries, .row_count = 2, .column_count = 2 };
         const action = Core.internal.sparse_checked.operator.CsrBackend(Matrix).borrow(&matrix);
-        var owner = context();
-        defer expectClose(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer expectClose(owner) catch unreachable;
         const input = [_]T{ value(T, 1, 2), value(T, 3, -1) };
         const coefficients = [_]T{ value(T, 1, 0), value(T, 2, 0), value(T, 3, 0), value(T, 4, 0) };
         var output: [2]T = @splat(value(T, 91, 13));
-        try Managed.runScratch(T, &owner, .{ .action = action, .input = &input, .coefficients = &coefficients, .output = &output });
+        try Managed.runScratch(T, owner, .{ .action = action, .input = &input, .coefficients = &coefficients, .output = &output });
         try std.testing.expectEqualDeep(value(T, -3.5, -10), output[0]);
         try std.testing.expectEqualDeep(value(T, -7.5, 3.5), output[1]);
     }
 }
 pub fn checkCase7() !void {
     var allocations = E.test_support.Allocations{ .budget = 0 };
-    var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer expectClose(owner) catch unreachable;
     const diag = [_]f64{0.5};
     var backend = Backend(f64){ .diagonal = &diag };
     const input = [_]f64{3};
     var output = [_]f64{91};
     const request = Cheb.Request(f64){ .action = backend.borrow(), .input = &input, .coefficients = &.{ 1, 2, 3 }, .output = &output };
-    try std.testing.expectError(error.OutOfMemory, Managed.runScratch(f64, &owner, request));
+    try std.testing.expectError(error.OutOfMemory, Managed.runScratch(f64, owner, request));
     try std.testing.expectEqual(@as(f64, 91), output[0]);
     try std.testing.expectEqual(@as(usize, 0), backend.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     allocations.budget = 1;
-    try Managed.runScratch(f64, &owner, request);
+    try Managed.runScratch(f64, owner, request);
     const stats = allocations.stats();
     try std.testing.expectEqual(@as(usize, 1), stats.rejected);
     try std.testing.expectEqual(@as(usize, 1), stats.accepted);
@@ -252,11 +262,13 @@ pub fn checkCase8() !void {
         }
     };
     var allocations = E.test_support.Allocations{ .budget = 2 };
-    var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var backend = Concurrent{};
     const action = N.Operator(f64){ .context = &backend, .rows = 1, .columns = 1, .apply_fn = Concurrent.apply };
-    var first = Call{ .owner = &owner, .action = action, .input = .{3} };
-    var second = Call{ .owner = &owner, .action = action, .input = .{6} };
+    var first = Call{ .owner = owner, .action = action, .input = .{3} };
+    var second = Call{ .owner = owner, .action = action, .input = .{6} };
     const thread1 = try std.Thread.spawn(.{}, Call.run, .{&first});
     var joined = false;
     const thread2 = std.Thread.spawn(.{}, Call.run, .{&second}) catch |err| {
@@ -275,7 +287,7 @@ pub fn checkCase8() !void {
     try std.testing.expectEqual(@as(usize, 2), snapshot.active_operations);
     try std.testing.expectEqual(@as(usize, 2), snapshot.resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.busy, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(owner));
     backend.release.store(true, .release);
     thread1.join();
     thread2.join();
@@ -284,7 +296,7 @@ pub fn checkCase8() !void {
     try std.testing.expectEqual(@as(f64, 15), first.output[0]);
     try std.testing.expectEqual(@as(f64, 30), second.output[0]);
     try std.testing.expectEqual(@as(usize, 2), allocations.stats().freed);
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 pub fn checkCase9() !void {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
@@ -297,8 +309,9 @@ pub fn checkCase9() !void {
         const diag = [_]S.Real(T){ 0.5, -0.25 };
         var fallback = Backend(T){ .diagonal = &diag };
         inline for (.{ csr, fallback.borrow() }) |action| inline for (.{ N.Dense.Layout.row_major, N.Dense.Layout.column_major }) |layout| {
-            var owner = context();
-            defer expectClose(&owner) catch unreachable;
+            var reference_owner: FixtureReferenceContext = undefined;
+            const owner = context(&reference_owner);
+            defer expectClose(owner) catch unreachable;
             const stride: usize = if (layout == .row_major) 4 else 3;
             const shape = N.Dense.PanelShape{ .row_count = 2, .column_count = 3, .leading_dimension = stride, .layout = layout };
             var input: [10]T = @splat(value(T, std.math.nan(S.Real(T)), 0));
@@ -310,7 +323,7 @@ pub fn checkCase9() !void {
             };
             const saved = input;
             const coefficients = [_]T{ value(T, 1, 0), value(T, 2, 0), value(T, 3, 0) };
-            try Managed.runPanelScratch(T, &owner, .{ .action = action, .input = x.asConst(), .coefficients = &coefficients, .output = y });
+            try Managed.runPanelScratch(T, owner, .{ .action = action, .input = x.asConst(), .coefficients = &coefficients, .output = y });
             for (0..3) |j| for (0..2) |i| {
                 const factor: S.Real(T) = if (i == 0) 0.5 else -2.125;
                 const expected = S.mul(T, S.realScalar(T, factor), x.column(j).at(i).*);
@@ -350,13 +363,14 @@ pub fn checkCase10() !void {
         panel.column(0).at(1).* = value(T, 0, -0.5);
         const backend = DenseAction{ .matrix = panel.asConst() };
         const action = N.Operator(T){ .context = &backend, .rows = 2, .columns = 2, .apply_fn = DenseAction.apply };
-        var owner = context();
-        defer expectClose(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer expectClose(owner) catch unreachable;
         const input = [_]T{ value(T, 1, 2), value(T, 3, -1) };
         const coefficients = [_]T{ value(T, 1, 0), value(T, 2, 0), value(T, 3, 0), value(T, 4, 0) };
         var output: [2]T = @splat(value(T, 91, 13));
         const saved = data;
-        try Managed.runScratch(T, &owner, .{ .action = action, .input = &input, .coefficients = &coefficients, .output = &output });
+        try Managed.runScratch(T, owner, .{ .action = action, .input = &input, .coefficients = &coefficients, .output = &output });
         try std.testing.expectEqualDeep(value(T, -3.5, -10), output[0]);
         try std.testing.expectEqualDeep(value(T, -7.5, 3.5), output[1]);
         try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&data));
@@ -365,8 +379,9 @@ pub fn checkCase10() !void {
 pub fn checkCase11() !void {
     const diag = [_]f64{ 0.5, -0.25 };
     var backend = Backend(f64){ .diagonal = &diag, .fail_at = 5 };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     const shape = N.Dense.PanelShape{ .row_count = 2, .column_count = 3, .leading_dimension = 4, .layout = .row_major };
     var input = [_]f64{ 1, 2, 3, 77, 4, 5, 6, 77 };
     var output: [10]f64 = @splat(91);
@@ -401,14 +416,15 @@ pub fn checkCase12() !void {
         const R = S.Real(T);
         const diag = [_]R{ -3, -1, 0.5, 2, 4 };
         var backend = Backend(T){ .diagonal = &diag };
-        var owner = context();
-        defer expectClose(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer expectClose(owner) catch unreachable;
         var input: [5]T = undefined;
         for (&input, 0..) |*x, k| x.* = value(T, @floatFromInt(k + 1), 0.25);
         const saved = input;
         var vectors: [17]T = @splat(value(T, 77, 13));
         var real: [20]R = @splat(77);
-        const result = try LanczosManaged.runBorrowed(T, &owner, .{ .action = backend.borrow(), .initial = &input, .global_dimension = 5, .max_order = 5, .ritz_tolerance = 0 }, .{ .vectors = &vectors, .real = &real });
+        const result = try LanczosManaged.runBorrowed(T, owner, .{ .action = backend.borrow(), .initial = &input, .global_dimension = 5, .max_order = 5, .ritz_tolerance = 0 }, .{ .vectors = &vectors, .real = &real });
         try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, result.status);
         try std.testing.expectEqual(@as(usize, 5), result.order);
         try std.testing.expectEqual(@as(usize, 5), backend.calls.load(.acquire));
@@ -422,10 +438,11 @@ pub fn checkCase12() !void {
 pub fn checkCase13() !void {
     const diag = [_]f64{ -3, -1, 0.5, 2, 4 };
     var backend = Backend(f64){ .diagonal = &diag };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     const invariant = [_]f64{ 1, 0, 0, 0, 0 };
-    const early = try LanczosManaged.runScratch(f64, &owner, .{ .action = backend.borrow(), .initial = &invariant, .global_dimension = 5, .max_order = 5, .ritz_tolerance = 0 });
+    const early = try LanczosManaged.runScratch(f64, owner, .{ .action = backend.borrow(), .initial = &invariant, .global_dimension = 5, .max_order = 5, .ritz_tolerance = 0 });
     try std.testing.expectEqual(Lanczos.Status.early_breakdown, early.status);
     try std.testing.expectEqual(@as(usize, 1), early.order);
     try std.testing.expect(!early.has_previous_ritz);
@@ -433,15 +450,15 @@ pub fn checkCase13() !void {
     try std.testing.expectEqual(@as(f64, 0), early.max_change);
     try std.testing.expectEqual(@as(f64, -3), early.minimum);
     const initial = [_]f64{ 1, 1, 1, 1, 1 };
-    const limited = try LanczosManaged.runScratch(f64, &owner, .{ .action = backend.borrow(), .initial = &initial, .global_dimension = 5, .max_order = 1, .ritz_tolerance = 0 });
+    const limited = try LanczosManaged.runScratch(f64, owner, .{ .action = backend.borrow(), .initial = &initial, .global_dimension = 5, .max_order = 1, .ritz_tolerance = 0 });
     try std.testing.expectEqual(Lanczos.Status.iteration_limit, limited.status);
-    const generous = try LanczosManaged.runScratch(f64, &owner, .{ .action = backend.borrow(), .initial = &initial, .global_dimension = 5, .max_order = 3, .ritz_tolerance = 100 });
+    const generous = try LanczosManaged.runScratch(f64, owner, .{ .action = backend.borrow(), .initial = &initial, .global_dimension = 5, .max_order = 3, .ritz_tolerance = 100 });
     try std.testing.expectEqual(Lanczos.Status.converged, generous.status);
     try std.testing.expectEqual(@as(usize, 2), generous.order);
     try std.testing.expect(generous.has_previous_ritz);
     const only = [_]f64{2};
     var one = Backend(f64){ .diagonal = &only };
-    const exhausted = try LanczosManaged.runScratch(f64, &owner, .{ .action = one.borrow(), .initial = &.{3}, .global_dimension = 1, .max_order = 2, .ritz_tolerance = 0 });
+    const exhausted = try LanczosManaged.runScratch(f64, owner, .{ .action = one.borrow(), .initial = &.{3}, .global_dimension = 1, .max_order = 2, .ritz_tolerance = 0 });
     try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, exhausted.status);
 }
 pub fn checkCase14() !void {
@@ -451,26 +468,27 @@ pub fn checkCase14() !void {
             for (x, y) |v, *out| out.* = S.mul(S.ComplexF64, value(S.ComplexF64, 0, 1), v);
         }
     };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     const token: u8 = 0;
     const action = N.Operator(S.ComplexF64){ .context = &token, .rows = 1, .columns = 1, .apply_fn = Imaginary.apply };
     const input = [_]S.ComplexF64{value(S.ComplexF64, 1, 0)};
-    try std.testing.expectError(error.NonHermitianAction, LanczosManaged.runScratch(S.ComplexF64, &owner, .{ .action = action, .initial = &input, .global_dimension = 1, .max_order = 2, .ritz_tolerance = 0 }));
+    try std.testing.expectError(error.NonHermitianAction, LanczosManaged.runScratch(S.ComplexF64, owner, .{ .action = action, .initial = &input, .global_dimension = 1, .max_order = 2, .ritz_tolerance = 0 }));
     const diag = [_]f64{ 1, 2 };
     var backend = Backend(f64){ .diagonal = &diag, .fail_at = 1 };
     const request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &.{ 1, 1 }, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 };
-    try std.testing.expectError(error.InjectedActionFailure, LanczosManaged.runScratch(f64, &owner, request));
+    try std.testing.expectError(error.InjectedActionFailure, LanczosManaged.runScratch(f64, owner, request));
     backend.fail_at = 0;
     var zero = request;
     zero.initial = &.{ 0, 0 };
-    try std.testing.expectError(error.InvalidInitialVector, LanczosManaged.runScratch(f64, &owner, zero));
+    try std.testing.expectError(error.InvalidInitialVector, LanczosManaged.runScratch(f64, owner, zero));
     var nan = request;
     nan.initial = &.{ std.math.nan(f64), 1 };
-    try std.testing.expectError(error.NonFiniteInput, LanczosManaged.runScratch(f64, &owner, nan));
+    try std.testing.expectError(error.NonFiniteInput, LanczosManaged.runScratch(f64, owner, nan));
     var ritz = request;
     ritz.ritz_max_iterations = 0;
-    try std.testing.expectError(error.RitzSolverFailure, LanczosManaged.runScratch(f64, &owner, ritz));
+    try std.testing.expectError(error.RitzSolverFailure, LanczosManaged.runScratch(f64, owner, ritz));
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
 }
@@ -497,10 +515,11 @@ pub fn checkCase15() !void {
     };
     var reduction = Reduction{};
     var backend = Backend(f64){ .diagonal = &.{} };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     const request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &.{}, .global_dimension = 7, .max_order = 3, .ritz_tolerance = 0, .reduction = .{ .context = &reduction, .inner_fn = Reduction.inner, .norm_fn = Reduction.norm } };
-    const result = try LanczosManaged.runScratch(f64, &owner, request);
+    const result = try LanczosManaged.runScratch(f64, owner, request);
     try std.testing.expectEqual(Lanczos.Status.iteration_limit, result.status);
     try std.testing.expectEqual(@as(usize, 3), backend.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 3), reduction.inners.load(.acquire));
@@ -508,28 +527,30 @@ pub fn checkCase15() !void {
     try std.testing.expectApproxEqAbs(2 - std.math.sqrt(@as(f64, 2)), result.minimum, 2e-14);
     try std.testing.expectApproxEqAbs(2 + std.math.sqrt(@as(f64, 2)), result.maximum, 2e-14);
     reduction.fail_norm = true;
-    try std.testing.expectError(error.InjectedReductionFailure, LanczosManaged.runScratch(f64, &owner, request));
+    try std.testing.expectError(error.InjectedReductionFailure, LanczosManaged.runScratch(f64, owner, request));
     var missing = request;
     missing.reduction = null;
-    try std.testing.expectError(error.MissingGlobalReduction, LanczosManaged.runScratch(f64, &owner, missing));
+    try std.testing.expectError(error.MissingGlobalReduction, LanczosManaged.runScratch(f64, owner, missing));
 }
 pub fn checkCase16() !void {
     const high = std.math.floatMax(f64) / 2;
     const n = try Lanczos.localNorm(f64, &.{ high, high });
     try std.testing.expectApproxEqRel(high * std.math.sqrt(@as(f64, 2)), n, 2e-15);
     var allocations = E.test_support.Allocations{ .budget = 1 };
-    var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer expectClose(owner) catch unreachable;
     const diag = [_]f64{ -1, 2 };
     var backend = Backend(f64){ .diagonal = &diag };
     const request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &.{ high, high }, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 };
-    try std.testing.expectError(error.OutOfMemory, LanczosManaged.runScratch(f64, &owner, request));
+    try std.testing.expectError(error.OutOfMemory, LanczosManaged.runScratch(f64, owner, request));
     try std.testing.expectEqual(@as(usize, 0), backend.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 1), allocations.stats().freed);
     allocations.budget = 3;
-    const result = try LanczosManaged.runScratch(f64, &owner, request);
+    const result = try LanczosManaged.runScratch(f64, owner, request);
     try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, result.status);
     try std.testing.expectApproxEqAbs(@as(f64, -1), result.minimum, 1e-14);
     try std.testing.expectApproxEqAbs(@as(f64, 2), result.maximum, 1e-14);
@@ -543,10 +564,11 @@ pub fn checkCase17() !void {
         const entries = [_]T{ value(T, 0, 0.5), value(T, 0, -0.5) };
         const matrix = Matrix{ .row_offsets = &offsets, .column_indices = &indices, .values = &entries, .row_count = 2, .column_count = 2 };
         const action = Core.internal.sparse_checked.operator.CsrBackend(Matrix).borrow(&matrix);
-        var owner = context();
-        defer expectClose(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer expectClose(owner) catch unreachable;
         const input = [_]T{ value(T, 1, 2), value(T, 3, -1) };
-        const result = try LanczosManaged.runScratch(T, &owner, .{ .action = action, .initial = &input, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 });
+        const result = try LanczosManaged.runScratch(T, owner, .{ .action = action, .initial = &input, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 });
         try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, result.status);
         try std.testing.expectApproxEqAbs(@as(S.Real(T), -0.5), result.minimum, if (S.Real(T) == f32) 2e-6 else 1e-14);
         try std.testing.expectApproxEqAbs(@as(S.Real(T), 0.5), result.maximum, if (S.Real(T) == f32) 2e-6 else 1e-14);
@@ -555,31 +577,32 @@ pub fn checkCase17() !void {
 pub fn checkCase18() !void {
     const diag = [_]f64{ -1, 2 };
     var backend = Backend(f64){ .diagonal = &diag };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     var input = [_]f64{ 1, 1 };
     var vectors: [6]f64 = undefined;
     var real: [6]f64 = undefined;
     var request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &input, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 };
-    try std.testing.expectError(error.WorkspaceTooSmall, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = vectors[0..5], .real = &real }));
-    try std.testing.expectError(error.WorkspaceTooSmall, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = real[0..5] }));
-    try std.testing.expectError(error.AliasingNotAllowed, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &vectors }));
+    try std.testing.expectError(error.WorkspaceTooSmall, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = vectors[0..5], .real = &real }));
+    try std.testing.expectError(error.WorkspaceTooSmall, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = real[0..5] }));
+    try std.testing.expectError(error.AliasingNotAllowed, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &vectors }));
     request.initial = vectors[0..2];
-    try std.testing.expectError(error.AliasingNotAllowed, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.AliasingNotAllowed, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &real }));
     request.initial = real[0..2];
-    try std.testing.expectError(error.AliasingNotAllowed, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.AliasingNotAllowed, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &real }));
     request.initial = &input;
     request.action.columns = 3;
-    try std.testing.expectError(error.DimensionMismatch, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.DimensionMismatch, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &real }));
     request.action = backend.borrow();
     request.ritz_tolerance = -1;
-    try std.testing.expectError(error.InvalidOptions, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.InvalidOptions, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &real }));
     request.ritz_tolerance = 0;
     request.global_dimension = 1;
-    try std.testing.expectError(error.InvalidOptions, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.InvalidOptions, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &real }));
     request.global_dimension = 2;
     request.max_order = 0;
-    try std.testing.expectError(error.InvalidOptions, LanczosManaged.runBorrowed(f64, &owner, request, .{ .vectors = &vectors, .real = &real }));
+    try std.testing.expectError(error.InvalidOptions, LanczosManaged.runBorrowed(f64, owner, request, .{ .vectors = &vectors, .real = &real }));
     try std.testing.expectError(error.SizeOverflow, Lanczos.workspaceLength(f64, backend.borrow(), std.math.maxInt(usize)));
     var huge = backend.borrow();
     huge.rows = std.math.maxInt(usize);
@@ -590,15 +613,16 @@ pub fn checkCase18() !void {
 pub fn checkCase19() !void {
     const diag = [_]f64{ -1, 2 };
     var backend = Backend(f64){ .diagonal = &diag, .close_at = 1, .expected_pins = 2 };
-    var owner = context();
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
     const request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &.{ 1, 1 }, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 };
-    const result = try LanczosManaged.runScratch(f64, &owner, request);
+    const result = try LanczosManaged.runScratch(f64, owner, request);
     try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, result.status);
     try std.testing.expectEqual(@as(usize, 2), backend.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
-    try std.testing.expectError(error.Closing, LanczosManaged.runScratch(f64, &owner, request));
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectError(error.Closing, LanczosManaged.runScratch(f64, owner, request));
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 pub fn checkCase20() !void {
     C.Context.testing.configure(E.getContext(), 0, null);
@@ -620,7 +644,8 @@ pub fn checkCase20() !void {
     const entries = [_]S.ComplexF64{ value(S.ComplexF64, 0, 0.5), value(S.ComplexF64, 0, -0.5) };
     const wrapped = Wrapped{ .a = .{ .row_offsets = .{ .data = &offsets, .length = 3 }, .column_indices = .{ .data = &indices, .length = 2 }, .values = .{ .data = &entries, .length = 2 }, .rows = 2, .cols = 2 } };
     const action = N.Operator(S.ComplexF64){ .context = &wrapped, .rows = 2, .columns = 2, .apply_fn = Wrapped.apply };
-    var owner = context();
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
     const AdmissionProbe = struct {
         var count: std.atomic.Value(usize) = .init(0);
         fn observe(ctx: *C.Context, event: C.TestEvent) void {
@@ -631,14 +656,14 @@ pub fn checkCase20() !void {
         }
     };
     AdmissionProbe.count.store(0, .release);
-    C.Context.testing.configure(&owner, std.math.maxInt(usize), AdmissionProbe.observe);
-    defer expectClose(&owner) catch unreachable;
+    C.Context.testing.configure(owner, std.math.maxInt(usize), AdmissionProbe.observe);
+    defer expectClose(owner) catch unreachable;
     const input = [_]S.ComplexF64{ value(S.ComplexF64, 1, 2), value(S.ComplexF64, 3, -1) };
     const coefficients = [_]S.ComplexF64{ value(S.ComplexF64, 1, 0), value(S.ComplexF64, 2, 0), value(S.ComplexF64, 3, 0), value(S.ComplexF64, 4, 0) };
     var output: [2]S.ComplexF64 = undefined;
-    try Managed.runScratch(S.ComplexF64, &owner, .{ .action = action, .input = &input, .coefficients = &coefficients, .output = &output });
+    try Managed.runScratch(S.ComplexF64, owner, .{ .action = action, .input = &input, .coefficients = &coefficients, .output = &output });
     try std.testing.expectEqualDeep(value(S.ComplexF64, -3.5, -10), output[0]);
-    const ritz = try LanczosManaged.runScratch(S.ComplexF64, &owner, .{ .action = action, .initial = &input, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 });
+    const ritz = try LanczosManaged.runScratch(S.ComplexF64, owner, .{ .action = action, .initial = &input, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 });
     try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, ritz.status);
     var operation = try owner.begin();
     defer operation.end();
@@ -698,9 +723,10 @@ pub fn checkCase22() !void {
         const input = [_]T{ value(T, 1, 0.2), value(T, 2, -0.3) };
         const coeff = [_]T{ value(T, 1, 0), value(T, 2, 0), value(T, 3, 0) };
         var y: [2]T = @splat(value(T, 91, 13));
-        var owner = context();
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
         var op = try owner.begin();
-        var foreign = Foreign{ .owner = &owner, .a = .{ .row_offsets = .{ .data = &offsets, .length = 3 }, .column_indices = .{ .data = &indices, .length = 2 }, .values = .{ .data = &entries, .length = 2 }, .rows = 2, .cols = 2 } };
+        var foreign = Foreign{ .owner = owner, .a = .{ .row_offsets = .{ .data = &offsets, .length = 3 }, .column_indices = .{ .data = &indices, .length = 2 }, .values = .{ .data = &entries, .length = 2 }, .rows = 2, .cols = 2 } };
         const action = B.Action{ .context = &foreign, .rows = 2, .columns = 2, .workspace_elements = 0, .apply = Foreign.apply };
         const xb = W.const_buffer{ .data = &input, .length = 2 };
         const cb = W.const_buffer{ .data = &coeff, .length = 3 };
@@ -739,7 +765,7 @@ pub fn checkCase22() !void {
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
         try std.testing.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         op.end();
-        try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
     }
 }
 
@@ -770,9 +796,10 @@ pub fn checkCase23() !void {
                 return if (self.fail) -731 else 0;
             }
         };
-        var owner = context();
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
         var operation = try owner.begin();
-        var foreign = Foreign{ .owner = &owner };
+        var foreign = Foreign{ .owner = owner };
         const action = B.Action{ .context = &foreign, .rows = 2, .columns = 2, .workspace_elements = 0, .apply = Foreign.apply };
         const old = [_]T{ value(T, 3, 0.2), value(T, -2, -0.3) };
         const current = [_]T{ value(T, 1, -0.4), value(T, 4, 0.6) };
@@ -813,13 +840,15 @@ pub fn checkCase23() !void {
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
         try std.testing.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
         operation.end();
-        try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
     }
 }
 
 pub fn checkCase24() !void {
     var allocations = E.test_support.Allocations{ .budget = 0 };
-    var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var operation = try owner.begin();
     var backend = Backend(f64){ .diagonal = &.{0.5}, .expected_pins = 1 };
     const previous = [_]f64{2};
@@ -839,14 +868,15 @@ pub fn checkCase24() !void {
     try std.testing.expectEqual(@as(usize, 1), stats.accepted);
     try std.testing.expectEqual(@as(usize, 1), stats.freed);
     operation.end();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
-    var empty_owner = context();
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
+    var reference_empty_owner: FixtureReferenceContext = undefined;
+    const empty_owner = context(&reference_empty_owner);
     var empty_operation = try empty_owner.begin();
     var empty = Backend(f64){ .diagonal = &.{}, .expected_pins = 1 };
     try Managed.stepScratchAdmitted(f64, &empty_operation, empty.borrow(), &.{}, &.{}, &.{});
     try std.testing.expectEqual(@as(usize, 1), empty.calls.load(.acquire));
     empty_operation.end();
-    try expectClose(&empty_owner);
+    try expectClose(empty_owner);
 }
 
 pub fn checkLanczosSubnormalStarts() !void {
@@ -859,14 +889,15 @@ pub fn checkLanczosSubnormalStarts() !void {
                     const tiny: R = std.math.floatTrueMin(R) * multiple;
                     const diagonal = if (identity) [_]R{ 1, 1 } else [_]R{ -1, 2 };
                     var backend = Backend(T){ .diagonal = &diagonal };
-                    var owner = context();
-                    defer expectClose(&owner) catch unreachable;
+                    var reference_owner: FixtureReferenceContext = undefined;
+                    const owner = context(&reference_owner);
+                    defer expectClose(owner) catch unreachable;
                     const second = if (S.isComplex(T) and phase) value(T, 0, tiny) else value(T, if (phase) -tiny else tiny, 0);
                     const initial = [_]T{ value(T, tiny, 0), second };
                     const saved = initial;
                     var vectors: [9]T = @splat(value(T, 77, 13));
                     var real_work: [9]R = @splat(77);
-                    const result = try LanczosManaged.runBorrowed(T, &owner, .{ .action = backend.borrow(), .initial = &initial, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 }, .{ .vectors = &vectors, .real = &real_work });
+                    const result = try LanczosManaged.runBorrowed(T, owner, .{ .action = backend.borrow(), .initial = &initial, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0 }, .{ .vectors = &vectors, .real = &real_work });
                     const tolerance: R = if (R == f32) 3e-6 else 3e-14;
                     try std.testing.expectApproxEqAbs(@as(R, if (identity) 1 else -1), result.minimum, tolerance);
                     try std.testing.expectApproxEqAbs(@as(R, if (identity) 1 else 2), result.maximum, tolerance);
@@ -905,27 +936,29 @@ pub fn checkLanczosSubnormalMetricFailureAndClose() !void {
         }
     };
     var allocations = E.test_support.Allocations{ .budget = 10 };
-    var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var backend = Backend(f64){ .diagonal = &.{ 1, 1 }, .expected_pins = 2 };
     var metric = Metric{ .fail_unit = true };
     const tiny = std.math.floatTrueMin(f64);
     const initial = [_]f64{ tiny, tiny };
     const request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &initial, .global_dimension = 2, .max_order = 2, .ritz_tolerance = 0, .reduction = .{ .context = &metric, .inner_fn = Metric.inner, .norm_fn = Metric.norm } };
-    try std.testing.expectError(error.InjectedReductionFailure, LanczosManaged.runScratch(f64, &owner, request));
+    try std.testing.expectError(error.InjectedReductionFailure, LanczosManaged.runScratch(f64, owner, request));
     try std.testing.expectEqual(@as(usize, 0), backend.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 2), metric.calls);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     for ([_]f64{ 0, std.math.nan(f64), std.math.inf(f64) }) |invalid| {
         metric = .{ .unit_override = invalid };
-        try std.testing.expectError(error.NonFiniteReduction, LanczosManaged.runScratch(f64, &owner, request));
+        try std.testing.expectError(error.NonFiniteReduction, LanczosManaged.runScratch(f64, owner, request));
         try std.testing.expectEqual(@as(usize, 2), metric.calls);
         try std.testing.expectEqual(@as(usize, 0), backend.calls.load(.acquire));
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     }
     metric = .{ .close_unit = true };
-    const result = try LanczosManaged.runScratch(f64, &owner, request);
+    const result = try LanczosManaged.runScratch(f64, owner, request);
     try std.testing.expectApproxEqAbs(@as(f64, 1), result.minimum, 3e-14);
     try std.testing.expectApproxEqAbs(@as(f64, 1), result.maximum, 3e-14);
     try std.testing.expectEqual(@as(usize, 3), metric.calls);
@@ -933,8 +966,8 @@ pub fn checkLanczosSubnormalMetricFailureAndClose() !void {
     try std.testing.expectEqual(@as(usize, 10), allocations.stats().freed);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-    try std.testing.expectError(error.Closing, LanczosManaged.runScratch(f64, &owner, request));
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectError(error.Closing, LanczosManaged.runScratch(f64, owner, request));
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
     try std.testing.expectEqualSlices(f64, &.{ tiny, tiny }, &initial);
 }
 
@@ -959,19 +992,26 @@ pub fn checkLanczosSubnormalEmptyGlobalMetric() !void {
             };
         }
     };
-    var owner = context();
-    defer expectClose(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer expectClose(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{} };
     var metric = Metric{};
     const request = Lanczos.Request(f64){ .action = backend.borrow(), .initial = &.{}, .global_dimension = 1, .max_order = 1, .ritz_tolerance = 0, .reduction = .{ .context = &metric, .inner_fn = Metric.inner, .norm_fn = Metric.norm } };
-    const result = try LanczosManaged.runScratch(f64, &owner, request);
+    const result = try LanczosManaged.runScratch(f64, owner, request);
     try std.testing.expectEqual(Lanczos.Status.exhausted_dimension, result.status);
     try std.testing.expectEqual(@as(usize, 3), metric.calls);
     try std.testing.expectEqual(@as(f64, 1), result.minimum);
     metric = .{ .invalid_unit = true };
-    try std.testing.expectError(error.NonFiniteReduction, LanczosManaged.runScratch(f64, &owner, request));
+    try std.testing.expectError(error.NonFiniteReduction, LanczosManaged.runScratch(f64, owner, request));
     try std.testing.expectEqual(@as(usize, 2), metric.calls);
     try std.testing.expectEqual(@as(usize, 1), backend.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

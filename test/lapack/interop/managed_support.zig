@@ -77,7 +77,8 @@ pub const Spy = struct {
     }
 };
 pub const Rig = struct {
-    context: C.Context = undefined,
+    reference_context: FixtureReferenceContext = undefined,
+    context: *C.Context = undefined,
     x: Spy = .{},
     y: Spy = .{},
     z: Spy = .{},
@@ -104,12 +105,13 @@ pub const Rig = struct {
     continue_free: std.atomic.Value(bool) = .init(false),
     pub fn init(self: *Rig) void {
         self.x.rig = self;
-        self.context = C.Context.init(self.x.allocator(), execution.test_support.policy, .internal_closable);
-        C.Context.testing.configure(&self.context, std.math.maxInt(usize), observe);
+        self.reference_context.initInPlace(self.x.allocator(), execution.test_support.policy, .owned_closable, execution.reference.defaultCacheDomain());
+        self.context = self.reference_context.borrowedContext();
+        C.Context.testing.configure(self.context, std.math.maxInt(usize), observe);
         self.services = .{ .allocator = self.y.allocator(), .context = self, .nan_enabled = getter, .error_event = hook };
     }
     fn observe(ctx: *C.Context, e: C.TestEvent) void {
-        const self: *Rig = @fieldParentPtr("context", ctx);
+        const self: *Rig = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", ctx)));
         self.record(if (e == .admitted) .admitted else .finishing, 0);
         if (e == .finishing and self.pause_finish) {
             self.paused.store(true, .release);
@@ -160,10 +162,10 @@ pub const Rig = struct {
         self.action = .none;
         if (action == .close or action == .close_nested) {
             insist(self.context.requestClose() == .pending);
-            insist(self.context.tryProgressClose() == .busy);
+            insist(fixtureProgressClose(self.context) == .busy);
         }
         if (action == .nested or action == .close_nested) {
-            const result = F.callManaged(f64, i32, .high, &self.context, &self.services, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = 1, .values = @as(*[1]f64, @ptrCast(&self.nested_value)) }) catch |err| {
+            const result = F.callManaged(f64, i32, .high, self.context, &self.services, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = 1, .values = @as(*[1]f64, @ptrCast(&self.nested_value)) }) catch |err| {
                 self.nested_error = err;
                 return;
             };
@@ -178,7 +180,7 @@ pub const Rig = struct {
         try std.testing.expectEqual(@as(usize, 0), self.y.live);
         try std.testing.expectEqual(@as(usize, 0), self.z.live);
         _ = self.context.requestClose();
-        try std.testing.expectEqual(C.CloseResult.closed, self.context.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(self.context));
     }
 };
 pub fn fargs(values: ?[]f64) F.Arguments(f64, i64) {
@@ -190,4 +192,10 @@ pub fn sargs(a: ?[]const f64, b: ?[]f64) S.Arguments(f64, i64) {
 
 pub fn info(comptime I: type, result: anytype, expected: I) !void {
     try s.expectInfo(I, expected, result);
+}
+
+const FixtureReferenceContext = execution.reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *execution.Context) execution.CloseResult {
+    var report: execution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

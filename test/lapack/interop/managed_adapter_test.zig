@@ -24,14 +24,14 @@ test "managed invocation uses the same owner service resource and matrix identit
     // Address identity is within this artifact; do not close the default Context.
     try std.testing.expect(Core.Execution.getContext() == actual_execution.getContext());
     try std.testing.expect(Core.Execution.getContext() == actual_core.internal.numerics.Execution.getContext());
-    try std.testing.expectEqual(C.Lifetime.immortal_default, Core.Execution.getContext().lifetime);
+    try std.testing.expectEqual(@import("zynum-execution").reference.LegacyLifetime.immortal_default, Core.Execution.getContext().binding.legacy.lifetime);
     try std.testing.expect(F.Services == S.Services and F.Services == Core.Services);
     try std.testing.expect(F.Dense == S.Dense and F.Dense.Matrix(f64) == Core.Dense.Matrix(f64));
     try std.testing.expect(F.OwnerIdentity == S.OwnerIdentity);
     var r: h.Rig = .{};
     r.init();
     defer r.done() catch @panic("cleanup");
-    var invocation = try common.ManagedInvocation(Core).begin(&r.context, &r.services);
+    var invocation = try common.ManagedInvocation(Core).begin(r.context, &r.services);
     defer invocation.operation.end();
     try std.testing.expect(@TypeOf(invocation.services) == Core.Services);
     try std.testing.expect(invocation.services.allocator.ptr == r.x.allocator().ptr);
@@ -53,9 +53,11 @@ test "managed versus unmanaged normal domain has identical full output and origi
             var new: s.Context = .{};
             var os = old.services();
             var ns = new.services();
-            var context = C.Context.init(ns.allocator, h.execution.test_support.policy, .internal_closable);
+            var reference_context: FixtureReferenceContext = undefined;
+            reference_context.initInPlace(ns.allocator, h.execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const context = reference_context.borrowedContext();
             const old_result = F.call(T, I, level, &os, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a });
-            const new_result = try F.callManaged(T, I, level, &context, &ns, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &b });
+            const new_result = try F.callManaged(T, I, level, context, &ns, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &b });
             try std.testing.expectEqual(old_result.lapacke_info, new_result.lapacke_info);
             try s.bytes(&a, &b);
             try s.trace(&old, new.events[0..new.count]);
@@ -71,7 +73,7 @@ test "managed versus unmanaged normal domain has identical full output and origi
             os = old.services();
             ns = new.services();
             const so = S.call(T, I, level, &os, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &a, .b = &rhs });
-            const sn = try S.callManaged(T, I, level, &context, &ns, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &b, .b = &rhs2 });
+            const sn = try S.callManaged(T, I, level, context, &ns, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &b, .b = &rhs2 });
             try std.testing.expectEqual(so.lapacke_info, sn.lapacke_info);
             try s.bytes(&rhs, &rhs2);
             try s.bytes(&a, &b);
@@ -79,7 +81,7 @@ test "managed versus unmanaged normal domain has identical full output and origi
             try std.testing.expectEqual(@as(usize, 0), context.snapshot().active_operations);
             try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
             _ = context.requestClose();
-            try std.testing.expectEqual(C.CloseResult.closed, context.tryProgressClose());
+            try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(context));
         };
     };
 }
@@ -92,7 +94,7 @@ test "managed capture ignores allocator Y and Z and retains the original callbac
     var a = [_]f64{4};
     var args = h.fargs(&a);
     args.uplo = '?';
-    try h.info(i64, try F.callManaged(f64, i64, .high, &r.context, &r.services, args), -2);
+    try h.info(i64, try F.callManaged(f64, i64, .high, r.context, &r.services, args), -2);
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 1), r.x.frees);
     try std.testing.expectEqual(@as(usize, 0), r.y.attempts);
@@ -101,7 +103,7 @@ test "managed capture ignores allocator Y and Z and retains the original callbac
     // An entirely undefined allocator field is legal for managed capture.
     r.services.allocator = undefined;
     r.services.error_event = h.Rig.hookForTest;
-    try h.info(i64, try F.callManaged(f64, i64, .work, &r.context, &r.services, h.fargs(&a)), 0);
+    try h.info(i64, try F.callManaged(f64, i64, .work, r.context, &r.services, h.fargs(&a)), 0);
 }
 
 test "unmanaged compatibility still allocates using its captured input allocator" {
@@ -122,7 +124,7 @@ test "Closing and operation overflow precede all service reads hooks and arrays"
         defer r.done() catch @panic("cleanup");
         var held: ?C.Operation = null;
         if (overflow) {
-            C.Context.testing.configure(&r.context, 1, null);
+            C.Context.testing.configure(r.context, 1, null);
             held = try r.context.begin();
         } else _ = r.context.requestClose();
         defer if (held) |*operation| operation.end();
@@ -131,8 +133,8 @@ test "Closing and operation overflow precede all service reads hooks and arrays"
         var a = [_]f64{9};
         var args = h.fargs(&a);
         args.layout = 777;
-        try std.testing.expectError(err, F.callManaged(f64, i64, .high, &r.context, &services, args));
-        try std.testing.expectError(err, S.callManaged(f64, i64, .high, &r.context, &services, h.sargs(null, null)));
+        try std.testing.expectError(err, F.callManaged(f64, i64, .high, r.context, &services, args));
+        try std.testing.expectError(err, S.callManaged(f64, i64, .high, r.context, &services, h.sargs(null, null)));
         try std.testing.expectEqual(@as(f64, 9), a[0]);
         try std.testing.expectEqual(@as(usize, 0), r.count);
     }
@@ -145,13 +147,13 @@ test "managed getter and scan priority with work and disabled bypass" {
     const nan = std.math.nan(f64);
     var a = [_]f64{nan};
     var b = [_]f64{nan};
-    try h.info(i64, try S.callManaged(f64, i64, .high, &r.context, &r.services, h.sargs(&a, &b)), -5);
+    try h.info(i64, try S.callManaged(f64, i64, .high, r.context, &r.services, h.sargs(&a, &b)), -5);
     a[0] = 2;
-    try h.info(i64, try S.callManaged(f64, i64, .high, &r.context, &r.services, h.sargs(&a, &b)), -7);
+    try h.info(i64, try S.callManaged(f64, i64, .high, r.context, &r.services, h.sargs(&a, &b)), -7);
     try std.testing.expectEqual(@as(usize, 2), r.reads);
     try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
-    try h.info(i64, try S.callManaged(f64, i64, .work, &r.context, &r.services, h.sargs(&a, &b)), 0);
-    try h.info(i64, try s.owner.NoScanSolveAdapter.callManaged(f64, i64, .high, &r.context, &r.services, h.sargs(&a, &b)), 0);
+    try h.info(i64, try S.callManaged(f64, i64, .work, r.context, &r.services, h.sargs(&a, &b)), 0);
+    try h.info(i64, try s.owner.NoScanSolveAdapter.callManaged(f64, i64, .high, r.context, &r.services, h.sargs(&a, &b)), 0);
     try std.testing.expectEqual(@as(usize, 2), r.reads);
 }
 
@@ -165,7 +167,7 @@ test "getter and returning hook reentry admit separately with real nested numeri
         var a = [_]f64{4};
         var args = h.fargs(&a);
         if (trigger == .hook) args.uplo = '?';
-        try h.info(i64, try F.callManaged(f64, i64, .high, &r.context, &r.services, args), if (trigger == .hook) -2 else 0);
+        try h.info(i64, try F.callManaged(f64, i64, .high, r.context, &r.services, args), if (trigger == .hook) -2 else 0);
         try std.testing.expectEqual(@as(f64, 2), r.nested_value);
         try std.testing.expectEqual(@as(usize, 2), r.max_active);
         try std.testing.expect(r.nested_error == null);
@@ -183,7 +185,7 @@ test "getter and hook close deny nested admission while admitted outer work comp
         var b = [_]f64{8};
         var args = h.sargs(&a, &b);
         if (trigger == .hook) args.uplo = '?';
-        try h.info(i64, try S.callManaged(f64, i64, .high, &r.context, &r.services, args), if (trigger == .hook) -2 else 0);
+        try h.info(i64, try S.callManaged(f64, i64, .high, r.context, &r.services, args), if (trigger == .hook) -2 else 0);
         try std.testing.expectEqual(error.Closing, r.nested_error.?);
         try std.testing.expectEqual(@as(f64, 4), r.nested_value);
         try std.testing.expectEqual(@as(usize, 1), r.reads);
@@ -196,12 +198,12 @@ test "first scratch pin overflow uses no allocator and no standard error hook" {
     var r: h.Rig = .{};
     r.init();
     defer r.done() catch @panic("cleanup");
-    C.Context.testing.configure(&r.context, 1, null);
+    C.Context.testing.configure(r.context, 1, null);
     var holding = try r.context.begin();
     var held = try C.ContextScratch(u8).acquire(&holding, 1);
     holding.end();
     var a = [_]f64{4};
-    try std.testing.expectError(error.CounterOverflow, F.callManaged(f64, i64, .work, &r.context, &r.services, h.fargs(&a)));
+    try std.testing.expectError(error.CounterOverflow, F.callManaged(f64, i64, .work, r.context, &r.services, h.fargs(&a)));
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 0), r.hooks);
     try std.testing.expectEqual(@as(f64, 4), a[0]);
@@ -212,10 +214,10 @@ test "POTRS second pin overflow frees A after no B allocation and no hook" {
     var r: h.Rig = .{};
     r.init();
     defer r.done() catch @panic("cleanup");
-    C.Context.testing.configure(&r.context, 1, null);
+    C.Context.testing.configure(r.context, 1, null);
     var a = [_]f64{2};
     var b = [_]f64{8};
-    try std.testing.expectError(error.CounterOverflow, S.callManaged(f64, i64, .work, &r.context, &r.services, h.sargs(&a, &b)));
+    try std.testing.expectError(error.CounterOverflow, S.callManaged(f64, i64, .work, r.context, &r.services, h.sargs(&a, &b)));
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 1), r.x.frees);
     try std.testing.expectEqual(@as(usize, 0), r.hooks);
@@ -230,7 +232,7 @@ test "only real first OOM maps to minus1011 after its pin rolls back" {
         r.x.fail_at = 0;
         var a = [_]f64{2};
         var b = [_]f64{8};
-        if (solve) try h.info(i64, try S.callManaged(f64, i64, .work, &r.context, &r.services, h.sargs(&a, &b)), -1011) else try h.info(i64, try F.callManaged(f64, i64, .work, &r.context, &r.services, h.fargs(&a)), -1011);
+        if (solve) try h.info(i64, try S.callManaged(f64, i64, .work, r.context, &r.services, h.sargs(&a, &b)), -1011) else try h.info(i64, try F.callManaged(f64, i64, .work, r.context, &r.services, h.fargs(&a)), -1011);
         for (r.events[0..r.count]) |e| if (e.tag == .hook) {
             try std.testing.expectEqual(@as(usize, 0), e.pins);
             try std.testing.expectEqual(@as(usize, 1), e.active);
@@ -247,7 +249,7 @@ test "POTRS second OOM releases A before standard hook with no pins remaining" {
     r.x.fail_at = 1;
     var a = [_]f64{2};
     var b = [_]f64{8};
-    try h.info(i64, try S.callManaged(f64, i64, .work, &r.context, &r.services, h.sargs(&a, &b)), -1011);
+    try h.info(i64, try S.callManaged(f64, i64, .work, r.context, &r.services, h.sargs(&a, &b)), -1011);
     var freed = false;
     for (r.events[0..r.count]) |e| {
         if (e.tag == .free) {
@@ -271,7 +273,7 @@ test "POTRS B extent fault stays after A allocation with typed cleanup" {
     var args = h.sargs(null, null);
     args.nrhs = std.math.maxInt(i64);
     args.ldb = args.nrhs;
-    const result = try S.callManaged(f64, i64, .work, &r.context, &r.services, args);
+    const result = try S.callManaged(f64, i64, .work, r.context, &r.services, args);
     try std.testing.expect(result == .admission_fault);
     try std.testing.expect(result.admission_fault == error.SizeOverflow or result.admission_fault == error.IntegerNotRepresentable);
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
@@ -287,12 +289,12 @@ test "row empty calls retain scratch acquisitions while column empty holds only 
         var f = h.fargs(null);
         f.layout = layout;
         f.n = 0;
-        try h.info(i64, try F.callManaged(f64, i64, .work, &r.context, &r.services, f), 0);
+        try h.info(i64, try F.callManaged(f64, i64, .work, r.context, &r.services, f), 0);
         var a = h.sargs(null, null);
         a.layout = layout;
         a.n = 0;
         a.nrhs = 0;
-        try h.info(i64, try S.callManaged(f64, i64, .work, &r.context, &r.services, a), 0);
+        try h.info(i64, try S.callManaged(f64, i64, .work, r.context, &r.services, a), 0);
         try std.testing.expectEqual(@as(usize, if (layout == 101) 3 else 0), r.x.attempts);
         var starts: usize = 0;
         var ends: usize = 0;
@@ -316,7 +318,7 @@ const Worker = struct {
     result: ?S.Result(i64) = null,
     err: ?anyerror = null,
     fn run(self: *Worker) void {
-        self.result = S.callManaged(f64, i64, .work, &self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = '?', .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .a = self.a, .b = self.b }) catch |err| {
+        self.result = S.callManaged(f64, i64, .work, self.rig.context, &self.rig.services, .{ .layout = 101, .uplo = '?', .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .a = self.a, .b = self.b }) catch |err| {
             self.err = err;
             return;
         };
@@ -370,7 +372,7 @@ test "real paused returning hook or free blocks close until copyback cleanup and
         try std.testing.expectEqual(@as(usize, 1), state.active_operations);
         try std.testing.expectEqual(@as(usize, 2), state.resource_pins);
         _ = r.context.requestClose();
-        try std.testing.expectEqual(C.CloseResult.busy, r.context.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(r.context));
         r.continue_free.store(true, .release);
         thread.join();
         try std.testing.expect(worker.err == null);
@@ -387,13 +389,13 @@ test "allocator callbacks may reenter and request close outside Context gate" {
         r.trigger = trigger;
         r.action = .nested;
         var a = [_]f64{4};
-        try h.info(i64, try F.callManaged(f64, i64, .work, &r.context, &r.services, h.fargs(&a)), 0);
+        try h.info(i64, try F.callManaged(f64, i64, .work, r.context, &r.services, h.fargs(&a)), 0);
         try std.testing.expectEqual(@as(f64, 2), r.nested_value);
         try std.testing.expectEqual(@as(usize, 2), r.max_active);
         r.action = .close;
         r.nested_value = 4;
         a[0] = 4;
-        try h.info(i64, try F.callManaged(f64, i64, .work, &r.context, &r.services, h.fargs(&a)), 0);
+        try h.info(i64, try F.callManaged(f64, i64, .work, r.context, &r.services, h.fargs(&a)), 0);
         try std.testing.expectEqual(@as(f64, 2), a[0]);
     }
 }
@@ -404,7 +406,9 @@ test "managed admission faults and scalar errors preserve unmanaged result and o
         var new: s.Context = .{};
         var os = old.services();
         var ns = new.services();
-        var ctx = C.Context.init(ns.allocator, h.execution.test_support.policy, .internal_closable);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(ns.allocator, h.execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         var a = [_]f64{2};
         var b = [_]f64{ 8, 71 };
         var b2 = b;
@@ -425,7 +429,7 @@ test "managed admission faults and scalar errors preserve unmanaged result and o
         var args2 = args;
         if (args.b != null) args2.b = if (which == 5) b2[0..0] else &b2;
         const x = S.call(f64, i64, .work, &os, args);
-        const y = try S.callManaged(f64, i64, .work, &ctx, &ns, args2);
+        const y = try S.callManaged(f64, i64, .work, ctx, &ns, args2);
         try std.testing.expectEqual(std.meta.activeTag(x), std.meta.activeTag(y));
         switch (x) {
             .lapacke_info => |v| try std.testing.expectEqual(v, y.lapacke_info),
@@ -434,7 +438,7 @@ test "managed admission faults and scalar errors preserve unmanaged result and o
         try s.bytes(&b, &b2);
         try s.trace(&old, new.events[0..new.count]);
         _ = ctx.requestClose();
-        try std.testing.expectEqual(C.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(ctx));
     }
 }
 
@@ -446,8 +450,8 @@ test "managed native width one element accepts strides above i32 on 64 bit targe
     var a = [_]f64{4};
     var b = [_]f64{8};
     const ld = @as(i64, std.math.maxInt(i32)) + 19;
-    try h.info(i64, try F.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = ld, .values = &a }), 0);
-    try h.info(i64, try S.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .nrhs = 1, .lda = ld, .ldb = ld, .a = &a, .b = &b }), 0);
+    try h.info(i64, try F.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = ld, .values = &a }), 0);
+    try h.info(i64, try S.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .nrhs = 1, .lda = ld, .ldb = ld, .a = &a, .b = &b }), 0);
     try std.testing.expectEqual(@as(f64, 2), b[0]);
 }
 
@@ -480,7 +484,7 @@ const FactorWorker = struct {
     a: [1]f64 = .{4},
     err: ?anyerror = null,
     fn run(self: *@This()) void {
-        const result = F.callManaged(f64, i64, .work, &self.rig.context, &self.rig.services, h.fargs(&self.a)) catch |err| {
+        const result = F.callManaged(f64, i64, .work, self.rig.context, &self.rig.services, h.fargs(&self.a)) catch |err| {
             self.err = err;
             return;
         };
@@ -506,14 +510,14 @@ test "POTRF free POTRS A free and final operation boundary retain exact live cou
         try std.testing.expectEqual(@as(usize, 1), state.active_operations);
         try std.testing.expectEqual(@as(usize, if (stage < 2) 1 else 0), state.resource_pins);
         _ = r.context.requestClose();
-        try std.testing.expectEqual(C.CloseResult.busy, r.context.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(r.context));
         r.continue_free.store(true, .release);
         thread.join();
         try std.testing.expect(fw.err == null and sw.err == null);
         if (factor) try std.testing.expectEqual(@as(f64, 2), fw.a[0]) else try h.info(i64, sw.result.?, -2);
         try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().resource_pins);
-        try std.testing.expectEqual(C.CloseResult.closed, r.context.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(r.context));
         std.debug.print("pause stage={d} observed active={d} pins={d}; after join active=0 pins=0 closed\n", .{ stage, state.active_operations, state.resource_pins });
     }
 }
@@ -525,10 +529,12 @@ test "managed numerical failure and IEEE policies match unmanaged full buffer an
             var new: s.Context = .{};
             var os = old.services();
             var ns = new.services();
-            var ctx = C.Context.init(ns.allocator, h.execution.test_support.policy, .internal_closable);
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(ns.allocator, h.execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
             defer {
                 _ = ctx.requestClose();
-                std.debug.assert(ctx.tryProgressClose() == .closed);
+                std.debug.assert(fixtureProgressClose(ctx) == .closed);
             }
             var a: [6]T = @splat(s.value(T, 77, -5));
             a[s.pos(layout, 0, 0, 3)] = s.value(T, 1, 0);
@@ -536,7 +542,7 @@ test "managed numerical failure and IEEE policies match unmanaged full buffer an
             a[s.pos(layout, if (uplo == 'L') 1 else 0, if (uplo == 'L') 0 else 1, 3)] = s.value(T, 2, 0);
             var a2 = a;
             const x = F.call(T, i64, .work, &os, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a });
-            const y = try F.callManaged(T, i64, .work, &ctx, &ns, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a2 });
+            const y = try F.callManaged(T, i64, .work, ctx, &ns, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a2 });
             try h.info(i64, x, 2);
             try h.info(i64, y, 2);
             try s.bytes(&a, &a2);
@@ -560,7 +566,7 @@ test "managed numerical failure and IEEE policies match unmanaged full buffer an
                 var b = [_]T{ s.value(T, 10, 0), s.value(T, 89, -0.0) };
                 var b2 = b;
                 const sx = S.call(T, i64, .work, &os, .{ .layout = layout, .uplo = uplo, .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = &f, .b = &b });
-                const sy = try S.callManaged(T, i64, .work, &ctx, &ns, .{ .layout = layout, .uplo = uplo, .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = &f, .b = &b2 });
+                const sy = try S.callManaged(T, i64, .work, ctx, &ns, .{ .layout = layout, .uplo = uplo, .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = &f, .b = &b2 });
                 try h.info(i64, sx, 0);
                 try h.info(i64, sy, 0);
                 try s.bytes(&b, &b2);
@@ -586,7 +592,7 @@ test "managed Cholesky retains instance admission scratch and complex diagonal p
             expected = std.mem.sliceAsBytes(b);
         }
         fn observe(ctx: *C.Context, event: C.TestEvent) void {
-            const rig: *h.Rig = @fieldParentPtr("context", ctx);
+            const rig: *h.Rig = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", ctx)));
             if (ctx == execution.getContext() or ctx.snapshot().active_operations != 1) @panic("managed Cholesky admission split");
             rig.record(if (event == .admitted) .admitted else .finishing, 0);
             if (event == .finishing and (ctx.snapshot().resource_pins != 0 or rig.x.live != 0)) @panic("managed scratch outlived operation");
@@ -605,7 +611,7 @@ test "managed Cholesky retains instance admission scratch and complex diagonal p
             defer r.done() catch @panic("managed Cholesky cleanup");
             // The same limit also bounds pins: row-major solve needs two.
             // Observer active==1 supplies the strict single-operation assertion.
-            C.Context.testing.configure(&r.context, 2, ManagedProbe.observe);
+            C.Context.testing.configure(r.context, 2, ManagedProbe.observe);
             var a = [_]T{ s.value(T, 4, 7), s.value(T, 71, -3) };
             var b = [_]T{ s.value(T, 12, 4), s.value(T, 83, -7) };
             const expected_a = [_]T{ s.value(T, 2, 0), a[1] };
@@ -613,11 +619,11 @@ test "managed Cholesky retains instance admission scratch and complex diagonal p
             // Complex imaginary diagonal is ignored by lapack_potrf. Routing
             // through the checked admitted frontend would reject it instead.
             ManagedProbe.watch(&a, &expected_a);
-            try h.info(I, try binding.Shared.factorManaged(true, T, I, .work, &r.context, .{ .layout = layout, .uplo = 'L', .n = 1, .lda = 2, .values = &a }), 0);
+            try h.info(I, try binding.Shared.factorManaged(true, T, I, .work, r.context, .{ .layout = layout, .uplo = 'L', .n = 1, .lda = 2, .values = &a }), 0);
             try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().active_operations);
             try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().resource_pins);
             ManagedProbe.watch(&b, &expected_b);
-            try h.info(I, try binding.Shared.solveManaged(true, T, I, .work, &r.context, .{ .layout = layout, .uplo = 'U', .n = 1, .nrhs = 1, .lda = 2, .ldb = 2, .a = &a, .b = &b }), 0);
+            try h.info(I, try binding.Shared.solveManaged(true, T, I, .work, r.context, .{ .layout = layout, .uplo = 'U', .n = 1, .nrhs = 1, .lda = 2, .ldb = 2, .a = &a, .b = &b }), 0);
             try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().active_operations);
             try std.testing.expectEqual(@as(usize, 0), r.context.snapshot().resource_pins);
             try s.bytes(&expected_a, &a);
@@ -642,4 +648,10 @@ test "managed Cholesky retains instance admission scratch and complex diagonal p
             try std.testing.expectEqual(@as(usize, 0), execution.getContext().snapshot().active_operations);
         }
     };
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

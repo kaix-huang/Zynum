@@ -94,10 +94,19 @@ test "structured service callbacks borrow allocator executor and closing GEMM op
     const fixture = execution.test_support;
     fixture.setThreads(4);
     var allocations: fixture.Allocations = .{ .budget = 1 };
-    var ctx = execution.context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
+    const ReferenceFixture = struct {
+        const Context = @import("zynum-execution").reference.ReferenceContext;
+        fn progressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+            var report: @import("zynum-execution").CallReport = .{};
+            return ctx.tryProgressClose(&report);
+        }
+    };
+    var reference_ctx: ReferenceFixture.Context = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     defer {
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = ReferenceFixture.progressClose(ctx);
     }
     var operation = try ctx.begin();
     var ended = false;
@@ -130,7 +139,7 @@ test "structured service callbacks borrow allocator executor and closing GEMM op
     try std.testing.expectEqual(@as(u8, 1), services.run_low_latency(services.borrow, @intFromPtr(task_fn), &tasks, 4));
     for (&tasks.hits) |*hits| try std.testing.expectEqual(@as(usize, 1), hits.load(.acquire));
     try std.testing.expectEqual(execution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.busy, ReferenceFixture.progressClose(ctx));
     try std.testing.expectError(error.Closing, ctx.begin());
     try std.testing.expectEqual(@as(u8, 1), services.run_low_latency(services.borrow, @intFromPtr(task_fn), &tasks, 4));
     for (&tasks.hits) |*hits| try std.testing.expectEqual(@as(usize, 2), hits.load(.acquire));
@@ -160,6 +169,6 @@ test "structured service callbacks borrow allocator executor and closing GEMM op
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
     operation.end();
     ended = true;
-    try std.testing.expectEqual(execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, ReferenceFixture.progressClose(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
 }

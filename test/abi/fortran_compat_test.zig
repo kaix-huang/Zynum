@@ -2417,7 +2417,7 @@ const FortranAdmissionObservation = struct {
         expected = std.mem.sliceAsBytes(wanted);
     }
     fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
-        if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+        if (ctx != admission_execution.getContext() or fixtureExecutor(ctx) != admission_execution.get())
             @panic("Fortran ABI used a different default owner");
         if (ctx.snapshot().active_operations != 1) @panic("Fortran ABI did not retain one operation");
         switch (event) {
@@ -2596,9 +2596,9 @@ test "Fortran scaling retains one operation through real busy executor fallback"
         var finishes: usize = 0;
         var observed_values: []const f64 = &.{};
         fn call(ctx: *admission_execution.context.Context, event: admission_execution.context.TestEvent) void {
-            if (ctx != admission_execution.getContext() or &ctx.executor != admission_execution.get())
+            if (ctx != admission_execution.getContext() or fixtureExecutor(ctx) != admission_execution.get())
                 @panic("legacy fallback used a different default owner");
-            if (ctx.snapshot().active_operations != 1 or ctx.executor.io_busy.load(.acquire) != 1)
+            if (ctx.snapshot().active_operations != 1 or fixtureExecutor(ctx).io_busy.load(.acquire) != 1)
                 @panic("legacy fallback escaped its operation or busy batch");
             switch (event) {
                 .admitted => entries += 1,
@@ -2705,7 +2705,7 @@ fn ResourceGemmProbe(comptime thread_limit: usize) type {
                     if (watch_armed) {
                         if (!std.mem.eql(u8, actual, expected))
                             @panic("GEMM operation ended before final stores or damaged padding");
-                        if (expect_busy and ctx.executor.io_busy.load(.acquire) != 1)
+                        if (expect_busy and fixtureExecutor(ctx).io_busy.load(.acquire) != 1)
                             @panic("GEMM fallback outlived the real blocking batch");
                         if (expected_live_allocations) |expected_live| {
                             const allocation_state = allocations.?.stats();
@@ -2876,7 +2876,7 @@ fn runResourceGemmCase(comptime T: type, comptime Probe: type, ctx: *ResourceGem
     Probe.watch_armed = true;
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     const alpha: T = @floatFromInt(shape.alpha);
@@ -2892,7 +2892,7 @@ fn runResourceGemmCase(comptime T: type, comptime Probe: type, ctx: *ResourceGem
     try std.testing.expectEqual(active_before + 1, ctx.snapshot().active_operations);
     try std.testing.expectEqual(entries_before + 1, Probe.entries.load(.acquire));
     try std.testing.expectEqual(finishes_before, Probe.finishes.load(.acquire));
-    if (closing) try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    if (closing) try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     operation.end(); // The observer sees the complete, padded output while still admitted.
     ended = true;
     Probe.disarm();
@@ -2903,7 +2903,7 @@ fn runResourceGemmCase(comptime T: type, comptime Probe: type, ctx: *ResourceGem
 fn finishResourceGemmContext(comptime Probe: type, ctx: *ResourceGemmContext, allocations: *ResourceGemmAllocations) !void {
     Probe.disarm();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     const state = ctx.snapshot();
     try std.testing.expectEqual(@as(usize, 0), state.active_operations);
     try std.testing.expectEqual(@as(usize, 0), state.resource_pins);
@@ -2919,43 +2919,47 @@ test "borrowed real GEMM keeps two Context policies executors and allocators ind
     defer default_guard.deinit();
     var allocations_a: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var allocations_b: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var a = ResourceGemmContext.init(allocations_a.allocator(), Single.policy, .internal_closable);
-    var b = ResourceGemmContext.init(allocations_b.allocator(), Pair.policy, .internal_closable);
-    Single.setup(&a, &allocations_a);
-    Pair.setup(&b, &allocations_b);
+    var reference_a: FixtureReferenceContext = undefined;
+    reference_a.initInPlace(allocations_a.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const a = reference_a.borrowedContext();
+    var reference_b: FixtureReferenceContext = undefined;
+    reference_b.initInPlace(allocations_b.allocator(), Pair.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const b = reference_b.borrowedContext();
+    Single.setup(a, &allocations_a);
+    Pair.setup(b, &allocations_b);
     defer {
         Single.disarm();
         Pair.disarm();
         _ = b.requestClose();
-        _ = b.tryProgressClose();
+        _ = fixtureProgressClose(b);
         _ = a.requestClose();
-        _ = a.tryProgressClose();
+        _ = fixtureProgressClose(a);
     }
-    try std.testing.expect(&a.executor != &b.executor and &a.executor != admission_execution.get());
-    try std.testing.expect(a.executor.allocator.ptr == allocations_a.allocator().ptr);
-    try std.testing.expect(b.executor.allocator.ptr == allocations_b.allocator().ptr);
-    try std.testing.expect(a.executor.policy.max_threads == Single.policy.max_threads);
-    try std.testing.expect(b.executor.policy.max_threads == Pair.policy.max_threads);
+    try std.testing.expect(&reference_a.executor != &reference_b.executor and &reference_a.executor != admission_execution.get());
+    try std.testing.expect(reference_a.executor.allocator.ptr == allocations_a.allocator().ptr);
+    try std.testing.expect(reference_b.executor.allocator.ptr == allocations_b.allocator().ptr);
+    try std.testing.expect(reference_a.executor.policy.max_threads == Single.policy.max_threads);
+    try std.testing.expect(reference_b.executor.policy.max_threads == Pair.policy.max_threads);
     inline for (.{ f32, f64 }) |T| {
         for ([_]u8{ 'N', 'T' }) |ta| for ([_]u8{ 'N', 'T' }) |tb| {
             const before_b = allocations_b.stats();
             const queries_b = Pair.queries.load(.acquire);
-            try runResourceGemmCase(T, Single, &a, .{ .m = 65, .n = 67, .k = 129, .ta = ta, .tb = tb }, false, false);
+            try runResourceGemmCase(T, Single, a, .{ .m = 65, .n = 67, .k = 129, .ta = ta, .tb = tb }, false, false);
             try std.testing.expectEqualDeep(before_b, allocations_b.stats());
             try std.testing.expectEqual(queries_b, Pair.queries.load(.acquire));
             const before_a = allocations_a.stats();
             const queries_a = Single.queries.load(.acquire);
-            try runResourceGemmCase(T, Pair, &b, .{ .m = 65, .n = 67, .k = 129, .ta = ta, .tb = tb }, false, false);
+            try runResourceGemmCase(T, Pair, b, .{ .m = 65, .n = 67, .k = 129, .ta = ta, .tb = tb }, false, false);
             try std.testing.expectEqualDeep(before_a, allocations_a.stats());
             try std.testing.expectEqual(queries_a, Single.queries.load(.acquire));
             try default_guard.check();
         };
         // Above the real planner threshold, and transposed A avoids the NN
         // architecture fast path. Packed-A allocation is architecture-dependent.
-        try runResourceGemmCase(T, Single, &a, .{ .m = 192, .n = 192, .k = 192, .ta = 'T' }, false, false);
+        try runResourceGemmCase(T, Single, a, .{ .m = 192, .n = 192, .k = 192, .ta = 'T' }, false, false);
         const before_a = allocations_a.stats();
         const queries_a = Single.queries.load(.acquire);
-        try runResourceGemmCase(T, Pair, &b, .{ .m = 192, .n = 192, .k = 192, .ta = 'T' }, false, false);
+        try runResourceGemmCase(T, Pair, b, .{ .m = 192, .n = 192, .k = 192, .ta = 'T' }, false, false);
         try std.testing.expectEqualDeep(before_a, allocations_a.stats());
         try std.testing.expectEqual(queries_a, Single.queries.load(.acquire));
     }
@@ -2968,10 +2972,10 @@ test "borrowed real GEMM keeps two Context policies executors and allocators ind
         try std.testing.expect(allocations_a.stats().accepted > 0);
         try std.testing.expect(allocations_b.stats().accepted > 0);
         try std.testing.expect(Pair.configurations.load(.acquire) > 0);
-        try std.testing.expect(b.executor.io_init_state.load(.acquire) == 2 or b.executor.persistent_init_state.load(.acquire) == 2);
+        try std.testing.expect(reference_b.executor.io_init_state.load(.acquire) == 2 or reference_b.executor.persistent_init_state.load(.acquire) == 2);
     }
-    try finishResourceGemmContext(Pair, &b, &allocations_b);
-    try finishResourceGemmContext(Single, &a, &allocations_a);
+    try finishResourceGemmContext(Pair, b, &allocations_b);
+    try finishResourceGemmContext(Single, a, &allocations_a);
     try default_guard.check();
 }
 
@@ -2980,12 +2984,14 @@ test "borrowed real GEMM GEMV shortcuts and short wide copyback retain call reso
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     inline for (.{ f32, f64 }) |T| {
         for ([_]ResourceGemmShape{
@@ -2999,14 +3005,14 @@ test "borrowed real GEMM GEMV shortcuts and short wide copyback retain call reso
             .{ .m = 129, .n = 1, .k = 128, .tb = 'T' },
             .{ .m = 1, .n = 129, .k = 128, .tb = 'T' },
         }) |shape| {
-            try runResourceGemmCase(T, Probe, &ctx, shape, false, false);
+            try runResourceGemmCase(T, Probe, ctx, shape, false, false);
             try default_guard.check();
         }
     }
     // The final tail path is admitted while open, then must finish copyback and
     // all synchronous work after close is requested and before Operation.end.
-    try runResourceGemmCase(f64, Probe, &ctx, .{ .m = 34, .n = 2048, .k = 256 }, true, false);
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try runResourceGemmCase(f64, Probe, ctx, .{ .m = 34, .n = 2048, .k = 256 }, true, false);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try default_guard.check();
 }
 
@@ -3029,7 +3035,7 @@ const ResourceGemmBlockingBatch = struct {
         defer self.finished.store(true, .release);
         var operation = self.context.begin() catch return;
         defer operation.end();
-        self.accepted = operation.borrowedContext().executor.runLowLatency(.{
+        self.accepted = fixtureExecutor(operation.borrowedContext()).runLowLatency(.{
             .task_fn = execute,
             .tasks = self,
             .count = 2,
@@ -3043,14 +3049,16 @@ test "borrowed real GEMM falls back once while its own Context executor is busy"
     defer default_guard.deinit();
     inline for (.{ f32, f64 }) |T| {
         var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-        var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-        Probe.setup(&ctx, &allocations);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        Probe.setup(ctx, &allocations);
         defer {
             Probe.disarm();
             _ = ctx.requestClose();
-            _ = ctx.tryProgressClose();
+            _ = fixtureProgressClose(ctx);
         }
-        var work: ResourceGemmBlockingBatch = .{ .context = &ctx };
+        var work: ResourceGemmBlockingBatch = .{ .context = ctx };
         const caller = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&work});
         var joined = false;
         defer {
@@ -3060,14 +3068,14 @@ test "borrowed real GEMM falls back once while its own Context executor is busy"
         }
         while (!work.entered.load(.acquire) and !work.finished.load(.acquire)) std.Thread.yield() catch {};
         try std.testing.expect(work.entered.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
         try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
         const configurations = Probe.configurations.load(.acquire);
         const queries = Probe.queries.load(.acquire);
         const allocations_before = allocations.stats();
         // The same packed-A shape is parallel with the idle two-thread policy
         // above. No executor busy flag or run return is manually substituted.
-        try runResourceGemmCase(T, Probe, &ctx, .{ .m = 192, .n = 192, .k = 192, .ta = 'T' }, true, true);
+        try runResourceGemmCase(T, Probe, ctx, .{ .m = 192, .n = 192, .k = 192, .ta = 'T' }, true, true);
         try std.testing.expect(Probe.queries.load(.acquire) > queries);
         try std.testing.expectEqual(configurations, Probe.configurations.load(.acquire));
         if (comptime @import("builtin").target.cpu.arch == .aarch64 or @import("builtin").target.cpu.arch == .x86_64) {
@@ -3075,10 +3083,10 @@ test "borrowed real GEMM falls back once while its own Context executor is busy"
             try std.testing.expectEqual(allocations.stats().accepted - allocations_before.accepted, allocations.stats().freed - allocations_before.freed);
         }
         try std.testing.expect(!work.finished.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
         try std.testing.expectEqual(@as(usize, 2), Probe.entries.load(.acquire));
         try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try default_guard.check();
         work.release.store(true, .release);
         caller.join();
@@ -3087,7 +3095,7 @@ test "borrowed real GEMM falls back once while its own Context executor is busy"
         for (&work.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
         try std.testing.expectEqual(@as(usize, 2), Probe.finishes.load(.acquire));
         try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
-        try finishResourceGemmContext(Probe, &ctx, &allocations);
+        try finishResourceGemmContext(Probe, ctx, &allocations);
         try default_guard.check();
     }
 }
@@ -3097,17 +3105,19 @@ test "borrowed real GEMM AMX pack rejection applies beta once before full transp
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     // NN m=1 forwards to full transposed GEMV with m=n=1024, lda=1027.
     // The exact small-integer oracle checks 3*product+2*C and every padding
     // element; the finishing observer sees it while the Operation is live.
-    try runResourceGemmCase(f64, Probe, &ctx, .{
+    try runResourceGemmCase(f64, Probe, ctx, .{
         .m = 1,
         .n = 1024,
         .k = 1024,
@@ -3138,7 +3148,7 @@ test "borrowed real GEMM AMX pack rejection applies beta once before full transp
     try std.testing.expectEqual(@as(usize, 1), Probe.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), Probe.configurations.load(.acquire));
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try default_guard.check();
@@ -3246,7 +3256,7 @@ fn runComplexResourceGemm(comptime T: type, comptime Probe: type, ctx: *Resource
     Probe.watch_armed = true;
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     if (T == fortran.ComplexF32) {
@@ -3274,42 +3284,46 @@ test "borrowed complex GEMM keeps decomposition allocators and two Context polic
     defer guard.deinit();
     var aa: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var ab: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var a = ResourceGemmContext.init(aa.allocator(), Single.policy, .internal_closable);
-    var b = ResourceGemmContext.init(ab.allocator(), Triple.policy, .internal_closable);
-    Single.setup(&a, &aa);
-    Triple.setup(&b, &ab);
+    var reference_a: FixtureReferenceContext = undefined;
+    reference_a.initInPlace(aa.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const a = reference_a.borrowedContext();
+    var reference_b: FixtureReferenceContext = undefined;
+    reference_b.initInPlace(ab.allocator(), Triple.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const b = reference_b.borrowedContext();
+    Single.setup(a, &aa);
+    Triple.setup(b, &ab);
     defer {
         Single.disarm();
         Triple.disarm();
         _ = b.requestClose();
-        _ = b.tryProgressClose();
+        _ = fixtureProgressClose(b);
         _ = a.requestClose();
-        _ = a.tryProgressClose();
+        _ = fixtureProgressClose(a);
     }
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         for ([_]u8{ 'N', 'T', 'C' }) |ta| for ([_]u8{ 'N', 'T', 'C' }) |tb| {
             const before_b = ab.stats();
             const queries_b = Triple.queries.load(.acquire);
-            try runComplexResourceGemm(T, Single, &a, .{ .m = 65, .n = 67, .k = 33, .ta = ta, .tb = tb }, false, false);
+            try runComplexResourceGemm(T, Single, a, .{ .m = 65, .n = 67, .k = 33, .ta = ta, .tb = tb }, false, false);
             try std.testing.expectEqualDeep(before_b, ab.stats());
             try std.testing.expectEqual(queries_b, Triple.queries.load(.acquire));
             const before_a = aa.stats();
             const queries_a = Single.queries.load(.acquire);
-            try runComplexResourceGemm(T, Triple, &b, .{ .m = 65, .n = 67, .k = 33, .ta = ta, .tb = tb }, false, false);
+            try runComplexResourceGemm(T, Triple, b, .{ .m = 65, .n = 67, .k = 33, .ta = ta, .tb = tb }, false, false);
             try std.testing.expectEqualDeep(before_a, aa.stats());
             try std.testing.expectEqual(queries_a, Single.queries.load(.acquire));
             try guard.check();
         };
-        try runComplexResourceGemm(T, Triple, &b, .{ .m = 127, .n = 129, .k = 32 }, false, false);
+        try runComplexResourceGemm(T, Triple, b, .{ .m = 127, .n = 129, .k = 32 }, false, false);
         // Both applicable expanded-real routes are retained, including their
         // original alpha=1/beta=0 restriction; x86 may select 3M for the first.
-        try runComplexResourceGemm(T, Single, &a, .{ .m = 32, .n = 32, .k = 128, .ta = 'T', .expanded_coefficients = true }, false, false);
-        try runComplexResourceGemm(T, Single, &a, .{ .m = 64, .n = 64, .k = 64, .expanded_coefficients = true }, false, false);
+        try runComplexResourceGemm(T, Single, a, .{ .m = 32, .n = 32, .k = 128, .ta = 'T', .expanded_coefficients = true }, false, false);
+        try runComplexResourceGemm(T, Single, a, .{ .m = 64, .n = 64, .k = 64, .expanded_coefficients = true }, false, false);
     }
     try std.testing.expect(aa.stats().accepted > 0 and ab.stats().accepted > 0);
     try std.testing.expectEqual(aa.stats().accepted, aa.stats().freed);
-    try finishResourceGemmContext(Triple, &b, &ab);
-    try finishResourceGemmContext(Single, &a, &aa);
+    try finishResourceGemmContext(Triple, b, &ab);
+    try finishResourceGemmContext(Single, a, &aa);
     try guard.check();
 }
 
@@ -3320,21 +3334,23 @@ test "borrowed complex GEMM rejects outer workspace and inner packs without defa
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         for ([_]usize{ 0, 1 }) |budget| {
             var allocations: ResourceGemmAllocations = .{ .budget = budget };
-            var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-            Probe.setup(&ctx, &allocations);
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
+            Probe.setup(ctx, &allocations);
             defer {
                 Probe.disarm();
                 _ = ctx.requestClose();
-                _ = ctx.tryProgressClose();
+                _ = fixtureProgressClose(ctx);
             }
             // 3M owns the first allocation. The long-K real products retain
             // their original pack fallback, with no default allocator retry.
-            try runComplexResourceGemm(T, Probe, &ctx, .{ .m = 13, .n = 19, .k = 4097 }, true, false);
+            try runComplexResourceGemm(T, Probe, ctx, .{ .m = 13, .n = 19, .k = 4097 }, true, false);
             const state = allocations.stats();
             try std.testing.expectEqual(budget, state.accepted);
             try std.testing.expectEqual(state.accepted, state.freed);
             try std.testing.expect(state.rejected > 0);
-            try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+            try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
             try guard.check();
         }
     }
@@ -3345,12 +3361,14 @@ test "borrowed complex GEMM GEMV edges and invalid empty calls keep the enclosin
     const guard = try ResourceGemmDefaultGuard.init();
     defer guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         for ([_]ComplexResourceShape{
@@ -3363,11 +3381,11 @@ test "borrowed complex GEMM GEMV edges and invalid empty calls keep the enclosin
             .{ .m = 3, .n = 5, .k = 0 },
             .{ .m = 3, .n = 5, .k = 7, .zero_alpha = true },
         }) |shape| {
-            try runComplexResourceGemm(T, Probe, &ctx, shape, false, false);
+            try runComplexResourceGemm(T, Probe, ctx, shape, false, false);
             try guard.check();
         }
     }
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try guard.check();
 }
 
@@ -3377,14 +3395,16 @@ test "borrowed complex GEMM uses same Context fallback while its executor is gen
     defer guard.deinit();
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-        var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-        Probe.setup(&ctx, &allocations);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        Probe.setup(ctx, &allocations);
         defer {
             Probe.disarm();
             _ = ctx.requestClose();
-            _ = ctx.tryProgressClose();
+            _ = fixtureProgressClose(ctx);
         }
-        var work: ResourceGemmBlockingBatch = .{ .context = &ctx };
+        var work: ResourceGemmBlockingBatch = .{ .context = ctx };
         const caller = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&work});
         var joined = false;
         defer {
@@ -3395,18 +3415,18 @@ test "borrowed complex GEMM uses same Context fallback while its executor is gen
         while (!work.entered.load(.acquire) and !work.finished.load(.acquire)) std.Thread.yield() catch {};
         try std.testing.expect(work.entered.load(.acquire));
         const configurations = Probe.configurations.load(.acquire);
-        try runComplexResourceGemm(T, Probe, &ctx, .{ .m = 127, .n = 129, .k = 32 }, false, true);
-        try runComplexResourceGemm(T, Probe, &ctx, .{ .m = 256, .n = 1, .k = 256 }, true, true);
+        try runComplexResourceGemm(T, Probe, ctx, .{ .m = 127, .n = 129, .k = 32 }, false, true);
+        try runComplexResourceGemm(T, Probe, ctx, .{ .m = 256, .n = 1, .k = 256 }, true, true);
         try std.testing.expectEqual(configurations, Probe.configurations.load(.acquire));
         try std.testing.expect(!work.finished.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
         try guard.check();
         work.release.store(true, .release);
         caller.join();
         joined = true;
         try std.testing.expect(work.accepted);
         for (&work.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
-        try finishResourceGemmContext(Probe, &ctx, &allocations);
+        try finishResourceGemmContext(Probe, ctx, &allocations);
         try guard.check();
     }
 }
@@ -3506,7 +3526,7 @@ fn runIndependentResourceGemv(comptime T: type, comptime Probe: type, ctx: *Reso
     Probe.watch_armed = true;
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     const symbol = if (T == f32) "sgemv_" else if (T == f64) "dgemv_" else if (T == fortran.ComplexF32) "cgemv_" else "zgemv_";
@@ -3531,17 +3551,21 @@ test "independent borrowed GEMV retains two Contexts for four scalars transforms
     defer guard.deinit();
     var aa: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var ab: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var a = ResourceGemmContext.init(aa.allocator(), Single.policy, .internal_closable);
-    var b = ResourceGemmContext.init(ab.allocator(), Pair.policy, .internal_closable);
-    Single.setup(&a, &aa);
-    Pair.setup(&b, &ab);
+    var reference_a: FixtureReferenceContext = undefined;
+    reference_a.initInPlace(aa.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const a = reference_a.borrowedContext();
+    var reference_b: FixtureReferenceContext = undefined;
+    reference_b.initInPlace(ab.allocator(), Pair.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const b = reference_b.borrowedContext();
+    Single.setup(a, &aa);
+    Pair.setup(b, &ab);
     defer {
         Single.disarm();
         Pair.disarm();
         _ = b.requestClose();
-        _ = b.tryProgressClose();
+        _ = fixtureProgressClose(b);
         _ = a.requestClose();
-        _ = a.tryProgressClose();
+        _ = fixtureProgressClose(a);
     }
     inline for (.{ f32, f64, fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         for ([_]u8{ 'N', 'T', 'C' }) |trans| {
@@ -3549,24 +3573,24 @@ test "independent borrowed GEMV retains two Contexts for four scalars transforms
                 const shape: IndependentGemvShape = .{ .trans = trans, .incx = stride, .incy = stride };
                 const before_b = ab.stats();
                 const queries_b = Pair.queries.load(.acquire);
-                try runIndependentResourceGemv(T, Single, &a, shape, false, false);
+                try runIndependentResourceGemv(T, Single, a, shape, false, false);
                 try std.testing.expectEqualDeep(before_b, ab.stats());
                 try std.testing.expectEqual(queries_b, Pair.queries.load(.acquire));
                 const before_a = aa.stats();
                 const queries_a = Single.queries.load(.acquire);
-                try runIndependentResourceGemv(T, Pair, &b, shape, false, false);
+                try runIndependentResourceGemv(T, Pair, b, shape, false, false);
                 try std.testing.expectEqualDeep(before_a, aa.stats());
                 try std.testing.expectEqual(queries_a, Single.queries.load(.acquire));
             }
         }
         for ([_]IndependentGemvShape{ .{ .m = 0 }, .{ .n = 0 }, .{ .invalid = true }, .{ .m = 513, .n = 512 } }) |shape| {
-            try runIndependentResourceGemv(T, Pair, &b, shape, false, false);
+            try runIndependentResourceGemv(T, Pair, b, shape, false, false);
             try guard.check();
         }
     }
     try std.testing.expect(Pair.queries.load(.acquire) > 0);
-    try finishResourceGemmContext(Pair, &b, &ab);
-    try finishResourceGemmContext(Single, &a, &aa);
+    try finishResourceGemmContext(Pair, b, &ab);
+    try finishResourceGemmContext(Single, a, &aa);
     try guard.check();
 }
 
@@ -3580,32 +3604,36 @@ test "independent borrowed GEMV rejects actual scratch allocations without defau
     // numerics and ownership, without inventing an allocation on their leaf path.
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-        var ctx = ResourceGemmContext.init(allocations.allocator(), Pair.policy, .internal_closable);
-        Pair.setup(&ctx, &allocations);
+        var reference_ctx: FixtureReferenceContext = undefined;
+        reference_ctx.initInPlace(allocations.allocator(), Pair.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
+        Pair.setup(ctx, &allocations);
         defer {
             Pair.disarm();
             _ = ctx.requestClose();
-            _ = ctx.tryProgressClose();
+            _ = fixtureProgressClose(ctx);
         }
-        try runIndependentResourceGemv(T, Pair, &ctx, .{ .m = 513, .n = 512 }, true, false);
+        try runIndependentResourceGemv(T, Pair, ctx, .{ .m = 513, .n = 512 }, true, false);
         const stats = allocations.stats();
         try std.testing.expectEqual(@as(usize, 0), stats.accepted);
         try std.testing.expectEqual(@as(usize, 0), stats.freed);
         try std.testing.expectEqual(stats.attempts, stats.rejected);
         if (comptime @import("builtin").target.cpu.arch == .aarch64)
             try std.testing.expect(stats.rejected > 0);
-        try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
         try guard.check();
     }
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Single.policy, .internal_closable);
-    Single.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Single.setup(ctx, &allocations);
     defer {
         Single.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    try runIndependentResourceGemv(f64, Single, &ctx, .{ .m = 1024, .n = 1024, .trans = 'T' }, true, false);
+    try runIndependentResourceGemv(f64, Single, ctx, .{ .m = 1024, .n = 1024, .trans = 'T' }, true, false);
     const stats = allocations.stats();
     try std.testing.expectEqual(@as(usize, 0), stats.accepted);
     try std.testing.expectEqual(@as(usize, 0), stats.freed);
@@ -3617,7 +3645,7 @@ test "independent borrowed GEMV rejects actual scratch allocations without defau
         !builtin.target.cpu.has(.aarch64, .sve) and
         !(builtin.target.cpu.has(.aarch64, .sme) and builtin.target.cpu.has(.aarch64, .sme2));
     if (comptime static_amx) try std.testing.expect(stats.rejected > 0);
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try guard.check();
 }
 
@@ -3626,14 +3654,16 @@ test "independent borrowed GEMV finishes on its closing Context while its execut
     const guard = try ResourceGemmDefaultGuard.init();
     defer guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    var work: ResourceGemmBlockingBatch = .{ .context = &ctx };
+    var work: ResourceGemmBlockingBatch = .{ .context = ctx };
     const caller = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&work});
     var joined = false;
     defer {
@@ -3647,8 +3677,8 @@ test "independent borrowed GEMV finishes on its closing Context while its execut
     const queries = Probe.queries.load(.acquire);
     const before = allocations.stats();
     inline for (.{ f32, f64, fortran.ComplexF32 }) |T|
-        try runIndependentResourceGemv(T, Probe, &ctx, .{ .m = 513, .n = 512 }, false, true);
-    try runIndependentResourceGemv(fortran.ComplexF64, Probe, &ctx, .{ .m = 513, .n = 512 }, true, true);
+        try runIndependentResourceGemv(T, Probe, ctx, .{ .m = 513, .n = 512 }, false, true);
+    try runIndependentResourceGemv(fortran.ComplexF64, Probe, ctx, .{ .m = 513, .n = 512 }, true, true);
     try std.testing.expect(Probe.queries.load(.acquire) > queries);
     try std.testing.expectEqual(configurations, Probe.configurations.load(.acquire));
     const after = allocations.stats();
@@ -3656,15 +3686,15 @@ test "independent borrowed GEMV finishes on its closing Context while its execut
     if (comptime @import("builtin").target.cpu.arch == .aarch64)
         try std.testing.expect(after.accepted > before.accepted);
     try std.testing.expect(!work.finished.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     try guard.check();
     work.release.store(true, .release);
     caller.join();
     joined = true;
     try std.testing.expect(work.accepted);
     for (&work.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try guard.check();
 }
 
@@ -3739,7 +3769,7 @@ fn level1UpdateCase(comptime T: type, comptime kind: Level1Update, comptime Prob
     const finishes = Probe.finishes.load(.acquire);
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     }
     const ni: fortran.BlasInt = @intCast(n);
     switch (kind) {
@@ -3837,21 +3867,23 @@ test "borrowed Level 1 covers four scalars updates reductions strides and comple
     const guard = try ResourceGemmDefaultGuard.init();
     defer guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     inline for (.{ f32, f64, fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         for ([_]fortran.BlasInt{ 1, 2, -2, 3 }) |stride| {
             inline for (.{ Level1Update.copy, .swap, .scal, .axpy, .axpby, .rot }) |kind|
-                try level1UpdateCase(T, kind, Probe, &ctx, 7, stride, false, false);
+                try level1UpdateCase(T, kind, Probe, ctx, 7, stride, false, false);
             if (comptime T == f32 or T == f64) {
-                try level1UpdateCase(T, .rotm, Probe, &ctx, 7, stride, false, false);
+                try level1UpdateCase(T, .rotm, Probe, ctx, 7, stride, false, false);
             } else {
-                try level1UpdateCase(T, .rscal, Probe, &ctx, 7, stride, false, false);
+                try level1UpdateCase(T, .rscal, Probe, ctx, 7, stride, false, false);
             }
             var operation = try ctx.begin();
             defer operation.end();
@@ -3859,7 +3891,7 @@ test "borrowed Level 1 covers four scalars updates reductions strides and comple
         }
     }
     try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try guard.check();
 }
 
@@ -3870,24 +3902,28 @@ test "borrowed Level 1 large updates keep two Context policies and allocator lif
     defer guard.deinit();
     var one_alloc: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var many_alloc: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var one = ResourceGemmContext.init(one_alloc.allocator(), Single.policy, .internal_closable);
-    var many = ResourceGemmContext.init(many_alloc.allocator(), Parallel.policy, .internal_closable);
-    Single.setup(&one, &one_alloc);
-    Parallel.setup(&many, &many_alloc);
+    var reference_one: FixtureReferenceContext = undefined;
+    reference_one.initInPlace(one_alloc.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const one = reference_one.borrowedContext();
+    var reference_many: FixtureReferenceContext = undefined;
+    reference_many.initInPlace(many_alloc.allocator(), Parallel.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const many = reference_many.borrowedContext();
+    Single.setup(one, &one_alloc);
+    Parallel.setup(many, &many_alloc);
     defer {
         Single.disarm();
         Parallel.disarm();
         _ = many.requestClose();
-        _ = many.tryProgressClose();
+        _ = fixtureProgressClose(many);
         _ = one.requestClose();
-        _ = one.tryProgressClose();
+        _ = fixtureProgressClose(one);
     }
-    try level1UpdateCase(f64, .scal, Single, &one, 2 * 1024 * 1024, 1, false, false);
+    try level1UpdateCase(f64, .scal, Single, one, 2 * 1024 * 1024, 1, false, false);
     try std.testing.expectEqual(@as(usize, 0), one_alloc.stats().attempts);
-    try level1UpdateCase(f64, .scal, Parallel, &many, 2 * 1024 * 1024, 1, false, false);
-    try level1UpdateCase(f64, .axpby, Parallel, &many, 512 * 1024, 1, false, false);
-    try level1UpdateCase(fortran.ComplexF64, .scal, Parallel, &many, 512 * 1024, 2, false, false);
-    try level1UpdateCase(fortran.ComplexF32, .swap, Parallel, &many, 512 * 1024, 2, false, false);
+    try level1UpdateCase(f64, .scal, Parallel, many, 2 * 1024 * 1024, 1, false, false);
+    try level1UpdateCase(f64, .axpby, Parallel, many, 512 * 1024, 1, false, false);
+    try level1UpdateCase(fortran.ComplexF64, .scal, Parallel, many, 512 * 1024, 2, false, false);
+    try level1UpdateCase(fortran.ComplexF32, .swap, Parallel, many, 512 * 1024, 2, false, false);
     try std.testing.expect(Single.queries.load(.acquire) > 0);
     try std.testing.expect(Parallel.queries.load(.acquire) > 0);
     try std.testing.expect(Parallel.configurations.load(.acquire) > 0);
@@ -3895,8 +3931,8 @@ test "borrowed Level 1 large updates keep two Context policies and allocator lif
     try std.testing.expectEqual(@as(usize, 0), one_alloc.stats().attempts);
     // Threaded storage may remain live after every operation. It belongs to
     // this Executor and is checked for complete release only after its drain.
-    try finishResourceGemmContext(Parallel, &many, &many_alloc);
-    try finishResourceGemmContext(Single, &one, &one_alloc);
+    try finishResourceGemmContext(Parallel, many, &many_alloc);
+    try finishResourceGemmContext(Single, one, &one_alloc);
     try guard.check();
 }
 
@@ -3905,27 +3941,31 @@ test "borrowed Level 1 allocator refusal and real busy closing fallback finish e
     const guard = try ResourceGemmDefaultGuard.init();
     defer guard.deinit();
     var refused: ResourceGemmAllocations = .{ .budget = 0 };
-    var denied = ResourceGemmContext.init(refused.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&denied, &refused);
+    var reference_denied: FixtureReferenceContext = undefined;
+    reference_denied.initInPlace(refused.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const denied = reference_denied.borrowedContext();
+    Probe.setup(denied, &refused);
     defer {
         Probe.disarm();
         _ = denied.requestClose();
-        _ = denied.tryProgressClose();
+        _ = fixtureProgressClose(denied);
     }
-    try level1UpdateCase(f64, .scal, Probe, &denied, 2 * 1024 * 1024, 1, false, false);
+    try level1UpdateCase(f64, .scal, Probe, denied, 2 * 1024 * 1024, 1, false, false);
     try std.testing.expect(refused.stats().rejected > 0);
     try std.testing.expectEqual(@as(usize, 0), refused.stats().accepted);
     _ = denied.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, denied.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(denied));
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    var work: ResourceGemmBlockingBatch = .{ .context = &ctx };
+    var work: ResourceGemmBlockingBatch = .{ .context = ctx };
     const caller = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&work});
     var joined = false;
     defer {
@@ -3936,17 +3976,17 @@ test "borrowed Level 1 allocator refusal and real busy closing fallback finish e
     while (!work.entered.load(.acquire) and !work.finished.load(.acquire)) std.Thread.yield() catch {};
     try std.testing.expect(work.entered.load(.acquire));
     const allocations_before = allocations.stats();
-    try level1UpdateCase(f64, .axpy, Probe, &ctx, 512 * 1024, 1, true, true);
+    try level1UpdateCase(f64, .axpy, Probe, ctx, 512 * 1024, 1, true, true);
     try std.testing.expectEqualDeep(allocations_before, allocations.stats());
     try std.testing.expect(!work.finished.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
-    try std.testing.expect(ctx.executor.persistent_task_fn == ResourceGemmBlockingBatch.execute);
+    try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
+    try std.testing.expect(reference_ctx.executor.persistent_task_fn == ResourceGemmBlockingBatch.execute);
     work.release.store(true, .release);
     caller.join();
     joined = true;
     try std.testing.expect(work.accepted);
     for (&work.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try guard.check();
 }
 
@@ -4220,7 +4260,7 @@ const SymmetricMvResourceFixture = struct {
             fn finish(raw: *const anyopaque) !void {
                 const self: *const @This() = @ptrCast(@alignCast(raw));
                 try inspect(raw);
-                if (self.busy) try std.testing.expectEqual(@as(u8, 1), self.ctx.executor.io_busy.load(.acquire));
+                if (self.busy) try std.testing.expectEqual(@as(u8, 1), fixtureExecutor(self.ctx).io_busy.load(.acquire));
                 if (self.scratch) |log| {
                     if (self.scratch_elements != 0) try log.checkScratch(T, self.scratch_elements, self.refused) else try std.testing.expect(!log.snapshot().seen);
                     if (log.free_barrier) |barrier| try std.testing.expect(barrier.completed.load(.acquire));
@@ -4336,7 +4376,7 @@ const SymmetricMvResourceFixture = struct {
         };
         if (closing) {
             try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-            try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+            try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
             try std.testing.expectError(error.Closing, ctx.begin());
         }
         const symbol = switch (storage) {
@@ -4356,7 +4396,7 @@ const SymmetricMvResourceFixture = struct {
         if (scratch) |log| {
             if (scratch_elements != 0) try log.checkScratch(T, scratch_elements, refused) else try std.testing.expect(!log.snapshot().seen);
         }
-        if (closing) try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        if (closing) try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         operation.end();
         ended = true;
         try std.testing.expectEqual(active_before, ctx.snapshot().active_operations);
@@ -4370,12 +4410,14 @@ test "borrowed symmetric MV twelve entries preserve dense oracle strides padding
     const guard = try ResourceGemmDefaultGuard.init();
     defer guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Single.policy, .internal_closable);
-    Single.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Single.setup(ctx, &allocations);
     defer {
         Single.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     inline for (.{ f32, f64, fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         inline for (.{ F.Storage.dense, F.Storage.band, F.Storage.packed_storage }) |storage| {
@@ -4389,7 +4431,7 @@ test "borrowed symmetric MV twelve entries preserve dense oracle strides padding
                 }) |config| {
                     var shape = config;
                     shape.upper = upper;
-                    try F.run(T, storage, Single, &ctx, shape, null, 0, false);
+                    try F.run(T, storage, Single, ctx, shape, null, 0, false);
                 }
             }
         }
@@ -4397,7 +4439,7 @@ test "borrowed symmetric MV twelve entries preserve dense oracle strides padding
     try std.testing.expectEqual(@as(usize, 120), Single.entries.load(.acquire));
     try std.testing.expectEqual(Single.entries.load(.acquire), Single.finishes.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
-    try finishResourceGemmContext(Single, &ctx, &allocations);
+    try finishResourceGemmContext(Single, ctx, &allocations);
     try guard.check();
 }
 
@@ -4411,19 +4453,23 @@ test "borrowed symmetric MV keeps policy one and four scratch executors and allo
     var ab: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var sa: F.ScratchLog = .{ .backing = &aa };
     var sb: F.ScratchLog = .{ .backing = &ab };
-    var a = ResourceGemmContext.init(sa.allocator(), Single.policy, .internal_closable);
-    var b = ResourceGemmContext.init(sb.allocator(), Parallel.policy, .internal_closable);
-    sa.context = &a;
-    sb.context = &b;
-    Single.setup(&a, &aa);
-    Parallel.setup(&b, &ab);
+    var reference_a: FixtureReferenceContext = undefined;
+    reference_a.initInPlace(sa.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const a = reference_a.borrowedContext();
+    var reference_b: FixtureReferenceContext = undefined;
+    reference_b.initInPlace(sb.allocator(), Parallel.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const b = reference_b.borrowedContext();
+    sa.context = a;
+    sb.context = b;
+    Single.setup(a, &aa);
+    Parallel.setup(b, &ab);
     defer {
         Single.disarm();
         Parallel.disarm();
         _ = b.requestClose();
-        _ = b.tryProgressClose();
+        _ = fixtureProgressClose(b);
         _ = a.requestClose();
-        _ = a.tryProgressClose();
+        _ = fixtureProgressClose(a);
     }
     inline for (.{ f32, f64, fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         inline for (.{ F.Storage.dense, F.Storage.band, F.Storage.packed_storage }) |storage| {
@@ -4432,28 +4478,28 @@ test "borrowed symmetric MV keeps policy one and four scratch executors and allo
                 const before_b = ab.stats();
                 const queries_b = Parallel.queries.load(.acquire);
                 const single_scratch: usize = if (storage == .packed_storage and !F.isComplex(T) and @import("builtin").target.cpu.arch == .aarch64) 512 else 0;
-                try F.run(T, storage, Single, &a, shape, &sa, single_scratch, false);
+                try F.run(T, storage, Single, a, shape, &sa, single_scratch, false);
                 try std.testing.expectEqualDeep(before_b, ab.stats());
                 try std.testing.expectEqual(queries_b, Parallel.queries.load(.acquire));
-                try std.testing.expectEqual(@as(u32, 0), a.executor.persistent_worker_count.load(.acquire));
-                try std.testing.expectEqual(@as(u32, 0), a.executor.persistent_job_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 0), reference_a.executor.persistent_worker_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 0), reference_a.executor.persistent_job_count.load(.acquire));
                 const before_a = aa.stats();
                 const queries_a = Single.queries.load(.acquire);
                 var generations: [3]u32 = undefined;
-                for (&generations, 0..) |*generation, i| generation.* = b.executor.persistent_worker_generation[i].load(.acquire);
-                try F.run(T, storage, Parallel, &b, shape, &sb, if (storage == .band) 0 else 4 * 512, false);
+                for (&generations, 0..) |*generation, i| generation.* = reference_b.executor.persistent_worker_generation[i].load(.acquire);
+                try F.run(T, storage, Parallel, b, shape, &sb, if (storage == .band) 0 else 4 * 512, false);
                 try std.testing.expectEqualDeep(before_a, aa.stats());
                 try std.testing.expectEqual(queries_a, Single.queries.load(.acquire));
                 if (storage != .band) {
                     // A real synchronous four-task batch ran on this Context.
                     // This is stronger than a policy query or generic allocation.
-                    try std.testing.expectEqual(@as(u32, 4), b.executor.persistent_job_count.load(.acquire));
-                    try std.testing.expect(b.executor.persistent_worker_count.load(.acquire) >= 3);
-                    try std.testing.expectEqual(@as(u32, 3), b.executor.persistent_done_target.load(.acquire));
-                    try std.testing.expectEqual(@as(u32, 3), b.executor.persistent_done_count.load(.acquire));
-                    for (generations, 0..) |generation, i| try std.testing.expectEqual(generation +% 1, b.executor.persistent_worker_generation[i].load(.acquire));
+                    try std.testing.expectEqual(@as(u32, 4), reference_b.executor.persistent_job_count.load(.acquire));
+                    try std.testing.expect(reference_b.executor.persistent_worker_count.load(.acquire) >= 3);
+                    try std.testing.expectEqual(@as(u32, 3), reference_b.executor.persistent_done_target.load(.acquire));
+                    try std.testing.expectEqual(@as(u32, 3), reference_b.executor.persistent_done_count.load(.acquire));
+                    for (generations, 0..) |generation, i| try std.testing.expectEqual(generation +% 1, reference_b.executor.persistent_worker_generation[i].load(.acquire));
                 } else {
-                    for (generations, 0..) |generation, i| try std.testing.expectEqual(generation, b.executor.persistent_worker_generation[i].load(.acquire));
+                    for (generations, 0..) |generation, i| try std.testing.expectEqual(generation, reference_b.executor.persistent_worker_generation[i].load(.acquire));
                 }
                 try guard.check();
             }
@@ -4464,8 +4510,8 @@ test "borrowed symmetric MV keeps policy one and four scratch executors and allo
     try std.testing.expect(Parallel.configurations.load(.acquire) > 0);
     try std.testing.expectEqual(@as(usize, 24), Single.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 24), Parallel.entries.load(.acquire));
-    try finishResourceGemmContext(Parallel, &b, &ab);
-    try finishResourceGemmContext(Single, &a, &aa);
+    try finishResourceGemmContext(Parallel, b, &ab);
+    try finishResourceGemmContext(Single, a, &aa);
     try guard.check();
 }
 
@@ -4479,30 +4525,32 @@ test "borrowed symmetric MV refuses real scratch requests and falls back with be
             for ([_]bool{ true, false }) |upper| {
                 var allocations: ResourceGemmAllocations = .{ .budget = 0 };
                 var scratch: F.ScratchLog = .{ .backing = &allocations };
-                var ctx = ResourceGemmContext.init(scratch.allocator(), Parallel.policy, .internal_closable);
-                scratch.context = &ctx;
-                Parallel.setup(&ctx, &allocations);
+                var reference_ctx: FixtureReferenceContext = undefined;
+                reference_ctx.initInPlace(scratch.allocator(), Parallel.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+                const ctx = reference_ctx.borrowedContext();
+                scratch.context = ctx;
+                Parallel.setup(ctx, &allocations);
                 defer {
                     Parallel.disarm();
                     _ = ctx.requestClose();
-                    _ = ctx.tryProgressClose();
+                    _ = fixtureProgressClose(ctx);
                 }
                 // The same independent oracle includes nonzero old Y and beta.
                 // A real failed scratch allocation occurs before task submission.
-                try F.run(T, storage, Parallel, &ctx, .{ .n = 512, .k = 8, .upper = upper }, &scratch, 4 * 512, true);
+                try F.run(T, storage, Parallel, ctx, .{ .n = 512, .k = 8, .upper = upper }, &scratch, 4 * 512, true);
                 const stats = allocations.stats();
                 try std.testing.expectEqual(@as(usize, 1), stats.attempts);
                 try std.testing.expectEqual(@as(usize, 1), stats.rejected);
                 try std.testing.expectEqual(@as(usize, 0), stats.accepted);
                 try std.testing.expectEqual(@as(usize, 0), stats.freed);
-                try std.testing.expectEqual(@as(u32, 0), ctx.executor.persistent_worker_count.load(.acquire));
-                try std.testing.expectEqual(@as(u32, 0), ctx.executor.persistent_job_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 0), reference_ctx.executor.persistent_worker_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 0), reference_ctx.executor.persistent_job_count.load(.acquire));
                 try std.testing.expectEqual(@as(usize, 1), Parallel.entries.load(.acquire));
                 try std.testing.expectEqual(@as(usize, 1), Parallel.finishes.load(.acquire));
                 try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
                 try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
                 _ = ctx.requestClose();
-                try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+                try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
                 try guard.check();
             }
         }
@@ -4523,19 +4571,23 @@ test "borrowed Hermitian unit dense and band zero beta ignores old NaNs on both 
     var ab: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var sa: F.ScratchLog = .{ .backing = &aa };
     var sb: F.ScratchLog = .{ .backing = &ab };
-    var a = ResourceGemmContext.init(sa.allocator(), Single.policy, .internal_closable);
-    var b = ResourceGemmContext.init(sb.allocator(), Parallel.policy, .internal_closable);
-    sa.context = &a;
-    sb.context = &b;
-    Single.setup(&a, &aa);
-    Parallel.setup(&b, &ab);
+    var reference_a: FixtureReferenceContext = undefined;
+    reference_a.initInPlace(sa.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const a = reference_a.borrowedContext();
+    var reference_b: FixtureReferenceContext = undefined;
+    reference_b.initInPlace(sb.allocator(), Parallel.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const b = reference_b.borrowedContext();
+    sa.context = a;
+    sb.context = b;
+    Single.setup(a, &aa);
+    Parallel.setup(b, &ab);
     defer {
         Single.disarm();
         Parallel.disarm();
         _ = b.requestClose();
-        _ = b.tryProgressClose();
+        _ = fixtureProgressClose(b);
         _ = a.requestClose();
-        _ = a.tryProgressClose();
+        _ = fixtureProgressClose(a);
     }
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         inline for (.{ F.Storage.dense, F.Storage.band }) |storage| {
@@ -4550,31 +4602,31 @@ test "borrowed Hermitian unit dense and band zero beta ignores old NaNs on both 
                 };
                 const before_b = ab.stats();
                 const queries_b = Parallel.queries.load(.acquire);
-                try F.run(T, storage, Single, &a, shape, &sa, 0, false);
+                try F.run(T, storage, Single, a, shape, &sa, 0, false);
                 try std.testing.expectEqualDeep(before_b, ab.stats());
                 try std.testing.expectEqual(queries_b, Parallel.queries.load(.acquire));
                 try std.testing.expectEqual(@as(usize, 0), aa.stats().attempts);
-                try std.testing.expectEqual(@as(u32, 0), a.executor.persistent_worker_count.load(.acquire));
-                try std.testing.expectEqual(@as(u32, 0), a.executor.persistent_job_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 0), reference_a.executor.persistent_worker_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 0), reference_a.executor.persistent_job_count.load(.acquire));
 
                 const before_a = aa.stats();
                 const queries_a = Single.queries.load(.acquire);
                 var generations: [3]u32 = undefined;
                 for (&generations, 0..) |*generation, i|
-                    generation.* = b.executor.persistent_worker_generation[i].load(.acquire);
-                try F.run(T, storage, Parallel, &b, shape, &sb, if (storage == .dense) 4 * 512 else 0, false);
+                    generation.* = reference_b.executor.persistent_worker_generation[i].load(.acquire);
+                try F.run(T, storage, Parallel, b, shape, &sb, if (storage == .dense) 4 * 512 else 0, false);
                 try std.testing.expectEqualDeep(before_a, aa.stats());
                 try std.testing.expectEqual(queries_a, Single.queries.load(.acquire));
                 if (storage == .dense) {
-                    try std.testing.expectEqual(@as(u32, 4), b.executor.persistent_job_count.load(.acquire));
-                    try std.testing.expect(b.executor.persistent_worker_count.load(.acquire) >= 3);
-                    try std.testing.expectEqual(@as(u32, 3), b.executor.persistent_done_target.load(.acquire));
-                    try std.testing.expectEqual(@as(u32, 3), b.executor.persistent_done_count.load(.acquire));
+                    try std.testing.expectEqual(@as(u32, 4), reference_b.executor.persistent_job_count.load(.acquire));
+                    try std.testing.expect(reference_b.executor.persistent_worker_count.load(.acquire) >= 3);
+                    try std.testing.expectEqual(@as(u32, 3), reference_b.executor.persistent_done_target.load(.acquire));
+                    try std.testing.expectEqual(@as(u32, 3), reference_b.executor.persistent_done_count.load(.acquire));
                     for (generations, 0..) |generation, i|
-                        try std.testing.expectEqual(generation +% 1, b.executor.persistent_worker_generation[i].load(.acquire));
+                        try std.testing.expectEqual(generation +% 1, reference_b.executor.persistent_worker_generation[i].load(.acquire));
                 } else {
                     for (generations, 0..) |generation, i|
-                        try std.testing.expectEqual(generation, b.executor.persistent_worker_generation[i].load(.acquire));
+                        try std.testing.expectEqual(generation, reference_b.executor.persistent_worker_generation[i].load(.acquire));
                 }
                 try guard.check();
             }
@@ -4584,8 +4636,8 @@ test "borrowed Hermitian unit dense and band zero beta ignores old NaNs on both 
     try std.testing.expectEqual(@as(usize, 8), Parallel.entries.load(.acquire));
     try std.testing.expectEqual(Single.entries.load(.acquire), Single.finishes.load(.acquire));
     try std.testing.expectEqual(Parallel.entries.load(.acquire), Parallel.finishes.load(.acquire));
-    try finishResourceGemmContext(Parallel, &b, &ab);
-    try finishResourceGemmContext(Single, &a, &aa);
+    try finishResourceGemmContext(Parallel, b, &ab);
+    try finishResourceGemmContext(Single, a, &aa);
     try guard.check();
 }
 
@@ -4635,15 +4687,17 @@ fn runSymmetricMvBusyClosing(comptime T: type, comptime storage: SymmetricMvReso
     const Probe = SymmetricMvLifecycleProbe(2);
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var scratch: F.ScratchLog = .{ .backing = &allocations };
-    var ctx = ResourceGemmContext.init(scratch.allocator(), Probe.policy, .internal_closable);
-    scratch.context = &ctx;
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(scratch.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    scratch.context = ctx;
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    var blocker: ResourceGemmBlockingBatch = .{ .context = &ctx };
+    var blocker: ResourceGemmBlockingBatch = .{ .context = ctx };
     const thread = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&blocker});
     var joined = false;
     defer {
@@ -4654,45 +4708,45 @@ fn runSymmetricMvBusyClosing(comptime T: type, comptime storage: SymmetricMvReso
     }
     while (!blocker.entered.load(.acquire) and !blocker.finished.load(.acquire)) std.Thread.yield() catch {};
     try std.testing.expect(blocker.entered.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
-    try std.testing.expectEqual(@as(u32, 2), ctx.executor.persistent_job_count.load(.acquire));
+    try std.testing.expectEqual(@as(u32, 2), reference_ctx.executor.persistent_job_count.load(.acquire));
     // The existing visits counter is monotonic, not a publication handshake.
     // Acquire the real worker's completion instead before reading its effects.
-    while (ctx.executor.persistent_done_count.load(.acquire) != 1 and !blocker.finished.load(.acquire)) std.Thread.yield() catch {};
-    try std.testing.expectEqual(@as(u32, 1), ctx.executor.persistent_done_count.load(.acquire));
+    while (reference_ctx.executor.persistent_done_count.load(.acquire) != 1 and !blocker.finished.load(.acquire)) std.Thread.yield() catch {};
+    try std.testing.expectEqual(@as(u32, 1), reference_ctx.executor.persistent_done_count.load(.acquire));
     try std.testing.expectEqual(@as(u32, 1), blocker.visits[1].load(.acquire));
     // These fields were published before the caller's release-store to entered;
     // no following batch can acquire io_busy until this blocked batch returns.
-    const task_fn = ctx.executor.persistent_task_fn;
-    const tasks = ctx.executor.persistent_tasks;
+    const task_fn = reference_ctx.executor.persistent_task_fn;
+    const tasks = reference_ctx.executor.persistent_tasks;
     var generations: [admission_execution.owner.max_tasks]u32 = undefined;
-    for (&generations, 0..) |*generation, i| generation.* = ctx.executor.persistent_worker_generation[i].load(.acquire);
+    for (&generations, 0..) |*generation, i| generation.* = reference_ctx.executor.persistent_worker_generation[i].load(.acquire);
     const configurations = Probe.configurations.load(.acquire);
     const before = allocations.stats();
-    try F.runLifecycle(T, storage, Probe, &ctx, .{ .n = 512, .k = 8, .upper = upper }, &scratch, 2 * 512, false, true, true, true);
+    try F.runLifecycle(T, storage, Probe, ctx, .{ .n = 512, .k = 8, .upper = upper }, &scratch, 2 * 512, false, true, true, true);
     const after = allocations.stats();
     try std.testing.expectEqual(@as(usize, 1), after.attempts - before.attempts);
     try std.testing.expectEqual(@as(usize, 1), after.accepted - before.accepted);
     try std.testing.expectEqual(@as(usize, 1), after.freed - before.freed);
     try std.testing.expectEqual(before.rejected, after.rejected);
     try std.testing.expectEqual(configurations, Probe.configurations.load(.acquire));
-    try std.testing.expect(ctx.executor.persistent_task_fn == task_fn);
-    try std.testing.expect(ctx.executor.persistent_tasks == tasks);
-    try std.testing.expectEqual(@as(u32, 2), ctx.executor.persistent_job_count.load(.acquire));
-    for (generations, 0..) |generation, i| try std.testing.expectEqual(generation, ctx.executor.persistent_worker_generation[i].load(.acquire));
+    try std.testing.expect(reference_ctx.executor.persistent_task_fn == task_fn);
+    try std.testing.expect(reference_ctx.executor.persistent_tasks == tasks);
+    try std.testing.expectEqual(@as(u32, 2), reference_ctx.executor.persistent_job_count.load(.acquire));
+    for (generations, 0..) |generation, i| try std.testing.expectEqual(generation, reference_ctx.executor.persistent_worker_generation[i].load(.acquire));
     try std.testing.expect(!blocker.finished.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 2), Probe.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     blocker.release.store(true, .release);
     thread.join();
     joined = true;
     try std.testing.expect(blocker.accepted);
     for (&blocker.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
     try std.testing.expectEqual(@as(usize, 2), Probe.finishes.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 test "borrowed symmetric MV finishes after close with real busy Executor fallback and one beta" {
@@ -4720,21 +4774,23 @@ test "borrowed Hermitian band finishes on an already closing Context without scr
         for ([_]bool{ true, false }) |upper| {
             var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
             var scratch: F.ScratchLog = .{ .backing = &allocations };
-            var ctx = ResourceGemmContext.init(scratch.allocator(), Probe.policy, .internal_closable);
-            scratch.context = &ctx;
-            Probe.setup(&ctx, &allocations);
+            var reference_ctx: FixtureReferenceContext = undefined;
+            reference_ctx.initInPlace(scratch.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const ctx = reference_ctx.borrowedContext();
+            scratch.context = ctx;
+            Probe.setup(ctx, &allocations);
             defer {
                 Probe.disarm();
                 _ = ctx.requestClose();
-                _ = ctx.tryProgressClose();
+                _ = fixtureProgressClose(ctx);
             }
             // This is the n512/k8 unit band path, not an outer task submission.
-            try F.runLifecycle(T, .band, Probe, &ctx, .{ .n = 512, .k = 8, .upper = upper }, &scratch, 0, false, true, true, false);
+            try F.runLifecycle(T, .band, Probe, ctx, .{ .n = 512, .k = 8, .upper = upper }, &scratch, 0, false, true, true, false);
             try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
             try std.testing.expectEqual(@as(usize, 0), Probe.configurations.load(.acquire));
-            try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-            try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
-            try finishResourceGemmContext(Probe, &ctx, &allocations);
+            try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_init_state.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.persistent_init_state.load(.acquire));
+            try finishResourceGemmContext(Probe, ctx, &allocations);
             try guard.check();
         }
     }
@@ -4746,13 +4802,15 @@ fn runSymmetricMvPausedFree(comptime T: type, comptime storage: SymmetricMvResou
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var barrier: F.FreeBarrier = .{};
     var scratch: F.ScratchLog = .{ .backing = &allocations, .free_barrier = &barrier };
-    var ctx = ResourceGemmContext.init(scratch.allocator(), Probe.policy, .internal_closable);
-    scratch.context = &ctx;
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(scratch.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    scratch.context = ctx;
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     const Work = struct {
         ctx: *ResourceGemmContext,
@@ -4767,7 +4825,7 @@ fn runSymmetricMvPausedFree(comptime T: type, comptime storage: SymmetricMvResou
             };
         }
     };
-    var work: Work = .{ .ctx = &ctx, .scratch = &scratch, .upper = upper };
+    var work: Work = .{ .ctx = ctx, .scratch = &scratch, .upper = upper };
     const thread = try std.Thread.spawn(.{}, Work.run, .{&work});
     var joined = false;
     defer {
@@ -4789,17 +4847,17 @@ fn runSymmetricMvPausedFree(comptime T: type, comptime storage: SymmetricMvResou
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectEqual(@as(usize, 0), Probe.finishes.load(.acquire));
     // The numerical caller has released io_busy before releasing its workspace.
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_busy.load(.acquire));
     if (comptime thread_limit > 1) {
-        try std.testing.expectEqual(@as(u32, thread_limit), ctx.executor.persistent_job_count.load(.acquire));
-        try std.testing.expectEqual(@as(u32, thread_limit - 1), ctx.executor.persistent_done_count.load(.acquire));
+        try std.testing.expectEqual(@as(u32, thread_limit), reference_ctx.executor.persistent_job_count.load(.acquire));
+        try std.testing.expectEqual(@as(u32, thread_limit - 1), reference_ctx.executor.persistent_done_count.load(.acquire));
         try std.testing.expect(Probe.configurations.load(.acquire) > 0);
     } else {
         try std.testing.expectEqual(@as(usize, 0), Probe.configurations.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.persistent_init_state.load(.acquire));
     }
     try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     try std.testing.expectError(error.Closing, ctx.begin());
     try std.testing.expectEqual(admission_execution.context.Phase.closing, ctx.snapshot().phase);
     const allocations_at_free = allocations.stats(); // No recorder lock held by the paused thread.
@@ -4817,7 +4875,7 @@ fn runSymmetricMvPausedFree(comptime T: type, comptime storage: SymmetricMvResou
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
     // Persistent Executor storage may outlive Operation.end; only drain must
     // return all real allocations to the same captured backing allocator.
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 test "borrowed symmetric MV close stays busy until four real scratch frees return" {
@@ -5004,7 +5062,7 @@ fn lowerHermitianExpectedBatches(comptime T: type) usize {
 
 fn lowerHermitianGenerations(ctx: *ResourceGemmContext) [admission_execution.owner.max_tasks]u32 {
     var result: [admission_execution.owner.max_tasks]u32 = undefined;
-    for (&result, 0..) |*generation, i| generation.* = ctx.executor.persistent_worker_generation[i].load(.acquire);
+    for (&result, 0..) |*generation, i| generation.* = fixtureExecutor(ctx).persistent_worker_generation[i].load(.acquire);
     return result;
 }
 
@@ -5013,17 +5071,19 @@ fn runLowerHermitianIdle(comptime T: type, n: usize) !void {
     var data = try LowerHermitianFirstColumn(T).init(n);
     defer data.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations, &data);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations, &data);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     {
         var operation = try ctx.begin();
         defer operation.end();
-        try std.testing.expect(operation.borrowedContext() == &ctx);
+        try std.testing.expect(operation.borrowedContext() == ctx);
         data.call(&operation);
         try data.check();
         const batches = if (n - 1 < 512 * 1024) @as(usize, 0) else lowerHermitianExpectedBatches(T);
@@ -5034,35 +5094,35 @@ fn runLowerHermitianIdle(comptime T: type, n: usize) !void {
         try std.testing.expectEqual(batches, Probe.Base.queries.load(.acquire));
         try std.testing.expectEqual(batches, counts.caller);
         try std.testing.expectEqual(@as(usize, 0), counts.same_thread);
-        try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_busy.load(.acquire));
         if (batches == 0) {
             try std.testing.expectEqual(@as(usize, 0), counts.total);
             try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
-            try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-            try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_init_state.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.persistent_init_state.load(.acquire));
         } else if (comptime @import("builtin").target.cpu.arch != .x86_64) {
             // AArch64 C32: one ordinary AXPY batch, C64: AXPY plus DOT.
             // No persistent generation claim is made for these ordinary runs.
             try std.testing.expectEqual(batches * 4, counts.total);
             for (counts.helpers[1..]) |count| try std.testing.expectEqual(batches, count);
             try std.testing.expectEqual(batches * 3, counts.foreign);
-            try std.testing.expectEqual(@as(u8, 2), ctx.executor.io_init_state.load(.acquire));
-            try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
-            try std.testing.expectEqual(@as([admission_execution.owner.max_tasks]u32, @splat(0)), lowerHermitianGenerations(&ctx));
+            try std.testing.expectEqual(@as(u8, 2), reference_ctx.executor.io_init_state.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.persistent_init_state.load(.acquire));
+            try std.testing.expectEqual(@as([admission_execution.owner.max_tasks]u32, @splat(0)), lowerHermitianGenerations(ctx));
             try std.testing.expect(allocations.stats().accepted > 0);
         } else {
             // x86 uses runLowLatency. Observe the actual initialized mechanism;
             // persistent configuration happens at worker startup, not each job.
             try std.testing.expect(counts.foreign >= 3);
             try std.testing.expect(allocations.stats().accepted > 0);
-            if (ctx.executor.persistent_init_state.load(.acquire) == 2) {
+            if (reference_ctx.executor.persistent_init_state.load(.acquire) == 2) {
                 try std.testing.expectEqual(@as(usize, 3) + batches, counts.total);
                 for (counts.helpers[1..]) |count| try std.testing.expectEqual(@as(usize, 1), count);
-                try std.testing.expectEqual(@as(u32, 3), ctx.executor.persistent_worker_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 3), reference_ctx.executor.persistent_worker_count.load(.acquire));
             } else {
                 try std.testing.expectEqual(batches * 4, counts.total);
                 for (counts.helpers[1..]) |count| try std.testing.expectEqual(batches, count);
-                try std.testing.expectEqual(@as(u8, 2), ctx.executor.io_init_state.load(.acquire));
+                try std.testing.expectEqual(@as(u8, 2), reference_ctx.executor.io_init_state.load(.acquire));
             }
         }
         try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
@@ -5073,7 +5133,7 @@ fn runLowerHermitianIdle(comptime T: type, n: usize) !void {
     try std.testing.expectEqual(@as(usize, 1), Probe.Base.finishes.load(.acquire));
     try data.check();
     // Io.Threaded allocations may legitimately survive end until this drain.
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 fn LowerHermitianWorker(comptime T: type) type {
@@ -5116,7 +5176,7 @@ fn LowerHermitianWorker(comptime T: type) type {
         fn perform(self: *Self) !void {
             const ctx = self.operation.borrowedContext();
             try std.testing.expect(ctx == Probe.Base.context.?);
-            try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 1), fixtureExecutor(ctx).io_busy.load(.acquire));
             const configurations = Probe.counts();
             const before = self.allocations.stats();
             const generations = lowerHermitianGenerations(ctx);
@@ -5130,9 +5190,9 @@ fn LowerHermitianWorker(comptime T: type) type {
             try std.testing.expectEqualDeep(configurations, Probe.counts());
             try std.testing.expectEqualDeep(before, self.allocations.stats());
             try std.testing.expectEqual(generations, lowerHermitianGenerations(ctx));
-            try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
-            try std.testing.expectEqual(@as(u32, 0), ctx.executor.persistent_job_count.load(.acquire));
-            try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 0), fixtureExecutor(ctx).persistent_init_state.load(.acquire));
+            try std.testing.expectEqual(@as(u32, 0), fixtureExecutor(ctx).persistent_job_count.load(.acquire));
+            try std.testing.expectEqual(@as(u8, 1), fixtureExecutor(ctx).io_busy.load(.acquire));
             try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
             try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
             try std.testing.expectEqual(entries, Probe.Base.entries.load(.acquire));
@@ -5146,12 +5206,14 @@ fn runLowerHermitianNested(comptime T: type) !void {
     var data = try LowerHermitianFirstColumn(T).init(524289);
     defer data.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations, &data);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations, &data);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     {
         var operation = try ctx.begin();
@@ -5159,7 +5221,7 @@ fn runLowerHermitianNested(comptime T: type) !void {
         var work: LowerHermitianWorker(T) = .{ .operation = &operation, .data = &data, .allocations = &allocations };
         // A genuine ordinary Executor batch supplies the worker. No persistent
         // function/payload field is read: those are undefined before its init.
-        const accepted = ctx.executor.run(.{ .task_fn = LowerHermitianWorker(T).execute, .tasks = &work, .count = 2 });
+        const accepted = reference_ctx.executor.run(.{ .task_fn = LowerHermitianWorker(T).execute, .tasks = &work, .count = 2 });
         try std.testing.expect(accepted);
         if (work.worker_failure) |err| return err;
         try std.testing.expect(work.real_worker);
@@ -5168,8 +5230,8 @@ fn runLowerHermitianNested(comptime T: type) !void {
         try std.testing.expectEqual([_]usize{ 0, 1, 0, 0 }, Probe.counts().helpers);
         try std.testing.expectEqual(@as(usize, 1), Probe.counts().foreign);
         try std.testing.expectEqual(@as(usize, 0), Probe.counts().same_thread);
-        try std.testing.expectEqual(@as(u8, 2), ctx.executor.io_init_state.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 2), reference_ctx.executor.io_init_state.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_busy.load(.acquire));
         try std.testing.expect(allocations.stats().accepted > 0);
         try data.check();
         Probe.finishing_armed = true;
@@ -5177,7 +5239,7 @@ fn runLowerHermitianNested(comptime T: type) !void {
     try std.testing.expectEqual(@as(usize, 1), Probe.Base.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), Probe.Base.finishes.load(.acquire));
     try data.check();
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 test "borrowed lower Hermitian first column observes architecture specific L1 threshold without default resources" {
@@ -5300,7 +5362,7 @@ const TriangularMvResourceFixture = struct {
                 try self.checkOutput();
                 try std.testing.expectEqual(self.active, self.ctx.snapshot().active_operations);
                 try std.testing.expectEqual(@as(usize, 0), self.ctx.snapshot().resource_pins);
-                if (self.busy) try std.testing.expectEqual(@as(u8, 1), self.ctx.executor.io_busy.load(.acquire));
+                if (self.busy) try std.testing.expectEqual(@as(u8, 1), fixtureExecutor(self.ctx).io_busy.load(.acquire));
                 if (self.scratch) |log| {
                     if (self.scratch_elements != 0) try log.checkScratch(T, self.scratch_elements, self.refused) else try std.testing.expect(!log.snapshot().seen);
                     if (log.free_barrier) |barrier| try std.testing.expect(barrier.completed.load(.acquire));
@@ -5399,7 +5461,7 @@ const TriangularMvResourceFixture = struct {
         };
         if (closing) {
             try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-            try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+            try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
             try std.testing.expectError(error.Closing, ctx.begin());
         }
         const u = [_]u8{if (shape.upper) 'U' else 'L'};
@@ -5441,24 +5503,26 @@ test "borrowed triangular MV sixteen entries retain independent dense results an
     const guard = try ResourceGemmDefaultGuard.init();
     defer guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     inline for (.{ f32, f64, fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         inline for (.{ F.Kind.dense_multiply, F.Kind.dense_solve, F.Kind.packed_multiply, F.Kind.band_solve }) |kind| {
             for ([_]bool{ true, false }) |upper| for ([_]u8{ 'N', 'T', 'C' }) |trans| for ([_]bool{ false, true }) |unit| for ([_]fortran.BlasInt{ 1, 2, -2 }) |incx| {
-                try F.run(T, kind, Probe, &ctx, .{ .upper = upper, .trans = trans, .unit = unit, .incx = incx }, null, false, false, false);
+                try F.run(T, kind, Probe, ctx, .{ .upper = upper, .trans = trans, .unit = unit, .incx = incx }, null, false, false, false);
             };
-            try F.run(T, kind, Probe, &ctx, .{ .n = 0, .k = 0, .incx = -2 }, null, false, false, false);
+            try F.run(T, kind, Probe, ctx, .{ .n = 0, .k = 0, .incx = -2 }, null, false, false, false);
         }
     }
     try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
     try std.testing.expectEqual(@as(usize, 0), Probe.configurations.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try guard.check();
 }
 
@@ -5467,13 +5531,15 @@ fn runTriangularScratchCases(comptime limit: usize, refused: bool) !void {
     const Probe = SymmetricMvLifecycleProbe(limit);
     var allocations: ResourceGemmAllocations = .{ .budget = if (refused) 0 else std.math.maxInt(usize) };
     var scratch: SymmetricMvResourceFixture.ScratchLog = .{ .backing = &allocations };
-    var ctx = ResourceGemmContext.init(scratch.allocator(), Probe.policy, .internal_closable);
-    scratch.context = &ctx;
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(scratch.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    scratch.context = ctx;
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     var expected_attempts: usize = 0;
     inline for (.{ f32, f64 }) |T| {
@@ -5484,7 +5550,7 @@ fn runTriangularScratchCases(comptime limit: usize, refused: bool) !void {
                 else
                     .{ .n = 128, .k = 1, .upper = upper, .trans = 'N', .incx = -2 };
                 const before = allocations.stats();
-                try F.run(T, kind, Probe, &ctx, shape, &scratch, refused, false, false);
+                try F.run(T, kind, Probe, ctx, shape, &scratch, refused, false, false);
                 const increment: usize = if (F.scratchElements(T, kind, shape) == 0) 0 else 1;
                 expected_attempts += increment;
                 const after = allocations.stats();
@@ -5494,14 +5560,14 @@ fn runTriangularScratchCases(comptime limit: usize, refused: bool) !void {
                 try std.testing.expectEqual(before.freed + (if (refused) 0 else increment), after.freed);
             }
             // Preserve the real stack-output and no-offdiagonal unit shortcuts.
-            try F.run(T, .packed_multiply, Probe, &ctx, .{ .n = 128, .upper = upper, .unit = true }, &scratch, false, false, false);
-            try F.run(T, .band_solve, Probe, &ctx, .{ .n = 128, .k = 0, .upper = upper, .unit = true }, &scratch, false, false, false);
+            try F.run(T, .packed_multiply, Probe, ctx, .{ .n = 128, .upper = upper, .unit = true }, &scratch, false, false, false);
+            try F.run(T, .band_solve, Probe, ctx, .{ .n = 128, .k = 0, .upper = upper, .unit = true }, &scratch, false, false, false);
         }
         inline for (.{ F.Kind.packed_multiply, F.Kind.band_solve }) |kind| {
             // The effective upper multiply / lower solve overflows last. Any
             // early caller write before refusal would change the fallback result.
             const shape: F.Shape = .{ .n = if (kind == .packed_multiply) 129 else 128, .k = 1, .upper = kind == .packed_multiply, .late_overflow = true };
-            try F.run(T, kind, Probe, &ctx, shape, &scratch, refused, false, false);
+            try F.run(T, kind, Probe, ctx, shape, &scratch, refused, false, false);
             expected_attempts += if (F.scratchElements(T, kind, shape) == 0) @as(usize, 0) else 1;
         }
     }
@@ -5510,11 +5576,11 @@ fn runTriangularScratchCases(comptime limit: usize, refused: bool) !void {
     try std.testing.expectEqual(if (refused) @as(usize, 0) else expected_attempts, allocations.stats().accepted);
     try std.testing.expectEqual(if (refused) @as(usize, 0) else expected_attempts, allocations.stats().freed);
     try std.testing.expectEqual(@as(usize, 0), Probe.configurations.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.persistent_init_state.load(.acquire));
     Probe.disarm();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
@@ -5537,19 +5603,21 @@ fn runTriangularPausedFree(comptime T: type, comptime kind: TriangularMvResource
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var barrier: S.FreeBarrier = .{};
     var scratch: S.ScratchLog = .{ .backing = &allocations, .free_barrier = if (F.apple_finite) &barrier else null };
-    var ctx = ResourceGemmContext.init(scratch.allocator(), Probe.policy, .internal_closable);
-    scratch.context = &ctx;
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(scratch.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    scratch.context = ctx;
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     if (comptime !F.apple_finite) {
         // Execute numerical/closing coverage, without pretending a heap free ran.
-        try F.run(T, kind, Probe, &ctx, shape, &scratch, false, true, false);
+        try F.run(T, kind, Probe, ctx, shape, &scratch, false, true, false);
         try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
-        try finishResourceGemmContext(Probe, &ctx, &allocations);
+        try finishResourceGemmContext(Probe, ctx, &allocations);
         return;
     }
     const Work = struct {
@@ -5565,7 +5633,7 @@ fn runTriangularPausedFree(comptime T: type, comptime kind: TriangularMvResource
             };
         }
     };
-    var work: Work = .{ .ctx = &ctx, .scratch = &scratch, .shape = shape };
+    var work: Work = .{ .ctx = ctx, .scratch = &scratch, .shape = shape };
     const thread = try std.Thread.spawn(.{}, Work.run, .{&work});
     var joined = false;
     defer {
@@ -5585,7 +5653,7 @@ fn runTriangularPausedFree(comptime T: type, comptime kind: TriangularMvResource
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectEqual(@as(usize, 0), Probe.finishes.load(.acquire));
     try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     try std.testing.expectError(error.Closing, ctx.begin());
     try std.testing.expectEqual(@as(usize, 1), allocations.stats().accepted - allocations.stats().freed);
     barrier.allow_free.store(true, .release);
@@ -5596,7 +5664,7 @@ fn runTriangularPausedFree(comptime T: type, comptime kind: TriangularMvResource
     try scratch.checkScratch(T, shape.n, false);
     try std.testing.expectEqual(@as(usize, 1), Probe.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 test "borrowed triangular scratch free and staged copyback remain inside the closing operation" {
@@ -5672,7 +5740,7 @@ fn runTriangularAxpy(comptime Probe: type, ctx: *ResourceGemmContext, n: usize, 
     defer Base.disarm();
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     fortran.testing.admitted_triangular.axpyBody(T, &operation, n, .{ .re = 3, .im = 0 }, a.ptr + 1, y.ptr + 1);
@@ -5696,14 +5764,16 @@ fn runTriangularAxpyIdle(comptime limit: usize, n: usize) !void {
     const Probe = TriangularAxpyProbe(limit);
     const Base = Probe.Base;
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations, 1);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations, 1);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    try runTriangularAxpy(Probe, &ctx, n, false, false);
+    try runTriangularAxpy(Probe, ctx, n, false, false);
     if (n < 262144) {
         try std.testing.expectEqual(@as(usize, 0), Base.queries.load(.acquire));
         try std.testing.expectEqual(@as(usize, 0), Base.configurations.load(.acquire));
@@ -5720,17 +5790,17 @@ fn runTriangularAxpyIdle(comptime limit: usize, n: usize) !void {
             try std.testing.expect(Probe.foreign_helpers.load(.acquire) >= 1);
             try std.testing.expectEqual(@as(usize, 0), Probe.caller_helpers.load(.acquire));
             try std.testing.expect(allocations.stats().accepted > 0);
-            try std.testing.expect(ctx.executor.io_init_state.load(.acquire) == 2 or ctx.executor.persistent_init_state.load(.acquire) == 2);
-            if (ctx.executor.persistent_init_state.load(.acquire) == 2) {
-                try std.testing.expectEqual(@as(u32, 2), ctx.executor.persistent_job_count.load(.acquire));
-                try std.testing.expectEqual(@as(u32, 1), ctx.executor.persistent_done_count.load(.acquire));
+            try std.testing.expect(reference_ctx.executor.io_init_state.load(.acquire) == 2 or reference_ctx.executor.persistent_init_state.load(.acquire) == 2);
+            if (reference_ctx.executor.persistent_init_state.load(.acquire) == 2) {
+                try std.testing.expectEqual(@as(u32, 2), reference_ctx.executor.persistent_job_count.load(.acquire));
+                try std.testing.expectEqual(@as(u32, 1), reference_ctx.executor.persistent_done_count.load(.acquire));
             }
         }
     }
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_busy.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), Base.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), Base.finishes.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 test "borrowed triangular C64 nested AXPY keeps its actual threshold and two Context policies" {
@@ -5749,14 +5819,16 @@ test "borrowed triangular C64 nested AXPY finishes on its closing Context with a
     const Probe = TriangularAxpyProbe(2);
     const Base = Probe.Base;
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations, 2);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations, 2);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    var blocker: ResourceGemmBlockingBatch = .{ .context = &ctx };
+    var blocker: ResourceGemmBlockingBatch = .{ .context = ctx };
     const thread = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&blocker});
     var joined = false;
     defer {
@@ -5766,26 +5838,26 @@ test "borrowed triangular C64 nested AXPY finishes on its closing Context with a
     }
     while (!blocker.entered.load(.acquire) and !blocker.finished.load(.acquire)) std.Thread.yield() catch {};
     try std.testing.expect(blocker.entered.load(.acquire));
-    while (ctx.executor.persistent_done_count.load(.acquire) != 1 and !blocker.finished.load(.acquire)) std.Thread.yield() catch {};
-    try std.testing.expectEqual(@as(u32, 1), ctx.executor.persistent_done_count.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
-    const task_fn = ctx.executor.persistent_task_fn;
-    const tasks = ctx.executor.persistent_tasks;
-    const generations = lowerHermitianGenerations(&ctx);
+    while (reference_ctx.executor.persistent_done_count.load(.acquire) != 1 and !blocker.finished.load(.acquire)) std.Thread.yield() catch {};
+    try std.testing.expectEqual(@as(u32, 1), reference_ctx.executor.persistent_done_count.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
+    const task_fn = reference_ctx.executor.persistent_task_fn;
+    const tasks = reference_ctx.executor.persistent_tasks;
+    const generations = lowerHermitianGenerations(ctx);
     const before = allocations.stats();
     const configurations = Base.configurations.load(.acquire);
     const queries = Base.queries.load(.acquire);
-    try runTriangularAxpy(Probe, &ctx, 262144, true, true);
+    try runTriangularAxpy(Probe, ctx, 262144, true, true);
     try std.testing.expect(Base.queries.load(.acquire) > queries);
     try std.testing.expectEqual(configurations, Base.configurations.load(.acquire));
     try std.testing.expectEqualDeep(before, allocations.stats());
-    try std.testing.expectEqual(generations, lowerHermitianGenerations(&ctx));
-    try std.testing.expect(ctx.executor.persistent_task_fn == task_fn);
-    try std.testing.expect(ctx.executor.persistent_tasks == tasks);
-    try std.testing.expectEqual(@as(u32, 2), ctx.executor.persistent_job_count.load(.acquire));
+    try std.testing.expectEqual(generations, lowerHermitianGenerations(ctx));
+    try std.testing.expect(reference_ctx.executor.persistent_task_fn == task_fn);
+    try std.testing.expect(reference_ctx.executor.persistent_tasks == tasks);
+    try std.testing.expectEqual(@as(u32, 2), reference_ctx.executor.persistent_job_count.load(.acquire));
     try std.testing.expect(!blocker.finished.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     try guard.check();
     blocker.release.store(true, .release);
     thread.join();
@@ -5794,7 +5866,7 @@ test "borrowed triangular C64 nested AXPY finishes on its closing Context with a
     for (&blocker.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
     try std.testing.expectEqual(@as(usize, 2), Base.entries.load(.acquire));
     try std.testing.expectEqual(@as(usize, 2), Base.finishes.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try guard.check();
 }
 
@@ -5942,7 +6014,7 @@ fn rankResourceCase(comptime T: type, comptime kind: RankResourceKind, comptime 
     Probe.watch_armed = true;
     if (shape.closing) {
         _ = ctx.requestClose();
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     rankResourceCall(T, kind, &operation, shape, alpha, x.ptr, y.ptr, a.ptr, @intCast(lda));
@@ -5951,7 +6023,7 @@ fn rankResourceCase(comptime T: type, comptime kind: RankResourceKind, comptime 
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectEqual(entries_before + 1, Probe.entries.load(.acquire));
     try std.testing.expectEqual(finishes_before, Probe.finishes.load(.acquire));
-    if (shape.closing) try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    if (shape.closing) try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     operation.end();
     ended = true;
     Probe.disarm();
@@ -5963,8 +6035,8 @@ fn rankResourceScheduled(comptime Probe: type, ctx: *ResourceGemmContext, alloca
     try std.testing.expect(Probe.queries.load(.acquire) > 0);
     try std.testing.expect(Probe.configurations.load(.acquire) > 0);
     try std.testing.expect(allocations.stats().accepted > 0);
-    try std.testing.expect(ctx.executor.io_init_state.load(.acquire) == 2 or ctx.executor.persistent_init_state.load(.acquire) == 2);
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expect(fixtureExecutor(ctx).io_init_state.load(.acquire) == 2 or fixtureExecutor(ctx).persistent_init_state.load(.acquire) == 2);
+    try std.testing.expectEqual(@as(u8, 0), fixtureExecutor(ctx).io_busy.load(.acquire));
 }
 
 fn rankResourceOuterPair(comptime T: type, comptime kind: RankResourceKind, shape: RankResourceShape) !void {
@@ -5972,24 +6044,28 @@ fn rankResourceOuterPair(comptime T: type, comptime kind: RankResourceKind, shap
     const Many = ResourceGemmProbe(4);
     var allocation_a: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
     var allocation_b: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var a = ResourceGemmContext.init(allocation_a.allocator(), Single.policy, .internal_closable);
-    var b = ResourceGemmContext.init(allocation_b.allocator(), Many.policy, .internal_closable);
-    Single.setup(&a, &allocation_a);
-    Many.setup(&b, &allocation_b);
+    var reference_a: FixtureReferenceContext = undefined;
+    reference_a.initInPlace(allocation_a.allocator(), Single.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const a = reference_a.borrowedContext();
+    var reference_b: FixtureReferenceContext = undefined;
+    reference_b.initInPlace(allocation_b.allocator(), Many.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const b = reference_b.borrowedContext();
+    Single.setup(a, &allocation_a);
+    Many.setup(b, &allocation_b);
     defer {
         Single.disarm();
         Many.disarm();
         _ = b.requestClose();
-        _ = b.tryProgressClose();
+        _ = fixtureProgressClose(b);
         _ = a.requestClose();
-        _ = a.tryProgressClose();
+        _ = fixtureProgressClose(a);
     }
-    try std.testing.expect(&a.executor != &b.executor and &a.executor != admission_execution.get());
-    try std.testing.expect(a.executor.allocator.ptr == allocation_a.allocator().ptr);
-    try std.testing.expect(b.executor.allocator.ptr == allocation_b.allocator().ptr);
-    try std.testing.expect(a.executor.policy.max_threads == Single.policy.max_threads);
-    try std.testing.expect(b.executor.policy.max_threads == Many.policy.max_threads);
-    try rankResourceCase(T, kind, Single, &a, shape);
+    try std.testing.expect(&reference_a.executor != &reference_b.executor and &reference_a.executor != admission_execution.get());
+    try std.testing.expect(reference_a.executor.allocator.ptr == allocation_a.allocator().ptr);
+    try std.testing.expect(reference_b.executor.allocator.ptr == allocation_b.allocator().ptr);
+    try std.testing.expect(reference_a.executor.policy.max_threads == Single.policy.max_threads);
+    try std.testing.expect(reference_b.executor.policy.max_threads == Many.policy.max_threads);
+    try rankResourceCase(T, kind, Single, a, shape);
     try std.testing.expectEqual(@as(usize, 0), allocation_a.stats().attempts);
     try std.testing.expectEqual(@as(usize, 0), Single.configurations.load(.acquire));
     const a_state = a.snapshot();
@@ -5997,49 +6073,53 @@ fn rankResourceOuterPair(comptime T: type, comptime kind: RankResourceKind, shap
     const a_queries = Single.queries.load(.acquire);
     var closing_shape = shape;
     closing_shape.closing = true;
-    try rankResourceCase(T, kind, Many, &b, closing_shape);
-    try rankResourceScheduled(Many, &b, &allocation_b);
+    try rankResourceCase(T, kind, Many, b, closing_shape);
+    try rankResourceScheduled(Many, b, &allocation_b);
     try std.testing.expectEqualDeep(a_state, a.snapshot());
     try std.testing.expectEqualDeep(a_allocations, allocation_a.stats());
     try std.testing.expectEqual(a_queries, Single.queries.load(.acquire));
-    try finishResourceGemmContext(Many, &b, &allocation_b);
-    try finishResourceGemmContext(Single, &a, &allocation_a);
+    try finishResourceGemmContext(Many, b, &allocation_b);
+    try finishResourceGemmContext(Single, a, &allocation_a);
 }
 
 fn rankResourceNestedCase(comptime T: type, m: usize, real_coefficient: bool, expect_schedule: bool) !void {
     const Probe = ResourceGemmProbe(4);
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     // One column leaves outer GER serial. Only its real nested AXPY can submit.
-    try rankResourceCase(T, .geru, Probe, &ctx, .{ .m = m, .n = 1, .real_coefficient = real_coefficient });
+    try rankResourceCase(T, .geru, Probe, ctx, .{ .m = m, .n = 1, .real_coefficient = real_coefficient });
     if (expect_schedule) {
-        try rankResourceScheduled(Probe, &ctx, &allocations);
+        try rankResourceScheduled(Probe, ctx, &allocations);
     } else {
         try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
         try std.testing.expectEqual(@as(usize, 0), Probe.configurations.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-        try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_init_state.load(.acquire));
+        try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.persistent_init_state.load(.acquire));
     }
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 fn rankResourceBusyClosing(comptime T: type, comptime kind: RankResourceKind, original_shape: RankResourceShape) !void {
     const Probe = ResourceGemmProbe(4);
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    var work: ResourceGemmBlockingBatch = .{ .context = &ctx };
+    var work: ResourceGemmBlockingBatch = .{ .context = ctx };
     const caller = try std.Thread.spawn(.{}, ResourceGemmBlockingBatch.run, .{&work});
     var joined = false;
     defer {
@@ -6050,14 +6130,14 @@ fn rankResourceBusyClosing(comptime T: type, comptime kind: RankResourceKind, or
     while (!work.entered.load(.acquire) and !work.finished.load(.acquire)) std.Thread.yield() catch {};
     try std.testing.expect(work.entered.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
-    try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 1), reference_ctx.executor.io_busy.load(.acquire));
     const allocation_state = allocations.stats();
     const configurations = Probe.configurations.load(.acquire);
     const queries = Probe.queries.load(.acquire);
     var shape = original_shape;
     shape.busy = true;
     shape.closing = true;
-    try rankResourceCase(T, kind, Probe, &ctx, shape);
+    try rankResourceCase(T, kind, Probe, ctx, shape);
     try std.testing.expect(Probe.queries.load(.acquire) > queries);
     try std.testing.expectEqualDeep(allocation_state, allocations.stats());
     try std.testing.expectEqual(configurations, Probe.configurations.load(.acquire));
@@ -6065,8 +6145,8 @@ fn rankResourceBusyClosing(comptime T: type, comptime kind: RankResourceKind, or
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), ctx.snapshot().active_operations);
     try std.testing.expect(!work.finished.load(.acquire));
-    try std.testing.expect(ctx.executor.persistent_task_fn == ResourceGemmBlockingBatch.execute);
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expect(reference_ctx.executor.persistent_task_fn == ResourceGemmBlockingBatch.execute);
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     // Release/join is mandatory even if an earlier assertion fails. No plain
     // worker-written field is read before this acquire/join boundary.
     Probe.disarm();
@@ -6076,20 +6156,22 @@ fn rankResourceBusyClosing(comptime T: type, comptime kind: RankResourceKind, or
     try std.testing.expect(work.accepted);
     for (&work.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
     try std.testing.expectEqual(@as(usize, 2), Probe.finishes.load(.acquire));
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
 }
 
 fn rankResourceOom(comptime T: type, comptime kind: RankResourceKind, shape: RankResourceShape) !void {
     const Probe = ResourceGemmProbe(4);
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
-    try rankResourceCase(T, kind, Probe, &ctx, shape);
+    try rankResourceCase(T, kind, Probe, ctx, shape);
     const state = allocations.stats();
     try std.testing.expect(state.attempts > 0 and state.rejected > 0);
     try std.testing.expectEqual(@as(usize, 0), state.accepted);
@@ -6098,11 +6180,11 @@ fn rankResourceOom(comptime T: type, comptime kind: RankResourceKind, shape: Ran
     // ordinary group still configures that caller once; it must not be confused
     // with a successfully created helper or an algorithm-level false return.
     try std.testing.expectEqual(@as(usize, 1), Probe.configurations.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 2), ctx.executor.io_init_state.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 2), reference_ctx.executor.io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), reference_ctx.executor.io_busy.load(.acquire));
     Probe.disarm();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().resource_pins);
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
@@ -6115,43 +6197,45 @@ test "borrowed rank updates cover all twenty two mappings with independent full 
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     inline for (.{ f32, f64 }) |T| {
-        for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, .ger, Probe, &ctx, .{ .incx = inc, .incy = if (inc == 1) 1 else 2 });
-        try rankResourceCase(T, .ger, Probe, &ctx, .{ .zero_alpha = true });
-        try rankResourceCase(T, .ger, Probe, &ctx, .{ .m = 0 });
-        try rankResourceCase(T, .ger, Probe, &ctx, .{ .n = 0 });
+        for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, .ger, Probe, ctx, .{ .incx = inc, .incy = if (inc == 1) 1 else 2 });
+        try rankResourceCase(T, .ger, Probe, ctx, .{ .zero_alpha = true });
+        try rankResourceCase(T, .ger, Probe, ctx, .{ .m = 0 });
+        try rankResourceCase(T, .ger, Probe, ctx, .{ .n = 0 });
         inline for (.{ RankResourceKind.syr, .spr, .syr2, .spr2 }) |kind| {
             for ([_]bool{ true, false }) |upper| {
-                for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, kind, Probe, &ctx, .{ .upper = upper, .incx = inc, .incy = if (inc == 1) 1 else 2 });
-                try rankResourceCase(T, kind, Probe, &ctx, .{ .upper = upper, .zero_alpha = true });
-                try rankResourceCase(T, kind, Probe, &ctx, .{ .upper = upper, .n = 0 });
+                for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, kind, Probe, ctx, .{ .upper = upper, .incx = inc, .incy = if (inc == 1) 1 else 2 });
+                try rankResourceCase(T, kind, Probe, ctx, .{ .upper = upper, .zero_alpha = true });
+                try rankResourceCase(T, kind, Probe, ctx, .{ .upper = upper, .n = 0 });
             }
         }
     }
     inline for (.{ fortran.ComplexF32, fortran.ComplexF64 }) |T| {
         inline for (.{ RankResourceKind.geru, .gerc }) |kind| {
-            for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, kind, Probe, &ctx, .{ .incx = inc, .incy = if (inc == 1) 1 else 2 });
-            try rankResourceCase(T, kind, Probe, &ctx, .{ .zero_alpha = true });
-            try rankResourceCase(T, kind, Probe, &ctx, .{ .m = 0 });
-            try rankResourceCase(T, kind, Probe, &ctx, .{ .n = 0 });
+            for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, kind, Probe, ctx, .{ .incx = inc, .incy = if (inc == 1) 1 else 2 });
+            try rankResourceCase(T, kind, Probe, ctx, .{ .zero_alpha = true });
+            try rankResourceCase(T, kind, Probe, ctx, .{ .m = 0 });
+            try rankResourceCase(T, kind, Probe, ctx, .{ .n = 0 });
         }
         inline for (.{ RankResourceKind.her, .hpr, .her2, .hpr2 }) |kind| {
             for ([_]bool{ true, false }) |upper| {
-                for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, kind, Probe, &ctx, .{ .upper = upper, .incx = inc, .incy = if (inc == 1) 1 else 2 });
-                try rankResourceCase(T, kind, Probe, &ctx, .{ .upper = upper, .zero_alpha = true });
-                try rankResourceCase(T, kind, Probe, &ctx, .{ .upper = upper, .n = 0 });
+                for ([_]fortran.BlasInt{ 1, -2 }) |inc| try rankResourceCase(T, kind, Probe, ctx, .{ .upper = upper, .incx = inc, .incy = if (inc == 1) 1 else 2 });
+                try rankResourceCase(T, kind, Probe, ctx, .{ .upper = upper, .zero_alpha = true });
+                try rankResourceCase(T, kind, Probe, ctx, .{ .upper = upper, .n = 0 });
             }
         }
     }
     try std.testing.expectEqual(@as(usize, 0), allocations.stats().attempts);
-    try finishResourceGemmContext(Probe, &ctx, &allocations);
+    try finishResourceGemmContext(Probe, ctx, &allocations);
     try default_guard.check();
 }
 
@@ -6206,12 +6290,14 @@ fn level3BorrowedSyrkFailure(closing: bool) !void {
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = if (closing) std.math.maxInt(usize) else 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     const n: fortran.BlasInt = 129;
     const k: fortran.BlasInt = 8;
@@ -6240,7 +6326,7 @@ fn level3BorrowedSyrkFailure(closing: bool) !void {
     defer if (!ended) operation.end();
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     const upper = [1]u8{'U'};
@@ -6259,7 +6345,7 @@ fn level3BorrowedSyrkFailure(closing: bool) !void {
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
     Probe.disarm();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
 }
 
@@ -6276,12 +6362,14 @@ fn level3TriangularClosing(right: bool, solve: bool) !void {
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     const m: fortran.BlasInt = if (right) 129 else 257;
     const n: fortran.BlasInt = if (right) 257 else 129;
@@ -6314,7 +6402,7 @@ fn level3TriangularClosing(right: bool, solve: bool) !void {
     var ended = false;
     defer if (!ended) operation.end();
     try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     const side = [1]u8{if (right) 'R' else 'L'};
     const lower = [1]u8{'L'};
     const normal = [1]u8{'N'};
@@ -6333,7 +6421,7 @@ fn level3TriangularClosing(right: bool, solve: bool) !void {
     operation.end();
     ended = true;
     Probe.disarm();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
 }
 
@@ -6349,12 +6437,14 @@ fn level3BorrowedSyr2kFailure(closing: bool) !void {
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = if (closing) std.math.maxInt(usize) else 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     const n: fortran.BlasInt = 129;
     const k: fortran.BlasInt = 8;
@@ -6387,7 +6477,7 @@ fn level3BorrowedSyr2kFailure(closing: bool) !void {
     defer if (!ended) operation.end();
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
         try std.testing.expectError(error.Closing, ctx.begin());
     }
     const upper = [1]u8{'U'};
@@ -6406,7 +6496,7 @@ fn level3BorrowedSyr2kFailure(closing: bool) !void {
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
     Probe.disarm();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
 }
 
@@ -6424,12 +6514,14 @@ fn level3ComplexSymmetricResources(right: bool, herm: bool, closing: bool) !void
     const default_guard = try ResourceGemmDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: ResourceGemmAllocations = .{ .budget = 0 };
-    var ctx = ResourceGemmContext.init(allocations.allocator(), Probe.policy, .internal_closable);
-    Probe.setup(&ctx, &allocations);
+    var reference_ctx: FixtureReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), Probe.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    Probe.setup(ctx, &allocations);
     defer {
         Probe.disarm();
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = fixtureProgressClose(ctx);
     }
     const m: fortran.BlasInt = if (right) 129 else 257;
     const n: fortran.BlasInt = if (right) 257 else 129;
@@ -6475,7 +6567,7 @@ fn level3ComplexSymmetricResources(right: bool, herm: bool, closing: bool) !void
     defer if (!ended) operation.end();
     if (closing) {
         try std.testing.expectEqual(admission_execution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(admission_execution.context.CloseResult.busy, fixtureProgressClose(ctx));
     }
     const side = [1]u8{if (right) 'R' else 'L'};
     const lower = [1]u8{'L'};
@@ -6497,7 +6589,7 @@ fn level3ComplexSymmetricResources(right: bool, herm: bool, closing: bool) !void
     try std.testing.expectEqual(@as(usize, 1), Probe.finishes.load(.acquire));
     Probe.disarm();
     _ = ctx.requestClose();
-    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(admission_execution.context.CloseResult.closed, fixtureProgressClose(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
 }
 
@@ -6508,4 +6600,16 @@ test "borrowed complex SYMM and HEMM preserve both sides under allocator refusal
             try level3ComplexSymmetricResources(right, herm, true);
         }
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn fixtureExecutor(ctx: *@import("zynum-execution").Context) *@import("zynum-execution").reference.owner.Executor {
+    const fixture_execution = @import("zynum-execution");
+    if (ctx == fixture_execution.reference.getContext()) return @ptrCast(@alignCast(ctx.binding.legacy.userdata));
+    const wrapper: *FixtureReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
 }

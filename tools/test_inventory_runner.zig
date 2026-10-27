@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 const Io = std.Io;
 const runner_io: Io = Io.Threaded.global_single_threaded.io();
 const maximum_inventory_bytes = 4 * 1024 * 1024;
-const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "e717be147ad3d3de8d88ddb7d524fb2e4c3278b79844fe0c0f84fc31f92846d9";
+const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "8185512d97e8d21da3c424bbf3baa98ba54324761782919742d7502a3898d959";
 const NEXT_TEST_INVENTORY_SHA256: ?[]const u8 = null;
 
 const Inventory = struct {

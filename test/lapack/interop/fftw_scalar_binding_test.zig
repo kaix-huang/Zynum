@@ -21,11 +21,11 @@ const LifecycleProbe = struct {
     fn alloc(raw: *anyopaque, n: usize, alignment: std.mem.Alignment, ret: usize) ?[*]u8 {
         const self: *@This() = @ptrCast(@alignCast(raw));
         self.attempts += 1;
-        if (self.replace_at == self.attempts) self.owner.allocator = self.replacement.?;
+        if (self.replace_at == self.attempts) fixtureReplaceAllocator(@fieldParentPtr("context", self.owner), self.replacement.?);
         if (self.close_at == self.attempts) {
             self.close_snapshot = self.owner.snapshot();
             _ = self.owner.requestClose();
-            if (self.owner.tryProgressClose() != .busy) @panic("FFTW callback lost active admission");
+            if (fixtureProgressClose(self.owner) != .busy) @panic("FFTW callback lost active admission");
         }
         return self.backing.allocator().rawAlloc(n, alignment, ret);
     }
@@ -38,7 +38,7 @@ const LifecycleProbe = struct {
     fn free(raw: *anyopaque, data: []u8, alignment: std.mem.Alignment, ret: usize) void {
         const self: *@This() = @ptrCast(@alignCast(raw));
         self.free_snapshot = self.owner.snapshot();
-        if (self.owner.tryProgressClose() == .closed) @panic("FFTW resource pin released before captured free");
+        if (fixtureProgressClose(self.owner) == .closed) @panic("FFTW resource pin released before captured free");
         self.backing.allocator().rawFree(data, alignment, ret);
     }
 };
@@ -51,7 +51,7 @@ fn tolerance(comptime R: type) f64 {
 }
 fn finish(owner: *context.Context) !void {
     _ = owner.requestClose();
-    try E.expectEqual(context.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.closed, fixtureProgressClose(owner));
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
 }
 fn dft(comptime C: type, input: []const C, k: usize, sign: f64) struct { re: f64, im: f64 } {
@@ -118,7 +118,9 @@ test "Scalar FFTW complex new arrays use native real alignment and independent d
         const B = Boundary.Binding(R);
         const C = Scalar(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         try E.expect(B.Provider.OwnerIdentity == Core);
         try E.expect(B.Provider.Execution == Execution);
         var input: [16]R align(16) = @splat(777);
@@ -127,7 +129,7 @@ test "Scalar FFTW complex new arrays use native real alignment and independent d
         const values: [*]C = @ptrCast(&input[1]);
         const result: [*]C = @ptrCast(&output[1]);
         @memcpy(values[0..7], &logical);
-        const h = B.createWithContext(&owner, .complex, .{ 7, 1, 1 }, &input[1], &output[1], -1, 64).?;
+        const h = B.createWithContext(owner, .complex, .{ 7, 1, 1 }, &input[1], &output[1], -1, 64).?;
         try E.expectEqual(@as(c_int, 0), B.alignmentOf(&input[1]));
         try B.executeNewArrays(h, .complex, &input[1], &output[1]);
         for (result[0..7], 0..) |v, k| {
@@ -138,7 +140,7 @@ test "Scalar FFTW complex new arrays use native real alignment and independent d
         try E.expectEqual(@as(R, 888), output[0]);
         try E.expectEqual(@as(R, 888), output[15]);
         B.destroy(h);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     }
 }
@@ -147,7 +149,9 @@ test "Scalar FFTW all eleven real transforms use independent sums and preserve f
     inline for (.{ f32, f64 }) |R| {
         const B = Boundary.Binding(R);
         var probe: fixture.Allocations = .{ .budget = 512 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         for ([_]usize{ 2, 3, 4, 7 }) |n| for (0..11) |kind| {
             var input: [9]R align(16) = @splat(777);
             var output: [9]R align(16) = @splat(888);
@@ -157,14 +161,14 @@ test "Scalar FFTW all eleven real transforms use independent sums and preserve f
                 x.* = v.*;
             }
             const mode: c_uint = @intCast(kind);
-            const h = B.createTensorRealWithContext(&owner, 1, &.{@intCast(n)}, &.{mode}, &input[1], &output[1], 64).?;
+            const h = B.createTensorRealWithContext(owner, 1, &.{@intCast(n)}, &.{mode}, &input[1], &output[1], 64).?;
             try B.executeNewArrays(h, .real_transform, &input[1], &output[1]);
             for (output[1..][0..n], 0..) |v, k| try E.expectApproxEqAbs(realDefinition(mode, exact[0..n], k), @as(f64, v), tolerance(R));
             try E.expectEqual(@as(R, 888), output[0]);
             for (output[n + 1 ..]) |v| try E.expectEqual(@as(R, 888), v);
             B.destroy(h);
         };
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     }
 }
@@ -173,10 +177,12 @@ test "Scalar FFTW tensor real in place roundtrips retain odd row padding and gua
     inline for (.{ f32, f64 }) |R| {
         const B = Boundary.Binding(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var data: [10]R = .{ 1, 2, 3, 777, 4, 5, 6, 777, 888, 999 };
-        const forward = B.createTensorWithContext(&owner, .real_forward, 2, &.{ 2, 3 }, &data, &data, -1, 64).?;
-        const backward = B.createTensorWithContext(&owner, .real_backward, 2, &.{ 2, 3 }, &data, &data, 1, 64).?;
+        const forward = B.createTensorWithContext(owner, .real_forward, 2, &.{ 2, 3 }, &data, &data, -1, 64).?;
+        const backward = B.createTensorWithContext(owner, .real_backward, 2, &.{ 2, 3 }, &data, &data, 1, 64).?;
         try B.executeWithArrays(forward, &data, &data);
         try B.executeWithArrays(backward, &data, &data);
         for (0..2) |row| for (0..3) |column| try E.expectApproxEqAbs(@as(f64, @floatFromInt((row * 3 + column + 1) * 6)), @as(f64, data[row * 4 + column]), tolerance(R));
@@ -184,7 +190,7 @@ test "Scalar FFTW tensor real in place roundtrips retain odd row padding and gua
         try E.expectEqual(@as(R, 999), data[9]);
         B.destroy(forward);
         B.destroy(backward);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     }
 }
@@ -194,12 +200,14 @@ test "Scalar FFTW guru widths copy signed layouts and keep only selected output 
         const B = Boundary.Binding(R);
         const C = Scalar(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var input: [6]C = .{ .{ .re = 3, .im = 1 }, .{ .re = 2, .im = -1 }, .{ .re = 1, .im = 0 }, .{ .re = 6, .im = 2 }, .{ .re = 5, .im = 1 }, .{ .re = 4, .im = -1 } };
         var output: [13]C = @splat(.{ .re = 777, .im = 888 });
         var axes: [1]D = .{.{ .n = 3, .input_stride = -1, .output_stride = 2 }};
         var batches: [1]D = .{.{ .n = 2, .input_stride = 3, .output_stride = 6 }};
-        const h = B.createGuruWithContext(D, &owner, 1, &axes, 1, &batches, &input[2], &output, -1, 64).?;
+        const h = B.createGuruWithContext(D, owner, 1, &axes, 1, &batches, &input[2], &output, -1, 64).?;
         axes[0].n = 1;
         batches[0].n = 0;
         try B.executeWithArrays(h, &input[2], &output);
@@ -216,7 +224,7 @@ test "Scalar FFTW guru widths copy signed layouts and keep only selected output 
             try E.expectEqual(@as(R, 888), v.im);
         };
         B.destroy(h);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     };
 }
@@ -225,10 +233,12 @@ test "Scalar FFTW split and interleaved new arrays use the selected scalar plane
     inline for (.{ f32, f64 }) |R| {
         const B = Boundary.Binding(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var input: [8]R = .{ 1, 0, 2, 0, 3, 0, 777, 888 };
         var output: [8]R = @splat(999);
-        const h = B.createWithContext(&owner, .complex, .{ 3, 1, 1 }, &input, &output, -1, 64).?;
+        const h = B.createWithContext(owner, .complex, .{ 3, 1, 1 }, &input, &output, -1, 64).?;
         try B.executeSplitNewArrays(h, .complex, &input[0], &input[1], &output[0], &output[1]);
         try E.expectApproxEqAbs(@as(f64, 6), @as(f64, output[0]), tolerance(R));
         try E.expectApproxEqAbs(@as(f64, -1.5), @as(f64, output[2]), tolerance(R));
@@ -239,7 +249,7 @@ test "Scalar FFTW split and interleaved new arrays use the selected scalar plane
         try E.expectError(error.InvalidArgument, B.executeSplitNewArrays(h, .complex, &input[0], &input[2], &output[0], &output[1]));
         for (output) |v| try E.expectEqual(@as(R, 999), v);
         B.destroy(h);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     }
 }
@@ -249,10 +259,12 @@ test "Scalar FFTW failed metadata plan or workspace acquisitions retain outputs 
         const B = Boundary.Binding(R);
         const C = Scalar(R);
         var probe: fixture.Allocations = .{ .budget = budget };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var input: [3]C = @splat(.{ .re = 1, .im = 0 });
         var output: [3]C = @splat(.{ .re = 777, .im = 888 });
-        const h = B.createTensorWithContext(&owner, .complex, 1, &.{3}, &input, &output, -1, 64);
+        const h = B.createTensorWithContext(owner, .complex, 1, &.{3}, &input, &output, -1, 64);
         if (h) |live| {
             if (budget < 3) {
                 try E.expectError(error.OutOfMemory, B.executeWithArrays(live, &input, &output));
@@ -266,7 +278,7 @@ test "Scalar FFTW failed metadata plan or workspace acquisitions retain outputs 
             try E.expect(budget < 2);
             for (output) |v| try E.expectEqual(@as(R, 777), v.re);
         }
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     };
 }
@@ -275,15 +287,17 @@ test "Scalar FFTW both precisions share one admitted context and allocation clea
     const S = Boundary.F32;
     const D = Boundary;
     var probe: fixture.Allocations = .{ .budget = 32 };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
     var input_s: [3]Scalar(f32) = @splat(.{ .re = 1, .im = 0 });
     var output_s: [3]Scalar(f32) = @splat(.{ .re = 777, .im = 888 });
     var input_d: [3]Scalar(f64) = @splat(.{ .re = 2, .im = 0 });
     var output_d: [3]Scalar(f64) = @splat(.{ .re = 777, .im = 888 });
-    const s = S.createWithContext(&owner, .complex, .{ 3, 1, 1 }, &input_s, &output_s, -1, 64).?;
-    const d = D.createWithContext(&owner, .complex, .{ 3, 1, 1 }, &input_d, &output_d, -1, 64).?;
-    const bytes_s = S.allocateWithContext(&owner, 37).?;
-    const bytes_d = D.allocRealWithContext(&owner, 5).?;
+    const s = S.createWithContext(owner, .complex, .{ 3, 1, 1 }, &input_s, &output_s, -1, 64).?;
+    const d = D.createWithContext(owner, .complex, .{ 3, 1, 1 }, &input_d, &output_d, -1, 64).?;
+    const bytes_s = S.allocateWithContext(owner, 37).?;
+    const bytes_d = D.allocRealWithContext(owner, 5).?;
     try E.expectEqual(@as(usize, 0), @intFromPtr(bytes_s) % 64);
     try E.expectEqual(@as(usize, 4), owner.snapshot().resource_pins);
     var op = try owner.begin();
@@ -293,14 +307,14 @@ test "Scalar FFTW both precisions share one admitted context and allocation clea
     try E.expectEqual(@as(f32, 3), output_s[0].re);
     try E.expectEqual(@as(f64, 6), output_d[0].re);
     try E.expectError(error.Closing, S.executeWithArrays(s, &input_s, &output_s));
-    try E.expectEqual(context.CloseResult.busy, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.busy, fixtureProgressClose(owner));
     D.free(bytes_s);
     S.free(bytes_d);
     S.destroy(s);
     D.destroy(d);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     op.end();
-    try finish(&owner);
+    try finish(owner);
     try E.expectEqual(probe.stats().accepted, probe.stats().freed);
 }
 
@@ -309,10 +323,12 @@ test "Scalar FFTW many complex batches retain strided cells and direct definitio
         const B = Boundary.Binding(R);
         const C = Scalar(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var input: [6]C = .{ .{ .re = 1, .im = 1 }, .{ .re = 2, .im = 0 }, .{ .re = 3, .im = -1 }, .{ .re = 4, .im = 1 }, .{ .re = 5, .im = 0 }, .{ .re = 6, .im = -1 } };
         var output: [13]C = @splat(.{ .re = 777, .im = 888 });
-        const h = B.createManyWithContext(&owner, 1, &.{3}, 2, &input, null, 1, 3, &output, null, 2, 6, -1, 64).?;
+        const h = B.createManyWithContext(owner, 1, &.{3}, 2, &input, null, 1, 3, &output, null, 2, 6, -1, 64).?;
         try B.executeNewArrays(h, .complex, &input, &output);
         for (0..2) |batch| for (0..3) |k| {
             const expected = dft(C, input[batch * 3 ..][0..3], k, -1);
@@ -324,7 +340,7 @@ test "Scalar FFTW many complex batches retain strided cells and direct definitio
             try E.expectEqual(@as(R, 888), v.im);
         };
         B.destroy(h);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     }
 }
@@ -335,7 +351,9 @@ test "Scalar FFTW many guru and guru64 real batches preserve physical gaps and i
         const C = Scalar(R);
         const D = if (route == 2) B.IODim64 else B.IODim;
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var input: [14]R = @splat(777);
         var spectrum: [10]C = @splat(.{ .re = 888, .im = 999 });
         var output: [14]R = @splat(666);
@@ -346,13 +364,13 @@ test "Scalar FFTW many guru and guru64 real batches preserve physical gaps and i
         const forward_batches: [1]D = .{.{ .n = 2, .input_stride = 7, .output_stride = 5 }};
         const backward_batches: [1]D = .{.{ .n = 2, .input_stride = 5, .output_stride = 7 }};
         const forward = if (route == 0)
-            B.createManyRealWithContext(&owner, .forward, 1, &.{3}, 2, &input, null, 2, 7, &spectrum, null, 2, 5, null, 64).?
+            B.createManyRealWithContext(owner, .forward, 1, &.{3}, 2, &input, null, 2, 7, &spectrum, null, 2, 5, null, 64).?
         else
-            B.createGuruRealWithContext(D, &owner, .forward, 1, &axes, 1, &forward_batches, &input, &spectrum, null, 64).?;
+            B.createGuruRealWithContext(D, owner, .forward, 1, &axes, 1, &forward_batches, &input, &spectrum, null, 64).?;
         const backward = if (route == 0)
-            B.createManyRealWithContext(&owner, .backward, 1, &.{3}, 2, &spectrum, null, 2, 5, &output, null, 2, 7, null, 64).?
+            B.createManyRealWithContext(owner, .backward, 1, &.{3}, 2, &spectrum, null, 2, 5, &output, null, 2, 7, null, 64).?
         else
-            B.createGuruRealWithContext(D, &owner, .backward, 1, &axes, 1, &backward_batches, &spectrum, &output, null, 64).?;
+            B.createGuruRealWithContext(D, owner, .backward, 1, &axes, 1, &backward_batches, &spectrum, &output, null, 64).?;
         try B.executeNewArrays(forward, .real_forward, &input, &spectrum);
         for (0..2) |batch| {
             var logical: [3]C = undefined;
@@ -375,7 +393,7 @@ test "Scalar FFTW many guru and guru64 real batches preserve physical gaps and i
         }
         B.destroy(forward);
         B.destroy(backward);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     };
 }
@@ -384,13 +402,15 @@ test "Scalar FFTW split guru widths execute all three transform families with di
     inline for (.{ f32, f64 }) |R| inline for (.{ Boundary.Binding(R).IODim, Boundary.Binding(R).IODim64 }) |D| inline for (.{ Boundary.Binding(R).SplitTransform.complex, .real_forward, .real_backward }) |kind| {
         const B = Boundary.Binding(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var real_input: [4]R = .{ 1, 1, 1, 777 };
         var imaginary_input: [4]R = @splat(0);
         var real_output: [4]R = @splat(888);
         var imaginary_output: [4]R = @splat(999);
         if (kind == .real_backward) real_input = .{ 3, 0, 777, 777 };
-        const h = B.createGuruSplitWithContext(D, &owner, kind, 1, &.{.{ .n = 3, .input_stride = 1, .output_stride = 1 }}, 0, null, &real_input, if (kind == .real_forward) null else &imaginary_input, &real_output, if (kind == .real_backward) null else &imaginary_output, 64).?;
+        const h = B.createGuruSplitWithContext(D, owner, kind, 1, &.{.{ .n = 3, .input_stride = 1, .output_stride = 1 }}, 0, null, &real_input, if (kind == .real_forward) null else &imaginary_input, &real_output, if (kind == .real_backward) null else &imaginary_output, 64).?;
         try B.executeSplitNewArrays(h, kind, &real_input, if (kind == .real_forward) null else &imaginary_input, &real_output, if (kind == .real_backward) null else &imaginary_output);
         const output_count: usize = if (kind == .real_forward) 2 else 3;
         for (real_output[0..output_count], 0..) |v, j| {
@@ -403,7 +423,7 @@ test "Scalar FFTW split guru widths execute all three transform families with di
             for (imaginary_output[output_count..]) |v| try E.expectEqual(@as(R, 999), v);
         } else for (imaginary_output) |v| try E.expectEqual(@as(R, 999), v);
         B.destroy(h);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     };
 }
@@ -413,14 +433,16 @@ test "Scalar FFTW IEEE values zero batches flags and scalar byte overflow retain
         const B = Boundary.Binding(R);
         const C = Scalar(R);
         var probe: fixture.Allocations = .{ .budget = 32 };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         var input: [2]C = @splat(.{ .re = std.math.floatMax(R), .im = 0 });
         var output: [3]C = @splat(.{ .re = 777, .im = 888 });
-        try E.expect(B.allocRealWithContext(&owner, std.math.maxInt(usize) / @sizeOf(R) + 1) == null);
-        try E.expect(B.allocateWithContext(&owner, std.math.maxInt(usize)) == null);
-        try E.expect(B.createWithContext(&owner, .complex, .{ 2, 1, 1 }, &input, &output, -1, 1 << 21) == null);
+        try E.expect(B.allocRealWithContext(owner, std.math.maxInt(usize) / @sizeOf(R) + 1) == null);
+        try E.expect(B.allocateWithContext(owner, std.math.maxInt(usize)) == null);
+        try E.expect(B.createWithContext(owner, .complex, .{ 2, 1, 1 }, &input, &output, -1, 1 << 21) == null);
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-        const h = B.createWithContext(&owner, .complex, .{ 2, 1, 1 }, &input, &output, -1, 64).?;
+        const h = B.createWithContext(owner, .complex, .{ 2, 1, 1 }, &input, &output, -1, 64).?;
         try B.executeWithArrays(h, &input, &output);
         try E.expect(std.math.isInf(output[0].re));
         try E.expectEqual(@as(R, 777), output[2].re);
@@ -428,14 +450,14 @@ test "Scalar FFTW IEEE values zero batches flags and scalar byte overflow retain
         try B.executeWithArrays(h, &input, &output);
         try E.expect(std.math.isNan(output[0].re));
         B.destroy(h);
-        const empty = B.createManyWithContext(&owner, 1, &.{3}, 0, null, null, 1, 3, null, null, 1, 3, -1, 0).?;
+        const empty = B.createManyWithContext(owner, 1, &.{3}, 0, null, null, 1, 3, null, null, 1, 3, -1, 0).?;
         var op = try owner.begin();
         try B.executeAdmitted(empty, &op);
         op.end();
         B.destroy(empty);
-        const allocation = B.allocRealWithContext(&owner, 0).?;
+        const allocation = B.allocRealWithContext(owner, 0).?;
         Boundary.free(allocation);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.stats().accepted, probe.stats().freed);
     }
 }
@@ -445,12 +467,14 @@ test "Scalar FFTW planning and workspace close callbacks preserve prior admissio
         const B = Boundary.Binding(R);
         const C = Scalar(R);
         var probe: LifecycleProbe = .{ .close_at = close_at };
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-        probe.owner = &owner;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        probe.owner = owner;
         var input: [4]C = @splat(.{ .re = 1, .im = 0 });
         var output: [5]C = @splat(.{ .re = 777, .im = 888 });
         var admitted = try owner.begin();
-        const handle = B.createWithContext(&owner, .complex, .{ 4, 1, 1 }, &input, &output, -1, 64).?;
+        const handle = B.createWithContext(owner, .complex, .{ 4, 1, 1 }, &input, &output, -1, 64).?;
         try B.executeWithArraysAdmitted(handle, &admitted, &input, &output);
         const captured = probe.close_snapshot.?;
         try E.expectEqual(@as(usize, if (close_at == 1) 2 else 1), captured.active_operations);
@@ -463,9 +487,9 @@ test "Scalar FFTW planning and workspace close callbacks preserve prior admissio
         B.destroy(handle);
         try E.expectEqual(@as(usize, 1), probe.free_snapshot.?.active_operations);
         try E.expectEqual(@as(usize, 1), probe.free_snapshot.?.resource_pins);
-        try E.expectEqual(context.CloseResult.busy, owner.tryProgressClose());
+        try E.expectEqual(context.CloseResult.busy, fixtureProgressClose(owner));
         admitted.end();
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(probe.backing.stats().accepted, probe.backing.stats().freed);
     };
 }
@@ -477,13 +501,15 @@ test "Scalar FFTW every lease retains its acquiring allocator across callback re
         var first: LifecycleProbe = .{ .replace_at = 1 };
         var second: LifecycleProbe = .{};
         var unused: fixture.Allocations = .{ .budget = 0 };
-        var owner = context.Context.init(first.allocator(), fixture.policy, .internal_closable);
-        first.owner = &owner;
-        second.owner = &owner;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(first.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        first.owner = owner;
+        second.owner = owner;
         first.replacement = second.allocator();
         var input: [4]C = @splat(.{ .re = 1, .im = 0 });
         var output: [5]C = @splat(.{ .re = 777, .im = 888 });
-        const handle = B.createTensorWithContext(&owner, .complex, 2, &.{ 2, 2 }, &input, &output, -1, 64).?;
+        const handle = B.createTensorWithContext(owner, .complex, 2, &.{ 2, 2 }, &input, &output, -1, 64).?;
         try E.expectEqual(@as(usize, 1), first.backing.stats().accepted);
         try E.expectEqual(@as(usize, 1), second.backing.stats().accepted);
         try E.expectEqual(@as(usize, 2), owner.snapshot().resource_pins);
@@ -493,13 +519,13 @@ test "Scalar FFTW every lease retains its acquiring allocator across callback re
         try E.expectEqual(@as(usize, 2), second.backing.stats().accepted);
         try E.expectEqual(@as(usize, 1), second.backing.stats().freed);
         _ = owner.requestClose();
-        try E.expectEqual(context.CloseResult.waiting_resources, owner.tryProgressClose());
-        owner.allocator = unused.allocator();
+        try E.expectEqual(context.CloseResult.waiting_resources, fixtureProgressClose(owner));
+        fixtureReplaceAllocator(&reference_owner, unused.allocator());
         B.destroy(handle);
         try E.expectEqual(@as(usize, 2), first.free_snapshot.?.resource_pins);
         try E.expectEqual(@as(usize, 1), second.free_snapshot.?.resource_pins);
         try E.expectEqual(@as(usize, 0), unused.stats().attempts);
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(first.backing.stats().accepted, first.backing.stats().freed);
         try E.expectEqual(second.backing.stats().accepted, second.backing.stats().freed);
     }
@@ -511,11 +537,15 @@ test "Scalar FFTW admitted OOM retry after close rejects foreign owners without 
         const C = Scalar(R);
         var allocations: fixture.Allocations = .{ .budget = 2 };
         var foreign_allocations: fixture.Allocations = .{ .budget = 8 };
-        var owner = context.Context.init(allocations.allocator(), fixture.policy, .internal_closable);
-        var foreign = context.Context.init(foreign_allocations.allocator(), fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        var reference_foreign: FixtureReferenceContext = undefined;
+        reference_foreign.initInPlace(foreign_allocations.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const foreign = reference_foreign.borrowedContext();
         var input: [3]C = @splat(.{ .re = 1, .im = 0 });
         var output: [4]C = @splat(.{ .re = 777, .im = 888 });
-        const handle = B.createTensorWithContext(&owner, .complex, 1, &.{3}, &input, &output, -1, 64).?;
+        const handle = B.createTensorWithContext(owner, .complex, 1, &.{3}, &input, &output, -1, 64).?;
         var admitted = try owner.begin();
         var wrong = try foreign.begin();
         try E.expectError(error.ContextMismatch, B.executeNewArraysAdmitted(handle, .complex, &wrong, &input, &output));
@@ -532,10 +562,10 @@ test "Scalar FFTW admitted OOM retry after close rejects foreign owners without 
         try E.expectEqual(@as(R, 777), output[3].re);
         B.destroy(handle);
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-        try E.expectEqual(context.CloseResult.busy, owner.tryProgressClose());
+        try E.expectEqual(context.CloseResult.busy, fixtureProgressClose(owner));
         admitted.end();
-        try finish(&owner);
-        try finish(&foreign);
+        try finish(owner);
+        try finish(foreign);
         try E.expectEqual(allocations.stats().accepted, allocations.stats().freed);
         try E.expectEqual(@as(usize, 0), foreign_allocations.stats().accepted);
     }
@@ -570,7 +600,7 @@ const ConcurrentProbe = struct {
     }
     fn free(raw: *anyopaque, data: []u8, alignment: std.mem.Alignment, ret: usize) void {
         const self: *@This() = @ptrCast(@alignCast(raw));
-        if (self.owner.tryProgressClose() == .closed) @panic("concurrent FFTW free lost its resource pin");
+        if (fixtureProgressClose(self.owner) == .closed) @panic("concurrent FFTW free lost its resource pin");
         std.heap.c_allocator.rawFree(data, alignment, ret);
         _ = self.freed.fetchAdd(1, .monotonic);
     }
@@ -600,11 +630,13 @@ test "Scalar FFTW four simultaneous workspace admissions finish captured calls a
             }
         };
         var probe: ConcurrentProbe = .{};
-        var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-        probe.owner = &owner;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        probe.owner = owner;
         var input: [13]C = @splat(.{ .re = 1, .im = 0 });
         var output: [13]C = @splat(.{ .re = 777, .im = 888 });
-        const handle = B.createWithContext(&owner, .complex, .{ 13, 1, 1 }, &input, &output, -1, 64).?;
+        const handle = B.createWithContext(owner, .complex, .{ 13, 1, 1 }, &input, &output, -1, 64).?;
         var live = true;
         defer if (live) B.destroy(handle);
         var workers: [4]Worker = undefined;
@@ -626,7 +658,7 @@ test "Scalar FFTW four simultaneous workspace admissions finish captured calls a
         try E.expectEqual(@as(usize, 4), paused.active_operations);
         try E.expectEqual(@as(usize, 5), paused.resource_pins);
         _ = owner.requestClose();
-        try E.expectEqual(context.CloseResult.busy, owner.tryProgressClose());
+        try E.expectEqual(context.CloseResult.busy, fixtureProgressClose(owner));
         try E.expectError(error.Closing, B.executeWithArrays(handle, &input, &output));
         probe.release.store(true, .release);
         for (threads) |thread| thread.join();
@@ -634,12 +666,27 @@ test "Scalar FFTW four simultaneous workspace admissions finish captured calls a
         for (workers) |worker| try E.expect(!worker.failed);
         try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
         try E.expectEqual(@as(usize, 1), owner.snapshot().resource_pins);
-        try E.expectEqual(context.CloseResult.waiting_resources, owner.tryProgressClose());
+        try E.expectEqual(context.CloseResult.waiting_resources, fixtureProgressClose(owner));
         for (output) |v| try E.expectEqual(@as(R, 777), v.re);
         B.destroy(handle);
         live = false;
-        try finish(&owner);
+        try finish(owner);
         try E.expectEqual(@as(usize, 5), probe.accepted.load(.acquire));
         try E.expectEqual(probe.accepted.load(.acquire), probe.freed.load(.acquire));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+
+// These serial FFT fixtures rebind only before the reference Executor owns
+// worker/Io metadata. Keep the original per-allocation provenance assertions.
+fn fixtureReplaceAllocator(wrapper: *FixtureReferenceContext, allocator: std.mem.Allocator) void {
+    if (wrapper.executor.io_init_state.load(.acquire) != 0 or
+        wrapper.executor.persistent_init_state.load(.acquire) != 0)
+        @panic("FFT allocator fixture requires an unused reference Executor");
+    wrapper.executor.allocator = allocator;
 }

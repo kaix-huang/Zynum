@@ -12,7 +12,7 @@ fn close(owner: *C.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn Fixture(comptime T: type) type {
     const R = S.Real(T);
@@ -82,11 +82,13 @@ fn Fixture(comptime T: type) type {
 pub fn checkCompleteSpace() !void {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
         const R = S.Real(T);
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var operation = try owner.begin();
         defer operation.end();
-        var f = Fixture(T).init(&owner);
+        var f = Fixture(T).init(owner);
         const result = f.call(&operation, null);
         try std.testing.expectEqual(@as(i32, 0), result.status);
         try std.testing.expectEqual(@as(i32, 0), f.summary.status);
@@ -121,11 +123,13 @@ test "candidate contour binding returns complete-space eigenpairs with one borro
 
 pub fn checkFormatAndControlledStop() !void {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var operation = try owner.begin();
         defer operation.end();
-        var f = Fixture(T).init(&owner);
+        var f = Fixture(T).init(owner);
         f.options.flags = 16;
         var prior = f;
         try std.testing.expectEqual(B.INVALID_OPTIONS, f.call(&operation, null).status);
@@ -147,11 +151,13 @@ test "candidate contour binding preserves outputs on format rejection and contro
 
 pub fn checkCallbackAndClosingOwner() !void {
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var operation = try owner.begin();
         defer operation.end();
-        var f = Fixture(T).init(&owner);
+        var f = Fixture(T).init(owner);
         f.fail_at = 1;
         f.close_at = 1;
         const prior = f;
@@ -182,11 +188,13 @@ pub fn checkFinalAgreement() !void {
         }
     };
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var operation = try owner.begin();
         defer operation.end();
-        var f = Fixture(T).init(&owner);
+        var f = Fixture(T).init(owner);
         const prior = f;
         var reject: Reject = .{};
         const result = f.call(&operation, .{ .context = &reject, .agree = Reject.agree });
@@ -209,13 +217,15 @@ pub fn checkNativeControlRejections() !void {
         }
     };
     inline for (.{ S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
+        defer close(owner) catch unreachable;
         var operation = try owner.begin();
         defer operation.end();
         for (0..2) |agreed| {
             for (0..8) |kind| {
-                var f = Fixture(T).init(&owner);
+                var f = Fixture(T).init(owner);
                 switch (kind) {
                     0 => f.options.lower = f.options.upper,
                     1 => f.options.vertical_ratio = 0,
@@ -241,4 +251,10 @@ pub fn checkNativeControlRejections() !void {
 
 test "candidate contour binding native-control rejection preserves public outputs" {
     try checkNativeControlRejections();
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

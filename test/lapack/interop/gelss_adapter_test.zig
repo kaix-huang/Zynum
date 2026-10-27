@@ -112,7 +112,9 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, m: u
         bv[at(layout, i, j, ldb)] = value(T, z);
     };
     const old_a = av;
-    var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var operation = try context.begin();
     var probe: Probe = .{};
     const services = probe.services();
@@ -174,7 +176,7 @@ fn numeric(comptime T: type, comptime raw: bool, high: bool, layout: c_int, m: u
     try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
     operation.end();
     _ = context.requestClose();
-    try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+    try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
 }
 test "GELSS boundary four scalar typed raw high work layouts ranks scales and right vector overwrite" {
     var configurations: usize = 0;
@@ -192,7 +194,9 @@ test "GELSS boundary four scalar typed raw high work layouts ranks scales and ri
 test "GELSS boundary queries touch only WORK head with safe rounding and no allocation" {
     inline for (types) |T| inline for (.{ false, true }) |raw| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-        var context = Ctx.Context.init(failing.allocator(), F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(failing.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         var head = [2]T{ value(T, .{ .re = 71, .im = -19 }), value(T, .{ .re = 73, .im = -23 }) };
@@ -225,12 +229,14 @@ test "GELSS boundary queries touch only WORK head with safe rounding and no allo
         try std.testing.expectEqual(@as(usize, 0), probe.count);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "GELSS boundary scalar and row control precedence plus documented short WORK preservation" {
     inline for (types) |T| inline for (.{ false, true }) |raw| {
-        var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         var probe: Probe = .{};
         const services = probe.services();
@@ -301,12 +307,14 @@ test "GELSS boundary scalar and row control precedence plus documented short WOR
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
         _ = context.requestClose();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "GELSS boundary high NaN scans A then full B tail then real RCOND with compile and runtime controls" {
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]c_int{ 101, 102 }) |layout| {
-        var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         var probe: Probe = .{};
         const services = probe.services();
@@ -331,14 +339,16 @@ test "GELSS boundary high NaN scans A then full B tail then real RCOND with comp
         try std.testing.expectEqual(@as(usize, 0), probe.count);
         operation.end();
         _ = context.requestClose();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "GELSS boundary every allocation failure has exact memory INFO one callback and one closing operation" {
     var configurations: usize = 0;
     inline for (types) |T| inline for (.{ false, true }) |raw| for ([_]bool{ false, true }) |high| for ([_]c_int{ 101, 102 }) |layout| for (0..9) |budget| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = budget });
-        var context = Ctx.Context.init(failing.allocator(), F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(failing.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         var av = [4]T{ value(T, .{ .re = 2 }), S.zero(T), S.zero(T), value(T, .{ .re = 4 }) };
@@ -376,7 +386,7 @@ test "GELSS boundary every allocation failure has exact memory INFO one callback
         try std.testing.expectEqual(@as(usize, 1), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
         configurations += 1;
     };
     try std.testing.expectEqual(@as(usize, 288), configurations);
@@ -398,7 +408,9 @@ fn emptyCase(comptime T: type, comptime raw: bool, high: bool, layout: c_int, m:
     var real: [20]S.Real(T) = undefined;
     var probe: Probe = .{};
     const services = probe.services();
-    var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
     var operation = try context.begin();
     const minimum = try A.minimumWork(T, @intCast(m), @intCast(n), @intCast(rhs));
     try std.testing.expectEqual(@as(i32, 0), try call(T, raw, high, &operation, &services, .{ .layout = layout, .m = @intCast(m), .n = @intCast(n), .nrhs = @intCast(rhs), .a = &av, .lda = @intCast(lda), .b = &bv, .ldb = @intCast(ldb), .singular = &singular, .rcond = -1, .rank = &rank, .work = &work, .lwork = @intCast(minimum), .rwork = &real }));
@@ -415,7 +427,7 @@ fn emptyCase(comptime T: type, comptime raw: bool, high: bool, layout: c_int, m:
     try std.testing.expectEqual(@as(usize, 0), probe.count);
     operation.end();
     _ = context.requestClose();
-    try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+    try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
 }
 test "GELSS boundary empty B preservation zero A clearing and zero RHS nonempty factorization" {
     var configurations: usize = 0;
@@ -442,7 +454,9 @@ test "GELSS boundary typed storage and raw pointer faults remain separate from n
         var rank = [1]i32{-31};
         var work: [32]T = @splat(marker);
         var real: [5]S.Real(T) = undefined;
-        var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         const minimum = try A.minimumWork(T, 1, 1, 1);
         const base: A.Arguments(T) = .{ .layout = layout, .m = 1, .n = 1, .nrhs = 1, .a = &av, .lda = 1, .b = &bv, .ldb = 1, .singular = &singular, .rcond = -1, .rank = &rank, .work = &work, .lwork = @intCast(minimum), .rwork = &real };
@@ -481,7 +495,7 @@ test "GELSS boundary typed storage and raw pointer faults remain separate from n
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
         _ = context.requestClose();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "GELSS boundary positive INFO equals retained bidiagonal edge count and preserves uncommitted outputs" {
@@ -518,7 +532,9 @@ test "GELSS boundary positive INFO equals retained bidiagonal edge count and pre
             if (edge != 0) edges += 1;
         }
         try std.testing.expect(edges > 0 and edges == result.unconverged);
-        var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         const args: A.Arguments(T) = .{ .layout = layout, .m = 3, .n = 3, .nrhs = 1, .a = &av, .lda = 3, .b = &bv, .ldb = if (layout == 101) 1 else 3, .singular = &singular, .rcond = -1, .rank = &rank, .work = &work, .lwork = @intCast(try A.minimumWork(T, 3, 3, 1)), .rwork = &real };
@@ -530,7 +546,7 @@ test "GELSS boundary positive INFO equals retained bidiagonal edge count and pre
         for (singular) |x| try std.testing.expectEqual(@as(S.Real(T), 37), x);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "GELSS boundary Shared captures existing configuration callbacks and original operation owner" {
@@ -538,11 +554,13 @@ test "GELSS boundary Shared captures existing configuration callbacks and origin
     defer B.shared_services.setNancheck(previous);
     B.shared_services.setNancheck(1);
     inline for (types) |T| for ([_]bool{ false, true }) |high| {
-        var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var probe: Probe = .{};
         const defaults: B.shared_services.Callbacks = .{ .lapacke = .{ .userdata = &probe, .function = Probe.event }, .fortran_returning_test = .{ .userdata = &probe, .function = Probe.event } };
         const args: A.Arguments(T) = .{ .layout = 102, .m = -1, .n = 0, .nrhs = 0, .lda = 1, .ldb = 1, .rcond = -1 };
-        const info = try B.Shared.gelssRawManagedWithDefaults(true, T, if (high) .high else .work, &context, rawArgs(T, args), defaults);
+        const info = try B.Shared.gelssRawManagedWithDefaults(true, T, if (high) .high else .work, context, rawArgs(T, args), defaults);
         try std.testing.expectEqual(@as(i32, -2), info);
         try std.testing.expectEqual(@as(usize, 1), probe.count);
         try std.testing.expectEqual(B.common.Routine.gelss, probe.events[0].routine);
@@ -551,8 +569,8 @@ test "GELSS boundary Shared captures existing configuration callbacks and origin
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         _ = context.requestClose();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
-        try std.testing.expectError(error.Closing, B.Shared.gelssRawManagedWithDefaults(true, T, .high, &context, rawArgs(T, args), defaults));
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
+        try std.testing.expectError(error.Closing, B.Shared.gelssRawManagedWithDefaults(true, T, .high, context, rawArgs(T, args), defaults));
     };
     try std.testing.expect(A.OwnerIdentity == Core and Raw.OwnerIdentity == Core and B.Provider.OwnerIdentity == Core);
 }
@@ -565,7 +583,9 @@ test "GELSS boundary retains FFT and mixed index Sparse resources through one cl
         const ordinals = [_]i32{ 0, 1 };
         const numbers = [_]T{ value(T, .{ .re = 2 }), value(T, .{ .re = 4 }) };
         const pattern: N.SparsePattern.Pattern(i64, i32) = .{ .ranges = .{ .contiguous = &offsets }, .ordinals = &ordinals, .row_count = 2, .column_count = 2 };
-        var context = Ctx.Context.init(std.testing.allocator, F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         var descriptor = try Descriptor.createAdmitted(&operation, .{ .complex_1d = 2 });
         try descriptor.commitAdmitted(&operation);
@@ -591,17 +611,19 @@ test "GELSS boundary retains FFT and mixed index Sparse resources through one cl
         try std.testing.expectEqual(@as(usize, 1), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 2), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(Ctx.CloseResult.waiting_resources, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.waiting_resources, fixtureProgressClose(context));
         sparse.release();
         try std.testing.expectEqual(@as(usize, 1), context.snapshot().resource_pins);
         descriptor.deinit();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "GELSS boundary auxiliary and row allocations retain parameter and memory error precedence" {
     inline for (types) |T| inline for (.{ false, true }) |raw| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-        var context = Ctx.Context.init(failing.allocator(), F.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(failing.allocator(), F.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         var probe: Probe = .{};
@@ -637,6 +659,12 @@ test "GELSS boundary auxiliary and row allocations retain parameter and memory e
         try std.testing.expectEqual(@as(usize, 0), failing.allocated_bytes);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(Ctx.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(Ctx.CloseResult.closed, fixtureProgressClose(context));
     };
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

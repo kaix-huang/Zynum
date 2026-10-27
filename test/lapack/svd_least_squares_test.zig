@@ -80,8 +80,10 @@ fn fixture(comptime T: type, m: usize, n: usize, deficient: bool, relative: f128
     };
     const old_a = av;
     const old_b = bv;
-    var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
-    const result = try solver.solveManaged(&context, T, a.asConst(), b.asConst(), output, .{ .relative = @floatCast(relative) }, options);
+    var reference_context: FixtureReferenceContext = undefined;
+    reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const context = reference_context.borrowedContext();
+    const result = try solver.solveManaged(context, T, a.asConst(), b.asConst(), output, .{ .relative = @floatCast(relative) }, options);
     try std.testing.expectEqual(.converged, result.status);
     try std.testing.expectEqual(rank, result.rank);
     try std.testing.expectEqual(@as(usize, 0), result.unconverged);
@@ -121,7 +123,7 @@ fn fixture(comptime T: type, m: usize, n: usize, deficient: bool, relative: f128
     try std.testing.expectEqual(@as(usize, 0), context.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
     _ = context.requestClose();
-    try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+    try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
 }
 test "SVD least squares shared Core real complex shapes ranks cutoff and independent scales" {
     var configurations: usize = 0;
@@ -150,27 +152,33 @@ test "SVD least squares exact cutoff equality zero relative absolute and singlet
         var singular: [3]scalar.Real(T) = undefined;
         const cuts = [5]solver.Cutoff(T){ .{}, .{ .relative = 0.25 }, .{ .relative = 1 }, .{ .absolute = 1 }, .{ .absolute = 0.25 } };
         for (cuts, [_]usize{ 3, 1, 0, 1, 2 }) |cut, expected| {
-            var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
-            const result = try solver.solveManaged(&context, T, matrix(T, &av, 3, 3, 3).asConst(), matrix(T, &bv, 3, 1, 3).asConst(), .{ .solution = matrix(T, &xv, 3, 1, 3), .right_vectors = matrix(T, &vv, 3, 3, 3), .singular = &singular, .residual = matrix(T, &.{}, 0, 1, 0) }, cut, .{});
+            var reference_context: FixtureReferenceContext = undefined;
+            reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const context = reference_context.borrowedContext();
+            const result = try solver.solveManaged(context, T, matrix(T, &av, 3, 3, 3).asConst(), matrix(T, &bv, 3, 1, 3).asConst(), .{ .solution = matrix(T, &xv, 3, 1, 3), .right_vectors = matrix(T, &vv, 3, 3, 3), .singular = &singular, .residual = matrix(T, &.{}, 0, 1, 0) }, cut, .{});
             try std.testing.expectEqual(.converged, result.status);
             try std.testing.expectEqual(expected, result.rank);
             _ = context.requestClose();
-            try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+            try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
         }
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var one_a = [1]T{value(T, .{ .re = 2 })};
         var one_b = [1]T{value(T, .{ .re = 6 })};
-        const result = try solver.solveManaged(&context, T, matrix(T, &one_a, 1, 1, 1).asConst(), matrix(T, &one_b, 1, 1, 1).asConst(), .{ .solution = matrix(T, xv[0..1], 1, 1, 1), .right_vectors = matrix(T, vv[0..1], 1, 1, 1), .singular = singular[0..1], .residual = matrix(T, &.{}, 0, 1, 0) }, .{ .relative = 1 }, .{});
+        const result = try solver.solveManaged(context, T, matrix(T, &one_a, 1, 1, 1).asConst(), matrix(T, &one_b, 1, 1, 1).asConst(), .{ .solution = matrix(T, xv[0..1], 1, 1, 1), .right_vectors = matrix(T, vv[0..1], 1, 1, 1), .singular = singular[0..1], .residual = matrix(T, &.{}, 0, 1, 0) }, .{ .relative = 1 }, .{});
         try std.testing.expectEqual(@as(usize, 0), result.rank);
         try close(T, .{}, xv[0], 1);
         _ = context.requestClose();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     }
 }
 test "SVD least squares all scratch allocations borrow closing operation and unwind on failure" {
     inline for (scalars) |T| for (0..4) |budget| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = budget });
-        var context = execution.context.Context.init(failing.allocator(), execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(failing.allocator(), execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         _ = context.requestClose();
         var av = [4]T{ value(T, .{ .re = 2 }), scalar.zero(T), scalar.zero(T), value(T, .{ .re = 4 }) };
@@ -196,13 +204,15 @@ test "SVD least squares all scratch allocations borrow closing operation and unw
         try std.testing.expectEqual(failing.allocated_bytes, failing.freed_bytes);
         try std.testing.expectError(error.Closing, context.begin());
         operation.end();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "SVD least squares resource count overflow unwinds original closing operation" {
     inline for (scalars) |T| for ([_]usize{ 1, 2 }) |limit| {
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
-        execution.context.Context.testing.configure(&context, limit, null);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
+        execution.context.Context.testing.configure(context, limit, null);
         var operation = try context.begin();
         _ = context.requestClose();
         var av = [1]T{value(T, .{ .re = 2 })};
@@ -217,13 +227,15 @@ test "SVD least squares resource count overflow unwinds original closing operati
         try std.testing.expectEqual(@as(usize, 1), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         operation.end();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     };
 }
 test "SVD least squares preflight and closed Context reject without allocating or writing outputs" {
     inline for (scalars) |T| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
-        var context = execution.context.Context.init(failing.allocator(), execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(failing.allocator(), execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var av: [4]T = @splat(value(T, .{ .re = 2 }));
         var bv: [2]T = @splat(value(T, .{ .re = 1 }));
         const marker = value(T, .{ .re = 19, .im = -23 });
@@ -235,25 +247,25 @@ test "SVD least squares preflight and closed Context reject without allocating o
         const out: solver.Outputs(T) = .{ .solution = matrix(T, &xv, 2, 1, 2), .right_vectors = matrix(T, &vv, 2, 2, 2), .singular = &singular, .residual = matrix(T, &.{}, 0, 1, 0) };
         var wrong = out;
         wrong.solution.row_count = 1;
-        try std.testing.expectError(error.DimensionMismatch, solver.solveManaged(&context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
+        try std.testing.expectError(error.DimensionMismatch, solver.solveManaged(context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
         wrong = out;
         wrong.singular = singular[0..1];
-        try std.testing.expectError(error.BufferTooSmall, solver.solveManaged(&context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
+        try std.testing.expectError(error.BufferTooSmall, solver.solveManaged(context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
         wrong = out;
         wrong.solution.values = &av;
-        try std.testing.expectError(error.AliasingNotAllowed, solver.solveManaged(&context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
+        try std.testing.expectError(error.AliasingNotAllowed, solver.solveManaged(context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
         wrong = out;
         wrong.solution.values = &bv;
-        try std.testing.expectError(error.AliasingNotAllowed, solver.solveManaged(&context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
+        try std.testing.expectError(error.AliasingNotAllowed, solver.solveManaged(context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
         const mixed: [*]scalar.Real(T) = @ptrCast(&av);
         wrong = out;
         wrong.singular = mixed[0..2];
-        try std.testing.expectError(error.AliasingNotAllowed, solver.solveManaged(&context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
-        try std.testing.expectError(error.InvalidCutoff, solver.solveManaged(&context, T, a.asConst(), b.asConst(), out, .{ .relative = -1 }, .{}));
-        try std.testing.expectError(error.InvalidCutoff, solver.solveManaged(&context, T, a.asConst(), b.asConst(), out, .{ .absolute = std.math.nan(solver.Wide(T)) }, .{}));
-        try std.testing.expectError(error.InvalidTolerance, solver.solveManaged(&context, T, a.asConst(), b.asConst(), out, .{}, .{ .relative_tolerance = 0 }));
+        try std.testing.expectError(error.AliasingNotAllowed, solver.solveManaged(context, T, a.asConst(), b.asConst(), wrong, .{}, .{}));
+        try std.testing.expectError(error.InvalidCutoff, solver.solveManaged(context, T, a.asConst(), b.asConst(), out, .{ .relative = -1 }, .{}));
+        try std.testing.expectError(error.InvalidCutoff, solver.solveManaged(context, T, a.asConst(), b.asConst(), out, .{ .absolute = std.math.nan(solver.Wide(T)) }, .{}));
+        try std.testing.expectError(error.InvalidTolerance, solver.solveManaged(context, T, a.asConst(), b.asConst(), out, .{}, .{ .relative_tolerance = 0 }));
         av[0] = value(T, .{ .re = std.math.nan(f128) });
-        try std.testing.expectError(error.NonFiniteInput, solver.solveManaged(&context, T, a.asConst(), b.asConst(), out, .{}, .{}));
+        try std.testing.expectError(error.NonFiniteInput, solver.solveManaged(context, T, a.asConst(), b.asConst(), out, .{}, .{}));
         for (xv) |x| try std.testing.expectEqual(marker, x);
         for (vv) |x| try std.testing.expectEqual(marker, x);
         for (singular) |x| try std.testing.expectEqual(@as(scalar.Real(T), 31), x);
@@ -261,8 +273,8 @@ test "SVD least squares preflight and closed Context reject without allocating o
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         _ = context.requestClose();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
-        try std.testing.expectError(error.Closing, solver.solveManaged(&context, T, a.asConst(), b.asConst(), out, .{}, .{}));
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
+        try std.testing.expectError(error.Closing, solver.solveManaged(context, T, a.asConst(), b.asConst(), out, .{}, .{}));
         try std.testing.expectEqual(@as(usize, 0), failing.allocated_bytes);
         try std.testing.expectError(error.SizeOverflow, solver.plan(T, std.math.maxInt(usize), 1, 1));
     }
@@ -278,8 +290,10 @@ test "SVD least squares bounded factorization and checked reconstruction failure
         var xv: [3]T = @splat(marker);
         var vv: [9]T = @splat(marker);
         var singular: [3]scalar.Real(T) = @splat(31);
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
-        const result = try solver.solveManaged(&context, T, matrix(T, &av, 3, 3, 3).asConst(), matrix(T, &bv, 3, 1, 3).asConst(), .{ .solution = matrix(T, &xv, 3, 1, 3), .right_vectors = matrix(T, &vv, 3, 3, 3), .singular = &singular, .residual = matrix(T, &.{}, 0, 1, 0) }, .{}, .{ .max_steps = 0 });
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
+        const result = try solver.solveManaged(context, T, matrix(T, &av, 3, 3, 3).asConst(), matrix(T, &bv, 3, 1, 3).asConst(), .{ .solution = matrix(T, &xv, 3, 1, 3), .right_vectors = matrix(T, &vv, 3, 3, 3), .singular = &singular, .residual = matrix(T, &.{}, 0, 1, 0) }, .{}, .{ .max_steps = 0 });
         try std.testing.expectEqual(.no_convergence, result.status);
         try std.testing.expectEqual(solver.Stage.factorization, result.stage);
         try std.testing.expect(result.unconverged > 0 and result.unconverged <= 2);
@@ -288,13 +302,13 @@ test "SVD least squares bounded factorization and checked reconstruction failure
         for (singular) |x| try std.testing.expectEqual(@as(scalar.Real(T), 31), x);
         var tiny_a = [1]T{value(T, .{ .re = std.math.floatTrueMin(scalar.Real(T)) })};
         const out: solver.Outputs(T) = .{ .solution = matrix(T, xv[0..1], 1, 1, 1), .right_vectors = matrix(T, vv[0..1], 1, 1, 1), .singular = singular[0..1], .residual = matrix(T, &.{}, 0, 1, 0) };
-        const failed = try solver.solveManaged(&context, T, matrix(T, &tiny_a, 1, 1, 1).asConst(), matrix(T, bv[0..1], 1, 1, 1).asConst(), out, .{}, .{});
+        const failed = try solver.solveManaged(context, T, matrix(T, &tiny_a, 1, 1, 1).asConst(), matrix(T, bv[0..1], 1, 1, 1).asConst(), out, .{}, .{});
         try std.testing.expectEqual(.non_finite_result, failed.status);
         try std.testing.expectEqual(solver.Stage.reconstruction, failed.stage);
         try std.testing.expectEqual(marker, xv[0]);
         try std.testing.expectEqual(marker, vv[0]);
         try std.testing.expectEqual(@as(scalar.Real(T), 31), singular[0]);
-        const ieee = try solver.solveManaged(&context, T, matrix(T, &tiny_a, 1, 1, 1).asConst(), matrix(T, bv[0..1], 1, 1, 1).asConst(), out, .{}, .{ .numerical_policy = .ieee });
+        const ieee = try solver.solveManaged(context, T, matrix(T, &tiny_a, 1, 1, 1).asConst(), matrix(T, bv[0..1], 1, 1, 1).asConst(), out, .{}, .{ .numerical_policy = .ieee });
         try std.testing.expectEqual(.converged, ieee.status);
         try std.testing.expectEqual(@as(usize, 0), ieee.unconverged);
         try std.testing.expect(std.math.isInf(wide(T, xv[0]).re));
@@ -305,7 +319,7 @@ test "SVD least squares bounded factorization and checked reconstruction failure
         var publication_v = [1]T{marker};
         var publication_residual = [1]T{marker};
         var publication_singular = [1]scalar.Real(T){31};
-        const publication = try solver.solveManaged(&context, T, matrix(T, &publication_a, 2, 1, 2).asConst(), matrix(T, &publication_b, 2, 1, 2).asConst(), .{ .solution = matrix(T, &publication_x, 1, 1, 1), .right_vectors = matrix(T, &publication_v, 1, 1, 1), .singular = &publication_singular, .residual = matrix(T, &publication_residual, 1, 1, 1) }, .{}, .{});
+        const publication = try solver.solveManaged(context, T, matrix(T, &publication_a, 2, 1, 2).asConst(), matrix(T, &publication_b, 2, 1, 2).asConst(), .{ .solution = matrix(T, &publication_x, 1, 1, 1), .right_vectors = matrix(T, &publication_v, 1, 1, 1), .singular = &publication_singular, .residual = matrix(T, &publication_residual, 1, 1, 1) }, .{}, .{});
         try std.testing.expectEqual(.non_finite_result, publication.status);
         try std.testing.expectEqual(solver.Stage.publication, publication.stage);
         try std.testing.expectEqual(marker, publication_x[0]);
@@ -315,7 +329,7 @@ test "SVD least squares bounded factorization and checked reconstruction failure
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         _ = context.requestClose();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     }
 }
 test "SVD least squares zero RHS still factors and empty or zero matrices retain defined outputs" {
@@ -329,14 +343,16 @@ test "SVD least squares zero RHS still factors and empty or zero matrices retain
             var xv: [1]T = @splat(value(T, .{ .re = 17 }));
             var vv: [12]T = undefined;
             var singular: [3]scalar.Real(T) = @splat(31);
-            var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
-            const result = try solver.solveManaged(&context, T, matrix(T, &av, m, n, m).asConst(), matrix(T, &.{}, m, 0, m).asConst(), .{ .solution = matrix(T, &xv, n, 0, n), .right_vectors = matrix(T, &vv, n, k, n), .singular = &singular, .residual = matrix(T, &.{}, m -| n, 0, m -| n) }, .{}, .{});
+            var reference_context: FixtureReferenceContext = undefined;
+            reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const context = reference_context.borrowedContext();
+            const result = try solver.solveManaged(context, T, matrix(T, &av, m, n, m).asConst(), matrix(T, &.{}, m, 0, m).asConst(), .{ .solution = matrix(T, &xv, n, 0, n), .right_vectors = matrix(T, &vv, n, k, n), .singular = &singular, .residual = matrix(T, &.{}, m -| n, 0, m -| n) }, .{}, .{});
             try std.testing.expectEqual(.converged, result.status);
             try std.testing.expectEqual(k, result.rank);
             if (k > 0) try std.testing.expectEqual(@as(scalar.Real(T), @floatFromInt(k + 1)), singular[0]);
             try close(T, .{ .re = 17 }, xv[0], 1);
             _ = context.requestClose();
-            try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+            try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
         }
         for ([_][2]usize{ .{ 0, 2 }, .{ 2, 0 }, .{ 3, 2 } }) |shape| {
             const m = shape[0];
@@ -348,8 +364,10 @@ test "SVD least squares zero RHS still factors and empty or zero matrices retain
             var vv: [4]T = undefined;
             var rv: [2]T = @splat(value(T, .{ .re = 23 }));
             var singular: [2]scalar.Real(T) = @splat(31);
-            var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
-            const result = try solver.solveManaged(&context, T, matrix(T, &av, m, n, m).asConst(), matrix(T, &bv, m, 1, m).asConst(), .{ .solution = matrix(T, &xv, n, 1, n), .right_vectors = matrix(T, &vv, n, k, n), .singular = &singular, .residual = matrix(T, &rv, m -| n, 1, m -| n) }, .{}, .{});
+            var reference_context: FixtureReferenceContext = undefined;
+            reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const context = reference_context.borrowedContext();
+            const result = try solver.solveManaged(context, T, matrix(T, &av, m, n, m).asConst(), matrix(T, &bv, m, 1, m).asConst(), .{ .solution = matrix(T, &xv, n, 1, n), .right_vectors = matrix(T, &vv, n, k, n), .singular = &singular, .residual = matrix(T, &rv, m -| n, 1, m -| n) }, .{}, .{});
             try std.testing.expectEqual(.converged, result.status);
             try std.testing.expectEqual(@as(usize, 0), result.rank);
             for (xv[0..n]) |x| try close(T, .{}, x, 1);
@@ -357,7 +375,7 @@ test "SVD least squares zero RHS still factors and empty or zero matrices retain
             if (n == 0) for (0..m) |i| try std.testing.expectEqual(bv[i], rv[i]);
             if (m > n and n != 0) for (rv) |x| try close(T, .{ .re = 23 }, x, 1);
             _ = context.requestClose();
-            try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+            try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
         }
     }
 }
@@ -377,7 +395,9 @@ test "SVD least squares FFT descriptor and mixed index Sparse control retain one
         const ordinals = [_]i32{ 0, 1 };
         const numbers = [_]T{ value(T, .{ .re = 2 }), value(T, .{ .re = 4 }) };
         const pattern: core.internal.numerics.SparsePattern.Pattern(i64, i32) = .{ .ranges = .{ .contiguous = &offsets }, .ordinals = &ordinals, .row_count = 2, .column_count = 2 };
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var operation = try context.begin();
         var descriptor = try Descriptor.createAdmitted(&operation, .{ .complex_1d = 2 });
         try descriptor.commitAdmitted(&operation);
@@ -405,12 +425,18 @@ test "SVD least squares FFT descriptor and mixed index Sparse control retain one
         try std.testing.expectEqual(@as(usize, 2), context.snapshot().resource_pins);
         try std.testing.expectError(error.Closing, context.begin());
         operation.end();
-        try std.testing.expectEqual(execution.context.CloseResult.waiting_resources, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.waiting_resources, fixtureProgressClose(context));
         sparse.release();
         try std.testing.expectEqual(@as(usize, 1), context.snapshot().resource_pins);
-        try std.testing.expectEqual(execution.context.CloseResult.waiting_resources, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.waiting_resources, fixtureProgressClose(context));
         descriptor.deinit();
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

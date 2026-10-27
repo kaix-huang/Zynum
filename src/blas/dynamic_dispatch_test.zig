@@ -915,6 +915,16 @@ test "parallel complex 3M packing preserves uneven task fringes and coefficients
 // allocated separately, so the observed allocations are numerical scratch only.
 const DynamicResourceExecution = @import("zynum-core").internal.numerics.Execution;
 const DynamicResourceContext = DynamicResourceExecution.context.Context;
+const DynamicReferenceContext = DynamicResourceExecution.reference.ReferenceContext;
+fn dynamicProgress(ctx: *DynamicResourceContext) DynamicResourceExecution.context.CloseResult {
+    var report: DynamicResourceExecution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn dynamicExecutor(ctx: *DynamicResourceContext) *DynamicResourceExecution.owner.Executor {
+    const wrapper: *DynamicReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
+}
+
 const DynamicResourceAllocations = DynamicResourceExecution.test_support.Allocations;
 
 const DynamicResourceProbe = struct {
@@ -1079,8 +1089,10 @@ fn dynamicResourceGemm(comptime T: type, m: usize, n: usize, k: usize, budget: u
     const default_guard = try DynamicResourceDefaultGuard.init();
     defer default_guard.deinit();
     var allocations: DynamicResourceAllocations = .{ .budget = budget };
-    var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicResourceProbe.policy, .internal_closable);
-    DynamicResourceProbe.setup(&ctx, &allocations);
+    var reference_ctx: DynamicReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), DynamicResourceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    DynamicResourceProbe.setup(ctx, &allocations);
     var operation = try ctx.begin();
     var ended = false;
     defer if (!ended) {
@@ -1106,9 +1118,9 @@ fn dynamicResourceGemm(comptime T: type, m: usize, n: usize, k: usize, budget: u
     try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(b_before), std.mem.sliceAsBytes(b));
     // No Executor allocation can explain observed scratch traffic in this
     // one-thread fixture. This also guards unintended default-pool fallback.
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_busy.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).persistent_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).io_busy.load(.acquire));
     const stats = allocations.stats();
     try std.testing.expectEqual(stats.accepted, stats.freed);
     operation.end();
@@ -1118,7 +1130,7 @@ fn dynamicResourceGemm(comptime T: type, m: usize, n: usize, k: usize, budget: u
     try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.finished);
     try std.testing.expectEqual(@as(usize, 0), ctx.snapshot().active_operations);
     try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
     try default_guard.check();
     return stats;
 }
@@ -1208,12 +1220,14 @@ fn dynamicComplexResourceGemm(comptime T: type, budget: usize) !DynamicResourceA
     const guard = try DynamicResourceDefaultGuard.init();
     defer guard.deinit();
     var allocations: DynamicResourceAllocations = .{ .budget = budget };
-    var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicResourceProbe.policy, .internal_closable);
-    DynamicResourceProbe.setup(&ctx, &allocations);
+    var reference_ctx: DynamicReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), DynamicResourceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    DynamicResourceProbe.setup(ctx, &allocations);
     defer {
         DynamicResourceProbe.watch = false;
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = dynamicProgress(ctx);
     }
     var operation = try ctx.begin();
     var ended = false;
@@ -1238,15 +1252,15 @@ fn dynamicComplexResourceGemm(comptime T: type, budget: usize) !DynamicResourceA
     try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(b_before), std.mem.sliceAsBytes(b));
     const stats = allocations.stats();
     try std.testing.expectEqual(stats.accepted, stats.freed);
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).persistent_init_state.load(.acquire));
     operation.end();
     ended = true;
     DynamicResourceProbe.watch = false;
     try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.admitted);
     try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.finished);
     _ = ctx.requestClose();
-    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
     try guard.check();
     return stats;
 }
@@ -1307,16 +1321,18 @@ test "complex GEMV unit helpers retain resources at actual Level 1 scheduling bo
     const guard = try DynamicResourceDefaultGuard.init();
     defer guard.deinit();
     var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = DynamicResourceContext.init(allocations.allocator(), ComplexUnitResourceProbe.policy, .internal_closable);
-    ComplexUnitResourceProbe.context = &ctx;
+    var reference_ctx: DynamicReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), ComplexUnitResourceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    ComplexUnitResourceProbe.context = ctx;
     ComplexUnitResourceProbe.queries.store(0, .release);
     ComplexUnitResourceProbe.configurations.store(0, .release);
     ComplexUnitResourceProbe.finishes = 0;
-    DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), ComplexUnitResourceProbe.observe);
+    DynamicResourceContext.testing.configure(ctx, std.math.maxInt(usize), ComplexUnitResourceProbe.observe);
     defer {
         ComplexUnitResourceProbe.watching = false;
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = dynamicProgress(ctx);
     }
     var calls: usize = 0;
     inline for (.{ api.ComplexF32, api.ComplexF64 }) |T| {
@@ -1366,7 +1382,7 @@ test "complex GEMV unit helpers retain resources at actual Level 1 scheduling bo
     try std.testing.expect(ComplexUnitResourceProbe.queries.load(.acquire) > 0);
     try std.testing.expect(ComplexUnitResourceProbe.configurations.load(.acquire) > 0);
     _ = ctx.requestClose();
-    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
     try std.testing.expectEqual(@as(usize, 0), allocations.stats().rejected);
     try guard.check();
@@ -1402,13 +1418,15 @@ fn dynamicIndependentGemv(comptime T: type, budget: usize) !DynamicResourceAlloc
     const guard = try DynamicResourceDefaultGuard.init();
     defer guard.deinit();
     var allocations: DynamicResourceAllocations = .{ .budget = budget };
-    var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicResourceProbe.policy, .internal_closable);
+    var reference_ctx: DynamicReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), DynamicResourceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
     defer {
         DynamicResourceProbe.watch = false;
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = dynamicProgress(ctx);
     }
-    DynamicResourceProbe.setup(&ctx, &allocations);
+    DynamicResourceProbe.setup(ctx, &allocations);
     var operation = try ctx.begin();
     var ended = false;
     defer if (!ended) {
@@ -1419,7 +1437,7 @@ fn dynamicIndependentGemv(comptime T: type, budget: usize) !DynamicResourceAlloc
     DynamicResourceProbe.expected = std.mem.sliceAsBytes(expected);
     DynamicResourceProbe.watch = true;
     try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
-    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, ctx.tryProgressClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, dynamicProgress(ctx));
     const m: i32 = @intCast(rows);
     const n: i32 = @intCast(cols);
     const lda: i32 = @intCast(lda_u);
@@ -1430,8 +1448,8 @@ fn dynamicIndependentGemv(comptime T: type, budget: usize) !DynamicResourceAlloc
     try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(expected), std.mem.sliceAsBytes(y));
     try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(a_before), std.mem.sliceAsBytes(a));
     try std.testing.expectEqualSlices(u8, std.mem.sliceAsBytes(x_before), std.mem.sliceAsBytes(x));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.io_init_state.load(.acquire));
-    try std.testing.expectEqual(@as(u8, 0), ctx.executor.persistent_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).io_init_state.load(.acquire));
+    try std.testing.expectEqual(@as(u8, 0), dynamicExecutor(ctx).persistent_init_state.load(.acquire));
     const stats = allocations.stats();
     try std.testing.expectEqual(stats.accepted, stats.freed);
     operation.end();
@@ -1439,7 +1457,7 @@ fn dynamicIndependentGemv(comptime T: type, budget: usize) !DynamicResourceAlloc
     DynamicResourceProbe.watch = false;
     try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.admitted);
     try std.testing.expectEqual(@as(usize, 1), DynamicResourceProbe.finished);
-    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
     try guard.check();
     return stats;
 }
@@ -1524,7 +1542,7 @@ const DynamicWorkspaceBatch = struct {
         defer self.finished.store(true, .release);
         var operation = self.context.begin() catch return;
         defer operation.end();
-        self.accepted = self.context.executor.runLowLatency(.{ .task_fn = execute, .tasks = self, .count = 4 });
+        self.accepted = dynamicExecutor(self.context).runLowLatency(.{ .task_fn = execute, .tasks = self, .count = 4 });
     }
 };
 
@@ -1562,21 +1580,23 @@ test "checked GEMV workspace COPY uses both batches of the borrowed executor and
             expected_scratch[1 + i] = expected[1 + i];
         }
         var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
-        var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicWorkspaceProbe.policy, .internal_closable);
+        var reference_ctx: DynamicReferenceContext = undefined;
+        reference_ctx.initInPlace(allocations.allocator(), DynamicWorkspaceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         defer {
             DynamicWorkspaceProbe.watch = false;
             _ = ctx.requestClose();
-            _ = ctx.tryProgressClose();
+            _ = dynamicProgress(ctx);
         }
         // Warm the actual four-task persistent executor, then record its exact
         // generation counters; COPY must issue two jobs, or none while busy.
-        var warm: DynamicWorkspaceBatch = .{ .context = &ctx };
+        var warm: DynamicWorkspaceBatch = .{ .context = ctx };
         warm.release.store(true, .release);
         DynamicWorkspaceBatch.run(&warm);
         try std.testing.expect(warm.accepted);
         for (&warm.visits) |*v| try std.testing.expectEqual(@as(u32, 1), v.load(.acquire));
-        try std.testing.expectEqual(@as(u32, 3), ctx.executor.persistent_worker_count.load(.acquire));
-        DynamicWorkspaceProbe.context = &ctx;
+        try std.testing.expectEqual(@as(u32, 3), dynamicExecutor(ctx).persistent_worker_count.load(.acquire));
+        DynamicWorkspaceProbe.context = ctx;
         DynamicWorkspaceProbe.allocation_log = &allocations;
         const before_allocations = allocations.stats();
         DynamicWorkspaceProbe.live_allocations = before_allocations.accepted - before_allocations.freed;
@@ -1586,8 +1606,8 @@ test "checked GEMV workspace COPY uses both batches of the borrowed executor and
         DynamicWorkspaceProbe.expected_workspace = expected_scratch;
         DynamicWorkspaceProbe.watch = false;
         DynamicWorkspaceProbe.finishes = 0;
-        DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), DynamicWorkspaceProbe.observe);
-        var active: DynamicWorkspaceBatch = .{ .context = &ctx };
+        DynamicResourceContext.testing.configure(ctx, std.math.maxInt(usize), DynamicWorkspaceProbe.observe);
+        var active: DynamicWorkspaceBatch = .{ .context = ctx };
         var caller: ?std.Thread = null;
         defer {
             DynamicWorkspaceProbe.watch = false;
@@ -1600,7 +1620,7 @@ test "checked GEMV workspace COPY uses both batches of the borrowed executor and
             try std.testing.expect(active.entered.load(.acquire));
         }
         var generations: [3]u32 = undefined;
-        for (&generations, 0..) |*generation, i| generation.* = ctx.executor.persistent_worker_generation[i].load(.acquire);
+        for (&generations, 0..) |*generation, i| generation.* = dynamicExecutor(ctx).persistent_worker_generation[i].load(.acquire);
         var operation = try ctx.begin();
         var ended = false;
         defer if (!ended) {
@@ -1609,14 +1629,14 @@ test "checked GEMV workspace COPY uses both batches of the borrowed executor and
         };
         DynamicWorkspaceProbe.watch = true;
         try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, dynamicProgress(ctx));
         api.operations.testing.executeMatrixVectorWithWorkspaceAdmitted(f64, &operation, matrix_view, input_view, result_view, scratch[1 .. length + 1], length, 0, -3);
         for (generations, 0..) |generation, i|
-            try std.testing.expectEqual(generation +% @as(u32, if (busy) 0 else 2), ctx.executor.persistent_worker_generation[i].load(.acquire));
+            try std.testing.expectEqual(generation +% @as(u32, if (busy) 0 else 2), dynamicExecutor(ctx).persistent_worker_generation[i].load(.acquire));
         if (busy) {
             try std.testing.expect(!active.finished.load(.acquire));
-            try std.testing.expectEqual(@as(u8, 1), ctx.executor.io_busy.load(.acquire));
-            try std.testing.expect(ctx.executor.persistent_task_fn == DynamicWorkspaceBatch.execute);
+            try std.testing.expectEqual(@as(u8, 1), dynamicExecutor(ctx).io_busy.load(.acquire));
+            try std.testing.expect(dynamicExecutor(ctx).persistent_task_fn == DynamicWorkspaceBatch.execute);
         }
         try std.testing.expectEqualSlices(f64, expected, y);
         try std.testing.expectEqualSlices(f64, expected_scratch, scratch);
@@ -1633,7 +1653,7 @@ test "checked GEMV workspace COPY uses both batches of the borrowed executor and
             try std.testing.expect(active.accepted);
             for (&active.visits) |*v| try std.testing.expectEqual(@as(u32, 1), v.load(.acquire));
         }
-        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
         try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
         try guard.check();
     }
@@ -1670,26 +1690,28 @@ test "checked Level 1 Into COPY and combine retain one closing Context across ob
         @memset(expected, 103);
         for (0..n) |i| expected[1 + i] = 2 * x_before[1 + i] - 3 * input_before[1 + i];
         var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
-        var ctx = DynamicResourceContext.init(allocations.allocator(), DynamicWorkspaceProbe.policy, .internal_closable);
+        var reference_ctx: DynamicReferenceContext = undefined;
+        reference_ctx.initInPlace(allocations.allocator(), DynamicWorkspaceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+        const ctx = reference_ctx.borrowedContext();
         defer {
             DynamicWorkspaceProbe.watch = false;
             _ = ctx.requestClose();
-            _ = ctx.tryProgressClose();
+            _ = dynamicProgress(ctx);
         }
-        var warm: DynamicWorkspaceBatch = .{ .context = &ctx };
+        var warm: DynamicWorkspaceBatch = .{ .context = ctx };
         warm.release.store(true, .release);
         DynamicWorkspaceBatch.run(&warm);
         try std.testing.expect(warm.accepted);
-        try std.testing.expectEqual(@as(u32, 3), ctx.executor.persistent_worker_count.load(.acquire));
-        DynamicWorkspaceProbe.context = &ctx;
+        try std.testing.expectEqual(@as(u32, 3), dynamicExecutor(ctx).persistent_worker_count.load(.acquire));
+        DynamicWorkspaceProbe.context = ctx;
         DynamicWorkspaceProbe.allocation_log = &allocations;
         DynamicWorkspaceProbe.result = output;
         DynamicWorkspaceProbe.expected_result = expected;
         DynamicWorkspaceProbe.workspace = input;
         DynamicWorkspaceProbe.expected_workspace = input_before;
         DynamicWorkspaceProbe.finishes = 0;
-        DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), DynamicWorkspaceProbe.observe);
-        var active: DynamicWorkspaceBatch = .{ .context = &ctx };
+        DynamicResourceContext.testing.configure(ctx, std.math.maxInt(usize), DynamicWorkspaceProbe.observe);
+        var active: DynamicWorkspaceBatch = .{ .context = ctx };
         var caller: ?std.Thread = null;
         defer {
             DynamicWorkspaceProbe.watch = false;
@@ -1702,7 +1724,7 @@ test "checked Level 1 Into COPY and combine retain one closing Context across ob
             try std.testing.expect(active.entered.load(.acquire));
         }
         var generations: [3]u32 = undefined;
-        for (&generations, 0..) |*generation, i| generation.* = ctx.executor.persistent_worker_generation[i].load(.acquire);
+        for (&generations, 0..) |*generation, i| generation.* = dynamicExecutor(ctx).persistent_worker_generation[i].load(.acquire);
         const allocation_state = allocations.stats();
         DynamicWorkspaceProbe.live_allocations = allocation_state.accepted - allocation_state.freed;
         var operation = try ctx.begin();
@@ -1713,13 +1735,13 @@ test "checked Level 1 Into COPY and combine retain one closing Context across ob
         };
         DynamicWorkspaceProbe.watch = true;
         try std.testing.expectEqual(DynamicResourceExecution.context.RequestResult.pending, ctx.requestClose());
-        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, ctx.tryProgressClose());
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.busy, dynamicProgress(ctx));
         // This alias is the exact checked post-validation helper. Public
         // validation/alias handling has separate modern-root coverage.
         api.operations.testing.executeCombineVectorsIntoAdmitted(f64, &operation, xv, iv, ov, 2, -3);
         if (comptime builtin.target.cpu.arch == .aarch64 or builtin.target.cpu.arch == .x86_64) {
             for (generations, 0..) |generation, i|
-                try std.testing.expectEqual(generation +% @as(u32, if (busy) 0 else 2), ctx.executor.persistent_worker_generation[i].load(.acquire));
+                try std.testing.expectEqual(generation +% @as(u32, if (busy) 0 else 2), dynamicExecutor(ctx).persistent_worker_generation[i].load(.acquire));
         }
         try std.testing.expectEqualSlices(f64, expected, output);
         try std.testing.expectEqualSlices(f64, x_before, x);
@@ -1730,14 +1752,14 @@ test "checked Level 1 Into COPY and combine retain one closing Context across ob
         try std.testing.expectEqual(@as(usize, 1), DynamicWorkspaceProbe.finishes);
         if (caller) |thread| {
             try std.testing.expect(!active.finished.load(.acquire));
-            try std.testing.expect(ctx.executor.persistent_task_fn == DynamicWorkspaceBatch.execute);
+            try std.testing.expect(dynamicExecutor(ctx).persistent_task_fn == DynamicWorkspaceBatch.execute);
             active.release.store(true, .release);
             thread.join();
             caller = null;
             try std.testing.expect(active.accepted);
             for (&active.visits) |*visits| try std.testing.expectEqual(@as(u32, 1), visits.load(.acquire));
         }
-        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+        try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
         try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
         try guard.check();
     }
@@ -1747,16 +1769,18 @@ test "dynamic Level 1 reductions retain borrowed policy across real complex and 
     const guard = try DynamicResourceDefaultGuard.init();
     defer guard.deinit();
     var allocations: DynamicResourceAllocations = .{ .budget = std.math.maxInt(usize) };
-    var ctx = DynamicResourceContext.init(allocations.allocator(), ComplexUnitResourceProbe.policy, .internal_closable);
-    ComplexUnitResourceProbe.context = &ctx;
+    var reference_ctx: DynamicReferenceContext = undefined;
+    reference_ctx.initInPlace(allocations.allocator(), ComplexUnitResourceProbe.policy, .owned_closable, DynamicResourceExecution.reference.defaultCacheDomain());
+    const ctx = reference_ctx.borrowedContext();
+    ComplexUnitResourceProbe.context = ctx;
     ComplexUnitResourceProbe.queries.store(0, .release);
     ComplexUnitResourceProbe.configurations.store(0, .release);
     ComplexUnitResourceProbe.watching = false;
-    DynamicResourceContext.testing.configure(&ctx, std.math.maxInt(usize), ComplexUnitResourceProbe.observe);
+    DynamicResourceContext.testing.configure(ctx, std.math.maxInt(usize), ComplexUnitResourceProbe.observe);
     defer {
         ComplexUnitResourceProbe.watching = false;
         _ = ctx.requestClose();
-        _ = ctx.tryProgressClose();
+        _ = dynamicProgress(ctx);
     }
     inline for (.{ f32, f64, api.ComplexF32, api.ComplexF64 }) |T| {
         const complex = T == api.ComplexF32 or T == api.ComplexF64;
@@ -1813,7 +1837,7 @@ test "dynamic Level 1 reductions retain borrowed policy across real complex and 
     try std.testing.expect(ComplexUnitResourceProbe.configurations.load(.acquire) > 0);
     try std.testing.expect(allocations.stats().accepted > 0);
     _ = ctx.requestClose();
-    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, ctx.tryProgressClose());
+    try std.testing.expectEqual(DynamicResourceExecution.context.CloseResult.closed, dynamicProgress(ctx));
     try std.testing.expectEqual(allocations.stats().accepted, allocations.stats().freed);
     try guard.check();
 }

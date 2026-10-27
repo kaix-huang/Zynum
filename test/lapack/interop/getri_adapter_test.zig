@@ -50,7 +50,7 @@ fn numerical(comptime T: type, comptime I: type, comptime raw: bool, managed: bo
         var rig: h.Rig = .{};
         rig.init();
         rig.services.allocator = undefined;
-        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, &rig.context, &rig.services, args));
+        try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, rig.context, &rig.services, args));
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, if (level == .high) 1 else 0), rig.reads);
         try std.testing.expectEqual(expected_allocations, rig.x.attempts);
@@ -126,7 +126,7 @@ test "GETRI raw query has one output and no factor pivot transpose or allocator 
             rig.init();
             rig.services.allocator = undefined;
             const args: Raw.Arguments(T, I) = .{ .layout = layout, .n = n, .a = @ptrFromInt(1), .lda = @max(@as(I, 1), n), .pivots = @ptrFromInt(1), .work = work[0..].ptr, .lwork = -1 };
-            try s.expectInfo(I, 0, try Raw.callManaged(T, I, .work, &rig.context, &rig.services, args));
+            try s.expectInfo(I, 0, try Raw.callManaged(T, I, .work, rig.context, &rig.services, args));
             const expected: f64 = if (T == f32 or T == s.C32) (if (n == 16777217) 16777218 else if (n == 16777219) 16777220 else @floatFromInt(@max(@as(I, 1), n))) else @floatFromInt(@max(@as(I, 1), n));
             try std.testing.expectEqual(expected, s.re(T, work[0]));
             try std.testing.expectEqual(@as(f64, 0), s.im(T, work[0]));
@@ -207,7 +207,7 @@ test "GETRI singular factor returns first positive INFO without pivot reads or i
         var rig: h.Rig = .{};
         rig.init();
         rig.services.allocator = undefined;
-        try s.expectInfo(I, 2, try A.callManaged(f64, I, level, &rig.context, &rig.services, .{ .layout = layout, .n = 3, .a = &a, .lda = 4, .pivots = null, .work = &work, .lwork = 3 }));
+        try s.expectInfo(I, 2, try A.callManaged(f64, I, level, rig.context, &rig.services, .{ .layout = layout, .n = 3, .a = &a, .lda = 4, .pivots = null, .work = &work, .lwork = 3 }));
         try s.bytes(&before, &a);
         const expected = @as(usize, if (level == .high) 1 else 0) + @as(usize, if (layout == 101) 1 else 0);
         try std.testing.expectEqual(expected, rig.x.attempts);
@@ -291,7 +291,7 @@ test "GETRI every public transpose and wide allocation failure releases captured
             const public_failure = high and fail_at == 0;
             const transpose_failure = layout == 101 and fail_at == @as(usize, if (high) 1 else 0);
             const expected: i64 = if (transpose_failure) -1011 else -1010;
-            try s.expectInfo(i64, expected, try A.callManaged(f64, i64, level, &rig.context, &rig.services, .{ .layout = layout, .n = 2, .a = &a, .lda = 2, .pivots = &pivots, .work = &work, .lwork = 2 }));
+            try s.expectInfo(i64, expected, try A.callManaged(f64, i64, level, rig.context, &rig.services, .{ .layout = layout, .n = 2, .a = &a, .lda = 2, .pivots = &pivots, .work = &work, .lwork = 2 }));
             try s.bytes(&before, &a);
             try std.testing.expectEqual(fail_at + 1, rig.x.attempts);
             try std.testing.expectEqual(fail_at, rig.x.frees);
@@ -327,7 +327,7 @@ test "GETRI high query and execution retain one allocator and admission through 
         const pivots = [_]i64{ 1, -999 };
         rig.b = &a;
         rig.free_observer = expectCompleteAtFree;
-        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .n = 2, .a = &a, .lda = 3, .pivots = &pivots }));
+        try s.expectInfo(i64, 0, try A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .n = 2, .a = &a, .lda = 3, .pivots = &pivots }));
         try std.testing.expectEqual(error.Closing, rig.nested_error.?);
         try std.testing.expectEqual(@as(usize, 1), rig.max_active);
         try std.testing.expectEqual(@as(usize, 3), rig.x.frees);
@@ -348,12 +348,12 @@ test "GETRI pin counter exhaustion is propagated outside INFO at each high row l
     for (0..3) |limit| {
         var rig: h.Rig = .{};
         rig.init();
-        h.C.Context.testing.configure(&rig.context, limit, null);
+        h.C.Context.testing.configure(rig.context, limit, null);
         rig.services.allocator = undefined;
         var a = [_]f64{ 2, 1, 0, 4 };
         const before = a;
         const pivots = [_]i64{ 1, -999 };
-        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .high, &rig.context, &rig.services, .{ .layout = 101, .n = 2, .a = &a, .lda = 2, .pivots = &pivots }));
+        try std.testing.expectError(error.CounterOverflow, A.callManaged(f64, i64, .high, rig.context, &rig.services, .{ .layout = 101, .n = 2, .a = &a, .lda = 2, .pivots = &pivots }));
         try s.bytes(&before, &a);
         try std.testing.expectEqual(limit, rig.x.attempts);
         try std.testing.expectEqual(limit, rig.x.frees);
@@ -376,7 +376,7 @@ test "GETRI returning backend diagnostic keeps transpose pinned and restores log
     rig.b = &a;
     rig.free_observer = expectOriginalAtFree;
     var work = [_]f64{ -7, 99 };
-    try s.expectInfo(i64, -7, try A.callManaged(f64, i64, .work, &rig.context, &rig.services, .{ .layout = 101, .n = 2, .a = &a, .lda = 3, .pivots = null, .work = &work, .lwork = 1 }));
+    try s.expectInfo(i64, -7, try A.callManaged(f64, i64, .work, rig.context, &rig.services, .{ .layout = 101, .n = 2, .a = &a, .lda = 3, .pivots = null, .work = &work, .lwork = 1 }));
     try std.testing.expectEqual(error.Closing, rig.nested_error.?);
     try std.testing.expectEqualSlices(f64, &.{ 2, 99 }, &work);
     try std.testing.expectEqual(@as(usize, 1), rig.x.frees);
@@ -398,7 +398,7 @@ test "GETRI concurrent close waits for full output and all three paused high row
         result: ?A.Result(i64) = null,
         failure: ?anyerror = null,
         fn run(self: *@This()) void {
-            self.result = A.callManaged(f64, i64, .high, &self.rig.context, &self.rig.services, .{ .layout = 101, .n = 2, .a = self.a, .lda = 3, .pivots = self.pivots }) catch |err| {
+            self.result = A.callManaged(f64, i64, .high, self.rig.context, &self.rig.services, .{ .layout = 101, .n = 2, .a = self.a, .lda = 3, .pivots = self.pivots }) catch |err| {
                 self.failure = err;
                 return;
             };
@@ -421,12 +421,12 @@ test "GETRI concurrent close waits for full output and all three paused high row
         }
         h.execution.test_support.wait(&rig.paused);
         try std.testing.expectEqual(h.C.RequestResult.pending, rig.context.requestClose());
-        try std.testing.expectEqual(h.C.CloseResult.busy, rig.context.tryProgressClose());
+        try std.testing.expectEqual(h.C.CloseResult.busy, fixtureProgressClose(rig.context));
         const state = rig.context.snapshot();
         try std.testing.expectEqual(@as(usize, 1), state.active_operations);
         try std.testing.expectEqual(@as(usize, 3), state.resource_pins);
         expectCompleteAtFree(&rig);
-        try std.testing.expectError(error.Closing, owner.Shared.getriRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .n = 0, .a = @ptrFromInt(1), .lda = 1, .pivots = @ptrFromInt(1), .work = @ptrFromInt(1), .lwork = 1 }));
+        try std.testing.expectError(error.Closing, owner.Shared.getriRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .n = 0, .a = @ptrFromInt(1), .lda = 1, .pivots = @ptrFromInt(1), .work = @ptrFromInt(1), .lwork = 1 }));
     }
     try std.testing.expect(call.failure == null);
     try s.expectInfo(i64, 0, call.result.?);
@@ -440,7 +440,7 @@ test "GETRI configured owner and all shared route families keep default and loca
     var rig: h.Rig = .{};
     rig.init();
     _ = rig.context.requestClose();
-    try std.testing.expectError(error.Closing, owner.Shared.getriRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .n = 0, .a = null, .lda = 1, .pivots = null }));
+    try std.testing.expectError(error.Closing, owner.Shared.getriRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .n = 0, .a = null, .lda = 1, .pivots = null }));
     try std.testing.expectEqual(@as(usize, 0), rig.count);
     try rig.done();
     var work = [_]f64{-7};
@@ -470,7 +470,7 @@ test "GETRI managed access and public workspace routes preserve extreme cross en
             var rig: h.Rig = .{};
             rig.init();
             rig.services.allocator = undefined;
-            try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, &rig.context, &rig.services, .{ .layout = layout, .n = 4, .a = if (raw) a[0..].ptr else &a, .lda = 5, .pivots = if (raw) pivots[0..].ptr else &pivots, .work = if (raw) work[0..].ptr else &work, .lwork = 4 }));
+            try s.expectInfo(I, 0, try Adapter.callManaged(T, I, level, rig.context, &rig.services, .{ .layout = layout, .n = 4, .a = if (raw) a[0..].ptr else &a, .lda = 5, .pivots = if (raw) pivots[0..].ptr else &pivots, .work = if (raw) work[0..].ptr else &work, .lwork = 4 }));
             const value = a[s.pos(layout, 3, 0, 5)];
             try std.testing.expectEqual(-small, s.re(T, value));
             try std.testing.expectEqual(if (owner.Core.Scalar.isComplex(T)) -small else @as(f64, 0), s.im(T, value));
@@ -489,7 +489,7 @@ test "GETRI empty row stride and negative size distinguish high query from work 
             rig.init();
             rig.services.allocator = undefined;
             var work = [_]f64{-7};
-            try s.expectInfo(I, 0, try Raw.callManaged(f64, I, level, &rig.context, &rig.services, .{ .layout = 101, .n = 0, .a = @ptrFromInt(1), .lda = 0, .pivots = @ptrFromInt(1), .work = work[0..].ptr, .lwork = 1 }));
+            try s.expectInfo(I, 0, try Raw.callManaged(f64, I, level, rig.context, &rig.services, .{ .layout = 101, .n = 0, .a = @ptrFromInt(1), .lda = 0, .pivots = @ptrFromInt(1), .work = work[0..].ptr, .lwork = 1 }));
             const allocations: usize = if (level == .high) 2 else 1;
             try std.testing.expectEqual(allocations, rig.x.attempts);
             try std.testing.expectEqual(allocations, rig.x.frees);
@@ -501,7 +501,7 @@ test "GETRI empty row stride and negative size distinguish high query from work 
             if (fail) rig.x.fail_at = 0;
             var work = [_]f64{-7};
             const expected: I = if (fail and level == .work) -1011 else -2;
-            try s.expectInfo(I, expected, try A.callManaged(f64, I, level, &rig.context, &rig.services, .{ .layout = 101, .n = -1, .a = null, .lda = 0, .pivots = null, .work = &work, .lwork = 0 }));
+            try s.expectInfo(I, expected, try A.callManaged(f64, I, level, rig.context, &rig.services, .{ .layout = 101, .n = -1, .a = null, .lda = 0, .pivots = null, .work = &work, .lwork = 0 }));
             try std.testing.expectEqual(@as(usize, if (level == .high) 0 else 1), rig.x.attempts);
             try rig.done();
         };
@@ -557,7 +557,7 @@ test "GETRI shared profile defaults capture once across both wide OOM callbacks 
     var a = [_]f64{ 2, 1, 0, 4 };
     const before = a;
     const pivots = [_]i64{ 1, -999 };
-    try s.expectInfo(i64, -1010, try owner.Shared.getriRawManagedWithDefaults(true, f64, i64, .high, &rig.context, .{ .layout = 101, .n = 2, .a = a[0..].ptr, .lda = 2, .pivots = pivots[0..].ptr }, .{ .lapacke = .{ .userdata = &recorder, .function = Recorder.event } }));
+    try s.expectInfo(i64, -1010, try owner.Shared.getriRawManagedWithDefaults(true, f64, i64, .high, rig.context, .{ .layout = 101, .n = 2, .a = a[0..].ptr, .lda = 2, .pivots = pivots[0..].ptr }, .{ .lapacke = .{ .userdata = &recorder, .function = Recorder.event } }));
     try s.bytes(&before, &a);
     try std.testing.expectEqual(@as(usize, 2), recorder.calls);
     try std.testing.expectEqual(@as(usize, 1), cfg.testing.snapshot().captures);
@@ -570,8 +570,8 @@ test "GETRI shared profile defaults capture once across both wide OOM callbacks 
     };
     _ = cfg.setCallbacks(.{});
     var work = [_]f64{-7};
-    try s.expectInfo(i64, 0, try owner.Shared.getriRawManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .n = 0, .a = @ptrFromInt(1), .lda = 1, .pivots = @ptrFromInt(1), .work = work[0..].ptr, .lwork = 1 }));
-    try s.expectInfo(i64, 0, try owner.Shared.getriManaged(false, f64, i64, .work, &rig.context, .{ .layout = 102, .n = 0, .a = null, .lda = 1, .pivots = null, .work = &work, .lwork = 1 }));
+    try s.expectInfo(i64, 0, try owner.Shared.getriRawManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .n = 0, .a = @ptrFromInt(1), .lda = 1, .pivots = @ptrFromInt(1), .work = work[0..].ptr, .lwork = 1 }));
+    try s.expectInfo(i64, 0, try owner.Shared.getriManaged(false, f64, i64, .work, rig.context, .{ .layout = 102, .n = 0, .a = null, .lda = 1, .pivots = null, .work = &work, .lwork = 1 }));
     try std.testing.expectEqual(@as(usize, 3), cfg.testing.snapshot().captures);
     try std.testing.expectEqual(@as(usize, 1), cfg.testing.snapshot().getter_calls);
     var admissions: usize = 0;
@@ -583,4 +583,9 @@ test "GETRI shared profile defaults capture once across both wide OOM callbacks 
     try std.testing.expectEqual(@as(usize, 3), admissions);
     try std.testing.expectEqual(@as(usize, 3), finishes);
     try rig.done();
+}
+
+fn fixtureProgressClose(ctx: *@import("managed_support.zig").Core.Execution.Context) @import("managed_support.zig").Core.Execution.CloseResult {
+    var report: @import("managed_support.zig").Core.Execution.CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

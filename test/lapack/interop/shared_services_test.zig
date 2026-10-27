@@ -30,7 +30,7 @@ test "shared config default routes retain actual owner identities across all sca
             @compileError("shared services require the actual injected owner");
     }
     try std.testing.expect(Core.Execution.getContext() == actual_execution.getContext());
-    try std.testing.expect(Core.Execution.get() == &actual_execution.getContext().executor);
+    try std.testing.expect(Core.Execution.get() == fixtureExecutor(actual_execution.getContext()));
     const before = actual_execution.getContext().snapshot();
     const identity = cfg.testing.identity();
     cfg.setNancheck(0);
@@ -51,7 +51,7 @@ test "shared config default routes retain actual owner identities across all sca
     try std.testing.expectEqual(@as(usize, 0), stats.environment_reads);
     const after = actual_execution.getContext().snapshot();
     try std.testing.expectEqual(before, after);
-    try std.testing.expectEqual(C.Lifetime.immortal_default, actual_execution.getContext().lifetime);
+    try std.testing.expectEqual(@import("zynum-execution").reference.LegacyLifetime.immortal_default, actual_execution.getContext().binding.legacy.lifetime);
 }
 
 test "shared NaN state reads the real stable environment once and setter avoids initialization" {
@@ -124,9 +124,9 @@ test "shared service capture does not read NaN until the original valid high ent
         r.init();
         defer r.done() catch @panic("cleanup");
         var a = [_]f64{4};
-        try h.info(i64, try Shared.factorManaged(scan, f64, i64, level, &r.context, h.fargs(&a)), 0);
+        try h.info(i64, try Shared.factorManaged(scan, f64, i64, level, r.context, h.fargs(&a)), 0);
         var rhs = [_]f64{12};
-        try h.info(i64, try Shared.solveManaged(scan, f64, i64, level, &r.context, h.sargs(&a, &rhs)), 0);
+        try h.info(i64, try Shared.solveManaged(scan, f64, i64, level, r.context, h.sargs(&a, &rhs)), 0);
         try std.testing.expectEqual(@as(f64, 3), rhs[0]);
         const stats = cfg.testing.snapshot();
         const reads: usize = if (scan and level == .high) 2 else 0;
@@ -139,8 +139,8 @@ test "shared service capture does not read NaN until the original valid high ent
     var r: h.Rig = .{};
     r.init();
     defer r.done() catch @panic("cleanup");
-    try h.info(i64, try Shared.factorManaged(true, f64, i64, .high, &r.context, .{ .layout = -1, .uplo = 'L', .n = 1, .lda = 1, .values = null }), -1);
-    try h.info(i64, try Shared.solveManaged(true, f64, i64, .high, &r.context, .{ .layout = -1, .uplo = 'L', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = null }), -1);
+    try h.info(i64, try Shared.factorManaged(true, f64, i64, .high, r.context, .{ .layout = -1, .uplo = 'L', .n = 1, .lda = 1, .values = null }), -1);
+    try h.info(i64, try Shared.solveManaged(true, f64, i64, .high, r.context, .{ .layout = -1, .uplo = 'L', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = null }), -1);
     try std.testing.expectEqual(@as(usize, 2), cfg.testing.snapshot().captures);
     try std.testing.expectEqual(@as(usize, 0), cfg.testing.snapshot().getter_calls);
     try std.testing.expect(!cfg.testing.snapshot().initialized);
@@ -215,11 +215,11 @@ test "shared begin refusal precedes configuration capture getter and allocation"
     var r: h.Rig = .{};
     r.init();
     defer r.done() catch @panic("cleanup");
-    C.Context.testing.configure(&r.context, 0, null);
-    try std.testing.expectError(error.CounterOverflow, Shared.factorManaged(true, f64, i64, .high, &r.context, h.fargs(null)));
-    C.Context.testing.configure(&r.context, 1, null);
+    C.Context.testing.configure(r.context, 0, null);
+    try std.testing.expectError(error.CounterOverflow, Shared.factorManaged(true, f64, i64, .high, r.context, h.fargs(null)));
+    C.Context.testing.configure(r.context, 1, null);
     _ = r.context.requestClose();
-    try std.testing.expectError(error.Closing, Shared.solveManaged(true, f64, i64, .high, &r.context, h.sargs(null, null)));
+    try std.testing.expectError(error.Closing, Shared.solveManaged(true, f64, i64, .high, r.context, h.sargs(null, null)));
     try std.testing.expectEqual(@as(usize, 0), cfg.testing.snapshot().captures);
     try std.testing.expectEqual(@as(usize, 0), cfg.testing.snapshot().getter_calls);
     try std.testing.expectEqual(@as(usize, 0), cfg.testing.snapshot().environment_reads);
@@ -238,9 +238,9 @@ test "shared row OOM retains real allocation and reverse cleanup before the C ho
         var a = [_]f64{2};
         var b = [_]f64{12};
         if (solve) {
-            try h.info(i64, try Shared.solveManaged(true, f64, i64, .work, &r.context, h.sargs(&a, &b)), -1011);
+            try h.info(i64, try Shared.solveManaged(true, f64, i64, .work, r.context, h.sargs(&a, &b)), -1011);
         } else {
-            try h.info(i64, try Shared.factorManaged(true, f64, i64, .work, &r.context, h.fargs(&a)), -1011);
+            try h.info(i64, try Shared.factorManaged(true, f64, i64, .work, r.context, h.fargs(&a)), -1011);
         }
         try std.testing.expectEqual(@as(usize, if (solve) 2 else 1), r.x.attempts);
         try std.testing.expectEqual(@as(usize, if (solve) 1 else 0), r.x.frees);
@@ -267,10 +267,10 @@ test "shared second scratch pin overflow frees the first lease without a standar
     r.init();
     defer r.done() catch @panic("cleanup");
     bindRig(&r);
-    C.Context.testing.configure(&r.context, 1, null);
+    C.Context.testing.configure(r.context, 1, null);
     var a = [_]f64{2};
     var b = [_]f64{12};
-    try std.testing.expectError(error.CounterOverflow, Shared.solveManaged(true, f64, i64, .work, &r.context, h.sargs(&a, &b)));
+    try std.testing.expectError(error.CounterOverflow, Shared.solveManaged(true, f64, i64, .work, r.context, h.sargs(&a, &b)));
     try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 1), r.x.frees);
     try std.testing.expectEqual(@as(usize, 0), r.hooks);
@@ -285,7 +285,7 @@ test "shared first scratch pin overflow does not allocate and empty row calls re
     r.init();
     defer r.done() catch @panic("cleanup");
     bindRig(&r);
-    C.Context.testing.configure(&r.context, 1, null);
+    C.Context.testing.configure(r.context, 1, null);
     {
         var operation = try r.context.begin();
         var held = C.ContextScratch(u8).acquire(&operation, 1) catch |err| {
@@ -295,17 +295,17 @@ test "shared first scratch pin overflow does not allocate and empty row calls re
         operation.end();
         defer held.deinit();
         var a = [_]f64{4};
-        try std.testing.expectError(error.CounterOverflow, Shared.factorManaged(true, f64, i64, .work, &r.context, h.fargs(&a)));
+        try std.testing.expectError(error.CounterOverflow, Shared.factorManaged(true, f64, i64, .work, r.context, h.fargs(&a)));
         try std.testing.expectEqual(@as(usize, 1), r.x.attempts);
         try std.testing.expectEqual(@as(usize, 0), r.hooks);
         try std.testing.expectEqual(@as(usize, 1), r.context.snapshot().resource_pins);
     }
-    C.Context.testing.configure(&r.context, std.math.maxInt(usize), null);
+    C.Context.testing.configure(r.context, std.math.maxInt(usize), null);
     const attempts = r.x.attempts;
     for ([_]c_int{ 101, 102 }) |layout| {
         const ld: i64 = if (layout == 101) 0 else 1;
-        try h.info(i64, try Shared.factorManaged(true, f64, i64, .work, &r.context, .{ .layout = layout, .uplo = 'L', .n = 0, .lda = ld, .values = null }), 0);
-        try h.info(i64, try Shared.solveManaged(true, f64, i64, .work, &r.context, .{ .layout = layout, .uplo = 'L', .n = 0, .nrhs = 0, .lda = ld, .ldb = ld, .a = null, .b = null }), 0);
+        try h.info(i64, try Shared.factorManaged(true, f64, i64, .work, r.context, .{ .layout = layout, .uplo = 'L', .n = 0, .lda = ld, .values = null }), 0);
+        try h.info(i64, try Shared.solveManaged(true, f64, i64, .work, r.context, .{ .layout = layout, .uplo = 'L', .n = 0, .nrhs = 0, .lda = ld, .ldb = ld, .a = null, .b = null }), 0);
     }
     try std.testing.expectEqual(attempts + 3, r.x.attempts);
     try std.testing.expectEqual(r.x.attempts, r.x.frees);
@@ -332,7 +332,7 @@ const Reentrant = struct {
         check(cfg.getNancheck() == 1);
         if (self.close_first) {
             check(self.context.requestClose() == .pending);
-            check(self.context.tryProgressClose() == .busy);
+            check(fixtureProgressClose(self.context) == .busy);
         }
         const value: *[1]f64 = @ptrCast(&self.nested_value);
         const factor = Shared.factorManaged(true, f64, i64, .high, self.context, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = 1, .values = value }) catch |err| {
@@ -355,12 +355,12 @@ test "shared callback replacement and finite reentry keep outer snapshot and one
         var r: h.Rig = .{};
         r.init();
         defer r.done() catch @panic("cleanup");
-        var callback = Reentrant{ .context = &r.context, .close_first = close_first };
+        var callback = Reentrant{ .context = r.context, .close_first = close_first };
         _ = cfg.setCallbacks(.{ .fortran_returning_test = .{ .userdata = &callback, .function = Reentrant.original } });
         var a = [_]f64{4};
         var args = h.fargs(&a);
         args.uplo = '?';
-        try h.info(i64, try Shared.factorManaged(true, f64, i64, .work, &r.context, args), -2);
+        try h.info(i64, try Shared.factorManaged(true, f64, i64, .work, r.context, args), -2);
         try std.testing.expectEqual(@as(usize, 1), callback.old_calls);
         try std.testing.expectEqual(@as(usize, if (close_first) 0 else 1), callback.new_calls);
         try std.testing.expectEqual(@as(f64, if (close_first) 4 else 2), callback.nested_value);
@@ -427,11 +427,13 @@ test "shared captured userdata survives replacement while real allocation or fre
     for ([_]bool{ false, true }) |pause_free| {
         reset();
         var allocator = PausingAllocator{ .pause_free = pause_free };
-        var context = C.Context.init(allocator.allocator(), Core.Execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(allocator.allocator(), Core.Execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var old = Events{ .kind = .fortran_returning_test };
         var new = Events{ .kind = .fortran_returning_test };
         _ = cfg.setCallbacks(.{ .fortran_returning_test = old.callback() });
-        var worker = Worker{ .context = &context };
+        var worker = Worker{ .context = context };
         const thread = try std.Thread.spawn(.{}, Worker.run, .{&worker});
         {
             defer {
@@ -445,7 +447,7 @@ test "shared captured userdata survives replacement while real allocation or fre
             try std.testing.expectEqual(@as(usize, 1), snapshot.active_operations);
             try std.testing.expectEqual(@as(usize, 1), snapshot.resource_pins);
             try std.testing.expectEqual(C.RequestResult.pending, context.requestClose());
-            try std.testing.expectEqual(C.CloseResult.busy, context.tryProgressClose());
+            try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(context));
             try std.testing.expectEqual(@as(usize, 1), cfg.testing.snapshot().captures);
         }
         // Old/new userdata are still alive here; replacing the tuple did not
@@ -456,7 +458,7 @@ test "shared captured userdata survives replacement while real allocation or fre
         try std.testing.expectEqual(@as(usize, 0), new.calls);
         try std.testing.expectEqual(@as(usize, 1), allocator.backing.attempts);
         try std.testing.expectEqual(@as(usize, 1), allocator.backing.frees);
-        try std.testing.expectEqual(C.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(context));
     }
 }
 
@@ -534,8 +536,8 @@ test "shared managed engines match original managed full padded real and complex
             const fa: h.F.Arguments(T, I) = .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a };
             var fb = fa;
             fb.values = &other;
-            try h.info(I, try h.F.callManaged(T, I, .high, &r.context, &r.services, fa), 0);
-            try h.info(I, try Shared.factorManaged(true, T, I, .high, &r.context, fb), 0);
+            try h.info(I, try h.F.callManaged(T, I, .high, r.context, &r.services, fa), 0);
+            try h.info(I, try Shared.factorManaged(true, T, I, .high, r.context, fb), 0);
             try s.bytes(&a, &other);
             var rhs: [6]T = @splat(s.value(T, 83, -7));
             rhs[s.pos(layout, 0, 0, 3)] = s.value(T, 10, 2);
@@ -543,8 +545,8 @@ test "shared managed engines match original managed full padded real and complex
             rhs[s.pos(layout, 0, 1, 3)] = s.value(T, -6, 1);
             rhs[s.pos(layout, 1, 1, 3)] = s.value(T, 12, 3);
             var rhs2 = rhs;
-            try h.info(I, try h.S.callManaged(T, I, .work, &r.context, &r.services, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &a, .b = &rhs }), 0);
-            try h.info(I, try Shared.solveManaged(true, T, I, .work, &r.context, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &other, .b = &rhs2 }), 0);
+            try h.info(I, try h.S.callManaged(T, I, .work, r.context, &r.services, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &a, .b = &rhs }), 0);
+            try h.info(I, try Shared.solveManaged(true, T, I, .work, r.context, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &other, .b = &rhs2 }), 0);
             try s.bytes(&rhs, &rhs2);
             try s.bytes(&a, &other);
             try std.testing.expectEqual(@as(usize, 0), r.y.attempts);
@@ -615,4 +617,16 @@ test "two profiles with null shared configuration keep independent defaults" {
     try std.testing.expectEqual(@as(usize, 2), first.calls);
     try std.testing.expectEqual(@as(usize, 1), second.calls);
     try std.testing.expect(cfg.captureCallbacks().lapacke == null);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn fixtureExecutor(ctx: *@import("zynum-execution").Context) *@import("zynum-execution").reference.owner.Executor {
+    const fixture_execution = @import("zynum-execution");
+    if (ctx == fixture_execution.reference.getContext()) return @ptrCast(@alignCast(ctx.binding.legacy.userdata));
+    const wrapper: *FixtureReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
 }

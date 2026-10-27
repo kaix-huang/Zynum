@@ -24,7 +24,7 @@ const Probe = struct {
         self.alloc_snapshot = self.owner.snapshot();
         if (self.close_on_alloc) {
             _ = self.owner.requestClose();
-            if (self.owner.tryProgressClose() != .busy) @panic("FFT allocation is not admitted");
+            if (fixtureProgressClose(self.owner) != .busy) @panic("FFT allocation is not admitted");
         }
         return self.backing.allocator().rawAlloc(n, a, ret);
     }
@@ -37,24 +37,28 @@ const Probe = struct {
     fn free(raw: *anyopaque, data: []u8, a: std.mem.Alignment, ret: usize) void {
         const self = cast(raw);
         self.free_snapshot = self.owner.snapshot();
-        if (self.owner.tryProgressClose() == .closed) @panic("FFT close passed managed free");
+        if (fixtureProgressClose(self.owner) == .closed) @panic("FFT close passed managed free");
         self.backing.allocator().rawFree(data, a, ret);
     }
 };
 fn finish(owner: *context.Context) !void {
     _ = owner.requestClose();
-    try E.expectEqual(context.CloseResult.closed, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.closed, fixtureProgressClose(owner));
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
 }
 test "FFT scratch pins the exact owner before callbacks and frees before ending one operation" {
     var probe: Probe = .{ .close_on_alloc = true };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
-    var other = context.Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
+    var reference_other: FixtureReferenceContext = undefined;
+    reference_other.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const other = reference_other.borrowedContext();
     const plan = try facade.core.ComplexPlan.init(3, .forward);
     const input = [_]C{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 0 }, .{ .re = 3, .im = 0 } };
     var output: [3]C = undefined;
-    try M.runScratch(.complex, C, &owner, plan, &input, &output);
+    try M.runScratch(.complex, C, owner, plan, &input, &output);
     try E.expectApproxEqAbs(@as(f64, 6), output[0].re, 1e-12);
     try E.expectEqual(@as(usize, 1), probe.alloc_snapshot.?.active_operations);
     try E.expectEqual(@as(usize, 1), probe.alloc_snapshot.?.resource_pins);
@@ -64,36 +68,42 @@ test "FFT scratch pins the exact owner before callbacks and frees before ending 
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), other.snapshot().active_operations);
     try E.expectEqual(@as(usize, 1), probe.backing.stats().freed);
-    try E.expectError(error.Closing, M.runScratch(.complex, C, &owner, plan, &input, &output));
-    try finish(&owner);
-    try finish(&other);
+    try E.expectError(error.Closing, M.runScratch(.complex, C, owner, plan, &input, &output));
+    try finish(owner);
+    try finish(other);
 }
 test "FFT allocation and numerical failures unwind the resource and preserve output" {
     var probe: Probe = .{ .backing = .{ .budget = 0 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     const plan = try facade.core.ComplexPlan.init(3, .forward);
     var input = [_]C{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 0 }, .{ .re = 3, .im = 0 } };
     var output: [3]C = @splat(.{ .re = 123, .im = 456 });
-    try E.expectError(error.OutOfMemory, M.runScratch(.complex, C, &owner, plan, &input, &output));
+    try E.expectError(error.OutOfMemory, M.runScratch(.complex, C, owner, plan, &input, &output));
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
-    try finish(&owner);
+    try finish(owner);
     var allocated: Probe = .{};
-    var good = context.Context.init(allocated.allocator(), fixture.policy, .internal_closable);
-    allocated.owner = &good;
+    var reference_good: FixtureReferenceContext = undefined;
+    reference_good.initInPlace(allocated.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const good = reference_good.borrowedContext();
+    allocated.owner = good;
     input[0].re = std.math.nan(f64);
-    try E.expectError(error.NonFiniteInput, M.runScratch(.complex, C, &good, plan, &input, &output));
+    try E.expectError(error.NonFiniteInput, M.runScratch(.complex, C, good, plan, &input, &output));
     try E.expectEqual(@as(usize, 1), allocated.backing.stats().freed);
     for (output) |x| try E.expectEqual(@as(f64, 123), x.re);
     try E.expectEqual(@as(usize, 0), good.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), good.snapshot().resource_pins);
-    try finish(&good);
+    try finish(good);
 }
 test "FFT admitted workspace remains usable after close request without nested admission or pin" {
     var probe: Probe = .{ .backing = .{ .budget = 0 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     var op = try owner.begin();
     _ = owner.requestClose();
     const plan = try facade.core.ComplexPlan.init(2, .forward);
@@ -105,13 +115,15 @@ test "FFT admitted workspace remains usable after close request without nested a
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), probe.backing.stats().attempts);
-    try E.expectError(error.Closing, M.runBorrowed(.complex, C, &owner, plan, &input, &output, &work));
+    try E.expectError(error.Closing, M.runBorrowed(.complex, C, owner, plan, &input, &output, &work));
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 test "FFT managed facade dispatches all eight transform actions through one shared context" {
     inline for (comptime std.meta.tags(facade.Action)) |action| {
-        var owner = context.Context.init(std.testing.allocator, fixture.policy, .internal_closable);
+        var reference_owner: FixtureReferenceContext = undefined;
+        reference_owner.initInPlace(std.testing.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const owner = reference_owner.borrowedContext();
         const plan: facade.Plan(action) = switch (action) {
             .complex => try facade.core.ComplexPlan.init(3, .forward),
             .real_forward, .real_backward => try facade.core.RealPlan.init(3),
@@ -124,21 +136,23 @@ test "FFT managed facade dispatches all eight transform actions through one shar
         var input: [3]facade.Input(action, C) = undefined;
         for (&input) |*v| v.* = if (@TypeOf(v.*) == C) .{ .re = 1, .im = 0 } else 1;
         var output: [3]facade.Output(action, C) = undefined;
-        try M.runScratch(action, C, &owner, plan, &input, &output);
+        try M.runScratch(action, C, owner, plan, &input, &output);
         try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
         try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
-        try finish(&owner);
+        try finish(owner);
     }
 }
 test "FFT admission and resource counter exhaustion preserve existing caller lifetimes" {
     var probe: Probe = .{ .backing = .{ .budget = 0 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     owner.test_state.limit = 0;
     const plan = try facade.core.ComplexPlan.init(2, .forward);
     const input = [_]C{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 0 } };
     var output: [2]C = @splat(.{ .re = 123, .im = 456 });
-    try E.expectError(error.CounterOverflow, M.runScratch(.complex, C, &owner, plan, &input, &output));
+    try E.expectError(error.CounterOverflow, M.runScratch(.complex, C, owner, plan, &input, &output));
     try E.expectEqual(@as(usize, 0), probe.backing.stats().attempts);
     owner.test_state.limit = 1;
     var op = try owner.begin();
@@ -154,7 +168,7 @@ test "FFT admission and resource counter exhaustion preserve existing caller lif
     try E.expectEqual(@as(usize, 1), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     op.end();
-    try finish(&owner);
+    try finish(owner);
 }
 
 test "FFT facade borrows the actual Core scalar execution and default identities" {
@@ -163,7 +177,7 @@ test "FFT facade borrows the actual Core scalar execution and default identities
         if (Execution != actual or context.Operation != actual.context.Operation) @compileError("FFT execution owner mismatch");
     }
     try E.expect(Execution.getContext() == actual.getContext());
-    try E.expectEqual(context.Lifetime.immortal_default, actual.getContext().lifetime);
+    try E.expectEqual(@import("zynum-execution").reference.LegacyLifetime.immortal_default, actual.getContext().binding.legacy.lifetime);
     const p = try facade.core.ComplexPlan.init(1, .forward);
     const x = [_]C{.{ .re = 2, .im = 3 }};
     var y: [1]C = undefined;
@@ -176,9 +190,11 @@ test "FFT facade borrows the actual Core scalar execution and default identities
 const D = facade.Persistent(Execution, C);
 test "FFT persistent metadata owns one original ContextScratch pin across operations" {
     var probe: Probe = .{};
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
-    var descriptor = try D.create(&owner, .{ .complex_1d = 3 });
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
+    var descriptor = try D.create(owner, .{ .complex_1d = 3 });
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try E.expectEqual(@as(usize, 1), owner.snapshot().resource_pins);
     const input = [_]C{ .{ .re = 1, .im = 0 }, .{ .re = 2, .im = 0 }, .{ .re = 3, .im = 0 } };
@@ -197,14 +213,16 @@ test "FFT persistent metadata owns one original ContextScratch pin across operat
     try E.expectEqual(@as(usize, 1), owner.snapshot().resource_pins);
     try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     _ = owner.requestClose();
-    try E.expectEqual(context.CloseResult.waiting_resources, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.waiting_resources, fixtureProgressClose(owner));
     descriptor.deinit();
     try E.expectEqual(@as(usize, 3), probe.backing.stats().freed);
-    try finish(&owner);
+    try finish(owner);
 }
 test "FFT descriptor reconfiguration is transactional and invalidates successful commit" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
-    var descriptor = try D.create(&owner, .{ .complex_1d = 2 });
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    var descriptor = try D.create(owner, .{ .complex_1d = 2 });
     try descriptor.commit();
     var op = try owner.begin();
     try E.expectError(error.InvalidLength, descriptor.reconfigureAdmitted(&op, .{ .real_1d = 0 }));
@@ -225,15 +243,17 @@ test "FFT descriptor reconfiguration is transactional and invalidates successful
     try E.expectError(error.WrongTransform, descriptor.runBorrowedAdmitted(.complex_forward, &op, &cx, &y, &work));
     op.end();
     descriptor.deinit();
-    try finish(&owner);
+    try finish(owner);
 }
 test "FFT descriptor invalid geometry allocation rejection and pin exhaustion unwind independently" {
     var probe: Probe = .{ .backing = .{ .budget = 0 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
-    try E.expectError(error.InvalidLength, D.create(&owner, .{ .cosine_1d = 1 }));
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
+    try E.expectError(error.InvalidLength, D.create(owner, .{ .cosine_1d = 1 }));
     try E.expectEqual(@as(usize, 0), probe.backing.stats().attempts);
-    try E.expectError(error.OutOfMemory, D.create(&owner, .{ .complex_1d = 2 }));
+    try E.expectError(error.OutOfMemory, D.create(owner, .{ .complex_1d = 2 }));
     try E.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     owner.test_state.limit = 1;
     var op = try owner.begin();
@@ -244,13 +264,15 @@ test "FFT descriptor invalid geometry allocation rejection and pin exhaustion un
     pin.releaseAfterResourceFree();
     op.end();
     owner.test_state.limit = 0;
-    try E.expectError(error.CounterOverflow, D.create(&owner, .{ .complex_1d = 2 }));
-    try finish(&owner);
+    try E.expectError(error.CounterOverflow, D.create(owner, .{ .complex_1d = 2 }));
+    try finish(owner);
 }
 test "FFT descriptor callback close preserves admitted execution and frees metadata before its pin" {
     var probe: Probe = .{ .close_on_alloc = true };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
     var op = try owner.begin();
     var descriptor = try D.createAdmitted(&op, .{ .complex_1d = 2 });
     try E.expectEqual(@as(usize, 1), probe.alloc_snapshot.?.resource_pins);
@@ -265,20 +287,24 @@ test "FFT descriptor callback close preserves admitted execution and frees metad
     try E.expectError(error.Closing, descriptor.commit());
     try E.expectError(error.Closing, descriptor.runBorrowed(.complex_forward, &input, &output, &work));
     op.end();
-    try E.expectEqual(context.CloseResult.waiting_resources, owner.tryProgressClose());
+    try E.expectEqual(context.CloseResult.waiting_resources, fixtureProgressClose(owner));
     descriptor.deinit();
     try E.expectEqual(@as(usize, 0), probe.free_snapshot.?.active_operations);
     try E.expectEqual(@as(usize, 1), probe.free_snapshot.?.resource_pins);
-    try finish(&owner);
+    try finish(owner);
 }
 test "FFT descriptor rejects another owner and retains its captured metadata allocator" {
     var first: Probe = .{};
     var second: Probe = .{};
-    var owner = context.Context.init(first.allocator(), fixture.policy, .internal_closable);
-    var other = context.Context.init(second.allocator(), fixture.policy, .internal_closable);
-    first.owner = &owner;
-    second.owner = &other;
-    var descriptor = try D.create(&owner, .{ .complex_1d = 2 });
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(first.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    var reference_other: FixtureReferenceContext = undefined;
+    reference_other.initInPlace(second.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const other = reference_other.borrowedContext();
+    first.owner = owner;
+    second.owner = other;
+    var descriptor = try D.create(owner, .{ .complex_1d = 2 });
     var wrong = try other.begin();
     try E.expectError(error.ContextMismatch, descriptor.commitAdmitted(&wrong));
     try E.expectError(error.ContextMismatch, descriptor.reconfigureAdmitted(&wrong, .{ .complex_1d = 3 }));
@@ -290,21 +316,23 @@ test "FFT descriptor rejects another owner and retains its captured metadata all
     wrong.end();
     try descriptor.commit();
     // Deliberate fixture mutation verifies every allocation's captured owner.
-    second.owner = &owner;
-    owner.allocator = second.allocator();
+    second.owner = owner;
+    fixtureReplaceAllocator(&reference_owner, second.allocator());
     try descriptor.runScratch(.complex_forward, &input, &output);
     try E.expectEqual(@as(usize, 1), second.backing.stats().freed);
     _ = owner.requestClose();
     descriptor.deinit();
     try E.expectEqual(@as(usize, 1), first.backing.stats().freed);
     try E.expectEqual(@as(usize, 1), first.free_snapshot.?.resource_pins);
-    try finish(&owner);
-    try finish(&other);
+    try finish(owner);
+    try finish(other);
 }
 test "FFT descriptor dispatches all nine directions and both complex precisions with preserved tails" {
     inline for (.{ Core.internal.numerics.Scalar.ComplexF32, C }) |Scalar| {
         inline for (comptime std.meta.tags(facade.Transform)) |transform| {
-            var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
+            var reference_owner: FixtureReferenceContext = undefined;
+            reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+            const owner = reference_owner.borrowedContext();
             const geometry: facade.Geometry = switch (transform) {
                 .complex_forward, .complex_backward => .{ .complex_1d = 3 },
                 .real_forward, .real_backward => .{ .real_1d = 3 },
@@ -312,7 +340,7 @@ test "FFT descriptor dispatches all nine directions and both complex precisions 
                 .volume_forward, .volume_backward => .{ .complex_3d = .{ 1, 1, 3 } },
                 .volume_real_forward, .volume_real_backward => .{ .real_3d = .{ 1, 1, 3 } },
             };
-            var descriptor = try facade.Persistent(Execution, Scalar).create(&owner, geometry);
+            var descriptor = try facade.Persistent(Execution, Scalar).create(owner, geometry);
             try descriptor.commit();
             const In = facade.Input(facade.actionFor(transform), Scalar);
             const Out = facade.Output(facade.actionFor(transform), Scalar);
@@ -329,13 +357,15 @@ test "FFT descriptor dispatches all nine directions and both complex precisions 
             try E.expectEqual(@as(usize, 1), owner.snapshot().resource_pins);
             try E.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
             descriptor.deinit();
-            try finish(&owner);
+            try finish(owner);
         }
     }
 }
 test "FFT descriptor protects heap metadata and affine lease bookkeeping from buffer writes" {
-    var owner = context.Context.init(E.allocator, fixture.policy, .internal_closable);
-    var descriptor: D align(16) = try D.create(&owner, .{ .complex_1d = 1 });
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(E.allocator, fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    var descriptor: D align(16) = try D.create(owner, .{ .complex_1d = 1 });
     try descriptor.commit();
     var op = try owner.begin();
     const input = [_]C{.{ .re = 2, .im = 3 }};
@@ -353,13 +383,15 @@ test "FFT descriptor protects heap metadata and affine lease bookkeeping from bu
     try E.expectEqual(@as(f64, 2), output[0].re);
     op.end();
     descriptor.deinit();
-    try finish(&owner);
+    try finish(owner);
 }
 test "FFT descriptor failed execution preserves metadata output tails and workspace resource balance" {
     var probe: Probe = .{ .backing = .{ .budget = 2 } };
-    var owner = context.Context.init(probe.allocator(), fixture.policy, .internal_closable);
-    probe.owner = &owner;
-    var descriptor = try D.create(&owner, .{ .complex_1d = 2 });
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(probe.allocator(), fixture.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    probe.owner = owner;
+    var descriptor = try D.create(owner, .{ .complex_1d = 2 });
     try descriptor.commit();
     var input = [_]C{ .{ .re = std.math.nan(f64), .im = 0 }, .{ .re = 2, .im = 0 } };
     var output: [3]C = @splat(.{ .re = 999, .im = 33 });
@@ -376,5 +408,20 @@ test "FFT descriptor failed execution preserves metadata output tails and worksp
     try E.expectError(error.CounterOverflow, descriptor.runScratchAdmitted(.complex_forward, &op, &input, &output));
     op.end();
     descriptor.deinit();
-    try finish(&owner);
+    try finish(owner);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+
+// These serial FFT fixtures rebind only before the reference Executor owns
+// worker/Io metadata. Keep the original per-allocation provenance assertions.
+fn fixtureReplaceAllocator(wrapper: *FixtureReferenceContext, allocator: std.mem.Allocator) void {
+    if (wrapper.executor.io_init_state.load(.acquire) != 0 or
+        wrapper.executor.persistent_init_state.load(.acquire) != 0)
+        @panic("FFT allocator fixture requires an unused reference Executor");
+    wrapper.executor.allocator = allocator;
 }

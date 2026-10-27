@@ -7,14 +7,15 @@ const S = @import("../blas/core/shared/scalar.zig");
 const P = @import("synchronization.zig");
 const E = @import("zynum-execution");
 const C = E.context;
-fn context() C.Context {
-    return C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+fn context(storage: *FixtureReferenceContext) *C.Context {
+    storage.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    return storage.borrowedContext();
 }
 fn close(owner: *C.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn value(comptime T: type, re: S.Real(T), im: S.Real(T)) T {
     return if (comptime S.isComplex(T)) .{ .re = re, .im = im } else re;
@@ -113,7 +114,7 @@ fn Reducer(comptime T: type) type {
             try std.testing.expectEqual(@as(usize, 8), values.len);
             if (self.close_owner) {
                 _ = owner.requestClose();
-                try std.testing.expectEqual(C.CloseResult.busy, owner.tryProgressClose());
+                try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(owner));
             }
             for (values) |*x| x.* = S.mul(T, S.realScalar(T, self.scale), x.*);
             if (self.fail) {
@@ -131,9 +132,10 @@ test "subspace projection four scalars all layouts match exact weighted complex 
         f.init(yl, zl, hl, sl);
         const before_y = f.y;
         const before_z = f.z;
-        var owner = context();
-        defer close(&owner) catch unreachable;
-        try F.Managed(E).runScratch(T, &owner, f.request());
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
+        try F.Managed(E).runScratch(T, owner, f.request());
         try f.expected(1);
         try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before_y), std.mem.asBytes(&f.y));
         try std.testing.expectEqualSlices(u8, std.mem.asBytes(&before_z), std.mem.asBytes(&f.z));
@@ -143,23 +145,24 @@ test "subspace projection one packed reduction serves both matrices and fails tr
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         var f: Fixture(T) = .{};
         f.init(.row_major, .column_major, .column_major, .row_major);
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var reducer: Reducer(T) = .{ .scale = 2 };
         var r = f.request();
         r.reduction = reducer.borrow();
-        try F.Managed(E).runScratch(T, &owner, r);
+        try F.Managed(E).runScratch(T, owner, r);
         try f.expected(2);
         try std.testing.expectEqual(@as(usize, 1), reducer.calls);
         for (0..2) |fault| {
             f.reset();
             reducer.fail = fault == 0;
             reducer.nan = fault == 1;
-            if (fault == 0) try std.testing.expectError(error.InjectedProjectionReduction, F.Managed(E).runScratch(T, &owner, r)) else try std.testing.expectError(error.NonFiniteReduction, F.Managed(E).runScratch(T, &owner, r));
+            if (fault == 0) try std.testing.expectError(error.InjectedProjectionReduction, F.Managed(E).runScratch(T, owner, r)) else try std.testing.expectError(error.NonFiniteReduction, F.Managed(E).runScratch(T, owner, r));
             try f.unchanged();
             reducer.fail = false;
             reducer.nan = false;
-            try F.Managed(E).runScratch(T, &owner, r);
+            try F.Managed(E).runScratch(T, owner, r);
             try f.expected(2);
         }
     }
@@ -167,54 +170,56 @@ test "subspace projection one packed reduction serves both matrices and fails tr
 test "subspace projection invalid shape metric finite inputs alias and short scratch fail before reduction" {
     var f: Fixture(f64) = .{};
     f.init(.row_major, .column_major, .column_major, .row_major);
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var reducer: Reducer(f64) = .{};
     var r = f.request();
     r.reduction = reducer.borrow();
     var work: [26]f64 = undefined;
     var bad = r;
     bad.applied.shape.column_count = 1;
-    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runBorrowed(f64, &owner, bad, &work));
+    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runBorrowed(f64, owner, bad, &work));
     f.weights[1] = -1;
-    try std.testing.expectError(error.InvalidMetric, F.Managed(E).runBorrowed(f64, &owner, r, &work));
+    try std.testing.expectError(error.InvalidMetric, F.Managed(E).runBorrowed(f64, owner, r, &work));
     f.weights[1] = std.math.nan(f64);
-    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runBorrowed(f64, &owner, r, &work));
+    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runBorrowed(f64, owner, r, &work));
     f.weights[1] = 2;
     f.y[offset(f.ys, 2, 1)] = std.math.inf(f64);
-    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runBorrowed(f64, &owner, r, &work));
+    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runBorrowed(f64, owner, r, &work));
     f.y[offset(f.ys, 2, 1)] = 2;
     bad = r;
     bad.overlap = r.hamiltonian;
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(f64, &owner, bad, &work));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(f64, owner, bad, &work));
     bad = r;
     bad.hamiltonian.values = &f.y;
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(f64, &owner, bad, &work));
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(f64, &owner, r, work[0..25]));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(f64, owner, bad, &work));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runBorrowed(f64, owner, r, work[0..25]));
     bad = r;
     bad.hamiltonian.values = &work;
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(f64, &owner, bad, &work));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runBorrowed(f64, owner, bad, &work));
     try std.testing.expectEqual(@as(usize, 0), reducer.calls);
     try f.unchanged();
     try std.testing.expectError(error.SizeOverflow, F.workspaceLength(f64, std.math.maxInt(usize), 2));
     try std.testing.expectError(error.SizeOverflow, F.workspaceLength(f64, 0, std.math.maxInt(usize)));
-    try F.Managed(E).runScratch(f64, &owner, r);
+    try F.Managed(E).runScratch(f64, owner, r);
     try f.expected(1);
 }
 test "subspace projection arithmetic overflow preserves both outputs and releases the operation" {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
         var f: Fixture(T) = .{};
         f.init(.row_major, .column_major, .column_major, .row_major);
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var r = f.request();
         f.y[offset(f.ys, 0, 0)] = value(T, std.math.floatMax(S.Real(T)), 0);
-        try std.testing.expectError(error.NonFiniteReduction, F.Managed(E).runScratch(T, &owner, r));
+        try std.testing.expectError(error.NonFiniteReduction, F.Managed(E).runScratch(T, owner, r));
         try f.unchanged();
         f.init(.row_major, .column_major, .column_major, .row_major);
         f.weights[1] = std.math.floatMax(S.Real(T));
         r = f.request();
-        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, &owner, r));
+        try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runScratch(T, owner, r));
         try f.unchanged();
     }
 }
@@ -228,46 +233,51 @@ test "subspace projection final and local remote rejection preserves both matric
     };
     var f: Fixture(f64) = .{};
     f.init(.row_major, .column_major, .column_major, .row_major);
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     for ([_]P.Stage{ .local_arithmetic, .commit }) |stage| {
         var observer: Observer = .{ .fail_stage = stage };
         var r = f.request();
         r.synchronization = .{ .context = &observer, .agree_fn = Observer.agree };
-        try std.testing.expectError(error.InjectedRemoteProjection, F.Managed(E).runScratch(f64, &owner, r));
+        try std.testing.expectError(error.InjectedRemoteProjection, F.Managed(E).runScratch(f64, owner, r));
         try f.unchanged();
     }
-    try F.Managed(E).runScratch(f64, &owner, f.request());
+    try F.Managed(E).runScratch(f64, owner, f.request());
     try f.expected(1);
 }
 test "subspace projection closing callback and OOM preserve shared owner lifetime" {
     var f: Fixture(f64) = .{};
     f.init(.row_major, .column_major, .column_major, .row_major);
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var reducer: Reducer(f64) = .{ .close_owner = true };
     var r = f.request();
     r.reduction = reducer.borrow();
-    try F.Managed(E).runScratch(f64, &owner, r);
+    try F.Managed(E).runScratch(f64, owner, r);
     try f.expected(1);
-    try std.testing.expectError(error.Closing, F.Managed(E).runScratch(f64, &owner, r));
+    try std.testing.expectError(error.Closing, F.Managed(E).runScratch(f64, owner, r));
     var tracker: E.test_support.Allocations = .{ .budget = 0 };
-    var denied = C.Context.init(tracker.allocator(), E.test_support.policy, .internal_closable);
-    defer close(&denied) catch unreachable;
+    var reference_denied: FixtureReferenceContext = undefined;
+    reference_denied.initInPlace(tracker.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const denied = reference_denied.borrowedContext();
+    defer close(denied) catch unreachable;
     f.reset();
-    try std.testing.expectError(error.OutOfMemory, F.Managed(E).runScratch(f64, &denied, f.request()));
+    try std.testing.expectError(error.OutOfMemory, F.Managed(E).runScratch(f64, denied, f.request()));
     try f.unchanged();
     try std.testing.expectEqual(@as(usize, 0), tracker.stats().accepted);
 }
 test "subspace projection empty column set is no-op while empty shard still participates in reduction" {
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     const shape: D.PanelShape = .{ .row_count = 3, .column_count = 0, .leading_dimension = 0, .layout = .row_major };
     var h = [_]f64{91};
     var s = [_]f64{92};
     const weights = [_]f64{ std.math.nan(f64), -1, std.math.inf(f64) };
     const target: D.PanelShape = .{ .row_count = 0, .column_count = 0, .leading_dimension = 0, .layout = .column_major };
-    try F.Managed(E).runScratch(f64, &owner, .{ .basis = .{ .values = &.{}, .shape = shape }, .applied = .{ .values = &.{}, .shape = shape }, .weights = &weights, .hamiltonian = .{ .values = &h, .shape = target }, .overlap = .{ .values = &s, .shape = target } });
+    try F.Managed(E).runScratch(f64, owner, .{ .basis = .{ .values = &.{}, .shape = shape }, .applied = .{ .values = &.{}, .shape = shape }, .weights = &weights, .hamiltonian = .{ .values = &h, .shape = target }, .overlap = .{ .values = &s, .shape = target } });
     try std.testing.expectEqual(@as(f64, 91), h[0]);
     try std.testing.expectEqual(@as(f64, 92), s[0]);
     const Remote = struct {
@@ -289,7 +299,7 @@ test "subspace projection empty column set is no-op while empty shard still part
     r.applied.values = &.{};
     r.weights = &.{};
     r.reduction = .{ .context = &remote, .reduce_fn = Remote.apply };
-    try F.Managed(E).runScratch(f64, &owner, r);
+    try F.Managed(E).runScratch(f64, owner, r);
     try f.expected(1);
     try std.testing.expectEqual(@as(usize, 1), remote.calls);
 }
@@ -309,11 +319,18 @@ test "subspace projection stable Hermitian average avoids overflowing equal fini
     var dummy: u8 = 0;
     var f: Fixture(f64) = .{};
     f.init(.row_major, .column_major, .column_major, .row_major);
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var r = f.request();
     r.reduction = .{ .context = &dummy, .reduce_fn = Remote.apply };
-    try F.Managed(E).runScratch(f64, &owner, r);
+    try F.Managed(E).runScratch(f64, owner, r);
     try std.testing.expectEqual(std.math.floatMax(f64), f.h[offset(f.hs, 0, 1)]);
     try std.testing.expectEqual(std.math.floatMax(f64), f.h[offset(f.hs, 1, 0)]);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

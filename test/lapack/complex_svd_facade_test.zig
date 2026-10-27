@@ -82,7 +82,7 @@ const Observe = struct {
     var finishes: usize = 0;
     var watch: union(enum) { none, f32: *const f32, f64: *const f64 } = .none;
     fn callback(ctx: *E.context.Context, event: E.context.TestEvent) void {
-        if (ctx != E.getContext() or &ctx.executor != E.get()) @panic("SVD facade changed its configured owner");
+        if (ctx != E.getContext() or fixtureExecutor(ctx) != E.get()) @panic("SVD facade changed its configured owner");
         if (ctx.snapshot().active_operations != 1 or ctx.snapshot().resource_pins != 0) @panic("SVD facade did not borrow exactly one allocation-free operation");
         switch (event) {
             .admitted => entries += 1,
@@ -126,12 +126,13 @@ test "complex SVD facade releases one existing admission on errors empty calls a
 }
 test "complex SVD reconstruction and rank solve borrow a closing caller operation without readmission" {
     const Probe = struct {
-        context: E.context.Context,
+        reference_context: FixtureReferenceContext = undefined,
+        context: *E.context.Context = undefined,
         entries: usize = 0,
         finishes: usize = 0,
         completed: bool = false,
         fn callback(ctx: *E.context.Context, event: E.context.TestEvent) void {
-            const self: *@This() = @fieldParentPtr("context", ctx);
+            const self: *@This() = @fieldParentPtr("reference_context", @as(*FixtureReferenceContext, @fieldParentPtr("context", ctx)));
             if (ctx.snapshot().active_operations != 1 or ctx.snapshot().resource_pins != 0) @panic("pure complex Core changed borrowed lifetime");
             switch (event) {
                 .admitted => self.entries += 1,
@@ -143,8 +144,10 @@ test "complex SVD reconstruction and rank solve borrow a closing caller operatio
         }
     };
     inline for (.{ C32, C64 }) |C| {
-        var probe: Probe = .{ .context = E.context.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable) };
-        E.context.Context.testing.configure(&probe.context, 1, Probe.callback);
+        var probe: Probe = .{};
+        probe.reference_context.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        probe.context = probe.reference_context.borrowedContext();
+        E.context.Context.testing.configure(probe.context, 1, Probe.callback);
         var op = try probe.context.begin();
         var ended = false;
         defer {
@@ -153,10 +156,10 @@ test "complex SVD reconstruction and rank solve borrow a closing caller operatio
                 op.end();
             }
             _ = probe.context.requestClose();
-            _ = probe.context.tryProgressClose();
+            _ = fixtureProgressClose(probe.context);
         }
         try std.testing.expectEqual(E.context.RequestResult.pending, probe.context.requestClose());
-        try std.testing.expectEqual(E.context.CloseResult.busy, probe.context.tryProgressClose());
+        try std.testing.expectEqual(E.context.CloseResult.busy, fixtureProgressClose(probe.context));
         const original = [_]C{value(C, 3, 4)};
         const rhs = [_]C{value(C, 6, 8)};
         var a = original;
@@ -177,13 +180,25 @@ test "complex SVD reconstruction and rank solve borrow a closing caller operatio
         try std.testing.expectEqual(@as(usize, 1), rank.rank);
         try std.testing.expectEqual(@as(usize, 1), probe.entries);
         try std.testing.expectEqual(@as(usize, 0), probe.finishes);
-        try std.testing.expectEqual(E.context.CloseResult.busy, probe.context.tryProgressClose());
+        try std.testing.expectEqual(E.context.CloseResult.busy, fixtureProgressClose(probe.context));
         probe.completed = true;
         op.end();
         ended = true;
         try std.testing.expectEqual(@as(usize, 1), probe.finishes);
-        try std.testing.expectEqual(E.context.CloseResult.closed, probe.context.tryProgressClose());
+        try std.testing.expectEqual(E.context.CloseResult.closed, fixtureProgressClose(probe.context));
         try std.testing.expectError(error.Closing, probe.context.begin());
     }
     try std.testing.expectEqual(@as(usize, 0), E.getContext().snapshot().active_operations);
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
+}
+fn fixtureExecutor(ctx: *@import("zynum-execution").Context) *@import("zynum-execution").reference.owner.Executor {
+    const fixture_execution = @import("zynum-execution");
+    if (ctx == fixture_execution.reference.getContext()) return @ptrCast(@alignCast(ctx.binding.legacy.userdata));
+    const wrapper: *FixtureReferenceContext = @fieldParentPtr("context", ctx);
+    return &wrapper.executor;
 }

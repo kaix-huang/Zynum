@@ -8,14 +8,15 @@ const O = @import("operator.zig");
 const P = @import("synchronization.zig");
 const E = @import("zynum-execution");
 const C = E.context;
-fn context() C.Context {
-    return C.Context.init(std.testing.allocator, E.test_support.policy, .internal_closable);
+fn context(storage: *FixtureReferenceContext) *C.Context {
+    storage.initInPlace(std.testing.allocator, E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    return storage.borrowedContext();
 }
 fn close(owner: *C.Context) !void {
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
     _ = owner.requestClose();
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
 }
 fn value(comptime T: type, re: S.Real(T), im: S.Real(T)) T {
     return if (comptime S.isComplex(T)) .{ .re = re, .im = im } else re;
@@ -51,7 +52,7 @@ fn Backend(comptime T: type) type {
             try std.testing.expectEqual(@as(usize, 1), operation.borrowedContext().snapshot().active_operations);
             if (self.close_at == self.calls) {
                 _ = operation.borrowedContext().requestClose();
-                try std.testing.expectEqual(C.CloseResult.busy, operation.borrowedContext().tryProgressClose());
+                try std.testing.expectEqual(C.CloseResult.busy, fixtureProgressClose(operation.borrowedContext()));
             }
             for (input, output, self.diagonal) |x, *y, lambda| y.* = S.mul(T, S.realScalar(T, lambda), x);
             if (self.calls == self.fail_at) return error.InjectedSeriesSetAction;
@@ -88,10 +89,11 @@ test "series set four scalars ragged coefficients and both panel layouts match i
         const before_out = output;
         const diagonal = [_]R{ -0.85, -0.2, 0.35, 0.9 };
         const input = [_]T{ value(T, 1, 0.25), value(T, 2, -0.5), value(T, -1, 0.75), value(T, 0.5, -0.125) };
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var backend = Backend(T){ .diagonal = &diagonal };
-        try F.Managed(E).runSeriesSetScratch(T, &owner, .{ .action = backend.action(), .input = &input, .coefficients = coeff, .coefficient_counts = &counts, .output = .{ .values = &output, .shape = ys } });
+        try F.Managed(E).runSeriesSetScratch(T, owner, .{ .action = backend.action(), .input = &input, .coefficients = coeff, .coefficient_counts = &counts, .output = .{ .values = &output, .shape = ys } });
         try std.testing.expectEqual(@as(usize, 32), backend.calls);
         for (counts, 0..) |count, j| for (diagonal, input, 0..) |lambda, x, i| try near(T, S.mul(T, polynomial(T, coeff, j, count, lambda), x), output[index(ys, i, j)]);
         for (0..output.len) |p| {
@@ -106,8 +108,9 @@ test "series set four scalars ragged coefficients and both panel layouts match i
 }
 test "series set packs aliased input before committing every output column" {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         const diag = [_]S.Real(T){ -0.5, 0, 0.75 };
         var backend = Backend(T){ .diagonal = &diag };
         const counts = [_]usize{ 3, 6 };
@@ -116,7 +119,7 @@ test "series set packs aliased input before committing every output column" {
         var output = [_]T{ value(T, 1, 0.2), value(T, 2, 0.3), value(T, 3, 0.4), value(T, 94, 0), value(T, 95, 0), value(T, 96, 0), value(T, 97, 0), value(T, 98, 0), value(T, 99, 0), value(T, 100, 0), value(T, 101, 0), value(T, 102, 0) };
         const before = output;
         const shape: D.PanelShape = .{ .row_count = 3, .column_count = 2, .leading_dimension = 4, .layout = .row_major };
-        try F.Managed(E).runSeriesSetScratch(T, &owner, .{ .action = backend.action(), .input = output[0..3], .coefficients = coeff, .coefficient_counts = &counts, .output = .{ .values = &output, .shape = shape } });
+        try F.Managed(E).runSeriesSetScratch(T, owner, .{ .action = backend.action(), .input = output[0..3], .coefficients = coeff, .coefficient_counts = &counts, .output = .{ .values = &output, .shape = shape } });
         for (counts, 0..) |count, j| for (diag, 0..) |lambda, i| try near(T, S.mul(T, polynomial(T, coeff, j, count, lambda), before[i]), output[index(shape, i, j)]);
         for ([_]usize{ 2, 3, 6, 7, 10, 11 }) |p| try std.testing.expectEqualDeep(before[p], output[p]);
     }
@@ -125,8 +128,9 @@ fn smallRequest(backend: *Backend(f64), input: []const f64, coefficients: []cons
     return .{ .action = backend.action(), .input = input, .coefficients = .{ .values = coefficients, .shape = .{ .row_count = 4, .column_count = 2, .leading_dimension = 4, .layout = .column_major } }, .coefficient_counts = counts, .output = .{ .values = output, .shape = .{ .row_count = 2, .column_count = 2, .leading_dimension = 2, .layout = .column_major } } };
 }
 test "series set validates counts finite prefixes geometry scratch aliases and overflow before actions" {
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{ 0.25, 0.5 } };
     const input = [_]f64{ 1, 2 };
     var coefficients = [_]f64{ 1, 0.2, 0.3, 0.4, 1, 0.1, 0.2, 0.3 };
@@ -136,18 +140,18 @@ test "series set validates counts finite prefixes geometry scratch aliases and o
     var work: [15]f64 = undefined;
     var q = smallRequest(&backend, &input, &coefficients, &counts, output[0..4]);
     counts[1] = 0;
-    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runSeriesSetBorrowed(f64, &owner, q, &work));
+    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runSeriesSetBorrowed(f64, owner, q, &work));
     counts[1] = 5;
-    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runSeriesSetBorrowed(f64, &owner, q, &work));
+    try std.testing.expectError(error.InvalidOptions, F.Managed(E).runSeriesSetBorrowed(f64, owner, q, &work));
     counts[1] = 4;
     coefficients[7] = std.math.nan(f64);
-    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runSeriesSetBorrowed(f64, &owner, q, &work));
+    try std.testing.expectError(error.NonFiniteInput, F.Managed(E).runSeriesSetBorrowed(f64, owner, q, &work));
     coefficients[7] = 0.3;
     q.output.shape.column_count = 1;
-    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runSeriesSetBorrowed(f64, &owner, q, &work));
+    try std.testing.expectError(error.DimensionMismatch, F.Managed(E).runSeriesSetBorrowed(f64, owner, q, &work));
     q.output.shape.column_count = 2;
-    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runSeriesSetBorrowed(f64, &owner, q, work[0..9]));
-    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runSeriesSetBorrowed(f64, &owner, q, output[0..10]));
+    try std.testing.expectError(error.WorkspaceTooSmall, F.Managed(E).runSeriesSetBorrowed(f64, owner, q, work[0..9]));
+    try std.testing.expectError(error.AliasingNotAllowed, F.Managed(E).runSeriesSetBorrowed(f64, owner, q, output[0..10]));
     var huge = backend.action();
     huge.rows = std.math.maxInt(usize);
     huge.columns = huge.rows;
@@ -156,8 +160,9 @@ test "series set validates counts finite prefixes geometry scratch aliases and o
     try std.testing.expectEqualDeep(before, output);
 }
 test "series set callback failures and nonfinite arithmetic preserve all output columns then permit retry" {
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{ 0.25, 0.5 } };
     const input = [_]f64{ 1, 2 };
     const coefficients = [_]f64{ 1, 0.2, 0.3, 0.4, 1, 0.1, 0.2, 0.3 };
@@ -166,16 +171,16 @@ test "series set callback failures and nonfinite arithmetic preserve all output 
     const before = output;
     const q = smallRequest(&backend, &input, &coefficients, &counts, &output);
     backend.fail_at = 2;
-    try std.testing.expectError(error.InjectedSeriesSetAction, F.Managed(E).runSeriesSetScratch(f64, &owner, q));
+    try std.testing.expectError(error.InjectedSeriesSetAction, F.Managed(E).runSeriesSetScratch(f64, owner, q));
     try std.testing.expectEqualDeep(before, output);
     backend.calls = 0;
     backend.fail_at = 0;
     backend.nan_at = 2;
-    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runSeriesSetScratch(f64, &owner, q));
+    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runSeriesSetScratch(f64, owner, q));
     try std.testing.expectEqualDeep(before, output);
     backend.calls = 0;
     backend.nan_at = 0;
-    try F.Managed(E).runSeriesSetScratch(f64, &owner, q);
+    try F.Managed(E).runSeriesSetScratch(f64, owner, q);
     try std.testing.expectEqual(@as(usize, 3), backend.calls);
     try std.testing.expectEqualSlices(f64, &input, output[0..2]);
     var overflow = Backend(f64){ .diagonal = &.{1} };
@@ -183,7 +188,7 @@ test "series set callback failures and nonfinite arithmetic preserve all output 
     const c = [_]f64{ 1, 1 };
     const length = [_]usize{2};
     var y = [_]f64{91};
-    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runSeriesSetScratch(f64, &owner, .{ .action = overflow.action(), .input = &x, .coefficients = .{ .values = &c, .shape = .{ .row_count = 2, .column_count = 1, .leading_dimension = 2, .layout = .column_major } }, .coefficient_counts = &length, .output = .{ .values = &y, .shape = .{ .row_count = 1, .column_count = 1, .leading_dimension = 1, .layout = .column_major } } }));
+    try std.testing.expectError(error.NonFiniteResult, F.Managed(E).runSeriesSetScratch(f64, owner, .{ .action = overflow.action(), .input = &x, .coefficients = .{ .values = &c, .shape = .{ .row_count = 2, .column_count = 1, .leading_dimension = 2, .layout = .column_major } }, .coefficient_counts = &length, .output = .{ .values = &y, .shape = .{ .row_count = 1, .column_count = 1, .leading_dimension = 1, .layout = .column_major } } }));
     try std.testing.expectEqual(@as(f64, 91), y[0]);
 }
 const Observer = struct {
@@ -202,8 +207,9 @@ const Observer = struct {
     }
 };
 test "series set remote coefficient arithmetic and final commit failures preserve every output" {
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var observer = Observer{};
     var backend = Backend(f64){ .diagonal = &.{ 0.25, 0.5 }, .sync = observer.descriptor() };
     const input = [_]f64{ 1, 2 };
@@ -215,7 +221,7 @@ test "series set remote coefficient arithmetic and final commit failures preserv
         observer = fault;
         backend.calls = 0;
         const q = smallRequest(&backend, &input, &coefficients, &counts, &output);
-        try std.testing.expectError(error.RemoteSeriesSetFailure, F.Managed(E).runSeriesSetScratch(f64, &owner, q));
+        try std.testing.expectError(error.RemoteSeriesSetFailure, F.Managed(E).runSeriesSetScratch(f64, owner, q));
         try std.testing.expectEqualDeep(before, output);
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().active_operations);
         try std.testing.expectEqual(@as(usize, 0), owner.snapshot().resource_pins);
@@ -223,48 +229,52 @@ test "series set remote coefficient arithmetic and final commit failures preserv
 }
 test "series set allocation failure and closing owner release the same operation and scratch" {
     var allocations = E.test_support.Allocations{ .budget = 0 };
-    var owner = C.Context.init(allocations.allocator(), E.test_support.policy, .internal_closable);
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    reference_owner.initInPlace(allocations.allocator(), E.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+    const owner = reference_owner.borrowedContext();
+    defer close(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{ 0.25, 0.5 } };
     const input = [_]f64{ 1, 2 };
     const coefficients = [_]f64{ 1, 0.2, 0.3, 0.4, 1, 0.1, 0.2, 0.3 };
     const counts = [_]usize{ 1, 4 };
     var output = [_]f64{ 91, 92, 93, 94 };
     const q = smallRequest(&backend, &input, &coefficients, &counts, &output);
-    try std.testing.expectError(error.OutOfMemory, F.Managed(E).runSeriesSetScratch(f64, &owner, q));
+    try std.testing.expectError(error.OutOfMemory, F.Managed(E).runSeriesSetScratch(f64, owner, q));
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
     allocations.budget = 1;
     backend.close_at = 1;
-    try F.Managed(E).runSeriesSetScratch(f64, &owner, q);
+    try F.Managed(E).runSeriesSetScratch(f64, owner, q);
     try std.testing.expectEqual(@as(usize, 1), allocations.stats().accepted);
     try std.testing.expectEqual(@as(usize, 1), allocations.stats().freed);
-    try std.testing.expectEqual(C.CloseResult.closed, owner.tryProgressClose());
-    try std.testing.expectError(error.Closing, F.Managed(E).runSeriesSetScratch(f64, &owner, q));
+    try std.testing.expectEqual(C.CloseResult.closed, fixtureProgressClose(owner));
+    try std.testing.expectError(error.Closing, F.Managed(E).runSeriesSetScratch(f64, owner, q));
 }
 test "series set empty output and empty participating shard retain callback and padding contracts" {
-    var owner = context();
-    defer close(&owner) catch unreachable;
+    var reference_owner: FixtureReferenceContext = undefined;
+    const owner = context(&reference_owner);
+    defer close(owner) catch unreachable;
     var backend = Backend(f64){ .diagonal = &.{ 0.25, 0.5 } };
     const input = [_]f64{ 1, 2 };
     var output = [_]f64{91};
-    try F.Managed(E).runSeriesSetScratch(f64, &owner, .{ .action = backend.action(), .input = &input, .coefficients = .{ .values = &.{}, .shape = .{ .row_count = std.math.maxInt(usize), .column_count = 0, .leading_dimension = 0, .layout = .column_major } }, .coefficient_counts = &.{}, .output = .{ .values = &output, .shape = .{ .row_count = 2, .column_count = 0, .leading_dimension = 0, .layout = .column_major } } });
+    try F.Managed(E).runSeriesSetScratch(f64, owner, .{ .action = backend.action(), .input = &input, .coefficients = .{ .values = &.{}, .shape = .{ .row_count = std.math.maxInt(usize), .column_count = 0, .leading_dimension = 0, .layout = .column_major } }, .coefficient_counts = &.{}, .output = .{ .values = &output, .shape = .{ .row_count = 2, .column_count = 0, .leading_dimension = 0, .layout = .column_major } } });
     try std.testing.expectEqual(@as(usize, 0), backend.calls);
     var observer = Observer{};
     var empty = Backend(f64){ .diagonal = &.{}, .sync = observer.descriptor() };
     const coefficients = [_]f64{ 1, 2, 99, 99, 99, 1, 2, 3, 4, 5 };
-    try F.Managed(E).runSeriesSetScratch(f64, &owner, .{ .action = empty.action(), .input = &.{}, .coefficients = .{ .values = &coefficients, .shape = .{ .row_count = 5, .column_count = 2, .leading_dimension = 5, .layout = .column_major } }, .coefficient_counts = &.{ 2, 5 }, .output = .{ .values = &output, .shape = .{ .row_count = 0, .column_count = 2, .leading_dimension = 0, .layout = .column_major } } });
+    try F.Managed(E).runSeriesSetScratch(f64, owner, .{ .action = empty.action(), .input = &.{}, .coefficients = .{ .values = &coefficients, .shape = .{ .row_count = 5, .column_count = 2, .leading_dimension = 5, .layout = .column_major } }, .coefficient_counts = &.{ 2, 5 }, .output = .{ .values = &output, .shape = .{ .row_count = 0, .column_count = 2, .leading_dimension = 0, .layout = .column_major } } });
     try std.testing.expectEqual(@as(usize, 4), empty.calls);
     try std.testing.expectEqual(@as(f64, 91), output[0]);
 }
 test "series set widened accumulation retains finite values beyond native intermediate range" {
     inline for (.{ f32, f64, S.ComplexF32, S.ComplexF64 }) |T| {
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var backend = Backend(T){ .diagonal = &.{1} };
         const x = [_]T{value(T, std.math.floatMax(S.Real(T)) * 0.75, -std.math.floatMax(S.Real(T)) * 0.5)};
         const coefficients = [_]T{ value(T, -1, 0), value(T, 2, 0) };
         var output = [_]T{value(T, 91, 0)};
-        try F.Managed(E).runSeriesSetScratch(T, &owner, .{ .action = backend.action(), .input = &x, .coefficients = .{ .values = &coefficients, .shape = .{ .row_count = 2, .column_count = 1, .leading_dimension = 2, .layout = .column_major } }, .coefficient_counts = &.{2}, .output = .{ .values = &output, .shape = .{ .row_count = 1, .column_count = 1, .leading_dimension = 1, .layout = .column_major } } });
+        try F.Managed(E).runSeriesSetScratch(T, owner, .{ .action = backend.action(), .input = &x, .coefficients = .{ .values = &coefficients, .shape = .{ .row_count = 2, .column_count = 1, .leading_dimension = 2, .layout = .column_major } }, .coefficient_counts = &.{2}, .output = .{ .values = &output, .shape = .{ .row_count = 1, .column_count = 1, .leading_dimension = 1, .layout = .column_major } } });
         try std.testing.expectEqualDeep(x, output);
     }
 }
@@ -280,8 +290,9 @@ test "series set non diagonal real and complex Hermitian actions match spectral 
                 y[1] = S.add(T, S.mul(T, S.conj(T, off), x[0]), S.mul(T, value(T, 0.1, 0), x[1]));
             }
         };
-        var owner = context();
-        defer close(&owner) catch unreachable;
+        var reference_owner: FixtureReferenceContext = undefined;
+        const owner = context(&reference_owner);
+        defer close(owner) catch unreachable;
         var backend = Foreign{};
         const action: O.Operator(T) = .{ .context = &backend, .rows = 2, .columns = 2, .apply_fn = Foreign.apply };
         const input = [_]T{ value(T, 0.5, -0.25), value(T, -0.75, 0.4) };
@@ -290,7 +301,7 @@ test "series set non diagonal real and complex Hermitian actions match spectral 
         for (&coefficients, 0..) |*x, k| x.* = value(T, 1 / @as(S.Real(T), @floatFromInt(k + 1)), if (k % 2 == 0) 0.03 else -0.02);
         const coeff: D.ConstPanel(T) = .{ .values = &coefficients, .shape = .{ .row_count = 9, .column_count = 3, .leading_dimension = 9, .layout = .column_major } };
         var output: [6]T = undefined;
-        try F.Managed(E).runSeriesSetScratch(T, &owner, .{ .action = action, .input = &input, .coefficients = coeff, .coefficient_counts = &counts, .output = .{ .values = &output, .shape = .{ .row_count = 2, .column_count = 3, .leading_dimension = 2, .layout = .column_major } } });
+        try F.Managed(E).runSeriesSetScratch(T, owner, .{ .action = action, .input = &input, .coefficients = coeff, .coefficient_counts = &counts, .output = .{ .values = &output, .shape = .{ .row_count = 2, .column_count = 3, .leading_dimension = 2, .layout = .column_major } } });
         try std.testing.expectEqual(@as(usize, 8), backend.calls);
         const k = value(T, if (S.isComplex(T)) 0 else 1, if (S.isComplex(T)) 1 else 0);
         for (counts, 0..) |count, j| {
@@ -302,4 +313,10 @@ test "series set non diagonal real and complex Hermitian actions match spectral 
             try near(T, S.add(T, S.mul(T, mean, input[1]), S.mul(T, S.mul(T, difference, S.conj(T, k)), input[0])), output[j * 2 + 1]);
         }
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

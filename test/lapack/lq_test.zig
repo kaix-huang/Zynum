@@ -211,7 +211,9 @@ test "LQ zero extents use no workspace and represent identity without touching u
 
 test "LQ admitted factor and Q action finish while closing with one operation and no resource pins" {
     inline for (scalars) |T| {
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var op = try context.begin();
         _ = context.requestClose();
         var a = [_]T{ val(T, 1, 1), val(T, 2, 0), val(T, 3, 0) };
@@ -225,7 +227,7 @@ test "LQ admitted factor and Q action finish while closing with one operation an
         try std.testing.expectEqual(@as(usize, 0), context.snapshot().resource_pins);
         try std.testing.expectError(error.Closing, context.begin());
         op.end();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     }
 }
 
@@ -237,7 +239,9 @@ test "LQ checked arithmetic range status and IEEE projection reuse the existing 
         var tau = [_]T{val(T, -987, 65)};
         var work: [2]T = undefined;
         try std.testing.expectEqual(@as(usize, 1), try lq.factorize(T, mat(T, &a, 1, 2, 1), &tau, &work));
-        var context = execution.context.Context.init(std.testing.allocator, execution.test_support.policy, .internal_closable);
+        var reference_context: FixtureReferenceContext = undefined;
+        reference_context.initInPlace(std.testing.allocator, execution.test_support.policy, .owned_closable, @import("zynum-execution").reference.defaultCacheDomain());
+        const context = reference_context.borrowedContext();
         var op = try context.begin();
         a = .{ val(T, std.math.nan(f64), 0), val(T, 1, 0) };
         try std.testing.expectEqual(@as(usize, 0), try lq.factorizeWithContractAdmitted(&op, T, mat(T, &a, 1, 2, 1), &tau, &work, .lapack_ieee_v1));
@@ -246,6 +250,12 @@ test "LQ checked arithmetic range status and IEEE projection reuse the existing 
         try std.testing.expectEqual(@as(usize, 0), try lq.applyQWithContractAdmitted(&op, T, mat(T, &a, 1, 2, 1).asConst(), &tau, mat(T, &rhs, 2, 1, 2), .left, .normal, &apply_work, .lapack_ieee_v1));
         op.end();
         _ = context.requestClose();
-        try std.testing.expectEqual(execution.context.CloseResult.closed, context.tryProgressClose());
+        try std.testing.expectEqual(execution.context.CloseResult.closed, fixtureProgressClose(context));
     }
+}
+
+const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceContext;
+fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
+    var report: @import("zynum-execution").CallReport = .{};
+    return ctx.tryProgressClose(&report);
 }

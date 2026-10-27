@@ -94,8 +94,8 @@ test "stage raw and typed real complex factor solve match padded arrays events a
             a[selected] = s.value(T, 2, 2);
             const before = a;
             var a_raw = a;
-            try h.info(I, try F.callManaged(T, I, level, &typed.context, &typed.services, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a }), 0);
-            try h.info(I, try RF.callManaged(T, I, level, &raw.context, &raw.services, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = a_raw[0..].ptr }), 0);
+            try h.info(I, try F.callManaged(T, I, level, typed.context, &typed.services, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = &a }), 0);
+            try h.info(I, try RF.callManaged(T, I, level, raw.context, &raw.services, .{ .layout = layout, .uplo = uplo, .n = 2, .lda = 3, .values = a_raw[0..].ptr }), 0);
             try s.bytes(&a, &a_raw);
             try sameRig(&typed, &raw);
             try std.testing.expectEqual(s.value(T, 2, 0), a[0]);
@@ -108,8 +108,8 @@ test "stage raw and typed real complex factor solve match padded arrays events a
             };
             const b_before = b;
             var b_raw = b;
-            try h.info(I, try S.callManaged(T, I, level, &typed.context, &typed.services, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &factor, .b = &b }), 0);
-            try h.info(I, try RS.callManaged(T, I, level, &raw.context, &raw.services, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = factor_raw[0..].ptr, .b = b_raw[0..].ptr }), 0);
+            try h.info(I, try S.callManaged(T, I, level, typed.context, &typed.services, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = &factor, .b = &b }), 0);
+            try h.info(I, try RS.callManaged(T, I, level, raw.context, &raw.services, .{ .layout = layout, .uplo = uplo, .n = 2, .nrhs = 2, .lda = 3, .ldb = 3, .a = factor_raw[0..].ptr, .b = b_raw[0..].ptr }), 0);
             try s.bytes(&b, &b_raw);
             try s.bytes(&a, &factor);
             try s.bytes(&a_raw, &factor_raw);
@@ -133,8 +133,8 @@ test "stage raw invalid layout precedes pointer conversion getter and extent" {
     defer close(&r);
     var bytes: [16]u8 align(8) = @splat(0);
     const misaligned: [*]align(1) f64 = @ptrCast(bytes[1..].ptr);
-    try h.info(i64, try RF.callManaged(f64, i64, .high, &r.context, &r.services, .{ .layout = -1, .uplo = '?', .n = std.math.maxInt(i64), .lda = std.math.maxInt(i64), .values = misaligned }), -1);
-    try h.info(i64, try RS.callManaged(f64, i64, .high, &r.context, &r.services, .{ .layout = -1, .uplo = '?', .n = std.math.maxInt(i64), .nrhs = std.math.maxInt(i64), .lda = 0, .ldb = 0, .a = misaligned, .b = null }), -1);
+    try h.info(i64, try RF.callManaged(f64, i64, .high, r.context, &r.services, .{ .layout = -1, .uplo = '?', .n = std.math.maxInt(i64), .lda = std.math.maxInt(i64), .values = misaligned }), -1);
+    try h.info(i64, try RS.callManaged(f64, i64, .high, r.context, &r.services, .{ .layout = -1, .uplo = '?', .n = std.math.maxInt(i64), .nrhs = std.math.maxInt(i64), .lda = 0, .ldb = 0, .a = misaligned, .b = null }), -1);
     try std.testing.expectEqual(@as(usize, 0), r.reads);
     try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 2), r.hooks);
@@ -152,12 +152,12 @@ test "stage raw truncated high scans and A then B NaN precede later argument fau
     var b = [_]f64{ std.math.nan(f64), 3 };
     // n=2, lda=1 is illegal for the work call but the high scan visits A[0].
     var copy = a;
-    try h.info(i64, try F.callManaged(f64, i64, .high, &typed.context, &typed.services, .{ .layout = 102, .uplo = 'L', .n = 2, .lda = 1, .values = &copy }), -4);
-    try h.info(i64, try RF.callManaged(f64, i64, .high, &raw.context, &raw.services, .{ .layout = 102, .uplo = 'L', .n = 2, .lda = 1, .values = copy[0..].ptr }), -4);
-    try h.info(i64, try S.callManaged(f64, i64, .high, &typed.context, &typed.services, .{ .layout = 102, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = &a, .b = &b }), -5);
-    try h.info(i64, try RS.callManaged(f64, i64, .high, &raw.context, &raw.services, .{ .layout = 102, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr }), -5);
-    try h.info(i64, try S.callManaged(f64, i64, .high, &typed.context, &typed.services, .{ .layout = 102, .uplo = '?', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = &b }), -7);
-    try h.info(i64, try RS.callManaged(f64, i64, .high, &raw.context, &raw.services, .{ .layout = 102, .uplo = '?', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = b[0..].ptr }), -7);
+    try h.info(i64, try F.callManaged(f64, i64, .high, typed.context, &typed.services, .{ .layout = 102, .uplo = 'L', .n = 2, .lda = 1, .values = &copy }), -4);
+    try h.info(i64, try RF.callManaged(f64, i64, .high, raw.context, &raw.services, .{ .layout = 102, .uplo = 'L', .n = 2, .lda = 1, .values = copy[0..].ptr }), -4);
+    try h.info(i64, try S.callManaged(f64, i64, .high, typed.context, &typed.services, .{ .layout = 102, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = &a, .b = &b }), -5);
+    try h.info(i64, try RS.callManaged(f64, i64, .high, raw.context, &raw.services, .{ .layout = 102, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr }), -5);
+    try h.info(i64, try S.callManaged(f64, i64, .high, typed.context, &typed.services, .{ .layout = 102, .uplo = '?', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = &b }), -7);
+    try h.info(i64, try RS.callManaged(f64, i64, .high, raw.context, &raw.services, .{ .layout = 102, .uplo = '?', .n = 2, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = b[0..].ptr }), -7);
     try sameRig(&typed, &raw);
     try std.testing.expectEqual(@as(usize, 0), raw.hooks);
     try std.testing.expectEqual(@as(usize, 0), raw.x.attempts);
@@ -167,13 +167,13 @@ test "stage raw null nonreads and column empty checks preserve original priority
     var r: h.Rig = .{};
     r.init();
     defer close(&r);
-    try h.info(i64, try RF.callManaged(f64, i64, .high, &r.context, &r.services, .{ .layout = 102, .uplo = '?', .n = -1, .lda = -1, .values = null }), -2);
-    try h.info(i64, try RF.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 0, .lda = 0, .values = null }), -5);
-    try h.info(i64, try RF.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 0, .lda = 1, .values = null }), 0);
-    try fault(error.MissingBuffer, try RF.callManaged(f64, i64, .high, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = 1, .values = null }));
+    try h.info(i64, try RF.callManaged(f64, i64, .high, r.context, &r.services, .{ .layout = 102, .uplo = '?', .n = -1, .lda = -1, .values = null }), -2);
+    try h.info(i64, try RF.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 0, .lda = 0, .values = null }), -5);
+    try h.info(i64, try RF.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 0, .lda = 1, .values = null }), 0);
+    try fault(error.MissingBuffer, try RF.callManaged(f64, i64, .high, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .lda = 1, .values = null }));
     const nan_a = [_]f64{std.math.nan(f64)};
-    try h.info(i64, try RS.callManaged(f64, i64, .high, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .nrhs = 0, .lda = 1, .ldb = 1, .a = nan_a[0..].ptr, .b = null }), -5);
-    try h.info(i64, try RS.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .nrhs = 0, .lda = 1, .ldb = 1, .a = null, .b = null }), 0);
+    try h.info(i64, try RS.callManaged(f64, i64, .high, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .nrhs = 0, .lda = 1, .ldb = 1, .a = nan_a[0..].ptr, .b = null }), -5);
+    try h.info(i64, try RS.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 102, .uplo = 'L', .n = 1, .nrhs = 0, .lda = 1, .ldb = 1, .a = null, .b = null }), 0);
     try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 3), r.reads);
 }
@@ -182,11 +182,11 @@ test "stage raw row empty calls allocate and zero RHS still accesses factor" {
     var r: h.Rig = .{};
     r.init();
     defer close(&r);
-    try h.info(i64, try RF.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 101, .uplo = 'L', .n = 0, .lda = 0, .values = null }), 0);
-    try h.info(i64, try RS.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 101, .uplo = 'L', .n = 0, .nrhs = 0, .lda = 0, .ldb = 0, .a = null, .b = null }), 0);
+    try h.info(i64, try RF.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 101, .uplo = 'L', .n = 0, .lda = 0, .values = null }), 0);
+    try h.info(i64, try RS.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 101, .uplo = 'L', .n = 0, .nrhs = 0, .lda = 0, .ldb = 0, .a = null, .b = null }), 0);
     try std.testing.expectEqual(@as(usize, 3), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 3), r.x.frees);
-    try fault(error.MissingBuffer, try RS.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 101, .uplo = 'L', .n = 1, .nrhs = 0, .lda = 1, .ldb = 0, .a = null, .b = null }));
+    try fault(error.MissingBuffer, try RS.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 101, .uplo = 'L', .n = 1, .nrhs = 0, .lda = 1, .ldb = 0, .a = null, .b = null }));
     try std.testing.expectEqual(@as(usize, 5), r.x.attempts);
     try std.testing.expectEqual(@as(usize, 5), r.x.frees);
     try std.testing.expectEqual(@as(usize, 0), r.hooks);
@@ -199,9 +199,9 @@ test "stage raw actual row allocation failures precede pointer and uplo checks" 
         defer close(&r);
         r.x.fail_at = if (solve) 1 else 0;
         if (solve) {
-            try h.info(i64, try RS.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 101, .uplo = '?', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = null }), -1011);
+            try h.info(i64, try RS.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 101, .uplo = '?', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = null }), -1011);
         } else {
-            try h.info(i64, try RF.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = 101, .uplo = '?', .n = 1, .lda = 1, .values = null }), -1011);
+            try h.info(i64, try RF.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = 101, .uplo = '?', .n = 1, .lda = 1, .values = null }), -1011);
         }
         try std.testing.expectEqual(@as(usize, if (solve) 2 else 1), r.x.attempts);
         try std.testing.expectEqual(@as(usize, if (solve) 1 else 0), r.x.frees);
@@ -227,8 +227,8 @@ test "stage raw second temporary extent fault follows first allocation and clean
     defer close(&raw);
     const huge = std.math.maxInt(i64);
     const expected: anyerror = if (@bitSizeOf(usize) == 64) error.SizeOverflow else error.IntegerNotRepresentable;
-    try fault(expected, try S.callManaged(f64, i64, .work, &typed.context, &typed.services, .{ .layout = 101, .uplo = '?', .n = 1, .nrhs = huge, .lda = 1, .ldb = huge, .a = null, .b = null }));
-    try fault(expected, try RS.callManaged(f64, i64, .work, &raw.context, &raw.services, .{ .layout = 101, .uplo = '?', .n = 1, .nrhs = huge, .lda = 1, .ldb = huge, .a = null, .b = null }));
+    try fault(expected, try S.callManaged(f64, i64, .work, typed.context, &typed.services, .{ .layout = 101, .uplo = '?', .n = 1, .nrhs = huge, .lda = 1, .ldb = huge, .a = null, .b = null }));
+    try fault(expected, try RS.callManaged(f64, i64, .work, raw.context, &raw.services, .{ .layout = 101, .uplo = '?', .n = 1, .nrhs = huge, .lda = 1, .ldb = huge, .a = null, .b = null }));
     try sameRig(&typed, &raw);
     try std.testing.expectEqual(@as(usize, 1), raw.x.attempts);
     try std.testing.expectEqual(@as(usize, 1), raw.x.frees);
@@ -248,8 +248,8 @@ test "stage raw invalid uplo still copies RHS back before reverse release" {
     raw.b = &b_raw;
     typed.expect_copyback = true;
     raw.expect_copyback = true;
-    try h.info(i64, try S.callManaged(f64, i64, .work, &typed.context, &typed.services, .{ .layout = 101, .uplo = '?', .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .a = null, .b = &b }), -2);
-    try h.info(i64, try RS.callManaged(f64, i64, .work, &raw.context, &raw.services, .{ .layout = 101, .uplo = '?', .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .a = null, .b = b_raw[0..].ptr }), -2);
+    try h.info(i64, try S.callManaged(f64, i64, .work, typed.context, &typed.services, .{ .layout = 101, .uplo = '?', .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .a = null, .b = &b }), -2);
+    try h.info(i64, try RS.callManaged(f64, i64, .work, raw.context, &raw.services, .{ .layout = 101, .uplo = '?', .n = 2, .nrhs = 1, .lda = 2, .ldb = 2, .a = null, .b = b_raw[0..].ptr }), -2);
     try s.bytes(&b, &b_raw);
     try std.testing.expectEqualSlices(f64, &.{ 10, -900, 20 }, &b);
     try sameRig(&typed, &raw);
@@ -286,9 +286,9 @@ test "stage raw factor RHS overlap includes intervening padding and excludes tra
         var a = [_]f64{ 2, 0, 71, 0, 3, 12, 18 };
         const before = a;
         const overlap_b: [*]align(1) f64 = a[2..].ptr;
-        try fault(error.AliasingNotAllowed, try RS.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = layout, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 3, .ldb = if (layout == 101) 1 else 2, .a = a[0..].ptr, .b = overlap_b }));
+        try fault(error.AliasingNotAllowed, try RS.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = layout, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 3, .ldb = if (layout == 101) 1 else 2, .a = a[0..].ptr, .b = overlap_b }));
         try s.bytes(&before, &a);
-        try h.info(i64, try RS.callManaged(f64, i64, .work, &r.context, &r.services, .{ .layout = layout, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 3, .ldb = if (layout == 101) 1 else 2, .a = a[0..].ptr, .b = a[5..].ptr }), 0);
+        try h.info(i64, try RS.callManaged(f64, i64, .work, r.context, &r.services, .{ .layout = layout, .uplo = 'L', .n = 2, .nrhs = 1, .lda = 3, .ldb = if (layout == 101) 1 else 2, .a = a[0..].ptr, .b = a[5..].ptr }), 0);
         try std.testing.expectEqualSlices(f64, before[0..5], a[0..5]);
         try std.testing.expectEqual(@as(f64, 3), a[5]);
         try std.testing.expectEqual(@as(f64, 2), a[6]);
@@ -306,8 +306,8 @@ test "stage raw shared routes capture once preserve owner and bypass getter for 
         var a = [_]f64{4};
         var b = [_]f64{12};
         bind(&r);
-        try h.info(i64, try owner.Shared.factorRawManaged(scan, f64, i64, level, &r.context, .{ .layout = 101, .uplo = 'L', .n = 1, .lda = 1, .values = a[0..].ptr }), 0);
-        try h.info(i64, try owner.Shared.solveRawManaged(scan, f64, i64, level, &r.context, .{ .layout = 101, .uplo = 'U', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr }), 0);
+        try h.info(i64, try owner.Shared.factorRawManaged(scan, f64, i64, level, r.context, .{ .layout = 101, .uplo = 'L', .n = 1, .lda = 1, .values = a[0..].ptr }), 0);
+        try h.info(i64, try owner.Shared.solveRawManaged(scan, f64, i64, level, r.context, .{ .layout = 101, .uplo = 'U', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = a[0..].ptr, .b = b[0..].ptr }), 0);
         try std.testing.expectEqual(@as(f64, 3), b[0]);
         try std.testing.expectEqual(@as(usize, 2), cfg.testing.snapshot().captures);
         try std.testing.expectEqual(@as(usize, if (scan and level == .high) 2 else 0), cfg.testing.snapshot().getter_calls);
@@ -336,11 +336,11 @@ test "stage raw admission refuses before shared capture and borrowed services or
         var r: h.Rig = .{};
         r.init();
         defer close(&r);
-        if (overflow) C.Context.testing.configure(&r.context, 0, null) else _ = r.context.requestClose();
+        if (overflow) C.Context.testing.configure(r.context, 0, null) else _ = r.context.requestClose();
         const expected = if (overflow) error.CounterOverflow else error.Closing;
         var services: Core.Services = undefined;
-        try std.testing.expectError(expected, RF.callManaged(f64, i64, .high, &r.context, &services, .{ .layout = -1, .uplo = '?', .n = 1, .lda = 1, .values = null }));
-        try std.testing.expectError(expected, owner.Shared.solveRawManaged(true, f64, i64, .high, &r.context, .{ .layout = -1, .uplo = '?', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = null }));
+        try std.testing.expectError(expected, RF.callManaged(f64, i64, .high, r.context, &services, .{ .layout = -1, .uplo = '?', .n = 1, .lda = 1, .values = null }));
+        try std.testing.expectError(expected, owner.Shared.solveRawManaged(true, f64, i64, .high, r.context, .{ .layout = -1, .uplo = '?', .n = 1, .nrhs = 1, .lda = 1, .ldb = 1, .a = null, .b = null }));
         try std.testing.expectEqual(@as(usize, 0), cfg.testing.snapshot().captures);
         try std.testing.expectEqual(@as(usize, 0), cfg.testing.snapshot().getter_calls);
         try std.testing.expectEqual(@as(usize, 0), r.x.attempts);
@@ -354,7 +354,7 @@ test "stage raw capture ignores rebound allocator and keeps cleanup inside the a
     defer close(&r);
     r.rebind = true;
     var a = [_]f64{4};
-    try h.info(i64, try RF.callManaged(f64, i64, .high, &r.context, &r.services, .{ .layout = 101, .uplo = '?', .n = 1, .lda = 1, .values = a[0..].ptr }), -2);
+    try h.info(i64, try RF.callManaged(f64, i64, .high, r.context, &r.services, .{ .layout = 101, .uplo = '?', .n = 1, .lda = 1, .values = a[0..].ptr }), -2);
     try std.testing.expectEqual(@as(usize, 1), r.hooks);
     r.services.allocator = undefined;
     r.services.error_event = h.Rig.hookForTest;
