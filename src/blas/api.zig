@@ -10,7 +10,7 @@
 
 /// Checked vector and matrix view types plus constructors.
 pub const views = @import("api/views.zig");
-/// Runtime aliasing checks used by public operations in checked builds.
+/// Runtime aliasing checks used by public operations in every optimization mode.
 pub const aliasing = @import("api/aliasing.zig");
 /// User-facing BLAS operations implemented on checked views.
 pub const operations = @import("api/operations.zig");

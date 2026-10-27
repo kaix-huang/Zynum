@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
-const builtin = @import("builtin");
 const inventory = @import("public_surface_inventory.zig");
 const surface = @import("public-surface");
 const options = @import("public-surface-contract-options");
@@ -1533,7 +1532,8 @@ fn expectFacadeContract(comptime Facade: type) !void {
         "AliasingNotAllowed",
     };
     try expectExactErrorSet(Views.Error, expected_errors);
-    try std.testing.expectEqual(builtin.mode != .fast, Views.runtime_checks_enabled);
+    // Checked public API validation remains enabled in every optimization mode.
+    try std.testing.expect(Views.runtime_checks_enabled);
     try std.testing.expectEqualStrings("blas.api.views.MatrixTransform", @typeName(Views.MatrixTransform));
     try expectEnum(Views.MatrixTransform, u2, &.{
         .{ .name = "normal", .value = 0 },
@@ -1676,7 +1676,7 @@ test "inventory is a complete three-surface partition with numerical modules" {
     try expectRecordedOwnerContract("blas.types", "complexF32", "fn (re: f32, im: f32) ComplexF32", &.{ "result.re = re", "result.im = im" });
     try expectRecordedOwnerContract("blas.types", "complexF64", "fn (re: f64, im: f64) ComplexF64", &.{ "result.re = re", "result.im = im" });
     try expectRecordedOwnerContract("blas.api.views", "optionField", "fn (options: anytype, comptime name: []const u8, fallback: anytype) @TypeOf(fallback)", &.{ "runtime generic values", "name is comptime", "result type exactly @TypeOf(fallback)" });
-    try expectRecordedOwnerContract("blas.api.views", "ConstVector", "fn (comptime T: type) type", &.{ "stride: BlasInt = 1", "capacity outside fast" });
+    try expectRecordedOwnerContract("blas.api.views", "ConstVector", "fn (comptime T: type) type", &.{ "stride: BlasInt = 1", "capacity in every optimization mode" });
     try expectRecordedOwnerContract("blas.api.views", "Vector", "fn (comptime T: type) type", &.{ "asConst preserves storage, length, and stride", "stride: BlasInt = 1" });
     try expectRecordedOwnerContract("blas.api.views", "ConstMatrix", "fn (comptime T: type) type", &.{ "operation = .normal", "transposed/adjoint preserve storage shape", "effective counts swap" });
     try expectRecordedOwnerContract("blas.api.views", "Matrix", "fn (comptime T: type) type", &.{ "asConst preserves fields", "operation to .normal" });

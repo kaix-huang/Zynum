@@ -54,22 +54,18 @@ pub fn matricesOverlap(comptime T: type, first: anytype, second: anytype) views.
 }
 
 pub fn ensureNoVectorOverlap(comptime T: type, first: anytype, second: anytype) views.Error!void {
-    if (!views.runtime_checks_enabled) return;
     if (try vectorsOverlap(T, first, second)) return error.AliasingNotAllowed;
 }
 
 pub fn ensureNoVectorMatrixOverlap(comptime T: type, vector: anytype, matrix: anytype) views.Error!void {
-    if (!views.runtime_checks_enabled) return;
     if (try vectorMatrixOverlap(T, vector, matrix)) return error.AliasingNotAllowed;
 }
 
 pub fn ensureNoMatrixOverlap(comptime T: type, first: anytype, second: anytype) views.Error!void {
-    if (!views.runtime_checks_enabled) return;
     if (try matricesOverlap(T, first, second)) return error.AliasingNotAllowed;
 }
 
 pub fn ensureNoPartialVectorOverlap(comptime T: type, first: anytype, second: anytype) views.Error!void {
-    if (!views.runtime_checks_enabled) return;
     if (vectorsExactlyMatch(first, second)) return;
     if (try vectorsOverlap(T, first, second)) return error.AliasingNotAllowed;
 }

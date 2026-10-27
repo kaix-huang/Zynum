@@ -292,12 +292,10 @@ test "vector composition error and no-op paths each admit once" {
     invalid.length = -1;
     try std.testing.expectError(error.InvalidLength, blas.swapVectors(.{ .first_vector = invalid, .second_vector = target }));
     try Observe.check(10);
-    if (blas.api.views.runtime_checks_enabled) {
-        const overlap_input = try blas.constVector(f64, values[0..2], .{});
-        const overlap_output = try blas.vector(f64, values[1..3], .{});
-        try std.testing.expectError(error.AliasingNotAllowed, blas.copyVector(.{ .source_vector = overlap_input, .destination_vector = overlap_output }));
-        try Observe.check(11);
-    }
+    const overlap_input = try blas.constVector(f64, values[0..2], .{});
+    const overlap_output = try blas.vector(f64, values[1..3], .{});
+    try std.testing.expectError(error.AliasingNotAllowed, blas.copyVector(.{ .source_vector = overlap_input, .destination_vector = overlap_output }));
+    try Observe.check(11);
     try std.testing.expectEqualSlices(f64, &.{ -5, -5, 71 }, &values);
 }
 
@@ -491,19 +489,32 @@ test "matrix validation and workspace length failures retain one operation witho
     try std.testing.expectError(error.WorkspaceTooSmall, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = a, .result_matrix = c, .workspace = workspace[0..3] }));
     try Observe.check(10);
 
-    if (blas.api.views.runtime_checks_enabled) {
-        // Valid shape with short backing storage is rejected before core access.
-        var short_storage = a;
-        short_storage.values = a_values[0..1];
-        try std.testing.expectError(error.BufferTooSmall, blas.matrixVectorMultiply(.{ .matrix = short_storage, .input_vector = x, .result_vector = y }));
-        try Observe.check(11);
-        try std.testing.expectError(error.BufferTooSmall, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = short_storage, .input_vector = x, .result_vector = y, .workspace = workspace[0..] }));
-        try Observe.check(12);
-        try std.testing.expectError(error.BufferTooSmall, blas.matrixMultiply(.{ .left_matrix = short_storage, .right_matrix = a, .result_matrix = c }));
-        try Observe.check(13);
-        try std.testing.expectError(error.BufferTooSmall, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = short_storage, .right_matrix = a, .result_matrix = c, .workspace = workspace[0..] }));
-        try Observe.check(14);
-    }
+    // Valid shape with short backing storage is rejected before core access.
+    var short_storage = a;
+    short_storage.values = a_values[0..1];
+    try std.testing.expectError(error.BufferTooSmall, blas.matrixVectorMultiply(.{ .matrix = short_storage, .input_vector = x, .result_vector = y }));
+    try Observe.check(11);
+    try std.testing.expectError(error.BufferTooSmall, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = short_storage, .input_vector = x, .result_vector = y, .workspace = workspace[0..] }));
+    try Observe.check(12);
+    try std.testing.expectError(error.BufferTooSmall, blas.matrixMultiply(.{ .left_matrix = short_storage, .right_matrix = a, .result_matrix = c }));
+    try Observe.check(13);
+    try std.testing.expectError(error.BufferTooSmall, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = short_storage, .right_matrix = a, .result_matrix = c, .workspace = workspace[0..] }));
+    try Observe.check(14);
+    var short_result = c;
+    short_result.values = output_values[0..1];
+    try std.testing.expectError(error.BufferTooSmall, blas.matrixMultiply(.{ .left_matrix = a, .right_matrix = a, .result_matrix = short_result }));
+    try Observe.check(15);
+    try std.testing.expectError(error.BufferTooSmall, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = a, .result_matrix = short_result, .workspace = workspace[0..] }));
+    try Observe.check(16);
+    var huge_storage = a;
+    huge_storage.row_count = std.math.maxInt(blas.BlasInt);
+    huge_storage.column_count = std.math.maxInt(blas.BlasInt);
+    huge_storage.leading_dimension = std.math.maxInt(blas.BlasInt);
+    const extent_error = if (@bitSizeOf(usize) == 32) error.InvalidLength else error.BufferTooSmall;
+    try std.testing.expectError(extent_error, blas.matrixVectorMultiply(.{ .matrix = huge_storage, .input_vector = x, .result_vector = y }));
+    try Observe.check(17);
+    try std.testing.expectError(extent_error, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = huge_storage, .right_matrix = a, .result_matrix = c, .workspace = workspace[0..] }));
+    try Observe.check(18);
     try std.testing.expectEqualSlices(f64, &.{ 31, 32, 33, 34, 83 }, &workspace);
     try std.testing.expectEqualSlices(f64, &.{ 7, 8, 81, 9, 10, 82 }, &output_values);
     try std.testing.expectEqualSlices(f64, &.{ 1, 3, 91, 2, 4, 92 }, &a_values);
@@ -535,34 +546,33 @@ test "checked matrix overlap errors finish one operation before any storage muta
     const y = try blas.vector(f64, &result_values, .{ .length = 2 });
     const c = try blas.matrix(f64, &result_values, .{ .row_count = 2, .column_count = 2, .leading_dimension = 3 });
 
-    // Fast intentionally has no checked alias rejection contract. No illegal
-    // alias operation is issued there; these guards do not claim Fast coverage.
-    if (blas.api.views.runtime_checks_enabled) {
-        Observe.watch(&a_values, &.{ 1, 3, 91, 2, 4, 92 });
-        const alias_y = try blas.vector(f64, a_values[0..2], .{});
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiply(.{ .matrix = a, .input_vector = x, .result_vector = alias_y }));
-        try Observe.check(1);
-        const alias_c = try blas.matrix(f64, &a_values, .{ .row_count = 2, .column_count = 2, .leading_dimension = 3 });
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiply(.{ .left_matrix = a, .right_matrix = b, .result_matrix = alias_c }));
-        try Observe.check(2);
+    // Every optimization mode rejects unsupported aliasing before mutation.
+    Observe.watch(&a_values, &.{ 1, 3, 91, 2, 4, 92 });
+    const alias_y = try blas.vector(f64, a_values[0..2], .{});
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiply(.{ .matrix = a, .input_vector = x, .result_vector = alias_y }));
+    try Observe.check(1);
+    const alias_c = try blas.matrix(f64, &a_values, .{ .row_count = 2, .column_count = 2, .leading_dimension = 3 });
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiply(.{ .left_matrix = a, .right_matrix = b, .result_matrix = alias_c }));
+    try Observe.check(2);
 
-        Observe.watch(&result_values, &.{ 7, 8, 81, 9, 10, 82 });
-        // Each workspace is long enough but overlaps a different live operand.
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = a, .input_vector = x, .result_vector = y, .workspace = x_values[0..2] }));
-        try Observe.check(3);
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = a, .input_vector = x, .result_vector = y, .workspace = result_values[0..2] }));
-        try Observe.check(4);
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = a, .input_vector = x, .result_vector = y, .workspace = a_values[0..2] }));
-        try Observe.check(5);
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = b, .result_matrix = c, .workspace = a_values[0..4] }));
-        try Observe.check(6);
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = b, .result_matrix = c, .workspace = b_values[0..4] }));
-        try Observe.check(7);
-        try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = b, .result_matrix = c, .workspace = result_values[0..4] }));
-        try Observe.check(8);
-    } else {
-        try Observe.check(0);
-    }
+    Observe.watch(&result_values, &.{ 7, 8, 81, 9, 10, 82 });
+    // Each workspace is long enough but overlaps a different live operand.
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = a, .input_vector = x, .result_vector = y, .workspace = x_values[0..2] }));
+    try Observe.check(3);
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = a, .input_vector = x, .result_vector = y, .workspace = result_values[0..2] }));
+    try Observe.check(4);
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixVectorMultiplyWithWorkspace(.{ .matrix = a, .input_vector = x, .result_vector = y, .workspace = a_values[0..2] }));
+    try Observe.check(5);
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = b, .result_matrix = c, .workspace = a_values[0..4] }));
+    try Observe.check(6);
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = b, .result_matrix = c, .workspace = b_values[0..4] }));
+    try Observe.check(7);
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiplyWithWorkspace(.{ .left_matrix = a, .right_matrix = b, .result_matrix = c, .workspace = result_values[0..4] }));
+    try Observe.check(8);
+    Observe.watch(&b_values, &.{ 5, 7, 93, 6, 8, 94 });
+    const alias_right = try blas.matrix(f64, &b_values, .{ .row_count = 2, .column_count = 2, .leading_dimension = 3 });
+    try std.testing.expectError(error.AliasingNotAllowed, blas.matrixMultiply(.{ .left_matrix = a, .right_matrix = b, .result_matrix = alias_right }));
+    try Observe.check(9);
     try std.testing.expectEqualSlices(f64, &.{ 1, 3, 91, 2, 4, 92 }, &a_values);
     try std.testing.expectEqualSlices(f64, &.{ 5, 7, 93, 6, 8, 94 }, &b_values);
     try std.testing.expectEqualSlices(f64, &.{ 5, 6, 73 }, &x_values);

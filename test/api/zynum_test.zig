@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
-const builtin = @import("builtin");
 const zynum = @import("zynum");
 const blas = @import("zynum-blas");
 const lapack = @import("zynum-lapack");
@@ -75,10 +74,75 @@ test "modern API rejects structural shape errors in all build modes" {
 }
 
 test "modern checked API rejects short backing storage" {
-    if (builtin.mode == .fast) return error.SkipZigTest;
-
+    const views = blas.api.views;
+    try std.testing.expect(views.runtime_checks_enabled);
     var short = [_]f64{ 1, 2, 3 };
-    try std.testing.expectError(error.BufferTooSmall, zynum.constVector(f64, &short, .{ .length = 3, .stride = 2 }));
+    const before = short;
+    inline for (.{ @as(zynum.BlasInt, 2), @as(zynum.BlasInt, -2) }) |stride| {
+        try std.testing.expectError(error.BufferTooSmall, zynum.constVector(f64, &short, .{ .length = 3, .stride = stride }));
+        try std.testing.expectError(error.BufferTooSmall, zynum.vector(f64, &short, .{ .length = 3, .stride = stride }));
+    }
+    try std.testing.expectError(error.BufferTooSmall, zynum.constMatrix(f64, &short, .{ .row_count = 2, .column_count = 2, .leading_dimension = 3 }));
+    try std.testing.expectError(error.BufferTooSmall, zynum.matrix(f64, &short, .{ .row_count = 2, .column_count = 2, .leading_dimension = 3 }));
+
+    // Public structs can be assembled or changed after construction. Operations
+    // must revalidate real short backing slices before any output write.
+    const input = try zynum.constVector(f64, &short, .{});
+    var output = [_]f64{ 71, 73, 79 };
+    const output_before = output;
+    const result = try zynum.vector(f64, &output, .{});
+    var short_input = input;
+    short_input.stride = -2;
+    try std.testing.expectError(error.BufferTooSmall, zynum.scaleVectorInto(.{ .input_vector = short_input, .result_vector = result, .scale = @as(f64, 2) }));
+    var short_result = result;
+    short_result.stride = 2;
+    try std.testing.expectError(error.BufferTooSmall, zynum.scaleVectorInto(.{ .input_vector = input, .result_vector = short_result, .scale = @as(f64, 2) }));
+    try std.testing.expectError(error.BufferTooSmall, zynum.scaleVector(.{ .target_vector = short_result, .scale = @as(f64, 2) }));
+    try std.testing.expectError(error.BufferTooSmall, zynum.dotProduct(.{ .left_vector = short_input, .right_vector = input }));
+    try std.testing.expectError(error.BufferTooSmall, zynum.euclideanNorm(.{ .input_vector = short_input }));
+
+    // All metadata is valid i32. On a 64-bit host these extents fit usize but
+    // exceed the real backing; on a 32-bit target checked extent arithmetic
+    // rejects them as InvalidLength. No large or fabricated slice is needed.
+    const max = std.math.maxInt(zynum.BlasInt);
+    const extent_error = if (@bitSizeOf(usize) == 32) error.InvalidLength else error.BufferTooSmall;
+    try std.testing.expectError(extent_error, zynum.constVector(f64, &short, .{ .length = max, .stride = max }));
+    try std.testing.expectError(extent_error, zynum.vector(f64, &short, .{ .length = max, .stride = -max }));
+    try std.testing.expectError(extent_error, zynum.constMatrix(f64, &short, .{ .row_count = max, .column_count = max, .leading_dimension = max }));
+    try std.testing.expectError(extent_error, zynum.matrix(f64, &short, .{ .row_count = max, .column_count = max, .leading_dimension = max }));
+    var huge_result = result;
+    huge_result.length = max;
+    huge_result.stride = max;
+    try std.testing.expectError(extent_error, zynum.scaleVector(.{ .target_vector = huge_result, .scale = @as(f64, 2) }));
+    if (@bitSizeOf(usize) == 32) {
+        try std.testing.expectError(error.InvalidLength, views.requiredVectorStorageLength(max, max));
+        try std.testing.expectError(error.InvalidLength, views.requiredMatrixStorageLength(max, max, max));
+        // The product fits usize32 exactly; the final addition overflows.
+        try std.testing.expectError(error.InvalidLength, views.requiredVectorStorageLength(4, 1431655765));
+        try std.testing.expectError(error.InvalidLength, views.requiredMatrixStorageLength(2, 4, 1431655765));
+    } else {
+        const wide_max: usize = @intCast(max);
+        try std.testing.expectEqual(1 + (wide_max - 1) * wide_max, try views.requiredVectorStorageLength(max, max));
+        try std.testing.expectEqual(wide_max * wide_max, try views.requiredMatrixStorageLength(max, max, max));
+        try std.testing.expectEqual(@as(usize, 4294967296), try views.requiredVectorStorageLength(4, 1431655765));
+        try std.testing.expectEqual(@as(usize, 4294967297), try views.requiredMatrixStorageLength(2, 4, 1431655765));
+        // Byte-extent multiplication also rejects overflow without dereferencing
+        // the metadata-only view or manufacturing an invalid backing slice.
+        const huge = zynum.ConstVector(f64){ .values = &short, .length = max, .stride = max };
+        try std.testing.expectError(error.InvalidLength, blas.api.aliasing.vectorRange(f64, huge));
+        const huge_matrix = zynum.ConstMatrix(f64){ .values = &short, .row_count = max, .column_count = max, .leading_dimension = max };
+        try std.testing.expectError(error.InvalidLength, blas.api.aliasing.matrixRange(f64, huge_matrix));
+    }
+
+    // Empty views retain their established no-storage semantics even with
+    // otherwise unusable stride or leading dimension; nonempty ones reject it.
+    _ = try zynum.constVector(f64, &.{}, .{ .length = 0, .stride = 0 });
+    _ = try zynum.vector(f64, short[0..0], .{ .length = 0, .stride = std.math.minInt(zynum.BlasInt) });
+    _ = try zynum.constMatrix(f64, &.{}, .{ .row_count = 0, .column_count = max, .leading_dimension = 0 });
+    _ = try zynum.matrix(f64, short[0..0], .{ .row_count = max, .column_count = 0, .leading_dimension = 0 });
+    try std.testing.expectError(error.InvalidStride, zynum.constVector(f64, &short, .{ .length = 1, .stride = std.math.minInt(zynum.BlasInt) }));
+    try std.testing.expectEqualSlices(f64, &before, &short);
+    try std.testing.expectEqualSlices(f64, &output_before, &output);
 }
 
 test "modern vector Into operations write out of place" {
@@ -98,8 +162,6 @@ test "modern vector Into operations write out of place" {
 }
 
 test "modern matrix vector multiply rejects aliasing without workspace" {
-    if (builtin.mode == .fast) return error.SkipZigTest;
-
     var matrix_data = [_]f64{ 1, 2, 3, 4 };
     var vector_data = [_]f64{ 20, 10 };
     const matrix_view = try zynum.constMatrix(f64, &matrix_data, .{ .row_count = 2, .column_count = 2 });
@@ -111,6 +173,8 @@ test "modern matrix vector multiply rejects aliasing without workspace" {
         .input_vector = input_vector,
         .result_vector = result_vector,
     }));
+    try std.testing.expectEqualSlices(f64, &.{ 20, 10 }, &vector_data);
+    try std.testing.expectEqualSlices(f64, &.{ 1, 2, 3, 4 }, &matrix_data);
 }
 
 test "modern matrix vector multiply workspace supports in-place result" {
@@ -134,8 +198,6 @@ test "modern matrix vector multiply workspace supports in-place result" {
 }
 
 test "modern matrix multiply rejects aliasing without workspace" {
-    if (builtin.mode == .fast) return error.SkipZigTest;
-
     var left_data = [_]f64{ 1, 2, 3, 4 };
     var right_data = [_]f64{ 5, 6, 7, 8 };
     const left_matrix = try zynum.constMatrix(f64, &left_data, .{ .row_count = 2, .column_count = 2 });
@@ -147,6 +209,8 @@ test "modern matrix multiply rejects aliasing without workspace" {
         .right_matrix = right_matrix,
         .result_matrix = result_matrix,
     }));
+    try std.testing.expectEqualSlices(f64, &.{ 1, 2, 3, 4 }, &left_data);
+    try std.testing.expectEqualSlices(f64, &.{ 5, 6, 7, 8 }, &right_data);
 }
 
 test "modern matrix multiply workspace supports in-place result" {
@@ -423,11 +487,13 @@ test "checked Level 1 preserves validation order empty and partial alias rejecti
     try zynum.scaleVectorInto(.{ .input_vector = empty_input, .result_vector = empty, .scale = @as(f64, 2) });
     try std.testing.expectEqual(@as(f64, 0), try zynum.dotProduct(.{ .left_vector = empty_input, .right_vector = empty_input }));
     try std.testing.expectEqual(@as(f64, 0), try zynum.euclideanNorm(.{ .input_vector = empty_input }));
-    if (builtin.mode != .fast) {
-        const overlap = try blas.vector(f64, data[1..4], .{});
-        try std.testing.expectError(error.AliasingNotAllowed, zynum.copyVector(.{ .source_vector = input, .destination_vector = overlap }));
-        try std.testing.expectError(error.AliasingNotAllowed, zynum.addScaledVector(.{ .source_vector = input, .destination_vector = overlap, .scale = @as(f64, 2) }));
-        try std.testing.expectError(error.AliasingNotAllowed, zynum.combineVectorsInto(.{ .source_vector = input, .input_vector = input, .result_vector = overlap, .source_scale = @as(f64, 2), .input_scale = @as(f64, -3) }));
-    }
+    const overlap = try blas.vector(f64, data[1..4], .{});
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.swapVectors(.{ .first_vector = valid, .second_vector = overlap }));
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.copyVector(.{ .source_vector = input, .destination_vector = overlap }));
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.scaleVectorInto(.{ .input_vector = input, .result_vector = overlap, .scale = @as(f64, 2) }));
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.addScaledVectorInto(.{ .source_vector = input, .input_vector = input, .result_vector = overlap, .scale = @as(f64, 2) }));
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.combineVectors(.{ .source_vector = input, .destination_vector = overlap, .source_scale = @as(f64, 2), .destination_scale = @as(f64, -3) }));
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.addScaledVector(.{ .source_vector = input, .destination_vector = overlap, .scale = @as(f64, 2) }));
+    try std.testing.expectError(error.AliasingNotAllowed, zynum.combineVectorsInto(.{ .source_vector = input, .input_vector = input, .result_vector = overlap, .source_scale = @as(f64, 2), .input_scale = @as(f64, -3) }));
     try std.testing.expectEqualDeep(before, data);
 }

@@ -93,8 +93,8 @@ successful factorization; `pivots[k]` must lie in `[k, n)`.
 
 Dimensions, storage capacity, pivot bounds, prohibited overlap, and finite
 input values are checked before mutation in every optimization mode, including
-`fast`. The aliased BLAS view constructors keep their existing BLAS check
-policy; LAPACK operations independently validate those views. Invalid arguments
+`fast`. The aliased BLAS view constructors also validate structure and backing
+capacity in every mode; LAPACK operations independently validate those views. Invalid arguments
 return an error and leave outputs unchanged. Cholesky checks only the selected
 triangle; the opposite triangle and padding are preserved. LU preserves padding
 and the unused pivot tail. Solves preserve factors and pivot storage.

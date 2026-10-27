@@ -4,8 +4,8 @@
 //! User-facing checked BLAS operations for the Zig API.
 //!
 //! These functions translate checked public views into unchecked core operands,
-//! enforce cheap shape contracts in every build and aliasing contracts in checked
-//! builds, and keep BLAS ABI spellings out of the descriptive Zig facade. Default
+//! enforce shape, capacity, and aliasing contracts in every optimization mode,
+//! and keep BLAS ABI spellings out of the descriptive Zig facade. Default
 //! output operations use a no-alias contract; `WithWorkspace` variants provide
 //! explicit temporary storage for caller-approved aliasing.
 
@@ -93,7 +93,6 @@ fn ensureWorkspaceLength(actual: usize, required: usize) Error!void {
 }
 
 fn ensureVectorIntoAliases(comptime T: type, input_vector: anytype, result_vector: anytype) Error!void {
-    if (!views.runtime_checks_enabled) return;
     if (aliasing.vectorsExactlyMatch(input_vector, result_vector)) return;
     try aliasing.ensureNoVectorOverlap(T, input_vector, result_vector);
 }
@@ -249,7 +248,7 @@ pub fn matrixMultiplyWorkspaceLength(arguments: anytype) Error!usize {
 
 /// Swap elements between two mutable vector views over their shared length.
 ///
-/// Exact self-swaps are allowed; partial overlap is rejected in checked builds.
+/// Exact self-swaps are allowed; partial overlap is rejected in every optimization mode.
 pub fn swapVectors(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -269,7 +268,7 @@ pub fn swapVectors(arguments: anytype) Error!void {
 
 /// Copy from `source_vector` to `destination_vector` over their shared length.
 ///
-/// Exact self-copies are no-ops; partial overlap is rejected in checked builds.
+/// Exact self-copies are no-ops; partial overlap is rejected in every optimization mode.
 pub fn copyVector(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -307,7 +306,7 @@ fn scaleVectorAdmitted(operation: *const execution.context.Operation, arguments:
 /// Write `result_vector = scale * input_vector`.
 ///
 /// `input_vector` and `result_vector` must have equal lengths. Exact in-place
-/// use is allowed; other overlap is rejected in checked builds.
+/// use is allowed; other overlap is rejected in every optimization mode.
 pub fn scaleVectorInto(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -330,7 +329,7 @@ pub fn scaleVectorInto(arguments: anytype) Error!void {
 /// length.
 ///
 /// Exact source/destination aliasing is allowed; partial overlap is rejected in
-/// checked builds.
+/// every optimization mode.
 pub fn addScaledVector(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -359,7 +358,7 @@ fn addScaledVectorAdmitted(operation: *const execution.context.Operation, argume
 ///
 /// All three vectors must have equal lengths. `result_vector` may exactly match
 /// `input_vector`; other result/input or result/source overlap is rejected in
-/// checked builds.
+/// every optimization mode.
 pub fn addScaledVectorInto(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -386,7 +385,7 @@ pub fn addScaledVectorInto(arguments: anytype) Error!void {
 /// Accumulate `destination = source_scale * source + destination_scale * destination`.
 ///
 /// The operation runs over the source/destination shared length. Exact aliasing
-/// is allowed; partial overlap is rejected in checked builds.
+/// is allowed; partial overlap is rejected in every optimization mode.
 pub fn combineVectors(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -416,7 +415,7 @@ fn combineVectorsAdmitted(operation: *const execution.context.Operation, argumen
 ///
 /// All three vectors must have equal lengths. `result_vector` may exactly match
 /// `input_vector`; other result/input or result/source overlap is rejected in
-/// checked builds.
+/// every optimization mode.
 pub fn combineVectorsInto(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -493,7 +492,7 @@ pub fn euclideanNorm(arguments: anytype) Error!core.Real(@TypeOf(arguments.input
 /// Compute `result = product_scale * op(matrix) * input + result_scale * result`.
 ///
 /// `product_scale` defaults to one and `result_scale` defaults to zero. The
-/// result vector must not overlap the input vector or matrix in checked builds.
+/// result vector must not overlap the input vector or matrix in every optimization mode.
 pub fn matrixVectorMultiply(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -509,10 +508,8 @@ pub fn matrixVectorMultiply(arguments: anytype) Error!void {
     try result_vector.check();
 
     _ = try checkMatrixVectorShapes(input_matrix, input_vector, result_vector);
-    if (views.runtime_checks_enabled) {
-        try aliasing.ensureNoVectorOverlap(T, result_vector, input_vector);
-        try aliasing.ensureNoVectorMatrixOverlap(T, result_vector, input_matrix);
-    }
+    try aliasing.ensureNoVectorOverlap(T, result_vector, input_vector);
+    try aliasing.ensureNoVectorMatrixOverlap(T, result_vector, input_matrix);
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
@@ -523,7 +520,7 @@ pub fn matrixVectorMultiply(arguments: anytype) Error!void {
 /// result/matrix aliasing.
 ///
 /// `workspace` must contain at least `matrixVectorMultiplyWorkspaceLength`
-/// elements and must not overlap the matrix, input, or result in checked builds.
+/// elements and must not overlap the matrix, input, or result in every optimization mode.
 pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -543,12 +540,10 @@ pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
     const required_workspace = try checkedNonNegativeLength(result_length);
     try ensureWorkspaceLength(workspace.len, required_workspace);
 
-    if (views.runtime_checks_enabled) {
-        const workspace_view = try views.vector(T, workspace, .{ .length = result_length });
-        try aliasing.ensureNoVectorOverlap(T, workspace_view, input_vector);
-        try aliasing.ensureNoVectorOverlap(T, workspace_view, result_vector);
-        try aliasing.ensureNoVectorMatrixOverlap(T, workspace_view, input_matrix);
-    }
+    const workspace_view = try views.vector(T, workspace, .{ .length = result_length });
+    try aliasing.ensureNoVectorOverlap(T, workspace_view, input_vector);
+    try aliasing.ensureNoVectorOverlap(T, workspace_view, result_vector);
+    try aliasing.ensureNoVectorMatrixOverlap(T, workspace_view, input_matrix);
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
@@ -558,7 +553,7 @@ pub fn matrixVectorMultiplyWithWorkspace(arguments: anytype) Error!void {
 /// Compute `result = product_scale * op(left) * op(right) + result_scale * result`.
 ///
 /// `product_scale` defaults to one and `result_scale` defaults to zero. The
-/// result matrix must not overlap either input matrix in checked builds.
+/// result matrix must not overlap either input matrix in every optimization mode.
 pub fn matrixMultiply(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -574,10 +569,8 @@ pub fn matrixMultiply(arguments: anytype) Error!void {
     try result_matrix.check();
 
     try checkMatrixProductShapes(left_matrix, right_matrix, result_matrix);
-    if (views.runtime_checks_enabled) {
-        try aliasing.ensureNoMatrixOverlap(T, result_matrix, left_matrix);
-        try aliasing.ensureNoMatrixOverlap(T, result_matrix, right_matrix);
-    }
+    try aliasing.ensureNoMatrixOverlap(T, result_matrix, left_matrix);
+    try aliasing.ensureNoMatrixOverlap(T, result_matrix, right_matrix);
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));
@@ -588,7 +581,7 @@ pub fn matrixMultiply(arguments: anytype) Error!void {
 /// aliasing.
 ///
 /// `workspace` must contain at least `matrixMultiplyWorkspaceLength` elements
-/// and must not overlap either input matrix or the result in checked builds.
+/// and must not overlap either input matrix or the result in every optimization mode.
 pub fn matrixMultiplyWithWorkspace(arguments: anytype) Error!void {
     var operation = execution.beginDefault();
     defer operation.end();
@@ -607,16 +600,14 @@ pub fn matrixMultiplyWithWorkspace(arguments: anytype) Error!void {
 
     const required_workspace = try matrixProductElementCount(result_matrix);
     try ensureWorkspaceLength(workspace.len, required_workspace);
-    if (views.runtime_checks_enabled) {
-        const workspace_view = try views.matrix(T, workspace[0..required_workspace], .{
-            .row_count = result_matrix.row_count,
-            .column_count = result_matrix.column_count,
-            .leading_dimension = result_matrix.row_count,
-        });
-        try aliasing.ensureNoMatrixOverlap(T, workspace_view, left_matrix);
-        try aliasing.ensureNoMatrixOverlap(T, workspace_view, right_matrix);
-        try aliasing.ensureNoMatrixOverlap(T, workspace_view, result_matrix);
-    }
+    const workspace_view = try views.matrix(T, workspace[0..required_workspace], .{
+        .row_count = result_matrix.row_count,
+        .column_count = result_matrix.column_count,
+        .leading_dimension = result_matrix.row_count,
+    });
+    try aliasing.ensureNoMatrixOverlap(T, workspace_view, left_matrix);
+    try aliasing.ensureNoMatrixOverlap(T, workspace_view, right_matrix);
+    try aliasing.ensureNoMatrixOverlap(T, workspace_view, result_matrix);
 
     const product_scale: T = views.optionField(arguments, "product_scale", core.one(T));
     const result_scale: T = views.optionField(arguments, "result_scale", core.zero(T));

@@ -421,9 +421,12 @@ try blas.matrixMultiply(.{
 });
 ```
 
-All builds check structural fields such as dimensions, strides, and leading
-dimensions. debug, safe, and small also check backing capacity and
-unsupported aliasing; fast omits those capacity and alias checks.
+The checked public Zig BLAS API validates dimensions, strides, leading
+dimensions, storage extent arithmetic, backing capacity, and unsupported
+aliasing in every optimization mode, including fast. Unrepresentable storage
+extents return `InvalidLength`; short backing slices return `BufferTooSmall`.
+Validation errors occur before numerical output writes. The raw-pointer legacy
+interfaces and unchecked kernels retain their separate caller-validated contract.
 
 ## Aliasing Model
 

@@ -4,12 +4,11 @@
 //! Checked public vector and matrix views for the Zig BLAS API.
 //!
 //! Views describe caller-owned buffers; they never allocate or copy data. In
-//! all builds they validate cheap structural invariants such as lengths, strides,
-//! and leading dimensions. debug, safe, and small builds also check
-//! backing slice capacity before operations cross into the unchecked core layer.
+//! every optimization mode they validate structural invariants, checked storage
+//! extents, and backing slice capacity before operations cross into the unchecked
+//! core layer.
 //! Matrices use BLAS-style column-major storage with an explicit leading dimension.
 
-const builtin = @import("builtin");
 const std = @import("std");
 const core = @import("../core/checked.zig");
 const types = @import("../types.zig");
@@ -31,8 +30,8 @@ pub const Error = error{
 
 /// Backwards-compatible alias for the public BLAS API error set.
 pub const BlasError = Error;
-/// True for debug, safe, and small builds; false only in fast.
-pub const runtime_checks_enabled = builtin.mode != .fast;
+/// Compatibility flag: checked public API validation is enabled in every mode.
+pub const runtime_checks_enabled = true;
 
 /// Logical matrix operation applied by multiplication APIs without changing storage.
 pub const MatrixTransform = enum {
@@ -67,34 +66,38 @@ fn absoluteStride(stride: BlasInt) Error!usize {
 }
 
 /// Return the minimum element count required to store a strided vector view.
+/// An extent that cannot be represented by usize returns InvalidLength.
 pub fn requiredVectorStorageLength(length: BlasInt, stride: BlasInt) Error!usize {
     if (length < 0) return error.InvalidLength;
     if (length == 0) return 0;
     const step = try absoluteStride(stride);
     const len: usize = @intCast(length);
-    return 1 + (len - 1) * step;
+    const last_offset = std.math.mul(usize, len - 1, step) catch return error.InvalidLength;
+    return std.math.add(usize, last_offset, 1) catch error.InvalidLength;
 }
 
 /// Return the minimum element count required to store a column-major matrix view.
+/// An extent that cannot be represented by usize returns InvalidLength.
 pub fn requiredMatrixStorageLength(row_count: BlasInt, column_count: BlasInt, leading_dimension: BlasInt) Error!usize {
     if (row_count < 0 or column_count < 0) return error.InvalidLength;
     if (row_count == 0 or column_count == 0) return 0;
     if (leading_dimension < @max(@as(BlasInt, 1), row_count)) return error.InvalidLeadingDimension;
-    return @as(usize, @intCast(row_count)) + (@as(usize, @intCast(column_count - 1)) * @as(usize, @intCast(leading_dimension)));
+    const last_column_offset = std.math.mul(usize, @intCast(column_count - 1), @intCast(leading_dimension)) catch return error.InvalidLength;
+    return std.math.add(usize, @intCast(row_count), last_column_offset) catch error.InvalidLength;
 }
 
-/// Validate a vector view's structural fields in every build, and its backing
-/// slice capacity when runtime checks are enabled.
+/// Validate a vector view's structural fields, extent arithmetic, and backing
+/// slice capacity in every optimization mode.
 pub fn validateVectorStorage(data_len: usize, length: BlasInt, stride: BlasInt) Error!void {
     const required_len = try requiredVectorStorageLength(length, stride);
-    if (runtime_checks_enabled and data_len < required_len) return error.BufferTooSmall;
+    if (data_len < required_len) return error.BufferTooSmall;
 }
 
-/// Validate a matrix view's structural fields in every build, and its backing
-/// slice capacity when runtime checks are enabled.
+/// Validate a matrix view's structural fields, extent arithmetic, and backing
+/// slice capacity in every optimization mode.
 pub fn validateMatrixStorage(data_len: usize, row_count: BlasInt, column_count: BlasInt, leading_dimension: BlasInt) Error!void {
     const required_len = try requiredMatrixStorageLength(row_count, column_count, leading_dimension);
-    if (runtime_checks_enabled and data_len < required_len) return error.BufferTooSmall;
+    if (data_len < required_len) return error.BufferTooSmall;
 }
 
 /// Read an optional field from an anonymous options struct with a typed fallback.
