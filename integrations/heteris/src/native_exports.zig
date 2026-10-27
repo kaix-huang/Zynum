@@ -277,3 +277,46 @@ export fn zynum_native_gemm_f64_nn_v1(storage: ?*anyopaque, m64: u64, n64: u64, 
     reportResult(report, result);
     return c.ZYNUM_NATIVE_OK;
 }
+
+export fn zynum_native_gemm_f64_tn_v1(storage: ?*anyopaque, m64: u64, n64: u64, k64: u64, alpha: f64, a_raw: ?*align(1) const f64, a_backing: u64, lda64: u64, b_raw: ?*align(1) const f64, b_backing: u64, ldb64: u64, beta: f64, c_raw: ?*align(1) f64, c_backing: u64, ldc64: u64, report_arg: ?*align(1) Report) i32 {
+    const a_address = if (a_raw) |pointer| @intFromPtr(pointer) else 0;
+    const b_address = if (b_raw) |pointer| @intFromPtr(pointer) else 0;
+    const c_address = if (c_raw) |pointer| @intFromPtr(pointer) else 0;
+    const storage_address = if (storage) |pointer| @intFromPtr(pointer) else 0;
+    if (report_arg) |raw_report| {
+        const report_address = @intFromPtr(raw_report);
+        if (precheckMetadata(report_address, storage_address, a_address, a_backing) or
+            precheckMetadata(report_address, storage_address, b_address, b_backing) or
+            precheckMetadata(report_address, storage_address, c_address, c_backing)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    }
+    const report = reportPointer(report_arg, storage, @sizeOf(Context)) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const ctx = contextPointer(storage) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const m = dimension(m64) catch |err| return bufferStatus(err);
+    const n = dimension(n64) catch |err| return bufferStatus(err);
+    const k = dimension(k64) catch |err| return bufferStatus(err);
+    const lda = dimension(lda64) catch |err| return bufferStatus(err);
+    const ldb = dimension(ldb64) catch |err| return bufferStatus(err);
+    const ldc = dimension(ldc64) catch |err| return bufferStatus(err);
+    const a = matrixRange(a_address, a_backing, k, m, lda) catch |err| return bufferStatus(err);
+    const b = matrixRange(b_address, b_backing, k, n, ldb) catch |err| return bufferStatus(err);
+    const output = matrixRange(c_address, c_backing, m, n, ldc) catch |err| return bufferStatus(err);
+    if (!std.math.isFinite(alpha) or !std.math.isFinite(beta)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    if (overlaps(output.address, output.required_bytes, a.address, a.required_bytes) or
+        overlaps(output.address, output.required_bytes, b.address, b.required_bytes)) return c.ZYNUM_NATIVE_VIEW_INVALID;
+    // All dimensions, capacities, byte/address arithmetic, alignments and
+    // metadata/output aliases are proven before forming any borrowed slice.
+    const args: native.MatrixProductF64 = .{
+        .left_matrix = .{ .values = constSlice(a), .row_count = k, .column_count = m, .leading_dimension = lda, .operation = .transposed },
+        .right_matrix = .{ .values = constSlice(b), .row_count = k, .column_count = n, .leading_dimension = ldb },
+        .result_matrix = .{ .values = mutableSlice(output), .row_count = m, .column_count = n, .leading_dimension = ldc },
+        .product_scale = alpha,
+        .result_scale = beta,
+    };
+    var result: execution.CallReport = .{};
+    native.matrixMultiplyF64TN(ctx, args, &result) catch |err| {
+        reportResult(report, result);
+        return mathematicalStatus(err);
+    };
+    reportResult(report, result);
+    return c.ZYNUM_NATIVE_OK;
+}

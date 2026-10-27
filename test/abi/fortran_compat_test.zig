@@ -228,19 +228,7 @@ fn referenceGemmNoTransTransposedB(comptime T: type, m: usize, n: usize, k: usiz
     }
 }
 
-fn referenceGemmTransposedA(comptime T: type, transposed_b: bool, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
-    for (0..n) |j| {
-        for (0..m) |i| {
-            var sum: T = 0;
-            for (0..k) |p| {
-                const bv = if (transposed_b) b[matIndex(ldb, j, p)] else b[matIndex(ldb, p, j)];
-                sum = @mulAdd(T, a[matIndex(lda, p, i)], bv, sum);
-            }
-            const idxc = matIndex(ldc, i, j);
-            c[idxc] = @mulAdd(T, alpha, sum, if (beta == 0) 0 else beta * c[idxc]);
-        }
-    }
-}
+const referenceGemmTransposedA = @import("gemm_reference.zig").referenceGemmTransposedA;
 
 fn callGemmNoTrans(comptime T: type, m: usize, n: usize, k: usize, alpha: T, a: []const T, lda: fortran.BlasInt, b: []const T, ldb: fortran.BlasInt, beta: T, c: []T, ldc: fortran.BlasInt) void {
     var ta = [_]u8{'N'};

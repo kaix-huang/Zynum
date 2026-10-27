@@ -848,7 +848,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '8185512d97e8d21da3c424bbf3baa98ba54324761782919742d7502a3898d959'
+CURRENT_TEST_INVENTORY_SHA256 = '2569d13274aa2e8075476bf48c8a25a08041281989e551015b33e59e9f0496af'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = 'f25ebd580dbfcb572385fd85af4499a86ae898b644108c100ca53dada3aa5094'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -4711,11 +4711,26 @@ def _reviewed_host_assembly_source_refresh(previous_sha256: str, current: dict[s
             _fact_digest(_host_assembly_source_facts(current)) == HOST_ASSEMBLY_CURRENT_SOURCE_SHA256)
 
 
+# Exact reviewed TN source-only delta: the original Fortran root gains only
+# the pure oracle dependency; the optional provider roots retain their graph
+# identities and acquire normally discovered receipts/declarations (5 -> 11).
+# This does not bind or create compiler observations, native rows, or namesets.
+TN_ORACLE_PREVIOUS_SOURCE_SHA256 = "f44f7caae9a1bbb1e5a817ae3b65794706194809b71c8c16585ba98bea668755"
+TN_ORACLE_CURRENT_SOURCE_SHA256 = "e49ca061a2381143089d517ecb420109eaf7c7e93896367d6da37082857b2d52"
+
+
+def _reviewed_tn_oracle_source_refresh(previous_sha256: str, current: dict[str, Any]) -> bool:
+    return (previous_sha256 == TN_ORACLE_PREVIOUS_SOURCE_SHA256 and
+            _fact_digest(_host_assembly_source_facts(current)) == TN_ORACLE_CURRENT_SOURCE_SHA256)
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
     """Reconstruct the only source-derived facts allowed to be stale at refresh."""
     host_assembly_migration = _reviewed_host_assembly_source_refresh(
+        _fact_digest(_host_assembly_source_facts(inventory)), discovered)
+    tn_oracle_migration = _reviewed_tn_oracle_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
@@ -4732,6 +4747,8 @@ def _refresh_base_compatible_discovery(
             continue
         if host_assembly_migration:
             continue  # The complete old/new source facts were checked above.
+        if tn_oracle_migration and recorded.get("id") == "zig-root:fortran-tests":
+            continue  # Only this exact root gains the pure helper dependency.
         legacy = dict(current)
         legacy["launch_observation_ids"] = []
         tooling_migration = (
@@ -4937,6 +4954,12 @@ def _refresh_base_compatible_discovery(
              for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
             key=lambda gap: gap["id"],
         )
+    if tn_oracle_migration:
+        # Reconstruct the reviewed old source metadata for base validation only.
+        # The candidate still comes from discover(); native-ledger immutability
+        # and the original whole-file CURRENT/NEXT/publication gates remain.
+        compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
+        compatible["zig_test_files"] = inventory["zig_test_files"]
     compatible["python_test_modules"] = recorded_modules
     compatible["expected_test_sets"] = derived_sets
     compatible["test_mode_rows"] = inventory["test_mode_rows"]

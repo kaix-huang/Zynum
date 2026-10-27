@@ -186,3 +186,8 @@ pub fn multiplyComplexMatricesAdmitted(comptime T: type, operation: *const @impo
 pub fn multiplyF64NNExplicit(operation: *const @import("zynum-execution").Operation, args: operands.MatrixProduct(f64), report: *@import("zynum-execution").CallReport) @import("zynum-execution").ExecutionError!void {
     try @import("../matrix_matrix/gemm.zig").gemmF64NNExplicit(operation, args, report);
 }
+
+/// TN pointer operands retain physical A(k,m); the checked API owns admission.
+pub fn multiplyF64TNExplicit(operation: *const @import("zynum-execution").Operation, args: operands.MatrixProduct(f64), report: *@import("zynum-execution").CallReport) @import("zynum-execution").ExecutionError!void {
+    try @import("../matrix_matrix/planner.zig").transposedAF64Explicit(operation, args.output.row_count, args.output.column_count, args.left.row_count, args.product_scale, args.left.values, args.left.leading_dimension, args.right.values, args.right.leading_dimension, args.output_scale, args.output.values, args.output.leading_dimension, report);
+}

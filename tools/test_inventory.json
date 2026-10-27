@@ -1590,6 +1590,7 @@
         "src/sparse/views.zig",
         "src/zynum.zig",
         "test/abi/fortran_compat_test.zig",
+        "test/abi/gemm_reference.zig",
         "test/abi/reference.zig"
       ],
       "named_dependency_sources": [
@@ -6639,7 +6640,7 @@
           "attachment_owner": "adapter",
           "target": "requested-target",
           "source_sha256": "5b65b41834c8fb3a5a6c05cb6f74b52a73fdfe745d8e02ab63e27c2729c9fda5",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum_c",
@@ -6648,7 +6649,7 @@
           "attachment_owner": "adapter",
           "generator_observation_id": "compile:build.zig:addPlatformLibrary:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-build-options",
@@ -6657,7 +6658,7 @@
           "attachment_owner": "core",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-execution",
@@ -6666,7 +6667,7 @@
           "attachment_owner": "core",
           "target": "requested-target",
           "source_sha256": "2e64fb7ce1e777669d267e9b2bc906aadbf683a703e4ada4b060b40ee3fd0b70",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -6675,7 +6676,7 @@
           "attachment_owner": "core",
           "target": "requested-target",
           "source_sha256": "b2e9cad22b849ae385da637d133275c41208b72be88601a4bf2c38eff12e470b",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -6684,9 +6685,9 @@
           "attachment_owner": "execution",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -6700,7 +6701,7 @@
           "attachment_owner": "execution",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -6709,7 +6710,7 @@
           "attachment_owner": "execution",
           "target": "requested-target",
           "source_sha256": "b2e9cad22b849ae385da637d133275c41208b72be88601a4bf2c38eff12e470b",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -6718,9 +6719,9 @@
           "attachment_owner": "resources",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -6734,7 +6735,7 @@
           "attachment_owner": "upstream",
           "target": "requested-target",
           "source_sha256": "f811c79b9967e2a9f355e265a50249139f9a39854b6f8a8f7c4a77bad6e76893",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         }
       ]
     },
@@ -6940,7 +6941,8 @@
         "src/sparse/scalar.zig",
         "src/sparse/triangular.zig",
         "src/sparse/views.zig",
-        "src/zynum.zig"
+        "src/zynum.zig",
+        "test/abi/gemm_reference.zig"
       ],
       "named_dependency_sources": [
         {
@@ -6950,7 +6952,7 @@
           "attachment_owner": "core",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-execution",
@@ -6959,7 +6961,7 @@
           "attachment_owner": "core",
           "target": "requested-target",
           "source_sha256": "2e64fb7ce1e777669d267e9b2bc906aadbf683a703e4ada4b060b40ee3fd0b70",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -6968,7 +6970,7 @@
           "attachment_owner": "core",
           "target": "requested-target",
           "source_sha256": "b2e9cad22b849ae385da637d133275c41208b72be88601a4bf2c38eff12e470b",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -6977,9 +6979,9 @@
           "attachment_owner": "execution",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -6993,7 +6995,7 @@
           "attachment_owner": "execution",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -7002,7 +7004,16 @@
           "attachment_owner": "execution",
           "target": "requested-target",
           "source_sha256": "b2e9cad22b849ae385da637d133275c41208b72be88601a4bf2c38eff12e470b",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
+        },
+        {
+          "alias": "gemm-test-reference",
+          "path": "test/abi/gemm_reference.zig",
+          "module": "gemm_test_reference",
+          "attachment_owner": "math_module",
+          "target": "requested-target",
+          "source_sha256": "575d972e9d9a5a69caff12130efddfefb9faf684a29b05e4da4b5a973e9b30af",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -7011,9 +7022,9 @@
           "attachment_owner": "math_module",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -7027,7 +7038,7 @@
           "attachment_owner": "math_module",
           "target": "requested-target",
           "source_sha256": "f811c79b9967e2a9f355e265a50249139f9a39854b6f8a8f7c4a77bad6e76893",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-execution",
@@ -7036,7 +7047,7 @@
           "attachment_owner": "math_module",
           "target": "requested-target",
           "source_sha256": "2e64fb7ce1e777669d267e9b2bc906aadbf683a703e4ada4b060b40ee3fd0b70",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -7045,9 +7056,9 @@
           "attachment_owner": "resources",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -7281,7 +7292,7 @@
           "attachment_owner": "adapter",
           "target": "requested-target",
           "source_sha256": "5b65b41834c8fb3a5a6c05cb6f74b52a73fdfe745d8e02ab63e27c2729c9fda5",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum_c",
@@ -7290,7 +7301,7 @@
           "attachment_owner": "adapter",
           "generator_observation_id": "compile:build.zig:addPlatformLibrary:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-build-options",
@@ -7299,7 +7310,7 @@
           "attachment_owner": "core",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-execution",
@@ -7308,7 +7319,7 @@
           "attachment_owner": "core",
           "target": "requested-target",
           "source_sha256": "2e64fb7ce1e777669d267e9b2bc906aadbf683a703e4ada4b060b40ee3fd0b70",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -7317,7 +7328,7 @@
           "attachment_owner": "core",
           "target": "requested-target",
           "source_sha256": "b2e9cad22b849ae385da637d133275c41208b72be88601a4bf2c38eff12e470b",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -7326,9 +7337,9 @@
           "attachment_owner": "execution",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -7342,7 +7353,7 @@
           "attachment_owner": "execution",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -7351,7 +7362,7 @@
           "attachment_owner": "execution",
           "target": "requested-target",
           "source_sha256": "b2e9cad22b849ae385da637d133275c41208b72be88601a4bf2c38eff12e470b",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "adapter-root",
@@ -7360,7 +7371,7 @@
           "attachment_owner": "main",
           "target": "requested-target",
           "source_sha256": "21a61f9709e062fa5aa4900020cc22cfa2a92639db40d6a9296412527376ac63",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -7369,9 +7380,9 @@
           "attachment_owner": "main",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -7385,7 +7396,7 @@
           "attachment_owner": "main",
           "generator_observation_id": "reviewed original-Core shared Options module",
           "external_input": "execution-profile=integrated_native; reference_compat=false",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-execution",
@@ -7394,7 +7405,7 @@
           "attachment_owner": "main",
           "target": "requested-target",
           "source_sha256": "2e64fb7ce1e777669d267e9b2bc906aadbf683a703e4ada4b060b40ee3fd0b70",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-native",
@@ -7402,8 +7413,8 @@
           "module": "native",
           "attachment_owner": "main",
           "target": "requested-target",
-          "source_sha256": "a2b5c57ef32070997b0a92c3d98723bbfffc26b98ed2de0b29028d29e7d01453",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "source_sha256": "53b429f3a280f5d5af29e61319463b6bfe574071d82af3cb527fe87e752bd038",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-core",
@@ -7412,7 +7423,7 @@
           "attachment_owner": "native",
           "target": "requested-target",
           "source_sha256": "f811c79b9967e2a9f355e265a50249139f9a39854b6f8a8f7c4a77bad6e76893",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "zynum-execution",
@@ -7421,7 +7432,7 @@
           "attachment_owner": "native",
           "target": "requested-target",
           "source_sha256": "2e64fb7ce1e777669d267e9b2bc906aadbf683a703e4ada4b060b40ee3fd0b70",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         },
         {
           "alias": "heteris-provider-c",
@@ -7430,9 +7441,9 @@
           "attachment_owner": "resources",
           "generator_observation_id": "compile:build.zig:translateProvider:translated",
           "external_input": "explicit Heteris Data SDK authoritative headers",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1",
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37",
           "input_sha256": {
-            "include/zynum_native.h": "9cc573ee69e064631799b448068006fad1c85eb9f527f4385f126ade86062647"
+            "include/zynum_native.h": "27046ca63182d7c28580b2126ee936fe943b5b1389f1fac38dfc8c929fca480a"
           },
           "external_include_dependencies": [
             "heteris.h",
@@ -7446,7 +7457,7 @@
           "attachment_owner": "upstream",
           "target": "requested-target",
           "source_sha256": "f811c79b9967e2a9f355e265a50249139f9a39854b6f8a8f7c4a77bad6e76893",
-          "build_contract_sha256": "539a8dfd96c0eef2e431089ab74e1a70da849c6574041b02ac8e7c1cc3a56ab1"
+          "build_contract_sha256": "dfe5b37f1ed0578f893cb80b90e195d6cdb34a37e60e9f5464ecec280c0e8c37"
         }
       ]
     }
@@ -10313,6 +10324,42 @@
           "id": "zig-decl:src/native_provider_math_test.zig:4",
           "name": "invalid and empty views never allocate or submit; closing Context rejects valid work",
           "ordinal": 4,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:5",
+          "name": "native TN reuses original Fortran oracle across padded tails large K and tiled packing",
+          "ordinal": 5,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:6",
+          "name": "native TN scaling empty and beta zero preserve provider semantics and NaN no-read",
+          "ordinal": 6,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:7",
+          "name": "native TN each provider allocation failure preserves C and terminal allocation diagnostics",
+          "ordinal": 7,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:8",
+          "name": "native TN both bulks preserve exact rejection execution and callback diagnostics without replay",
+          "ordinal": 8,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:9",
+          "name": "native TN close after quiescent packing keeps one admission and packed lease through C",
+          "ordinal": 9,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:10",
+          "name": "native TN physical validation aliases transforms and closing precedence precede resources",
+          "ordinal": 10,
           "kind": "named"
         }
       ],
@@ -27290,6 +27337,36 @@
           "id": "python-decl:test/build/test_test_inventory.py:92",
           "name": "OperatorPhaseSourceReachabilityTests.test_phase_source_closure_keeps_existing_roots_and_owner_bindings",
           "ordinal": 92
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:93",
+          "name": "TNOracleSourceRefreshTests.test_exact_tn_pair_comes_from_original_walkers_and_declaration_parser",
+          "ordinal": 93
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:94",
+          "name": "TNOracleSourceRefreshTests.test_exact_tn_refresh_base_preserves_source_metadata_and_native_ledger",
+          "ordinal": 94
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:95",
+          "name": "TNOracleSourceRefreshTests.test_tn_helper_replacement_and_extra_reachability_are_rejected",
+          "ordinal": 95
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:96",
+          "name": "TNOracleSourceRefreshTests.test_tn_root_declaration_order_compile_and_launch_drift_are_rejected",
+          "ordinal": 96
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:97",
+          "name": "TNOracleSourceRefreshTests.test_tn_previous_facts_and_correctness_only_receipt_drift_are_rejected",
+          "ordinal": 97
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:98",
+          "name": "TNOracleSourceRefreshTests.test_tn_source_refresh_cannot_change_native_rows_sets_or_bindings",
+          "ordinal": 98
         }
       ],
       "root_ids": [
@@ -34941,7 +35018,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "root_id": "python-root:test-inventory-direct",
       "tests": [
         {
@@ -35408,10 +35485,40 @@
           "id": "test:python-root-test-inventory-direct:92",
           "name": "test/build/test_test_inventory.py::OperatorPhaseSourceReachabilityTests.test_phase_source_closure_keeps_existing_roots_and_owner_bindings",
           "ordinal": 92
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:93",
+          "name": "test/build/test_test_inventory.py::TNOracleSourceRefreshTests.test_exact_tn_pair_comes_from_original_walkers_and_declaration_parser",
+          "ordinal": 93
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:94",
+          "name": "test/build/test_test_inventory.py::TNOracleSourceRefreshTests.test_exact_tn_refresh_base_preserves_source_metadata_and_native_ledger",
+          "ordinal": 94
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:95",
+          "name": "test/build/test_test_inventory.py::TNOracleSourceRefreshTests.test_tn_helper_replacement_and_extra_reachability_are_rejected",
+          "ordinal": 95
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:96",
+          "name": "test/build/test_test_inventory.py::TNOracleSourceRefreshTests.test_tn_root_declaration_order_compile_and_launch_drift_are_rejected",
+          "ordinal": 96
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:97",
+          "name": "test/build/test_test_inventory.py::TNOracleSourceRefreshTests.test_tn_previous_facts_and_correctness_only_receipt_drift_are_rejected",
+          "ordinal": 97
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:98",
+          "name": "test/build/test_test_inventory.py::TNOracleSourceRefreshTests.test_tn_source_refresh_cannot_change_native_rows_sets_or_bindings",
+          "ordinal": 98
         }
       ],
-      "count": 93,
-      "digest": "2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "count": 99,
+      "digest": "cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "enumeration_source": "static"
     },
     {
@@ -51222,7 +51329,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -51237,7 +51344,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -51252,7 +51359,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -53427,7 +53534,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -53442,7 +53549,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -53457,7 +53564,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -55632,7 +55739,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -55647,7 +55754,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -55662,7 +55769,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -57837,7 +57944,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -57852,7 +57959,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -57867,7 +57974,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:2be7894a2a03ea46258941f02c590e6ed35cfc444267200474244c95d0606d0f",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:cf6d93ff892f606cf58ff886125408b81eeeb197e1bd6d36342d15a7857a31ee",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -59886,23 +59993,23 @@
     },
     "test_roots": {
       "count": 49,
-      "digest": "b4db9699fd22161ab50ac751f44bd63667deb09edd7a44044009182e44b144ad"
+      "digest": "9a7100806346479a96056b8535ee5a9a0fca5f294cf3ad4a5aa20a5f7d33028f"
     },
     "correctness_only_roots": {
       "count": 6,
-      "digest": "cb9b4cfaa74ab1d22daac6bf8e68a7bccb8c4d73c054871101394c23be265a94"
+      "digest": "87bd2607bf4d0a26d04341866ab2f6e29476fb295592ac4ccc470af76aee26b6"
     },
     "zig_test_files": {
       "count": 173,
-      "digest": "a7673d9272886db7c432983093e0c4b1ff167dc215221eaedb7f659d7fcaa419"
+      "digest": "381032dc46674a8947717227ad06d1ac5a6e2b2719bd748e92be7bf499b9fabb"
     },
     "python_test_modules": {
       "count": 42,
-      "digest": "f026cd2b65d35c17a3862e2621d155ed6059921ae87fbc62d0512dcbe42e5a17"
+      "digest": "51b209c93a51edd8fb7a7941ad71ac9725db0025692700ea9fb235068b825749"
     },
     "expected_test_sets": {
       "count": 66,
-      "digest": "5d29af845af8fa0c8b3c939a276b1349a11a763e3e098c124e23e3b45290443b"
+      "digest": "a347eb1ca44b27755ee5c83995ebbb799edda8746151d01ccc59d50119ac9882"
     },
     "native_observation_bindings": {
       "count": 147,
@@ -59910,7 +60017,7 @@
     },
     "test_mode_rows": {
       "count": 588,
-      "digest": "580181fba1b51bbf76fbc8988483eecd43b902a37b05d3e2a49480f858804c81"
+      "digest": "9288c14d9f7b3096ed1b437fb209389e495e137979232da380bd8f2356a0ae07"
     },
     "workflow_mode_bindings": {
       "count": 4,

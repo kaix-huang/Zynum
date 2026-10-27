@@ -458,3 +458,53 @@ pub fn noTransF64Explicit(operation: *const execution_api.Operation, m_: BlasInt
     }
     try resources.runChecked(runExplicitF64Task, @ptrCast(tasks.values.ptr), tasks.values.len, report);
 }
+
+const ExplicitTransposedAF64Task = struct {
+    m: usize,
+    k: usize,
+    a: [*]const f64,
+    lda: BlasInt,
+    packed_a: []f64,
+
+    fn run(task: @This()) void {
+        // Only the original packing helper runs on this provider worker.
+        packing.packTransposedA(f64, task.m, task.k, task.a, task.lda, task.packed_a);
+    }
+};
+
+/// One admitted operation spans packing and the original explicit NN planner.
+/// Each synchronous phase has its own diagnostic; the public output describes C.
+pub fn transposedAF64Explicit(operation: *const execution_api.Operation, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: f64, a: [*]const f64, lda: BlasInt, b: [*]const f64, ldb: BlasInt, beta: f64, c: [*]f64, ldc: BlasInt, report: *execution_api.CallReport) execution_api.ExecutionError!void {
+    report.* = .{};
+    if (m_ < 0 or n_ < 0 or k_ < 0) return error.ExtentOverflow;
+    // Preserve NN empty/scaling behavior without reading or packing A/B.
+    if (m_ == 0 or n_ == 0 or k_ == 0 or alpha == 0)
+        return noTransF64Explicit(operation, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, report);
+    const resources = execution_api.admittedResources(operation);
+    if (resources.maxThreads() == 0) return error.Unsupported;
+    const m: usize = @intCast(m_);
+    const k: usize = @intCast(k_);
+    const packed_len = std.math.mul(usize, m, k) catch return error.ExtentOverflow;
+    var allocation_report: execution_api.CallReport = .{};
+    var packed_a = resources.acquireScratch(f64, packed_len, &allocation_report) catch |err| {
+        report.* = allocation_report;
+        return err;
+    };
+    defer packed_a.release(report);
+
+    const task = [_]ExplicitTransposedAF64Task{.{ .m = m, .k = k, .a = a, .lda = lda, .packed_a = packed_a.values }};
+    var packing_report: execution_api.CallReport = .{};
+    resources.runTypedChecked(ExplicitTransposedAF64Task, ExplicitTransposedAF64Task.run, &task, &packing_report) catch |err| {
+        report.* = packing_report;
+        report.output = .unchanged;
+        return err;
+    };
+    // Packing is quiescent here, on the synchronous caller. Never submit NN
+    // from the packing callback or re-admit through the public Context API.
+    var output_report: execution_api.CallReport = .{};
+    noTransF64Explicit(operation, m_, n_, k_, alpha, packed_a.values.ptr, m_, b, ldb, beta, c, ldc, &output_report) catch |err| {
+        report.* = output_report;
+        return err;
+    };
+    report.* = output_report;
+}
