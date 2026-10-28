@@ -848,7 +848,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '7ff2a3cfa10d5032750e092e542eb2ed2462ece03b0f15d98eee686471878cbb'
+CURRENT_TEST_INVENTORY_SHA256 = '104c76c215645c3b651ce12813c5d872b567d99ba0cb56d43ca30eb727019968'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = 'f25ebd580dbfcb572385fd85af4499a86ae898b644108c100ca53dada3aa5094'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -2495,10 +2495,12 @@ def _native_source_closure(
                                                         else "execution-profile=integrated_native; reference_compat=false"),
                                      "build_contract_sha256": BUILD_CHECKER.INJECTION_HELPER_CONTRACT_SHA256["configureIntegrated"]}
                     if provider == "provider_c":
-                        header = "include/zynum_native.h"
-                        receipt["input_sha256"] = {header: hashlib.sha256(
-                            BUILD_CHECKER._frozen_regular_bytes(context, header, "provider translation root")
-                        ).hexdigest()}
+                        receipt["input_sha256"] = {
+                            header: hashlib.sha256(BUILD_CHECKER._frozen_regular_bytes(
+                                context, header, "provider translation repository header input"
+                            )).hexdigest()
+                            for header in BUILD_CHECKER.NATIVE_PROVIDER_TRANSLATION_INPUTS
+                        }
                         receipt["external_include_dependencies"] = ["heteris.h", "heteris_runtime_provider.h"]
                     receipts.append(receipt)
             elif alias in _ZIG_NON_RELATIVE_IMPORTS:
@@ -4747,6 +4749,37 @@ def _reviewed_periodic_laplacian_source_refresh(previous_sha256: str, current: d
             _fact_digest(_host_assembly_source_facts(current)) == PERIODIC_LAPLACIAN_CURRENT_SOURCE_SHA256)
 
 
+
+# Exact original-discovery spectral source-only delta. No compiler/native
+# expectation is created: only the eight existing Core source roots, six
+# correctness roots and appended provider declarations differ in this pair.
+NATIVE_SPECTRAL_PREVIOUS_SOURCE_SHA256 = "8222af6680713f6cfd51821eb0239db098b08b69fa34a6f7b7b3223cdac69473"
+NATIVE_SPECTRAL_CURRENT_SOURCE_SHA256 = "954b0bc4db60007969830868fd88665645d73ff4d05cf45400510dea1598b4d5"
+NATIVE_SPECTRAL_CHANGED_ROOT_IDS = (
+    "zig-root:blas-module-tests",
+    "zig-root:blas-public-surface-contract-tests",
+    "zig-root:cblas-tests",
+    "zig-root:fortran-tests",
+    "zig-root:lapack-tests",
+    "zig-root:modern-tests",
+    "zig-root:sparse-tests",
+    "zig-root:zynum-public-surface-contract-tests",
+)
+NATIVE_SPECTRAL_CHANGED_CORRECTNESS_ROOT_IDS = (
+    "correctness-root:dynamic-dispatch",
+    "correctness-root:checked-cholesky-lifecycle",
+    "correctness-root:lapacke-posv",
+    "correctness-root:heteris-adapter-package",
+    "correctness-root:native-provider-math_tests",
+    "correctness-root:native-provider-c_tests",
+)
+
+
+def _reviewed_native_spectral_source_refresh(previous_sha256: str, current: dict[str, Any]) -> bool:
+    return (previous_sha256 == NATIVE_SPECTRAL_PREVIOUS_SOURCE_SHA256 and
+            _fact_digest(_host_assembly_source_facts(current)) == NATIVE_SPECTRAL_CURRENT_SOURCE_SHA256)
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -4756,6 +4789,8 @@ def _refresh_base_compatible_discovery(
     tn_oracle_migration = _reviewed_tn_oracle_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     periodic_laplacian_migration = _reviewed_periodic_laplacian_source_refresh(
+        _fact_digest(_host_assembly_source_facts(inventory)), discovered)
+    native_spectral_migration = _reviewed_native_spectral_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
@@ -4776,6 +4811,8 @@ def _refresh_base_compatible_discovery(
             continue  # Only this exact root gains the pure helper dependency.
         if periodic_laplacian_migration and recorded.get("id") in PERIODIC_LAPLACIAN_CHANGED_ROOT_IDS:
             continue  # The complete reviewed pair binds these exact records.
+        if native_spectral_migration and recorded.get("id") in NATIVE_SPECTRAL_CHANGED_ROOT_IDS:
+            continue  # Exact spectral pair; no other test root may change.
         legacy = dict(current)
         legacy["launch_observation_ids"] = []
         tooling_migration = (
@@ -4981,7 +5018,7 @@ def _refresh_base_compatible_discovery(
              for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
             key=lambda gap: gap["id"],
         )
-    if tn_oracle_migration or periodic_laplacian_migration:
+    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration:
         # Reconstruct the reviewed old source metadata for base validation only.
         # The candidate still comes from discover(); native-ledger immutability
         # and the original whole-file CURRENT/NEXT/publication gates remain.

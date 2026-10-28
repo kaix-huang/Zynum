@@ -108,6 +108,7 @@ static void laplacian_death_cases(void) {
 }
 
 static void laplacian_runtime_cases(void);
+static void spectral_runtime_cases(void);
 int main(int argc,char **argv) {
  tn_death_cases();
  laplacian_death_cases();
@@ -207,6 +208,7 @@ int main(int argc,char **argv) {
  for(int i=0;i<2;++i)assert(dlclose(clients[i])==0);
 #endif
  laplacian_runtime_cases();
+ spectral_runtime_cases();
  printf("native Runtime C consumer passed; bulk=%u callbacks=%u caller_callbacks=%u\n",atomic_load(&bulk_calls),atomic_load(&callback_calls),atomic_load(&caller_callbacks));return 0;
 }
 
@@ -284,4 +286,257 @@ static void laplacian_runtime_cases(void) {
  assert(real_api.scratch_release(context.lease)==HETERIS_OK);
  assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_OK);
  printf("native periodic Laplacian C validation and direct output cases passed\n");
+}
+
+
+/* Spectral cases use the actual formal provider for Context, passive guard,
+   payload and workspace storage. Invalid numeric-address probes return before
+   dereference and do not attest provenance/lifetime of fabricated objects. */
+struct spectral_case;
+struct spectral_state {
+ unsigned calls,fail_at,nan_at,close_at,reenter,nested,child;
+ int32_t code;
+ void *guard,*nested_guard;uint64_t guard_bytes;
+ double *work,*nested_work;
+ zynum_native_report_v1 child_report;
+ int32_t child_status;
+ unsigned close_busy,after_child,hold;
+ _Atomic unsigned hold_entered,hold_release;
+};
+static int32_t spectral_identity(void *raw,void *context,uint64_t n,uint64_t w,const double *x,uint64_t xb,uint64_t ldx,double *y,uint64_t yb,uint64_t ldy) {
+ (void)raw;(void)context;assert(ldx==n&&ldy==n&&xb==n*w&&yb==n*w);
+ if(n==0||w==0){assert(x==NULL&&y==NULL&&xb==0&&yb==0);return 0;}
+ for(uint64_t j=0;j<w;++j)for(uint64_t i=0;i<n;++i)y[j*ldy+i]=x[j*ldx+i];
+ return 0;
+}
+static int32_t spectral_apply(void *raw,void *context,uint64_t n,uint64_t w,const double *x,uint64_t xb,uint64_t ldx,double *y,uint64_t yb,uint64_t ldy) {
+ struct spectral_state *state=raw;++state->calls;
+ assert(ldx==n&&ldy==n&&xb==n*w&&yb==n*w);
+ if(state->hold){atomic_store_explicit(&state->hold_entered,1,memory_order_release);while(!atomic_load_explicit(&state->hold_release,memory_order_acquire)){} }
+ if(state->reenter){
+  zynum_native_spectral_report_v1 nested_report;const double c0=1;double nested_output=773;
+  assert(zynum_native_chebyshev_series_f64_v1(context,spectral_identity,NULL,0,0,0,NULL,0,UINT64_MAX,&c0,1,1,-1,1,&nested_output,1,UINT64_MAX,state->work,0,state->guard,state->guard_bytes,&nested_report)==ZYNUM_NATIVE_SPECTRAL_BUSY);
+  assert(nested_report.phase==0&&nested_report.admission_attempted==0&&nested_report.callback_returned==0&&nested_output==773);
+ }
+ if(state->nested){
+  zynum_native_spectral_report_v1 nested_report;const double c0=2,input=3;double output=773;
+  assert(zynum_native_chebyshev_series_f64_v1(context,spectral_identity,NULL,0,1,1,&input,1,1,&c0,1,1,-1,1,&output,1,1,state->nested_work,4,state->nested_guard,state->guard_bytes,&nested_report)==ZYNUM_NATIVE_SPECTRAL_OK);
+  assert(output==6&&nested_report.admission_succeeded==1&&nested_report.callbacks_returned==0);
+ }
+ if(!state->after_child&&state->close_at==state->calls){
+  assert(zynum_native_context_request_close_v1(context,&state->child_report)==ZYNUM_NATIVE_OK);
+  assert(zynum_native_context_progress_close_v1(context,&state->child_report)==ZYNUM_NATIVE_BUSY);
+  state->close_busy=1;
+ }
+ if(state->child){
+  const double factor=1;
+  state->child_status=zynum_native_gemm_f64_nn_v1(context,n,w,1,1,x,xb,ldx,&factor,1,1,0,y,yb,ldy,&state->child_report);
+  if(state->after_child&&state->child_status==ZYNUM_NATIVE_OK&&state->close_at==state->calls){
+   assert(zynum_native_context_request_close_v1(context,&state->child_report)==ZYNUM_NATIVE_OK);
+   assert(zynum_native_context_progress_close_v1(context,&state->child_report)==ZYNUM_NATIVE_BUSY);state->close_busy=1;
+  }
+  return state->child_status;
+ }
+ if(state->calls==state->fail_at)return state->code;
+ if(n==0||w==0){assert(x==NULL&&y==NULL&&xb==0&&yb==0);return 0;}
+ for(uint64_t j=0;j<w;++j)for(uint64_t i=0;i<n;++i)y[j*ldy+i]=x[j*ldx+i];
+ if(state->calls==state->nan_at)y[0]=NAN;
+ return 0;
+}
+struct spectral_case {
+ void *context,*guard;uint64_t guard_bytes;
+ struct spectral_state *state;
+ uint64_t n,w,q,xb,ldx,cb,yb,ldy,wb;
+ const double *x,*coeff;double *y,*work;
+ double lower,upper;
+ zynum_native_spectral_apply_f64_v1 apply;
+};
+static int32_t spectral_series(struct spectral_case *a,zynum_native_spectral_report_v1 *report) {
+ return zynum_native_chebyshev_series_f64_v1(a->context,a->apply,a->state,a->state?sizeof *a->state:0,a->n,a->w,a->x,a->xb,a->ldx,a->coeff,a->cb,a->q,a->lower,a->upper,a->y,a->yb,a->ldy,a->work,a->wb,a->guard,a->guard_bytes,report);
+}
+static int32_t spectral_moments(struct spectral_case *a,zynum_native_spectral_report_v1 *report) {
+ return zynum_native_chebyshev_moments_f64_v1(a->context,a->apply,a->state,a->state?sizeof *a->state:0,a->n,a->w,a->x,a->xb,a->ldx,a->q,a->lower,a->upper,a->y,a->yb,a->ldy,a->work,a->wb,a->guard,a->guard_bytes,report);
+}
+static void spectral_bad(struct spectral_case *a,int32_t expected) {
+ zynum_native_spectral_report_v1 report,saved;memset(&report,0x5a,sizeof report);saved=report;
+ assert(spectral_series(a,&report)==expected);
+ if(expected==ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL)assert(memcmp(&report,&saved,sizeof report)==0);
+ else {
+  assert(report.abi_version==1&&report.struct_size==sizeof report&&report.phase==ZYNUM_NATIVE_SPECTRAL_VALIDATION&&report.output_state==0);
+  assert(report.admission_attempted==0&&report.admission_succeeded==0&&report.order_valid==0&&report.callback_returned==0&&report.callbacks_returned==0);
+  assert(report.admission_status==0&&report.callback_status==0&&report.order==0&&report.callback_order==0&&report.reserved[0]==0&&report.reserved[1]==0);
+ }
+}
+struct spectral_worker { struct spectral_case args; int32_t q1,q2; zynum_native_spectral_report_v1 report; pthread_t owner; };
+static int32_t spectral_worker_run(void *raw,uint64_t begin,uint64_t end) {
+ struct spectral_worker *w=raw;assert(begin==0&&end==1);assert(!pthread_equal(pthread_self(),w->owner));
+ w->args.q=1;w->q1=spectral_series(&w->args,&w->report);
+ w->args.q=2;w->args.state->child=1;w->q2=spectral_series(&w->args,&w->report);
+ return 0;
+}
+struct spectral_thread {struct spectral_case args;zynum_native_spectral_report_v1 report;int32_t status;};
+static void *spectral_thread_run(void *raw){struct spectral_thread *t=raw;t->status=spectral_series(&t->args,&t->report);return NULL;}
+static void spectral_runtime_cases(void) {
+ uint64_t gb=777,ga=777,required=777;
+ assert(zynum_native_spectral_guard_query_v1(NULL,&ga)==ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL&&ga==777);
+ assert(zynum_native_spectral_guard_query_v1(&gb,&gb)==ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL&&gb==777);
+ assert(zynum_native_spectral_guard_query_v1(&gb,&ga)==ZYNUM_NATIVE_SPECTRAL_OK&&gb>0&&ga>0&&gb+16<=64);
+ assert(zynum_native_spectral_workspace_elements_v1(0,1,1,1,&required)==ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT&&required==777);
+ assert(zynum_native_spectral_workspace_elements_v1(1,1,1,0,&required)==ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT&&required==777);
+ assert(zynum_native_spectral_workspace_elements_v1(1,0,UINT64_MAX,1,&required)==ZYNUM_NATIVE_SPECTRAL_OVERFLOW&&required==777);
+ assert(zynum_native_spectral_workspace_elements_v1(1,UINT64_MAX,0,1,&required)==ZYNUM_NATIVE_SPECTRAL_OVERFLOW&&required==777);
+ assert(zynum_native_spectral_workspace_elements_v1(2,0,0,UINT64_MAX,&required)==ZYNUM_NATIVE_SPECTRAL_OVERFLOW&&required==777);
+ assert(zynum_native_spectral_workspace_elements_v1(1,3,2,3,&required)==ZYNUM_NATIVE_SPECTRAL_OK&&required==24);
+ assert(zynum_native_spectral_workspace_elements_v1(2,3,2,3,&required)==ZYNUM_NATIVE_SPECTRAL_OK&&required==24);
+ heteris_rp_cpu_create_desc_v1 desc={0};desc.abi_version=1;desc.struct_size=sizeof desc;desc.compute_workers=2;desc.managed_thread_limit=3;desc.max_tasks=8;desc.max_dependencies=8;desc.host_bytes_limit=1u<<20;
+ heteris_rp_token runtime;assert(heteris_cpu_runtime_create_v1(&desc,&runtime)==HETERIS_OK);
+ heteris_runtime_provider_v1 provider;assert(heteris_cpu_runtime_export_provider_v1(runtime,&provider)==HETERIS_OK);
+ heteris_runtime_provider_api_v1 api=*provider.api;
+ zynum_native_context_requirements_v1 req;assert(zynum_native_context_query_v1(&req)==ZYNUM_NATIVE_OK);
+ heteris_rp_scratch_v1 memory[8];
+ assert(api.scratch_allocate(provider.provider,req.bytes,req.alignment,&memory[0])==HETERIS_OK);
+ for(unsigned i=1;i<=2;++i)assert(api.scratch_allocate(provider.provider,gb+16,ga,&memory[i])==HETERIS_OK);
+ for(unsigned i=3;i<8;++i)assert(api.scratch_allocate(provider.provider,128*sizeof(double),8,&memory[i])==HETERIS_OK);
+ void *context=memory[0].data;double *x=memory[3].data,*co=memory[4].data,*y=memory[5].data,*work=memory[6].data,*nested_work=memory[7].data;
+ unsigned char guard_before[64];
+ for(unsigned i=1;i<=2;++i){
+  memset(memory[i].data,0xa5,(size_t)gb+16);memcpy(guard_before,memory[i].data,(size_t)gb+16);
+  assert(zynum_native_spectral_guard_init_v1(memory[i].data,gb-1)==ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+  assert(memcmp(guard_before,memory[i].data,(size_t)gb+16)==0);
+  assert(zynum_native_spectral_guard_init_v1(memory[i].data,gb+16)==ZYNUM_NATIVE_SPECTRAL_OK);
+  for(uint64_t k=gb;k<gb+16;++k)assert(((unsigned char*)memory[i].data)[k]==0xa5);
+ }
+ zynum_native_policy_v1 policy={1,sizeof policy,1,1,{0,0}};zynum_native_report_v1 child_report;
+ assert(zynum_native_context_init_v1(context,req.bytes,&provider,&policy,&child_report)==ZYNUM_NATIVE_OK);
+ assert(api.provider_release(provider.provider)==HETERIS_OK);
+ for(unsigned i=0;i<128;++i){x[i]=NAN;co[i]=NAN;y[i]=773;work[i]=991;nested_work[i]=991;}
+ x[0]=1;x[1]=2;x[4]=3;x[5]=4;co[0]=1;co[1]=2;co[2]=3;
+ struct spectral_state state={0};state.guard=memory[1].data;state.nested_guard=memory[2].data;state.guard_bytes=gb+16;state.work=work;state.nested_work=nested_work;
+ const struct spectral_case base={context,memory[1].data,gb+16,&state,2,2,3,6,4,3,7,4,128,x,co,y,work,-1,1,spectral_apply};
+ struct spectral_case a=base;zynum_native_spectral_report_v1 report;
+ /* Strict preflight wins over logical overflow, invalid callback and BUSY. */
+ a.context=NULL;a.q=UINT64_MAX;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.x=NULL;a.xb=1;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.xb=UINT64_MAX;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.x=(const double*)(UINTPTR_MAX-7);a.xb=2;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.x=(const double*)&state;a.xb=sizeof state/8;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.guard_bytes=gb-1;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.guard=(void*)((uintptr_t)memory[1].data+1);spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ a=base;a.guard_bytes=UINT64_MAX;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ memset(&report,0x5a,sizeof report);zynum_native_spectral_report_v1 saved_report=report;
+ assert(zynum_native_chebyshev_series_f64_v1(context,spectral_apply,&state,0,2,2,x,6,4,co,3,3,-1,1,y,7,4,work,128,memory[1].data,gb+16,&report)==ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ assert(memcmp(&report,&saved_report,sizeof report)==0);
+ a=base;a.apply=NULL;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT);
+ a=base;a.q=0;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT);
+ a=base;a.lower=NAN;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT);
+ a=base;a.upper=INFINITY;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT);
+ a=base;a.lower=1;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_INVALID_ARGUMENT);
+ a=base;a.n=UINT64_MAX;a.w=0;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_OVERFLOW);
+ a=base;a.n=0;a.w=UINT64_MAX;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_OVERFLOW);
+ a=base;a.q=UINT64_MAX;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_OVERFLOW);
+ a=base;a.ldx=UINT64_MAX;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_OVERFLOW);
+ a=base;a.ldx=1;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.xb=5;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.yb=5;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.cb=2;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.wb=15;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.x=(const double*)((uintptr_t)x+1);spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.n=0;a.w=0;a.x=(const double*)((uintptr_t)x+1);a.xb=0;a.y=NULL;a.yb=0;a.work=NULL;a.wb=0;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_VIEW_INVALID);
+ a=base;a.n=0;a.w=0;a.xb=128;a.work=x+127;a.wb=1;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_ALIASING);
+ a=base;a.work=x;a.wb=128;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_ALIASING);
+ a=base;a.y=(double*)co;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_ALIASING);
+ co[0]=NAN;a=base;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_NONFINITE_INPUT);co[0]=1;
+ x[0]=INFINITY;spectral_bad(&a,ZYNUM_NATIVE_SPECTRAL_NONFINITE_INPUT);x[0]=1;
+ assert(state.calls==0);for(unsigned i=0;i<128;++i){assert(y[i]==773);assert(work[i]==991);}
+ /* Identity H, [-1,1]: every T_k(H) is I; independent expected sum=6. */
+ a=base;state.reenter=1;state.nested=1;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK);
+ assert(y[0]==6&&y[1]==12&&y[4]==18&&y[5]==24&&y[2]==773&&y[3]==773&&y[6]==773);
+ assert(state.calls==2&&report.phase==7&&report.order==2&&report.callback_order==2&&report.callbacks_returned==2&&report.callback_status==0&&report.output_state==1);
+ state.calls=0;state.reenter=0;state.nested=0;
+ assert(spectral_moments(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK);
+ assert(y[0]==5&&y[1]==5&&y[2]==5&&y[4]==25&&y[5]==25&&y[6]==25&&y[3]==773&&y[7]==773);
+ assert(state.calls==2&&report.phase==7&&report.output_state==1);
+ for(unsigned i=18;i<128;++i)assert(work[i]==991);
+ /* Staging permits partial X/output overlap and readonly coefficient/X sharing. */
+ double saved_x[128];memcpy(saved_x,x,sizeof saved_x);a=base;a.y=x+1;a.yb=127;
+ state.calls=0;assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK);
+ assert(x[0]==1&&x[1]==6&&x[2]==12&&x[5]==18&&x[6]==24);memcpy(x,saved_x,sizeof saved_x);
+ a=base;a.y=x;a.yb=128;state.calls=0;
+ assert(spectral_moments(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK);
+ assert(x[0]==5&&x[1]==5&&x[2]==5&&x[4]==25&&x[5]==25&&x[6]==25);memcpy(x,saved_x,sizeof saved_x);
+ a=base;x[2]=3;a.coeff=x;state.calls=0;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&y[0]==6&&y[1]==12&&y[4]==18&&y[5]==24);
+ memcpy(x,saved_x,sizeof saved_x);a=base;
+ double saved_y[128];memcpy(saved_y,y,sizeof saved_y);
+ const int32_t codes[]={INT32_MIN,-1,1,8,10,INT32_MAX};
+ for(unsigned i=0;i<sizeof codes/sizeof codes[0];++i){
+  state.calls=0;state.fail_at=2;state.code=codes[i];
+  assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_CALLBACK_FAILURE);
+  assert(report.phase==ZYNUM_NATIVE_SPECTRAL_APPLY&&report.order==2&&report.callback_order==2&&report.callback_status==codes[i]&&report.callbacks_returned==2&&report.admission_status==0&&report.output_state==0);
+  assert(memcmp(saved_y,y,sizeof saved_y)==0);
+ }
+ state.calls=0;state.fail_at=0;state.nan_at=1;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_NUMERICAL_FAILURE);
+ assert(report.phase==ZYNUM_NATIVE_SPECTRAL_RECURRENCE&&report.callback_returned==1&&report.callback_status==0&&report.callbacks_returned==1);
+ assert(memcmp(saved_y,y,sizeof saved_y)==0);state.nan_at=0;
+ a=base;a.n=1;a.w=1;a.xb=1;a.yb=1;a.ldx=UINT64_MAX;a.ldy=UINT64_MAX;a.q=1;
+ state.calls=0;co[0]=2;x[0]=3;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&y[0]==6&&state.calls==0&&report.order_valid==1&&report.order==0&&report.callback_returned==0);
+ x[0]=2;co[0]=0x1.fffffffffffffp1023;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_NUMERICAL_FAILURE&&report.phase==ZYNUM_NATIVE_SPECTRAL_INITIALIZE&&report.order==0&&report.callback_returned==0&&y[0]==6);
+ co[0]=1;x[0]=0x1.fffffffffffffp1023;
+ assert(spectral_moments(&a,&report)==ZYNUM_NATIVE_SPECTRAL_NUMERICAL_FAILURE&&report.phase==ZYNUM_NATIVE_SPECTRAL_MOMENT&&report.callback_returned==0&&y[0]==6);
+ /* A genuinely concurrent same-guard call is BUSY, while malformed control
+    still wins before CAS. The first callback is held on its API caller thread. */
+ a=base;x[0]=1;co[0]=1;state.calls=0;state.hold=1;
+ atomic_store(&state.hold_entered,0);atomic_store(&state.hold_release,0);
+ struct spectral_thread active={0};active.args=a;pthread_t thread;assert(pthread_create(&thread,NULL,spectral_thread_run,&active)==0);
+ while(!atomic_load_explicit(&state.hold_entered,memory_order_acquire)){}
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_BUSY&&report.admission_attempted==0&&report.callback_returned==0);
+ struct spectral_case malformed=a;malformed.apply=NULL;malformed.q=0;malformed.upper=NAN;
+ spectral_bad(&malformed,ZYNUM_NATIVE_SPECTRAL_BUSY);
+ malformed=a;malformed.context=NULL;spectral_bad(&malformed,ZYNUM_NATIVE_SPECTRAL_INVALID_CONTROL);
+ atomic_store_explicit(&state.hold_release,1,memory_order_release);assert(pthread_join(thread,NULL)==0);
+ assert(active.status==ZYNUM_NATIVE_SPECTRAL_OK);state.hold=0;state.calls=0;
+ /* Fully validated empty schedules and their report validity differ by kind. */
+ a=base;a.n=0;a.w=2;a.x=NULL;a.xb=0;a.ldx=UINT64_MAX;a.yb=7;a.q=3;state.calls=0;
+ assert(spectral_moments(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&state.calls==2&&report.order==2&&report.output_state==1);
+ assert(y[0]==0&&y[1]==0&&y[2]==0&&y[4]==0&&y[5]==0&&y[6]==0);
+ a.y=NULL;a.yb=0;a.ldy=UINT64_MAX;state.calls=0;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&state.calls==2&&report.output_state==0&&report.order==2);
+ a=base;a.w=0;a.x=NULL;a.xb=0;a.y=NULL;a.yb=0;a.ldx=UINT64_MAX;a.ldy=UINT64_MAX;a.work=NULL;a.wb=0;state.calls=0;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&state.calls==2&&report.callback_order==2&&report.output_state==0);
+ state.calls=0;
+ assert(spectral_moments(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&state.calls==0&&report.order_valid==0&&report.callback_returned==0&&report.phase==7&&report.output_state==0);
+ state.calls=0;state.fail_at=1;state.code=INT32_MIN;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_CALLBACK_FAILURE&&state.calls==1&&report.callback_status==INT32_MIN&&report.callbacks_returned==1&&report.output_state==0);
+ state.fail_at=0;
+ /* Real Runtime worker: Q1 is permitted; actual nested bulk is rejected. */
+ a=base;a.n=1;a.w=1;a.q=1;a.xb=1;a.yb=1;a.ldx=1;a.ldy=1;x[0]=1;co[0]=1;co[1]=1;state.calls=0;
+ struct spectral_worker worker={0};worker.args=a;worker.owner=pthread_self();heteris_rp_bulk_result_v1 outcome;
+ assert(api.cpu_bulk_sync(provider.provider,0,1,1,1,spectral_worker_run,&worker,&outcome)==HETERIS_OK);
+ assert(worker.q1==ZYNUM_NATIVE_SPECTRAL_OK&&worker.q2==ZYNUM_NATIVE_SPECTRAL_CALLBACK_FAILURE);
+ assert(state.child_status==ZYNUM_NATIVE_WOULD_DEADLOCK&&state.child_report.provider_status==HETERIS_WOULD_DEADLOCK);
+ assert(worker.report.admission_succeeded==1&&worker.report.callback_status==ZYNUM_NATIVE_WOULD_DEADLOCK&&worker.report.phase==ZYNUM_NATIVE_SPECTRAL_APPLY);
+ /* Closing after the first successful child invalidates the next child's
+    independent admission, while the successful outer admission stays valid. */
+ heteris_rp_scratch_v1 extra_context;assert(api.scratch_allocate(provider.provider,req.bytes,req.alignment,&extra_context)==HETERIS_OK);
+ assert(zynum_native_context_init_v1(extra_context.data,req.bytes,&provider,&policy,&child_report)==ZYNUM_NATIVE_OK);
+ struct spectral_case between=base;between.context=extra_context.data;between.n=1;between.w=1;between.xb=1;between.yb=1;between.ldx=1;between.ldy=1;
+ state.calls=0;state.child=1;state.close_at=1;state.after_child=1;state.close_busy=0;
+ assert(spectral_series(&between,&report)==ZYNUM_NATIVE_SPECTRAL_CALLBACK_FAILURE&&state.calls==2&&state.close_busy==1);
+ assert(report.admission_succeeded==1&&report.admission_status==0&&report.order==2&&report.callback_order==2&&report.callbacks_returned==2&&report.callback_status==ZYNUM_NATIVE_CONTEXT_CLOSING);
+ assert(state.child_status==ZYNUM_NATIVE_CONTEXT_CLOSING);
+ assert(zynum_native_context_progress_close_v1(extra_context.data,&child_report)==ZYNUM_NATIVE_OK);
+ assert(api.scratch_release(extra_context.lease)==HETERIS_OK);state.after_child=0;
+ state.child=0;state.calls=0;state.close_at=2;a=base;a.q=3;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_OK&&state.close_busy&&report.phase==7&&report.admission_succeeded==1);
+ state.calls=0;
+ assert(spectral_series(&a,&report)==ZYNUM_NATIVE_SPECTRAL_CONTEXT_FAILURE&&report.phase==ZYNUM_NATIVE_SPECTRAL_ADMISSION&&report.admission_attempted==1&&report.admission_succeeded==0&&report.admission_status==ZYNUM_NATIVE_CONTEXT_CLOSING&&report.callback_returned==0);
+ assert(zynum_native_context_progress_close_v1(context,&child_report)==ZYNUM_NATIVE_OK);
+ for(unsigned i=1;i<=2;++i)for(uint64_t k=gb;k<gb+16;++k)assert(((unsigned char*)memory[i].data)[k]==0xa5);
+ for(unsigned i=0;i<8;++i)assert(api.scratch_release(memory[i].lease)==HETERIS_OK);
+ assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_OK);
+ printf("native spectral C controls, guard, reports, empty, worker and close cases passed\n");
 }

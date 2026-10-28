@@ -18098,5 +18098,94 @@ class PotriComponentInventoryContractTests(unittest.TestCase):
                          {key: graph["module_borrow_variants"][key] for key in CHECKER.POTRI_MODULE_BORROWS})
 
 
+
+class NativeSpectralHeaderSourceContractTests(unittest.TestCase):
+    """Nested public header inputs cannot disappear behind the umbrella root."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.source = (REPOSITORY_ROOT / "build.zig").read_text()
+
+    def test_exact_two_header_inputs_single_root_and_install_edge(self) -> None:
+        headers = ("include/zynum_native.h", "include/zynum_native_spectral.h")
+        self.assertEqual(headers, CHECKER.NATIVE_PROVIDER_TRANSLATION_INPUTS)
+        template = CHECKER.INJECTION_OBSERVATION_TEMPLATES["compile:build.zig:translateProvider:translated"]
+        self.assertEqual([headers[0]], template["root_source"])
+        self.assertEqual({path: hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest()
+                          for path in headers}, template["input_sha256"])
+        self.assertEqual(["heteris.h", "heteris_runtime_provider.h"], template["external_include_dependencies"])
+        identifier = "install:build.zig:addPlatformLibrary:include/zynum_native_spectral.h"
+        row = CHECKER.INJECTION_OBSERVATION_TEMPLATES[identifier]
+        self.assertEqual([headers[1]], row["source"])
+        self.assertEqual(["zig-out/include/zynum_native_spectral.h"], row["destination"])
+        step = CHECKER.INJECTION_OBSERVATION_TEMPLATES["step:build.zig:addPlatformLibrary:platform"]
+        self.assertEqual(1, sum(r["id"] == identifier for r in step["direct_dependencies"]))
+        classifications = {r["path"]: r for r in CHECKER.INJECTION_SOURCE_CLASSIFICATIONS}
+        for path in (headers[1], "integrations/heteris/src/native_spectral_exports.zig",
+                     "src/numerics/checked_spectral.zig", "src/numerics/spectral_native.zig"):
+            self.assertEqual(hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest(),
+                             CHECKER.INJECTION_SOURCE_SHA256[path])
+            self.assertEqual("public-api" if path.endswith(".h") else "library-source", classifications[path]["owner"])
+            self.assertEqual("non-generated-source", classifications[path]["class"])
+
+    def test_missing_mutated_nested_header_rejects_original_frozen_source_guard(self) -> None:
+        tables = (CHECKER.GELSS_SOURCE_SHA256, CHECKER.GELS_SOURCE_SHA256, CHECKER.GVD_SOURCE_SHA256,
+                  CHECKER.EVD_SOURCE_SHA256, CHECKER.CONTROLS_SOURCE_SHA256, CHECKER.SYGV_SOURCE_SHA256,
+                  CHECKER.SYEV_SOURCE_SHA256, CHECKER.CONTOUR_SOURCE_SHA256, CHECKER.FEAST_SOURCE_SHA256,
+                  CHECKER.FFTW_F32_SOURCE_SHA256, CHECKER.POTRI_OWNER_SOURCE_SHA256,
+                  CHECKER.SHARED_FACADE_SOURCE_SHA256, CHECKER.EXECUTION_SOURCE_SHA256,
+                  CHECKER.EXECUTION_OBJECT_SOURCE_SHA256, CHECKER.COMMON_CORE_SOURCE_SHA256,
+                  CHECKER.MANAGED_LAPACKE_SOURCE_SHA256, CHECKER.MANAGED_SPARSE_SOURCE_SHA256,
+                  CHECKER.UNIFIED_BLAS_SOURCE_SHA256, CHECKER.OPERATOR_PHASE_SOURCE_SHA256,
+                  CHECKER.INJECTION_SOURCE_SHA256)
+        with tempfile.TemporaryDirectory(prefix="spectral-header-source-") as directory:
+            root = Path(directory)
+            (root / "build.zig").write_text("pub fn build() void {}\n")
+            paths = {CHECKER.NUMERICS_RESOURCES_PATH} | {path for table in tables for path in table}
+            for path in paths:
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((REPOSITORY_ROOT / path).read_bytes())
+            context = CHECKER._make_discovery_context(root)
+            CHECKER._numerics_resources_source_contract(context)
+            header = root / "include/zynum_native_spectral.h"
+            original = header.read_bytes()
+            header.write_bytes(original + b"\n/* unreviewed nested input */\n")
+            with self.assertRaisesRegex(CHECKER.InventoryError, "native injection source-only bytes drifted: include/zynum_native_spectral.h"):
+                CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+            header.unlink()
+            with self.assertRaises((CHECKER.InventoryError, CHECKER.repository_snapshot.RepositorySnapshotError)):
+                CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+            header.write_bytes(original)
+            CHECKER._numerics_resources_source_contract(CHECKER._make_discovery_context(root))
+
+    def test_wrong_root_and_duplicate_translation_reject_original_helper_guard(self) -> None:
+        changes = (
+            ('.root_source_file = b.path("include/zynum_native.h"),',
+             '.root_source_file = b.path("include/zynum_native_spectral.h"),'),
+            ('const provider_c = translateProvider(b, target, optimize, heteris_include);',
+             'const provider_c = translateProvider(b, target, optimize, heteris_include);\n    const duplicate_c = translateProvider(b, target, optimize, heteris_include);'),
+        )
+        for old, new in changes:
+            self.assertIn(old, self.source)
+            # The same declaration also exists in the reference branch.
+            # Bind this mutation to the integrated helper whose seam is tested.
+            start = self.source.index("fn configureIntegrated(") if old.startswith("const provider_c") else 0
+            position = self.source.index(old, start)
+            changed = self.source[:position] + new + self.source[position + len(old):]
+            with self.subTest(anchor=old), self.assertRaisesRegex(CHECKER.InventoryError, "reviewed native configure seam changed"):
+                CHECKER._reviewed_configure_projection(changed)
+
+    def test_false_header_install_source_destination_and_missing_edge_reject(self) -> None:
+        call = 'b.installFile("include/zynum_native_spectral.h", "include/zynum_native_spectral.h");'
+        self.assertEqual(1, self.source.count(call))
+        for replacement in (
+            'b.installFile("include/zynum_native.h", "include/zynum_native_spectral.h");',
+            'b.installFile("include/zynum_native_spectral.h", "include/unreviewed.h");',
+            '',
+        ):
+            with self.subTest(replacement=replacement), self.assertRaisesRegex(CHECKER.InventoryError, "reviewed native configure seam changed"):
+                CHECKER._reviewed_configure_projection(self.source.replace(call, replacement, 1))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -90,4 +90,5 @@ const void *zynum_native_execution_identity_v1(void);
 #ifdef __cplusplus
 }
 #endif
+#include "zynum_native_spectral.h"
 #endif

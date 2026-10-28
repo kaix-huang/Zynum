@@ -44,7 +44,7 @@
     }
   ],
   "build_root_digests": {
-    "build.zig": "56a9fee49ee1487704faf3bd19b23f89e5055331108dcb09506ceb05709b077c",
+    "build.zig": "6d87c66d47eabbf0e7414eeed32c6c80801f32d411511aba0620ac4327285484",
     "examples/zig/build.zig": "561f043bbebe2644098a25adebc9931a76560309fc4a830d6b4f05ad8f6d7b09",
     "integrations/heteris/build.zig": "df4a3f323566c501248c54d509cc47e18cba1d4924089835c0a7d0ae550cea2b"
   },
@@ -1446,7 +1446,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "e867c387719aec78a0efd99f120b9b2e39877b214fa19fcd4ada38d925463500"
+      "source_digest": "750e89f5346ed2a760d90c1683582bbdad01d249c75c5d46c64b60d00b882106"
     },
     {
       "owner": "build-composition",
@@ -1515,7 +1515,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "9dbb380a0272dd8d2838699139d46e10c64b181f001e27e9e0cf2ad77dafb4ac"
+      "source_digest": "522930422da3a2127d25b4942e4a38c0f944a3b47c80dbee743dbf55edfe2ab1"
     },
     {
       "owner": "test-infrastructure",
@@ -1544,7 +1544,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "d02ff2fbe25dda74af32f09285a3ee45d4bdfc3680c74fca9b55561b5a2375c0"
+      "source_digest": "49a36e5f0b5ff5cb21fe538614e41e731c44099f416f0f5dada3ada8b81fe9c4"
     },
     {
       "owner": "build-composition",
@@ -1572,7 +1572,7 @@
         "ordinal": 1
       },
       "call": "b.addTranslateC",
-      "source_digest": "8f12d90c6babd5f79f253011465a9484f48550fbba5261a4cf1e076bbe8cb340"
+      "source_digest": "170ff3c93cea728ca19bd44e8c9099dba0e150103ad9fe334ea6edcc6d6c5b99"
     },
     {
       "artifact_kind": "object",
@@ -1616,7 +1616,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "faa9c9f9676c623d8da1f76476e379e84cd4c3e7c005bf9d6ec488dc97ece4c1"
+      "source_digest": "4af780e279155b8d770b3a45a7dd1b854decddea2b25b5b91a027ddefee1ac01"
     },
     {
       "artifact_kind": "library",
@@ -1671,7 +1671,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "ec534fccc9d278c6b1545fafb601d3a2919a61e6903c997ef0e9078eed2b585d"
+      "source_digest": "f992c6b1fa53ebe3362bc65547a53929b4a455509249076bda2ba1fd24381ba4"
     },
     {
       "id": "compile:build.zig:build:bench",
@@ -1683,7 +1683,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "875a5a74f1e050d4a116a607f87bea9f5cab0883ff82fa87a786bf191515a1f8",
+      "source_digest": "ec070460bd56a916598480085c011f3ecffcbded4298b585cdb6e30a5a88ae9f",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "bench-zynum-blas",
@@ -1714,7 +1714,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "4c08b8f5280a034de7e513efd79d08ee8f54f9950dbda3ab030e2b28a07a2a9d",
+      "source_digest": "60f7ed19ecf2637c3cbeeffe109daee4d2aac408398041beb84913a266750793",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-module-tests",
@@ -1742,7 +1742,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "81625cda4e8e708e6b8a1563e2711d3c39c4a04f05292b7606ec0879d31c4a86",
+      "source_digest": "e30f910979b26e6a3560d118109c4c9566f0d1d6774851f5b2ded9717b076f89",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-public-surface-contract-tests",
@@ -1770,7 +1770,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "b54d8d8d38311e46da8ce7f53c01fb1ee262bca25f05ab0192fee44512e6db4a",
+      "source_digest": "a50d7f4b883bbe0db9d08fb8de976de5300f0f5a3b9193f8ad57b10650d0f1c7",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-cblas-compat-tests",
@@ -1814,7 +1814,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "83044d0aaddf638907692a1b564fd52831584784c436b143d0c1e321ffaf1df1",
+      "source_digest": "21120fa9af392edf1c8198321b9da3df85fb2369937716178406fed351a34d4c",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -1845,7 +1845,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "e8185a94c232a65531460913881f802c1083e0f2ca52b57dd270a722518a06b9"
+      "source_digest": "2b4d33d8c46acbebb529c3e6c895121644902b0766ca41a66ac419eb0826f8a8"
     },
     {
       "owner": "build-composition",
@@ -1873,7 +1873,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "501dc0109e661187cc1ca74fce6941947cd12ce43f049950b0b2c7f32c3eedc6",
+      "source_digest": "074cc50511a8e7bffd0c60e3886bf5af31ab4961e091822cc215d192c0d37916",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -1936,7 +1936,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "a3ad788d284e2e16ce775b899cae44563e05ce3178bfd4475da346c80cc3f1e9",
+      "source_digest": "596ebbb3b565bb5faff10c3600ff31b6bae546dbc6a961d92e02ac7e7c6f0fa2",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -1990,7 +1990,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "cd6b84732454f77ad2d90ed329ea8ece7bf0a13a6066ce73b3b6be9c7658899a",
+      "source_digest": "3cdde2347bebab34cbabba52697ba812fc74553d9562fc6675c61d9e5be01584",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -2040,7 +2040,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "64fee4c82772cac690a55b7bd9c11a3ed59684e4aa917a899e110d0dff154570",
+      "source_digest": "2dac34848ef8c9aeb2c05b695406976bfb075e662e7a47a0a4b02edd95da16cf",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -2090,7 +2090,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "05e617ba7b9d16f0089b16e1ae04cc43bb5851046f1d1ecce1c666d4d5bc0a5d",
+      "source_digest": "2ace9769a9da4572f7d0f9760cc2dcdf52dd3c73711fe44f1536899cd8973fec",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -2103,7 +2103,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "2e8f9bf9306f42cb172d1f5c257c3fd5d6fa8626b1a64e2d2dad04b90cfa8974",
+      "source_digest": "4032c411391c2898e8d9d11832d5019bccadf8c7951de7cbf71c0d9d0be9a9e1",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-compact-triangular-isolated",
@@ -2150,7 +2150,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "053d0882d0ab728929780ef342abcaa1fd43f5699ce0c5aae8a0e44aa4807ab0",
+      "source_digest": "2ac6de446cdcaa4fd16899c2a66ab3064b0e13b51fff9e503a9126604425d647",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-compact-triangular-isolated-test",
@@ -2228,7 +2228,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "77885e5b6c7061b37e213809ed5848457bc5dc80dac083e075706b4e95748efd",
+      "source_digest": "9f2e5b22fded927216abbaa10353d8410413f287956abad57546b86004fbcb88",
       "bundle_compiler_rt": true
     },
     {
@@ -2241,7 +2241,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "e3f31bd709d17f1dade71724c54c2248eea120b76e3c93e05c6f4f833cc465a1",
+      "source_digest": "69c1ecddef8c6a908ff13f7e09a268d7b70f42fe7072f162a2951e7bdb31725e",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "dcopy-probe",
@@ -2288,7 +2288,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "a974192e054563eb176cbd76e0c98c3c77d09377103958cf01324a3e31c05cd4",
+      "source_digest": "74b925a964de4d0feb59426a9daf86b29d977cd444796ae2be1cb0ad619f643e",
       "artifact_role": "dynamic-dispatch-correctness-only"
     },
     {
@@ -2317,7 +2317,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "2ee2304d1c50fb8d338010a91bdd312b81c64aacf2c639206fcd0c132b640c46"
+      "source_digest": "52a3744b76c8858cac339f93733a729ac9633f15baf2455f416b20249793b8bf"
     },
     {
       "id": "compile:build.zig:build:fortran_tests",
@@ -2329,7 +2329,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "7307a3fdaa614f68f1d55f0f72e23f4ef2b0d7c4cd96e5943fc37cebafc25ad0",
+      "source_digest": "035200d6cd8a06dde1b1c1f346bc4b827181303679a9409307d4e9c9fbab7fcf",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-fortran-compat-tests",
@@ -2357,7 +2357,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "40463618e7f715d2bc4d2e149f99ee88aa8ac0a24eec8a5e0ca937b6fc8a7162",
+      "source_digest": "98b5ebfff14692674976e321620ac921ac45bc92dc85bebc3b5d12b485bf209f",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-gemm-registry-tests",
@@ -2385,7 +2385,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "411ca5923e8f229fb9c140962626ae70adcf19f8f6f2d4b205ed96d4bdd1dcc4",
+      "source_digest": "44cb78d5d154bdbda153bc99eb2c118e7699bc5bfe58d473713b33ac3f0e7904",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "gemm-sweep",
@@ -2416,7 +2416,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "5895abe83b5cb273f2b19d56b498bc94aec29760a51f5911be3dc50f5a69b743",
+      "source_digest": "b70e944e10e84a24bd7ed9af94dfb88185572598670ed1a84fe0316ae86ccc01",
       "owner": "build-composition",
       "artifact_kind": "executable",
       "output_name": "generate_compat_headers",
@@ -2444,7 +2444,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "ecc25feec12bccecae1c47e8cb2dcaa7371c65a34b64b3a6ae89c65c4ca12773",
+      "source_digest": "90e28a62189b88d5bc47b4200a4a186b24dc92817e869efd712d669c7bb4ae71",
       "owner": "build-composition",
       "artifact_kind": "executable",
       "output_name": "generate_kernel_coverage",
@@ -2472,7 +2472,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "e79842bee31081d8a40ba907de1971e020852d1d7ff06c529abe0382c6d6363c",
+      "source_digest": "9d4bc823e55b8708b57247d1820754c6645ebbc21d3868b828b2b0291c053177",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-header-smoke-tests",
@@ -2539,7 +2539,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "3aac093e0d7362ddd7c5302807580e903a558476aed1ccb161eabc97d1c8e555",
+      "source_digest": "85a986e1d9de466a66fd090f2cd04f59a525f96a79525c4de1140213a6cd2618",
       "artifact_role": "test-inventory-enumerator-factory",
       "expansion_relation": "one-per-applicable-logical-zig-root",
       "root_module_relation": "same-pointer",
@@ -2761,7 +2761,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "d88a34bd59eeaba4a8404c6306909cd34d85e8135db534311c797a3a0782ee1f"
+      "source_digest": "5fa6ffe5e198bea413bf21a880629ddf068716f2ac90b9a34f0a5c5d7534241c"
     },
     {
       "artifact_kind": "object",
@@ -2805,7 +2805,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "8bdd760dfbbff044692fa34a5bfb94df11cbbbcd8e3350a38337e6dc16db556b"
+      "source_digest": "c291dd4a8808a5e2b731469a88de35b869442174c8711042c4c983525f695be7"
     },
     {
       "artifact_kind": "library",
@@ -2870,7 +2870,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "70cd2d47c0c77a1e31ea09701ab30bd611879df42ab5dd8278c67796e2997a93",
+      "source_digest": "f0bf7391922436e2c5d5f97322f5b5f703912bd0138bd172ac65ebb898b8846a",
       "source_variants": {
         "lapacke-controls=false,lapacke-potri=false,lapacke-getri=false,lapacke-trtri=false,lapacke-trtrs=false,lapacke-posv=false": "interface_subset/mkl2026.ilp64/potrf-potrs-getrf-getrs-gesv-stev-gelsd-ordinary-ilp64-v1/exports.zig",
         "lapacke-controls=false,lapacke-potri=false,lapacke-getri=false,lapacke-trtri=false,lapacke-trtrs=false,lapacke-posv=true": "interface_subset/mkl2026.ilp64/potrf-potrs-getrf-getrs-gesv-stev-gelsd-posv-ordinary-ilp64-v1/exports.zig",
@@ -2934,7 +2934,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "e7cc9465844ade9fb8bc0e981a23c155f311813552d8c4cfe4757fa076da44fd"
+      "source_digest": "1a564ccda603f934c2fcb6327d3b65f3d8bf8a71164ae4181c1cde2588b919b5"
     },
     {
       "artifact_kind": "library",
@@ -3117,7 +3117,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "dc2c92709bfdd8aeeeb20e600150e45fb7f72ad4b580af47976948577f8d3581",
+      "source_digest": "9dbb695053ec4b5570ba6ba1d4e68985ade6bb3d8f529e79e35ce5dbfcb651a4",
       "source_variants": {
         "lapacke-gelss=false,lapacke-gels=false,lapacke-gvd=false,lapacke-evd=false,lapacke-controls=false,lapacke-sygv=false,lapacke-syev=false,lapacke-potri=false,lapacke-getri=false,lapacke-trtri=false,lapacke-trtrs=false,lapacke-posv=false,lapacke-svd=false,lapacke-complex-gelsd=false,lapacke-qr=false": "interface_subset/mkl2026.lp64/potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-ordinary-lp64-v1/exports.zig",
         "lapacke-gelss=false,lapacke-gels=false,lapacke-gvd=false,lapacke-evd=false,lapacke-controls=false,lapacke-sygv=false,lapacke-syev=false,lapacke-potri=false,lapacke-getri=false,lapacke-trtri=false,lapacke-trtrs=false,lapacke-posv=false,lapacke-svd=false,lapacke-complex-gelsd=false,lapacke-qr=true": "interface_subset/mkl2026.lp64/potrf-potrs-getrf-getrs-gesv-stev-gelsd-heev-hegv-geqrf-ormqr-unmqr-orgqr-ungqr-ordinary-lp64-v1/exports.zig",
@@ -3285,7 +3285,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "79a411783725e10b6bcb63138c6a8d84efe174114791ea1cee9f1250815abc7a"
+      "source_digest": "656c4c0792addc9d387726fdc2e82347a2b7c03fd3d82e948c562eb2fe78a168"
     },
     {
       "id": "compile:build.zig:build:level1_probe",
@@ -3297,7 +3297,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "9ce8f2472b325f6058374ac33a0c9a0a2e8c5dd043324bdcbfdd64e3511dcf6f",
+      "source_digest": "626be9533075f3770b8dd9c695e2052f15aa2b6a159217ac810ef3f199964023",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "level1-probe",
@@ -3328,7 +3328,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "8e453c08a53f2dbc4cf2f7b494ab6458cdcd71777774f0a9710a81029748ad9c",
+      "source_digest": "4bc6790462eed8e385b8b2a1bfb776616f8f6666bba557a25e8f0d5e346aa6d2",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-level1-registry-tests",
@@ -3356,7 +3356,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "49ad6532b9195432bb79fbf42ed6821b2c185b7290eb3bcca07a5892e62db736",
+      "source_digest": "51d06f10d351057dfe8376361e22e5d0bbd04fb78f730173f13162890c3d2c23",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-level2-compact-registry-tests",
@@ -3384,7 +3384,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "c916f9db20458bd1e62fce231a93c88ce1a195196626eff5e2e3f49e3afcbe58",
+      "source_digest": "ebf64b7fff1cd7a0e7089db0bfe07ea287a4cdf011d00d069d6638d5049b494a",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-level2-fused-registry-tests",
@@ -3429,7 +3429,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "467eb6172e39923b5b2e67d37e9d440b9dcef004b81d31803200215711623d49",
+      "source_digest": "6f0f46729062f9b2764ccb89eef01d6a1f26648cf054fa7ef559f1e03f80fb45",
       "probe_contract_source": "test/build/level2_width_artifact_probe_contract.zig"
     },
     {
@@ -3460,7 +3460,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "eed532e6c2ebded19a24135af92df98d7a86ea388dbe1da6f8d6521a50730dfa"
+      "source_digest": "12313ea567da7c74fcb8a8cbb51eb0c490e4a36094de3a9a862d602a99f48fb7"
     },
     {
       "id": "compile:build.zig:build:level2_width_isolated_library",
@@ -3472,7 +3472,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "e3b2e957fb4ef6cf240cc7c7e41edf3b7ff9dc71fe65f20d1d11ba23d78ff402",
+      "source_digest": "6b1f5d242904bcfa0b4e028147fa75148227505ad1614b0751e566addb251bc0",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-width-isolated",
@@ -3519,7 +3519,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "5279116fd736bc1e1ca396e164e16ab718e5ca5e8f201e79c5de039d00860912",
+      "source_digest": "29687899c3eb658be4842fb69e79012a8289b017aa6d46bbef6d0ea52382b9db",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level2-x86-width-isolated-test",
@@ -3566,7 +3566,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "3ee10d0e861b124888f9f071317733988f6223e269e561bad8056cbc8d1501d3",
+      "source_digest": "be1239d49e506adf3622d16566a5ef2b53c8634111199e33ced9f7d6d478c439",
       "owner": "build-composition",
       "artifact_kind": "library",
       "output_name": "zynum_blas",
@@ -3631,7 +3631,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "bf72589f2d6d9ad99052ad779f630ba67c8da301453feaab3ff456b4659b074c",
+      "source_digest": "4b63b4b9680148a1214de7473bacd609da3969bee27236052bf8fc0a88235d2f",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-modern-tests",
@@ -3675,7 +3675,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "0e05d0822b19e9e3b6e53a9fe9270c639767608ef6703d8d58eff8f54fee28d9"
+      "source_digest": "9c4c2b6fdfd581ea417bdd0adbcef25443c4e1ca22a0e9b07c03f603849cdcd8"
     },
     {
       "id": "compile:build.zig:build:packed_parallel_tests",
@@ -3687,7 +3687,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "3e9c9d805eaaaaaf2cd62fcd7e846b3cdb8e5e303c49a3f3b1eaea867cf2b908",
+      "source_digest": "a445b0c4919a8fe7bd75a5e8fab6ee5389ec1389c7211ec02017717b65265da4",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-packed-parallel-tests",
@@ -3715,7 +3715,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "0d61ef35073344aa4565ae4f28aeb927e1cafc30030d8b9838314f1ce8e83f81",
+      "source_digest": "f0a3d9491fdc1622e5a2217c240ee42826f946b20fb7bdfa972d527824c9aa8a",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "rank-k-probe",
@@ -3754,7 +3754,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "56a7031b982ccd43bdcd8d079b8a97a5f91e989d611d444a9c4bdf8d29759fe3",
+      "source_digest": "c9d9b8196f4867ff7ef1429c7295d1e9cfc2a5a9f58bf2d92f7a0f085688b0b6",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "rotg-latency-probe",
@@ -3848,7 +3848,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "032c7af7479b092cbf2840673764287b5ddc277b201dfbc10bec98e4a19db0c0"
+      "source_digest": "ab6936c8407f0b78fb91b1ae3f43f938239ad3cade42ba6be7a52bf4f11d34d6"
     },
     {
       "artifact_kind": "library",
@@ -3901,7 +3901,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "eecceb7d4ede9ffc314f7bc4580f4a704685a09d8d9ce88c4128d9fd51811719"
+      "source_digest": "b049abac0bc2797e9d5c0757cff457bcfc6a82c5c17019153f502152a614c1a4"
     },
     {
       "artifact_kind": "library",
@@ -3949,7 +3949,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "c68d0bba8e6a55961eef28f50066734e1f61f7475618d08c617d75c939770b36"
+      "source_digest": "e554c097ddd42af2b35e333ef568864be203a8a8c59059534284959c99b6d5fd"
     },
     {
       "artifact_kind": "library",
@@ -4002,7 +4002,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "c9ce1653053c4c45411481b0f4c83ceb18e8bda971667ba7d8552a090fd60a6d"
+      "source_digest": "1898d722cb206949465d4fc1cd2a34c3e2a1ddbddd9c943da67c12619ad0ee75"
     },
     {
       "artifact_kind": "library",
@@ -4050,7 +4050,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "a7aa73ff5ebd4e7a3bb13ae1b27b6b863d4731dcf77deaeb9c8e3587f00e1298"
+      "source_digest": "ed32d4133174ad73a1bf561cb24918cf1026e8047dae6d5be2c28d09bb1b034c"
     },
     {
       "owner": "test-infrastructure",
@@ -4078,7 +4078,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "087dda3b24bba1dcf5fed3c4921fcd0f107d658e7951b87330404bd89d140e08"
+      "source_digest": "d3329fd4e96373e4f85891373c2b12a3ed9c35e07d14f30e1cfa24416b4615d9"
     },
     {
       "id": "compile:build.zig:build:static_lib",
@@ -4090,7 +4090,7 @@
         "ordinal": 1
       },
       "call": "b.addLibrary",
-      "source_digest": "a5719882e74cd829ec8a00ddcf2e54ebae7d21e3422db981b0f75ac3a15f1d62",
+      "source_digest": "98bef3f2211ff00d71418dfda4ea4dd5ce1aa07539af1227e0119c521a7a4231",
       "owner": "build-composition",
       "artifact_kind": "library",
       "output_name": "zynum_blas",
@@ -4148,7 +4148,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "076ddf2e50510d56bbe3d20b172a2ed1377c7d49b261554657dc79eb61226328",
+      "source_digest": "e74a912ad1ee1a49442c8350deac160b8d562e5d589bb3a07ece792a01cbc38b",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level1-x86-stride2-isolated",
@@ -4194,7 +4194,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "9ae60fd1d5e38cbf8a5bd780e4fbc72af5902dc4bfba6247069856089e43bc69",
+      "source_digest": "c6713d04a483088a62b535de753e580e749a0a5468a54107c3bb966fd1bd9f09",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level1-x86-stride2-isolated-test",
@@ -4240,7 +4240,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "cd69d8145c865fc4fa9b59c52da11963ee7e14623d0ce71b78b5291a26881966",
+      "source_digest": "4a8ba2a40e26e12baedbe0c928367c055fcd873ce8f915365ef2b4405f5d6045",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-structured-blocked-tests",
@@ -4268,7 +4268,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "6d81958c693f104a221b46bd77ec734b83924a2b6a987afe999fa271510fb30d",
+      "source_digest": "c3e5d7ab5e3c23688938eff7a5ca3bfb0481061fc99d560de3cc3586f6ed6dec",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level3-x86-structured-isolated",
@@ -4315,7 +4315,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "c29fcc2bcd9a45b9c1c1c80fe7afd3e16558ecc78b79c19fa1a5ce5ae6beb3a2",
+      "source_digest": "52017aedff8e46cf7f755529f72e8f861c0b0f8e043a9fb8155cec58d89fed87",
       "owner": "build-composition",
       "artifact_kind": "object",
       "output_name": "zynum-level3-x86-structured-isolated-test",
@@ -4361,7 +4361,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "0f01d1da8ec249cc64355d4d1dec53ae6ba15e668dc2281bd2bf09ab4611cd4f",
+      "source_digest": "70dd1ad0459154c101f5461a9f73f33076982bcd556e645d4cb377403850bf5a",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-structured-object-tests",
@@ -4389,7 +4389,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "9996fdb7a1f93a42c7c7384504dce213e4a4bcf7d454b4d2f67367c33dd0eded",
+      "source_digest": "bd5dcf861c8600cfc8c50570fd1f8d5d520b03ff45c6357b3dbad7b4d4976313",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-symm-dense-gemm-tests",
@@ -4417,7 +4417,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "7f53732fd781971f2d2199cba1fce0f3c4c4787b0d6eb019c535f976cb9fd885",
+      "source_digest": "590c98914a15879382bc4253fd11cccfc14e356ae697f8b964cc9e97456befb7",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "symm-probe",
@@ -4488,7 +4488,7 @@
         "ordinal": 1
       },
       "call": "b.addObject",
-      "source_digest": "fedc79e258c3b87a7a0dada28f735dde0bbcfe17848232f4c9b5d61db4051b99"
+      "source_digest": "5758bf37f3c941367a261b58576c360a0db8702a5c8499bcbd66ddc3eb8a275c"
     },
     {
       "owner": "test-infrastructure",
@@ -4515,7 +4515,7 @@
         "ordinal": 1
       },
       "call": "b.addTranslateC",
-      "source_digest": "bfb2c3939eb37baee8e695f5f207039d3cce54e0603c6d744fb35f5a4ab44a3f"
+      "source_digest": "2553657298165e67541fee2ed3573a2ae4965e3825357bf1fc5531e3857e20ab"
     },
     {
       "id": "compile:build.zig:build:triangular_band_solve_tests",
@@ -4527,7 +4527,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "f99d0b4757e4f8140d6600d1c69bbb868f9b05a2346cf5e0483bf8f93d8ba096",
+      "source_digest": "325e32ce96e3c73c87e5219f3441c28845f888a5e899fa842124217ce6cb2e02",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-band-solve-tests",
@@ -4555,7 +4555,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "6c180aebc8eda9f2d7a911df9d8563527f82ce28e7d4053eb022c7b1f2872872",
+      "source_digest": "84a560307f149ab265f14256e8a74fe87d75595aff5bc19857415524052e45f0",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-band-window-tests",
@@ -4583,7 +4583,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "38c23cc550a54aa97ce27162fc74e4a5d743672a15f2c7a941e09fd562f2388a",
+      "source_digest": "78477357b400482156280dfb9af6c26259d5bbb85095f0ff888a6205e73eb8c6",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-dense-unit-tests",
@@ -4611,7 +4611,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "a1e039fc45dca378d57d7390f6ebe6e1535c96c88d40c6423ec560eb9b883809",
+      "source_digest": "1cb515da9a953310f51b0e38a953ae06c8a0c4b5fd1aecae2ae1c35dca525cfa",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "triangular-matrix-probe",
@@ -4650,7 +4650,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "aa834bf0ecc3fff1f2d9f863d02080dfe331f74372ec73601f7265dfe48bbb23",
+      "source_digest": "2d3de306aa288875f11219a6246b37e900fac4f5cd6d7d59318571725a9fcddf",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-packed-unit-tests",
@@ -4678,7 +4678,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "6ccee7910b9b84cef8e03e567e51bc94db73a0ffea97c0986535e685acb6b520",
+      "source_digest": "d54ff7c70b5053d63758cdafa2db6dbf0c5b59efdd6299e27c4475e0b19e5d5f",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-triangular-parallel-tests",
@@ -4706,7 +4706,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "73c7b400a87f1f3fd2a33fe29699ee8107f669bdc5eb0112ce368d986acbbe21",
+      "source_digest": "9b510a85995e0f88f7919f7f0d9bd4eec1d31f0a22694d68616bd188146fdf5a",
       "owner": "benchmark-maintainers",
       "artifact_kind": "executable",
       "output_name": "vector-matrix-sweep",
@@ -4737,7 +4737,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "cb26a097ce63813981904a0956db820adfa64d761809af690b9e45051b35faa2",
+      "source_digest": "40b22e29291f9055e46a1bf9ca8e0f0ee31597ec7bce720d028aec59e420d2bd",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-blas-vector-stride2-parallel-tests",
@@ -4765,7 +4765,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "9d8efb52e86182f4e3e9fa54658b82bb57e9fd753e750383f5077860a290d862",
+      "source_digest": "82f2d41e93ccccf224756bfb801031708ebac6793d2af57e1652ed7919938200",
       "owner": "test-infrastructure",
       "artifact_kind": "test",
       "output_name": "zynum-public-surface-contract-tests",
@@ -4879,7 +4879,7 @@
         "ordinal": 1
       },
       "call": "b.addExecutable",
-      "source_digest": "3cb306aad66d258e7d7c595670d1606e4ea129ee4f5dbc67e619e8b65d78307d"
+      "source_digest": "0e10f4e658f440935f7519d8427f3f96398ea38da17c517382d933f3603cafbd"
     },
     {
       "owner": "test-infrastructure",
@@ -4908,7 +4908,7 @@
         "ordinal": 1
       },
       "call": "b.addTest",
-      "source_digest": "270ec1bb0bd6d8cc9dd1dd9ac2314373d9e9030c43362a9e0d43ae70a0e20ccf"
+      "source_digest": "10846e7d7cc55133b2194b1f7f1f8625b2e92b2fdd3cd6df3bbf611b15ba4a42"
     },
     {
       "owner": "build-composition",
@@ -4942,11 +4942,15 @@
         "ordinal": 1
       },
       "call": "b.addTranslateC",
-      "source_digest": "0bd632243fba818943619bf11c2027a6b19dc281e7c2ebf22ab98485b4b18ccd",
+      "source_digest": "c7eb3f784789e6116d2239e29be4cf61d09fad3c20faa7b7fe228857942d1663",
       "external_include_dependencies": [
         "heteris.h",
         "heteris_runtime_provider.h"
-      ]
+      ],
+      "input_sha256": {
+        "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+        "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
+      }
     },
     {
       "id": "compile:examples/zig/build.zig:build:exe",
@@ -4998,7 +5002,28 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "7abce2b2f791ebe820b050936c9aec6c161d88a4ad39638b3f3cd3c168599697"
+      "source_digest": "aeb5ea235c30eb1ba1290f5434c0cddcb5a96f34b84d3ecde76185a2392981c0"
+    },
+    {
+      "owner": "build-composition",
+      "producer": "repository file",
+      "source": [
+        "include/zynum_native_spectral.h"
+      ],
+      "destination": [
+        "zig-out/include/zynum_native_spectral.h"
+      ],
+      "condition": "execution-profile=integrated_native",
+      "id": "install:build.zig:addPlatformLibrary:include/zynum_native_spectral.h",
+      "category": "install",
+      "anchor": {
+        "file": "build.zig",
+        "enclosing_function": "addPlatformLibrary",
+        "symbol": "include-zynum-native-spectral-h",
+        "ordinal": 1
+      },
+      "call": "b.installFile",
+      "source_digest": "5e9e5023d31ed65a24fde0d44d96e5fef0e82f6371aa7ecd2368793ac6835e19"
     },
     {
       "owner": "build-composition",
@@ -5021,7 +5046,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "c362c4a3e82e108d0b9868f2a80f2e9e624654e43a539ccc894cf33dd0ad75ac"
+      "source_digest": "52423d7ff2fae05bf878e5541a11912ed34629d3afbbc02677424becdffb4d90"
     },
     {
       "owner": "build-composition",
@@ -5042,7 +5067,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "dd82c44190ad59bab11d0076b1f8ce9ce29a8f418e58ab18fec6854af8489a0a"
+      "source_digest": "b3929006e1bd7878565d9499c1a271a12a20a4044246f07cebbc6ed37106c49b"
     },
     {
       "owner": "build-composition",
@@ -5065,7 +5090,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "c0b9e589c63ac1fece6c6159c717725d1cbcb72ade5fe2c56678bef5b68acb8e"
+      "source_digest": "41b84276b25424b963faf6b68aac5b962ddfd168361304d309cdd020615d74d0"
     },
     {
       "owner": "build-composition",
@@ -5088,7 +5113,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "46f3ae2da8ef757fadf6a32f48a14922947a5c7c33389eb23587e8451855f919"
+      "source_digest": "9c058b17883b4e4781ba92995b17ac3a1cdc16bdb3088ae1cf44ff49689f47a5"
     },
     {
       "owner": "build-composition",
@@ -5111,7 +5136,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "fe9f687cb598f0fbbea78aaa2ac435d3eb370266f13ef616043ef4a35ba6ce3b"
+      "source_digest": "03e59ecca3ec3abb2a62f97921728f672db713bbe3d1ae88ad7e87b9770700ee"
     },
     {
       "owner": "build-composition",
@@ -5130,7 +5155,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "1db3c3ee86ce1a99a5c9dd641bb26f3d13bea894cf07c5df11bb7bed586ea570"
+      "source_digest": "db2ebb84a2f617e14b82c0e1755b6e3b71851a8c2a535f544addfe88fabe7013"
     },
     {
       "owner": "build-composition",
@@ -5149,7 +5174,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "7442580e39ae0e5a6bc720bf7fc1bc2c98463dec9a94a014e6a0c028b7fe025f"
+      "source_digest": "1ba2a18d52fd0c1e32af4dfad194407248639c0f1914b74d79fec32eb70bc2ca"
     },
     {
       "id": "install:build.zig:build:bench",
@@ -5161,7 +5186,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "8e4cd7581269d09b094bbc637b75724ed91776e31f7556e7fb331a2d86ddac7a",
+      "source_digest": "f2492e65397ea7db744747ac5acfc8ba9f19736ee2a9001f574d2434539f9dd2",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:bench",
       "source": "emitted artifact",
@@ -5191,7 +5216,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "c184cadd3069d1754bc1a4b2fea64dccf2a8d2220ffa16fdae4f2d4503f14da4",
+      "source_digest": "ef34d42227a91c27f536244d1af9db7f6303694e47535337664f4f5fc787e0c8",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -5204,7 +5229,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "a1f51191e1c897d425400d6faff8b8f2802bc297d31aeba0f16b554a7fdca090",
+      "source_digest": "5a3d3ba7693ceae358b812c665c8411eda041eb973325b482bae0f0a43478376",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:dcopy_probe",
       "source": "emitted artifact",
@@ -5231,7 +5256,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "4c644016918368aa66a545e3db1764b17ae7f5eceb24a508697f3d2885c10a94"
+      "source_digest": "ca840ca484bf2770daa6c5df5cec5990a9d9f14e5fff0fda61a272db3736cef8"
     },
     {
       "owner": "build-composition",
@@ -5250,7 +5275,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "3d180184b80280fe23ebfd15f3eab999bc65c6bf84e4642fc3b93bd77cf9688c"
+      "source_digest": "db2e3cc215e541dc8d2ed16114a79217c77da4dbd78bdeb0245965603c3f204e"
     },
     {
       "id": "install:build.zig:build:gemm_sweep",
@@ -5262,7 +5287,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "25d3dd505d3308a49a13e670fcbca77e3fea0aa6993567f9df7a037a108b6045",
+      "source_digest": "650f246850fdde788cf37904b020a3c25eefa2427f2de390e042ecf15b1e6b39",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:gemm_sweep",
       "source": "emitted artifact",
@@ -5282,7 +5307,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "7a9bc880cb167fc39e9b6c07af1899f790d87ef7b71b6f947c5a5cef1fff2ea2",
+      "source_digest": "85e13d20a184c7dd73a5f0df849ed77409bed3372da206a3d09606a0b280f662",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/abi_manifest.json",
@@ -5301,7 +5326,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "0b46050ee32fd9a35082eec592b7d174d0fefa587bf9e2f9346124fae7de385c",
+      "source_digest": "aa439404772f21009db1ccc67d778ae4b631a8daa438e374cb58b7c7fc64ddaf",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/blas.f90",
@@ -5320,7 +5345,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "2d713596350838dcafb0a803a3681dfff466a6e922d39e4452f085f8c1bfb83e",
+      "source_digest": "31d5e76f9911dd0bd6eae0bf9e7c2385ad782bed31e117674720749c1c423536",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/blas.h",
@@ -5339,7 +5364,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "d8fc469d86e6a2cb269311b5a4f12aea51706a924bd4993319bf5fb7d8e4976e",
+      "source_digest": "ff1d0221f094b3cf91616ce037491480cc0c98edbb380422a028d6fbbfb5c599",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "include/zynum/blas/cblas.h",
@@ -5365,7 +5390,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "89334267048d0bc2c69b27959622cb507c92353180fdb2990da02ae3cb553d26",
+      "source_digest": "f94cf73ab59a6c60f5ecfc2b0a9d12dc59dec134aaf76195278c09860825ad45",
       "checked_abi_contract_sha256": "3eb977d95960e0c33ae34f9a46aa1964bb09b0b004c89d1b8a13e652a278694f"
     },
     {
@@ -5385,7 +5410,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "98912fe8cc5859dc3b2bb0e0ad4df26cddf28d835c15ab10a2b2fd3255555ca4",
+      "source_digest": "13e3cd1c8ec36f3404e96c4c57e10f147eaaf1e06ae87e32657349d217858349",
       "checked_abi_contract_sha256": "3eb977d95960e0c33ae34f9a46aa1964bb09b0b004c89d1b8a13e652a278694f"
     },
     {
@@ -5405,7 +5430,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "2bae9c1c3d42c994d4659587cbced9bd4a147dcc94c38a413b9e12efc1c7b1bd",
+      "source_digest": "ba93bbde09f47d0ef45f53950e4d885b42d938e89ac0bf68b70003ddaed88254",
       "checked_abi_contract_sha256": "3eb977d95960e0c33ae34f9a46aa1964bb09b0b004c89d1b8a13e652a278694f"
     },
     {
@@ -5425,7 +5450,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "57472710e63061c9c63e14a1d21ca9350d608ab02a389d53eaa5ceea1b8ee884"
+      "source_digest": "05a6ed69a4c627d2d77c17a952923b58ba161d8c9da99ce3c8fe2bbb7e36637a"
     },
     {
       "owner": "build-composition",
@@ -5444,7 +5469,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "d6b1dd21b1bf7963376b94f005f2fc832ae3689ec723e792aba67d3df5a36376"
+      "source_digest": "d73931419c92808cf9cb2acdc647bb4b50ea22cf2b0d0d7e6caddfdd5c83b793"
     },
     {
       "owner": "build-composition",
@@ -5463,7 +5488,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "cf2386f671c1c8f70ad01fa9a5f70ab3710bbb264cabac4a251df390874b2417"
+      "source_digest": "261a1b89e68b470a088ba2389a189f91baea8bf57a24a654baacd93a3172e6d7"
     },
     {
       "owner": "build-composition",
@@ -5482,7 +5507,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "6ef35a829657fbaa761a47afe7f82548f71d017ab9efcad0789b614daf2d93b9"
+      "source_digest": "92c20f94de1e314d196edd9d41be9e8354583d04b95e377e62e1c70866188a98"
     },
     {
       "owner": "build-composition",
@@ -5501,7 +5526,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "b4f748742d31636d34950bdc924a58808ccabf78c8b73bbefba88fe4887f4250"
+      "source_digest": "e26856eaea86d8eef325d87b10bc6a1cb24225b491b3e45d027c8c0432620d8a"
     },
     {
       "owner": "build-composition",
@@ -5523,7 +5548,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "7c34aebed3232f541ea2b1a8ed5bfdbe79a49f6082492fde84145f694d81320f"
+      "source_digest": "b30c57098b696e3031b6309aa96e85a06045d60ad7d5fcdef8ad45f4e4569071"
     },
     {
       "id": "install:build.zig:build:install_rank_k_probe",
@@ -5535,7 +5560,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "b6870287ee48c5fdbd8012fba4a84644041b148ed9ad4ab80158159a4c819b3b",
+      "source_digest": "4b52172044159df53dd84bbd21b25d122f8a89e976816ca4cc354aeb86edddce",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:rank_k_probe",
       "source": "emitted artifact",
@@ -5555,7 +5580,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "d0a126cf9efa7bbf63a2855d380317d454385df268368aeca6ae53ffc013ece7",
+      "source_digest": "82b01b24d12e27d8535a3be38f9fc7f270fccd445417a7bd8eb271dab1147c26",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:rotg_latency_probe",
       "source": "emitted artifact",
@@ -5583,7 +5608,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "b69b48b35ded5159cebf8a976068b91ca154ef2c5378bbbc62aace7d030338d5"
+      "source_digest": "f7688cf7c467640506b7cc2e484ca1c6a08119e996e1166769dced302018384c"
     },
     {
       "id": "install:build.zig:build:install_symm_probe",
@@ -5595,7 +5620,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "ed120c95af55d6aa5c99a13dfab069642b3fa196d1a0c21384eabe5544034905",
+      "source_digest": "573b554ed5465404e4d60c6bb70d408104cdca1d8ddec48e901402a65ce617a3",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:symm_probe",
       "source": "emitted artifact",
@@ -5615,7 +5640,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "21f76b2788cd269908f3a42de4956127b1dd44124f99da9171354d623e76de11",
+      "source_digest": "7f2a7ba855e9112a11052cf913408b675f63e27e8be0cbced135613856cdaa34",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:triangular_matrix_probe",
       "source": "emitted artifact",
@@ -5642,7 +5667,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "3ad5a56b40844660b73e12e4e129f23a3fcfebb3716a870886a845a218095b64"
+      "source_digest": "7a13761e9b8d0127d3b6f206d79f702fe596dbbee5c5f0e2b3f9c4f5d519ad1e"
     },
     {
       "owner": "build-composition",
@@ -5661,7 +5686,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "22df9029e40c17ef479e9d369e8f4d8adf03408c8121693d28c077f70b3d616d"
+      "source_digest": "76c7a0353ee58f3b044abeb4af2fac1e4c1219edfeded394d88b11fa3d83a96d"
     },
     {
       "owner": "build-composition",
@@ -5680,7 +5705,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "0e75add72577afb9e5bf4e5817e004e8965b6840b11822c1f85808ae091127db"
+      "source_digest": "1fe006077401cd612620b35b13c65265e21bc09579f9c1bcc6866c21dabe85dd"
     },
     {
       "owner": "build-composition",
@@ -5699,7 +5724,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "cea48a5edfc6ac9e3ce9de084343c20e520d5e5535f21188ece8c53c42062b95"
+      "source_digest": "cc483dba91ee6013792bc1435f9ab4945aa2fb4a66f83c50257117a605fce3f8"
     },
     {
       "owner": "build-composition",
@@ -5718,7 +5743,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "6bc96363046db5071c4afca1d11302a7dd21c6d3ec039a00b615f5306b647942"
+      "source_digest": "cffb89073a0c8abfbe8ee8f3f5459eddc3188dd3d5d7b140058bcbccf61fcf18"
     },
     {
       "owner": "build-composition",
@@ -5737,7 +5762,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "d50a4380355d9075a4581e59e732bc507392bbdb0c134cbbd45d536d4adf2daa"
+      "source_digest": "a4f7329b842a0883eb9520acda37400643ba0bb9ee122c5dacd00c6379450042"
     },
     {
       "owner": "build-composition",
@@ -5756,7 +5781,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "6ae4c8d6ad1b37c76c67b0fe368010145716a137a0dbd2b7aa04e23540d07d00"
+      "source_digest": "efbac9c2058ab0d0a08027a797ccda903399fc40f65f9517186261a2df694c62"
     },
     {
       "owner": "build-composition",
@@ -5775,7 +5800,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "8c61b85654fd8004c926a43753a064037cf901c1ca51f3ffebc3b9ddee923f85"
+      "source_digest": "22ec098b5bc4dc7b803983a38842d02e80ffaac8bf690edbf5a99a9ec6b1ff01"
     },
     {
       "owner": "build-composition",
@@ -5794,7 +5819,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "b9bfa60e3f01912168a020f03a204c21b23c7592daa99a34da0c80af4689ecf2"
+      "source_digest": "f1dbab111e5384ad23d6c01663b030f67bd379d61451da4986a61ff85cbb5b3f"
     },
     {
       "owner": "build-composition",
@@ -5813,7 +5838,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "876086e183583bff3556a11a81992d735d03287f4744c611a6f8b1f37ede6cce"
+      "source_digest": "2718142fc54ec15eac4dd7ade55c20a2c74290236832ee7f1cdaffc781e4a348"
     },
     {
       "owner": "build-composition",
@@ -5832,7 +5857,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "f38ed379c954176031c344407b0a1f41e7ded578802b885b8336858cfc7e8357"
+      "source_digest": "c09b45c0364371c82e84f813417423ec07e47e4acb6390cf5e88dfd6e01243c0"
     },
     {
       "owner": "build-composition",
@@ -5851,7 +5876,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "be8f9b2b224e08b3f689664d0b9d4510584a24cf4cffa143c70873b19f7937c5"
+      "source_digest": "59de7089fcd9c7c0ea3bea506d27762c6f9800d248ea7353baf29413e2bfe4b1"
     },
     {
       "owner": "build-composition",
@@ -5870,7 +5895,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "fabc52dc1894fe8a1292a201ab2fca00866e9ede9efa7bdaa1b81a7c5689e800"
+      "source_digest": "b9dc702a1c51a0d6948d2c124eae9d39cde6ca63e36c2e8e685945283f9589d1"
     },
     {
       "owner": "build-composition",
@@ -5889,7 +5914,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "4a2b621c1514e4d10e3912df93854ba98c5bad9228872cf944434580875f1cfb"
+      "source_digest": "edade433688c9336aecf70bb4c0cf3c8720371527a52cb26df2cf4c18cf7eccd"
     },
     {
       "owner": "build-composition",
@@ -5908,7 +5933,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "7a36354fe57123866ac72a4ebfe4486cc365703b6a11298183af4a85aa3d4c18"
+      "source_digest": "d7ce446e4c27476a0f860a7bd6930506111a325e05cbc92af8fcbea7a946dff5"
     },
     {
       "owner": "build-composition",
@@ -5927,7 +5952,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "f40ffd4b118497578d860e73c35045c25af4c300c4ce02b338866417a29716f0"
+      "source_digest": "df06bcd0b26c9f6d0a4d49c38da1ad9ec62d1b2259cff94a999fc821b4b1c794"
     },
     {
       "owner": "build-composition",
@@ -5946,7 +5971,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "aa8395de3814c284dec7a38c6db47c8e90972459a21b2f1c23db9aa158c8c2dd"
+      "source_digest": "b526dcc8d8bc4bf44fcd896c9c8ff5accbc9cd7e4ef4055ce93463895bc17e16"
     },
     {
       "owner": "build-composition",
@@ -5965,7 +5990,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "4850fe049d282d1c23db646dd42b27932fd2535cb707e9f761028625d7ac0a8e"
+      "source_digest": "d6057f6755fabb266eb1f84e50fc1ff280b66280cdc9a08d8a1af5aeab79994e"
     },
     {
       "owner": "build-composition",
@@ -5984,7 +6009,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "472d6cdd1afc50c779eb794cad78ca3363cbaf47fe0c9c3d8170842276a018a8"
+      "source_digest": "9d9abac95f147ab32b77f8736e9213ad7b02c8e8b7b814c46b3ee66d23b5c349"
     },
     {
       "owner": "build-composition",
@@ -6003,7 +6028,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "acdf58c4201b02aa88441e624301b9afb12d47d1e5d94d87b4b5ef5904508ac5"
+      "source_digest": "7a1e5d0e6eee2c60d4b987c7d5029c0316d763667d8c86a3309d23fa222a332c"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-lp64 reached",
@@ -6022,7 +6047,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "371f037cd0a7ae2f87eb0b7b447753fc1d7448230d3f81070b114abced3afca8"
+      "source_digest": "1e5f8c16edf011303d30a70db5c01181081bf4c163a291a99687d3e9e4c351ca"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-lp64 reached",
@@ -6041,7 +6066,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "518edd53459e0b2cf8191ce103b229c1adf1834c1e192c3a1c0ecade8262cab7"
+      "source_digest": "f96a29d8ad0967a4218f8f4cc21d2c64f70624c443a68661621fbf81fb4c7863"
     },
     {
       "owner": "build-composition",
@@ -6064,7 +6089,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "f87bd1e81761d930dfb70260825178b4924932c104ccf714bb8c468f6f72ef26"
+      "source_digest": "1a9b77752ccf71a3609b2f9803fad7e9b830afb306785003c7af0677ff058248"
     },
     {
       "owner": "build-composition",
@@ -6087,7 +6112,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "ddd688b056a8f5677364ca27a9083403101d07a053ff6ea96560103efa00d9af"
+      "source_digest": "9ab0813e2abb0362b3d47b5d76c88184285df2d2f9882cc5eef6e039684e54b0"
     },
     {
       "owner": "build-composition",
@@ -6124,7 +6149,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "cd1b0fd775a9304665160cc787947d3c1c32088a1d1c48df847b5b1ba39f6a53"
+      "source_digest": "7ff2762e0896db293de6abcbd4c87757b0925e4a4658901b1a26d9e29c6d502b"
     },
     {
       "owner": "build-composition",
@@ -6147,7 +6172,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "de09c14790c85bb4b55d0031f92d3664afc4b2350b6cd81cd81966a7ffc34139"
+      "source_digest": "e095d0543e0178479b7dc08e86261154b1c0ce9f6b4f316767382761bbba9bb2"
     },
     {
       "owner": "build-composition",
@@ -6170,7 +6195,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "fe481c00ec25d47c62bccaafdd794fafb3dac93830148f1e0c93761ea9d85b38"
+      "source_digest": "59abeab7fe0eed2150496cb6a4da745f232482843f55c822caa3eedd27cdc23c"
     },
     {
       "owner": "build-composition",
@@ -6319,7 +6344,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "a4dd177294fef3712afb61737358e8c26af674312a86fc23c4b6bda2108c3c59"
+      "source_digest": "8369dc85b50d8ce9ed659ae9d1cd17b88780bf25e458ec0674b133c7df30cde9"
     },
     {
       "id": "install:build.zig:build:level1_probe",
@@ -6331,7 +6356,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "0104c8d2323ca22c0e42977e590c79df0f28e492109af6a78b1899b21c588930",
+      "source_digest": "ecac330b6c59e59f5fb3b5dd8eab60e59835413d08adf3167fa84083adc9fd81",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:level1_probe",
       "source": "emitted artifact",
@@ -6359,7 +6384,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "a7a7ad7e2e7991b0fdf315cc9c42359d880796462fc5c44bc8cd8d5bb9368f1f",
+      "source_digest": "b51faae9bf7e0e0cafcb310950866f64e70bc95233cd4a72c3a9e19891e8a014",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -6379,7 +6404,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "0df82d252c176352482c8562af0b5787b6e2dadaf73f841cb610e3cc47eaf9ba"
+      "source_digest": "547760697d5116545b1f2a11b8eb1f79f8d763862dce9a26f3cb80da2732127b"
     },
     {
       "condition": "Apple arm64; explicit install-abplas-lp64",
@@ -6398,7 +6423,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "49e8fe48de3ea10b38e113ae930ab63a8a3a6876a85cd791e9d73cda754be63c"
+      "source_digest": "9cde61ce14c44b559ab90cc2f5df2ff91658ec30fb05ef6c14abcb39135769f2"
     },
     {
       "owner": "build-composition",
@@ -6417,7 +6442,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "d9e3cd10cf76095c7c5d62bf7559c8e7bd2b4566724eaa7df73107752c32c369"
+      "source_digest": "1f25d421a5f774b932b4ead53a92ea5e783a330a60f62aade5da40653443670e"
     },
     {
       "owner": "build-composition",
@@ -6436,7 +6461,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "d17c958f0c5867a6f8a7d93232bf75b76b7dcdfbe706e93c9b8f4fb8fb841af6",
+      "source_digest": "7aace7e47bc9e7801ca2e8d448f04320320c32e2ad27bc20fc5c1c3488da3c5a",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -6456,7 +6481,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "08b4c412acf185328963ea2796e83fe8474d148a1ba52a485fc523516308f8c3"
+      "source_digest": "9d4ee4be97e83e07e075c4d7b876d6c31d76fa0928e1438a20ba14e98623ea47"
     },
     {
       "owner": "build-composition",
@@ -6475,7 +6500,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "bf1d2f5bb909d883034b94060f35ea67d3a9a65e699502898b2b1278dd1584df"
+      "source_digest": "764350981869702e024c7cbf39e7bebdcfd9fedf851adabdd8a864fd40cbcd25"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-ilp64 reached",
@@ -6494,7 +6519,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "378f60bd7a31f0167764cdc1c6cd3b36a88871e21ec70b605621c3c838575bbb"
+      "source_digest": "97bb97a5902c7d07302b0bd52f4cc77e35c091794619c08a73673028e145c32f"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-ilp64 reached",
@@ -6513,7 +6538,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "521478bd3903ad3da27253a6d43488b8bbeb3e7e7c64ad033ffa14baa56f5bd7"
+      "source_digest": "e5ff95e1ffc69cbf056f7ed19444f45c9dcf823252b6da1411050568a4ecd985"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-lp64 reached",
@@ -6532,7 +6557,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "ebc6bd1bfff9ac0b0236e93500502005d62187e807b33987ce05a49879e94918"
+      "source_digest": "f283dabc2fc65d8631ae99b6940e12ef869f10bf9bfa4102861a5971019d4741"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-lp64 reached",
@@ -6551,7 +6576,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "d5f7d4321bd4eecb856a283bc87556c465f58e5f5ac6aefebda98b48f6f4ee50"
+      "source_digest": "3efa8931ffe930cc23ccb1f09c7bd711759304393c5b9a684746ee5d8c4f4145"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-sparse-ilp64 reached",
@@ -6570,7 +6595,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "166d507c742675d2c13cd54ba62d0b6253dca6540169ed6d472cfcb3d58d10c5"
+      "source_digest": "b591a695ea5e58052d72dcf980d36249974c4fe2af6544059fdd1b9a5ba3e54a"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-sparse-lp64 reached",
@@ -6589,7 +6614,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "0c7b395a2db3a977ab2e96ccf670490785a076e69c6c3fd619dc401640202910"
+      "source_digest": "8e814550ec90fce55b17f92da8d5ed33f56ac7ecf54eceeb6055674bb4d87341"
     },
     {
       "condition": "Apple arm64; explicit install-abplas-lp64",
@@ -6608,7 +6633,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "72ecaa8285bc204489e61ad803c8f0a2c0ad685ba05726a0b6b1e00a888a52c5"
+      "source_digest": "0b200111dc6152379be78f48c2d504c02906e42ce7649bf459e139123db0e2f3"
     },
     {
       "id": "install:build.zig:build:pkgconfig/zynum_blas.pc",
@@ -6620,7 +6645,7 @@
         "ordinal": 1
       },
       "call": "b.installFile",
-      "source_digest": "c74551ba7008176a8b3782d5397e4513a8c42d49b246c8172c9b778c66b915ce",
+      "source_digest": "f8a851ca7ce7aba7a8806dfe7d11f32fd25198514d7e57955a3ae6cf2a1e8679",
       "owner": "build-composition",
       "producer": "repository file",
       "source": "pkgconfig/zynum_blas.pc",
@@ -6646,7 +6671,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "392d9e40171172046f2fffdb5454ad5350f187704e346b7ce9979548880200b5",
+      "source_digest": "334ba859a442298a448e0663ee0866fa22fb7c6c9574f89544b403aafc15dfc7",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -6666,7 +6691,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "87fec8ee10dfabce78def3679d6b161e4c2a3e6af2d34d189189742b1a0e2c3f"
+      "source_digest": "b09deede8c4ba404de93926ec18b8bfcb87c22599ad34ebe758fadf3b7dfb1a9"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-lapacke-lp64 reached",
@@ -6685,7 +6710,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "e2d57f9f8593eb7c7068056d3d1c9e5a9bd81c3510d9c75bd2a0677d57f2cf90"
+      "source_digest": "afc58502d3d229efe2421743c4cf18d2eb37e98e108bf26070a20f78fceb9fda"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-sparse-ilp64 reached",
@@ -6704,7 +6729,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "c82d6a3b59f9a7b595d907c92ea5725095407e158c895c27d8262cce564c843c"
+      "source_digest": "3c8bcaf90ab73766e800c3a99c6a8fe96f7b9efaaafa41d587b95994e205b431"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-sparse-lp64 reached",
@@ -6723,7 +6748,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "101182b3fbdcd1cf75d2013c78723c7baf36768ed5ca5c7e44568437a25b224e"
+      "source_digest": "c6ea314f5de1018c05d39657635b756a1ecab2cf3900e25e231a11b22e33fbc5"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-sparse-ilp64 reached",
@@ -6742,7 +6767,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "c61a5429a9a87d609f6ff4c8b6a4926a53002cee209d9754728f33c54d37ce4d"
+      "source_digest": "9c552f7385bb1aa19a6af522928e33d3a7611ee54266144e19a201deebce3775"
     },
     {
       "condition": "target.result.cpu.arch == .aarch64 and target.result.os.tag == .macos and install-sparse-lp64 reached",
@@ -6761,7 +6786,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallArtifact",
-      "source_digest": "151cbc7f5356002596ce463842bd6ae254e3cc3cd7ea1b116ee3b6303782cf88"
+      "source_digest": "ff3b234b6ef3339b213e1974a37682549250ac1016b56d830741d76e0df5b6dd"
     },
     {
       "id": "install:build.zig:build:vector_matrix_sweep",
@@ -6773,7 +6798,7 @@
         "ordinal": 1
       },
       "call": "b.installArtifact",
-      "source_digest": "5c349cf1a89acd88bc31f6838ac9f9bd17c7c5d1384b451b651b071ff5ec493f",
+      "source_digest": "dac54a4681a824c23722d3821c2e1fd8110971328eb764880c94949708a87dc5",
       "owner": "build-composition",
       "producer": "compile:build.zig:build:vector_matrix_sweep",
       "source": "emitted artifact",
@@ -6800,7 +6825,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "650ec73ea7ae530bec5994242a1c2bb98724c0f10666dc422cb11f05f29b78e6"
+      "source_digest": "48fc5f75a65c9243aea6158e07664387fde2e515165807abf938e42bac56f0a9"
     },
     {
       "owner": "build-composition",
@@ -6819,7 +6844,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "ea83c0e347123252f60d35d566f44e41d755d12ab0960f24d42f954b118b09f0"
+      "source_digest": "f13f15865dd7f67324ae989caba65596c8ecaf0eb306ae27991ff38c487b1290"
     },
     {
       "owner": "build-composition",
@@ -6838,7 +6863,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "d9501a83c505c0ac8cb3255d0ce967c71dc24d1515d6cbe176c0186cda8858e0"
+      "source_digest": "970476e95c3bd349fdfd3ca6c58e5828e09f48f83d164dbfe8683003374ca831"
     },
     {
       "owner": "build-composition",
@@ -6857,7 +6882,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "e24e504a7566cdede55346a2eb0ed90136f9a4590bff7dd5d5e995c82aa225db"
+      "source_digest": "4a472161fc86767bf7dec5026028befb6eb0d2bb5e4d055dd62d08d0bc7cbc8c"
     },
     {
       "owner": "build-composition",
@@ -6876,7 +6901,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "a00a6037c5fcb9d4b526e16dcf968c1fef06206d42f453c5ba69a7607b592296"
+      "source_digest": "3dea6e1b107063cc5804f528dd0c143d15201dc37da67de342f0ac14976f52cc"
     },
     {
       "owner": "build-composition",
@@ -6895,7 +6920,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "43927dd1c2516863bbb018e92190d65e7ce913005df2b3e8ca98a2b395821a92"
+      "source_digest": "194f12ba375d6050bc04b28f05bfcf9a91db2970f50ac9c1e0cc733f809be10e"
     },
     {
       "owner": "build-composition",
@@ -6933,7 +6958,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "afcd6f8584dbe0cfb8b4301b0665ba0f5617474ed7589cbdf6f21f562c69be6e"
+      "source_digest": "d0d3826f87430bc1b122bc2da8aee7bdd7893eb021f5e13a2184aca03e2b658b"
     },
     {
       "owner": "build-composition",
@@ -6972,7 +6997,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "7ffad7b00a8830d1a9e2d7618326448047cb1759402fe99035bfa7b863eac3f3"
+      "source_digest": "682fa526d8d4edb2df49c9cd4c6eab80e9a45d5aa59ba5443d2ee1f53990ee96"
     },
     {
       "owner": "build-composition",
@@ -7122,7 +7147,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "5e20704a5aadb3de086263326bc1865ed61a5d2882a075ccd2e3057d9e79ffc2"
+      "source_digest": "fee551846fc5f649977a95cb719d930ffb610d3ae87abd6aeccb9c0ac65f0650"
     },
     {
       "owner": "build-composition",
@@ -7150,7 +7175,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "a12b04f55682583bcd3c95a49e1afb4690ca99ad16ff9a7131c5c6e5e1e44d74"
+      "source_digest": "ef4518986183e1924ca3d5cb76933f6a02ae3099df36a2182fe85fa3e44e6b5e"
     },
     {
       "condition": "Apple arm64; install-abplas-lp64 reached; operator-interface=zynum_v1",
@@ -7169,7 +7194,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "a427e93d7d5b1f9972cbfc8512ad1a92065b7aaeabc93aed9df7f9f30c991c27"
+      "source_digest": "cc23d0dd685c635f7c6867e172378ab7ec6410538c68764c4bfa961f2ffee9f0"
     },
     {
       "owner": "build-composition",
@@ -7188,7 +7213,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "2cfee36216900ba5c119f693ce0cd87113588aff72e6ec7cdcd29f0e6bda2d6a"
+      "source_digest": "8119f845e817566c37bb03109ecb7fb6f518fbf8eaeb1975e2a6bf6091da49c4"
     },
     {
       "owner": "build-composition",
@@ -7207,7 +7232,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "96e28660a47c3a040b2bb62046785cb35387e405d0c12adfa0fa7f7467a50e00"
+      "source_digest": "3a3155ebd0b3ce4f2308e371d7ab2a5383d62e3908d0c5f7e0d2b125b7b063a7"
     },
     {
       "owner": "build-composition",
@@ -7226,7 +7251,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "cdec66e9b77453e14c850ca498d39deac0b53377e38c7950903bdc470510c7a1"
+      "source_digest": "b3212b38351a0c2d3012a384898567f63d532de83cb823cbc1053415e73a7410"
     },
     {
       "condition": "Apple arm64; install-abplas-lp64 reached; operator-interface=zynum_v1",
@@ -7245,7 +7270,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "96c5d66a0436b02f492e370c61124f6e3ec052dc95132b46953c29d7ef9278eb"
+      "source_digest": "37adb536d8afbbc074770c142868c09c0437a171db5b5e0e58e5a8a95035c41f"
     },
     {
       "owner": "build-composition",
@@ -7264,7 +7289,7 @@
         "ordinal": 1
       },
       "call": "b.addInstallFileWithDir",
-      "source_digest": "7473a34a300c93e7f5f159406991586ad98788be6bf4af32d92e8fddf1000429"
+      "source_digest": "2740a48f7623d8ef04efeed3fbfca891c31ddb0b0e25b3e02dd5b0a08d037c4b"
     },
     {
       "id": "install:examples/zig/build.zig:build:exe",
@@ -7307,7 +7332,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "9b09946ed20a9faac71d04bf902ab16bf87dd730a8ed5833cc830715e3b17564"
+      "source_digest": "df6cd5386423b99ec72e27ee989c39fb672fe5365f3bef35c7881072b1bcd095"
     },
     {
       "id": "launch:build.zig:build:abi_artifact_parity_verifier_tests",
@@ -7319,7 +7344,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "3f2e666ad249eeef9b520067c99b4ebc162409f8c56dcadb320ee430b9b3a333",
+      "source_digest": "42313075da24c7c8da0d9c59268a8ebe4366e515a7398ee061bffeadc3fbb773",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -7344,7 +7369,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "eca575338e5b63e2d8c060a7bab59b0bbe18781e548d81d532d6f0c6dd0bd197",
+      "source_digest": "946145108fedb8100c9da14ce65a48b4f9c36bb5e5fa603bf5e44767dc4807c8",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -7375,7 +7400,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "e62942dec728c33ad33bb9a30c002dc3935b1561097b894ba003e2573ed7ac27",
+      "source_digest": "de20710f2b024631b7150db30175db96976244bc4a15203fe47e8ad8b8d53473",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -7422,7 +7447,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ea7b9ff8f83133cae6ab7dbd41c5bd635597c4e973c87a32f377848e10e214bb"
+      "source_digest": "0a4c48a6b5cb92c92206cd8eff22aed7e0257e2609beef0e59df1c7bd3fa38ac"
     },
     {
       "argv_shape": [
@@ -7451,7 +7476,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "53c2c936b52f8192e3ab10207447045767ab1d74790a4366425cb1104c86c099"
+      "source_digest": "b9fa6c191686eac06de5a0189f463beaecbc6200475ec2958ef39c54d49ae290"
     },
     {
       "argv_shape": [
@@ -7478,7 +7503,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "2f69ac876a5ebd11db5cab2b66b9ceb0123010bc2efaafbd6d5665776718712b"
+      "source_digest": "8b145c31dc2b836c68245a9601c17e02ade6f817a42dbbc1929cfbefb8037635"
     },
     {
       "argv_shape": [
@@ -7521,7 +7546,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "92b28a5714d652138632ee37fd45ea1d9ce568ba1c26a69b75035cbf44dda758"
+      "source_digest": "99e7a3d3f93e9defef9b5ad553e2307951fe714a1e167956c42eef42cdea10b7"
     },
     {
       "owner": "test-infrastructure",
@@ -7544,7 +7569,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "487435feefdcf5a1aa53103bc028367f56d3c4eae87ac9eacf27b6a6b65b0469"
+      "source_digest": "3a833c6203b162e22669b090bf0aa7f310d988721b418b9af725b0b28ebaeb64"
     },
     {
       "owner": "test-infrastructure",
@@ -7567,7 +7592,7 @@
         "ordinal": 2
       },
       "call": "b.addRunArtifact",
-      "source_digest": "06ba209dc512975a2d0cfd16385a6b0f9ac824d2c9717d9b43fbcf9031204a30"
+      "source_digest": "e1792d99fffc16107729d82f7f348c9969478c8cf04f6019f9f1687d748e69d6"
     },
     {
       "owner": "build-composition",
@@ -7605,7 +7630,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "baa1d046337bcf46d22f96bc6c739b63ee99a8cb0a98e0b010f20997502cf956",
+      "source_digest": "b75cf1b607980137c36e4264143189703779902daaa87aea985882b5bb75bce7",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -7618,7 +7643,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "e54b290bb9c560fac7469e4d25380a8351c9cd93c460e4fcfb977705cc2d5fbb",
+      "source_digest": "7aedf1931327716aaec53ed12a8a337c724f3724d6275ed9b03b924fe7a10a1d",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -7656,7 +7681,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "8bd856257370e33e0ff08332acd11ef7413264fe530f969beb2322ccfbd7841d"
+      "source_digest": "72326c9fb3819c2cb9a482a98c2199f865f4141ec3d00722e9d5d3fe6baed7af"
     },
     {
       "id": "launch:build.zig:build:c_header_smoke_test",
@@ -7668,7 +7693,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "d6cef2a465ec938e54bded8e3fc8f882dc8a48523eb071a77b4b2fead33b5ced",
+      "source_digest": "2a540c539c86fc1b9c2a475ff6289867204a15ca276dabc60cb21317e877e916",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -7712,7 +7737,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "2a3e9599d371bbf2860f1f95a0bbed25707dfc2644eb8e41c690dccdb2abf6f7",
+      "source_digest": "061022467a4c4de6195c1a3b6e894554516e96f690e6ee87ba27ca01d036e926",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -7749,7 +7774,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "f8b8799bc4be2954d14c632baa38c0823f22c1f7703098bffa91d13968bfcafc",
+      "source_digest": "22634b23fa45fb34f2054669a1ec5833329cbe1b04a8ef66b40e37b4ac6a8156",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -7775,7 +7800,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "fca816f8696e617674aa87b66286de9a576f3fd795e318b0058e7eb9764c2bf3"
+      "source_digest": "0bc8c99ffcaced5134ec1f267c20843ec78ed7e45c3dc0df6f95604935e6eae1"
     },
     {
       "owner": "test-infrastructure",
@@ -7800,7 +7825,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "4ea777ea580e49ec35f934a6f123e77b0a35b867df38629ee8f9deda6d2d5be8"
+      "source_digest": "ec5ead8fc0ca288e8718590f0d8b0f40d50e25d268cbb9ac6e9549ab4ad7c1d3"
     },
     {
       "owner": "build-composition",
@@ -7831,7 +7856,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "2675044d2b41a1db262031ef25234625b8771c52a88e021dc17ba8933c9b4cc8"
+      "source_digest": "5237d58244f1c6946ec17397c52b40cb61f1e8f96cc8f67cca3718ac9eacecf5"
     },
     {
       "owner": "build-composition",
@@ -7867,7 +7892,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "da25e0ea259bda1b688fbacfcd57fcd563f0ab6d2c0b72797206deba271c3de8"
+      "source_digest": "edaad4b0000a7e2a9efb77a0d91870d20eadaf6a0631c1f1d7108ee878590043"
     },
     {
       "owner": "test-infrastructure",
@@ -7892,7 +7917,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "04af52c2eb8ca29e684e989f7ca3ec56cf01e793de8abe6dffcba18386c1a7c9"
+      "source_digest": "6f820413abc864720d4008012f8ff848d45d4396ab9bfeee60f7e9f68202ed56"
     },
     {
       "owner": "test-infrastructure",
@@ -7923,7 +7948,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "1ef6d8105d866566508b296a837b556853310a792a7fafe3dcf9610039bcce6b"
+      "source_digest": "5f2cbb571fa019e4f192b9a25ef7af08fa82931f57fb73f1e56a00d6f330da82"
     },
     {
       "id": "launch:build.zig:build:cpp_header_smoke_test",
@@ -7935,7 +7960,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "8f39d255ae3c8c6ed84ba7c612b40395e5a9d411f3a23aae1ccf86397b47a5c7",
+      "source_digest": "3fef903a2119dd22497e7c9ae7bc8f05b9d5e8da5ad726cf04527571313fcfd1",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -7985,7 +8010,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "86e0f98d81418672b680c85e809c2cb955516e3ac388815c0d8a54ab9a343f28"
+      "source_digest": "91fa9ecaf0ef9dd3f954c02dced0e1cb75b7e8824019cb5af11ba74f06f105f4"
     },
     {
       "owner": "build-composition",
@@ -8012,7 +8037,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "4baeb51ce699e96fb18b1130b4e22479565a47472814025137d3ec2f9b3f3924"
+      "source_digest": "2d8d8845eadf4e20c02682d8e841a20f32a84ce1ea8cbad37888c4095ea236bf"
     },
     {
       "argv_shape": [
@@ -8045,7 +8070,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "b1be1f6b1d7eacd5194b21509de3564b244cac47c4b7e97168ee237b5ed7ae76"
+      "source_digest": "8c7a5b3b36dc5ee1bb7f99b3604e908303d9596bc8b32f94d368da0327323516"
     },
     {
       "owner": "build-composition",
@@ -8073,7 +8098,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "5b1491da477941afccaaa036888239c95a01737a47ca1a2257bbe3ea97242c55"
+      "source_digest": "982f0fc4256c795a591f66b84e107eb10fe5440a87e54ab063003f18fd77e4f5"
     },
     {
       "owner": "test-infrastructure",
@@ -8098,7 +8123,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ab4af469a8f1f09ad4beca701abb2659ff391b408790131d0949e5652dd6d982"
+      "source_digest": "a68c10e05d35917b1a8da8e72bf0cb715cfef871e515b5c0e1e8afd4192c05ee"
     },
     {
       "argv_shape": [
@@ -8127,7 +8152,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "103d4b5b3981dbdf2f2c95fc799f41eb32360cb7e2bfc6f5c492b5e3317a472a"
+      "source_digest": "269da499000a48b60d82bafb7ec10d7f8813a2644c5dd10acacc1fdcace3ce9c"
     },
     {
       "owner": "build-composition",
@@ -8157,7 +8182,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "37367a4b1c9acb6f57699ab6b1ee576342f7c7f9327721ade3e87f427db96d00"
+      "source_digest": "7766149efc037038efe1138e334340cf058fcce29b1c374db19717919f7f22a0"
     },
     {
       "id": "launch:build.zig:build:fortran_module_smoke_test",
@@ -8169,7 +8194,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ab79b694b0b50e2a01fbe3e42eb7458ce3b864ccc55ab0e546aeebb0aa83b202",
+      "source_digest": "4226d138a81e27fa3cc336a74cc0abc3b743ba9a63606c14a67616310f8f31ec",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -8212,7 +8237,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "f8a0c537dfe1e44e17e24905fc810e552de7742fbcc84b222050ea7ac2f2c2e0",
+      "source_digest": "7af38fcee8595189bfbeba9ddb9d0c06e688cb83da42dc131e172b2fd1769cf6",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -8225,7 +8250,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "e495a66b0de917071ce7b7343602b05e6d98aca1b731f96074cf1c600b0838e8",
+      "source_digest": "47c0794e191e55aaabf5531707b62d4f46f5a9a0cc9143ebe6d516d0498d7452",
       "owner": "build-composition",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -8248,7 +8273,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "8d2785bd12caa87f2e8626f361ffccb660ff3ec25283b8364a183a8514fb37d6",
+      "source_digest": "989d44322f82c62665e0530664705e2243f0c09b1f7b070ee9028c56c3e9169b",
       "owner": "build-composition",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -8285,7 +8310,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "e1a504352f68e68f3bc11fccb0a8743f383a0e90bfaecbc17dda22da300cbf49"
+      "source_digest": "0cb76f98fc138594d158d3291c08716673c0c48ffe000796c18b9220adef1501"
     },
     {
       "argv_shape": [
@@ -8310,7 +8335,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "7948546751d46892ac25203b08e63dcec97a77732b31002458f1bb26bc1e3a9b"
+      "source_digest": "9e5008031b7eba19170145b29963f87f5038cab6f4e797960a7920f213b530bd"
     },
     {
       "owner": "test-infrastructure",
@@ -8338,7 +8363,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "005abecaf986707e253211bf9c59517f6626095f3b17f9670f390b813d46ec4b"
+      "source_digest": "efa93e9c9e4c3d68594824a03026bfa63e227f8c28d01fa6d4af8468bc4ef4bc"
     },
     {
       "argv_shape": [
@@ -8363,7 +8388,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "7b807b1a0c0914d82aa5bfb16a6456a8d99a6c57e2076287620aaca854e22387"
+      "source_digest": "67adb038916daf310445b16802a2727f8072501045b953cb3dca9ac23501f167"
     },
     {
       "owner": "test-infrastructure",
@@ -8391,7 +8416,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "4e50276bd9587f8f1c3a1617629e37be6c102c0ee8a2454bcce31b712d9ca7fd"
+      "source_digest": "48b852dd55f22ad917ca45d0e9355c2be6ed5a6467f0ef5e1ca68508b0ea3892"
     },
     {
       "argv_shape": [
@@ -8416,7 +8441,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "d2b44a35c3977ae2981f00af0d5e0de05f04882930ac86b08befa9465dd22260"
+      "source_digest": "bb48796fec75337c607a0aed3838eb3422e5bc5d3eb8c7f5ca5f7708d5ce375c"
     },
     {
       "argv_shape": [
@@ -8441,7 +8466,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "2cceb896a34b0e8b55f6bf874cc8a8a890ee618f4700be434458df8a911eb413"
+      "source_digest": "c004e0d7415865061dd3d470ff67af3b31ce21706e68540584bf765efabc1da7"
     },
     {
       "argv_shape": [
@@ -8466,7 +8491,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "387f9f9771fb7031e6023b2f210c74b481769316340dfbad8865595ecb81618c"
+      "source_digest": "4ac83ddea8328915c5e86eb02bdb60d5d0dbe864fc2d6757f5f7c9d006966053"
     },
     {
       "argv_shape": [
@@ -8499,7 +8524,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "dc0d688615523fd36d4ada3aee44b61de17eac851c740c42befcaa0de2970bd5"
+      "source_digest": "1d245bbbec210349152485002b43562c2cedc301355489b8f4e69ad55a136aee"
     },
     {
       "command_shape": "system-command",
@@ -8534,7 +8559,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "3ff01e07140a2187efde497028ea93e2f5ff0e67666d1f03916ac1ff895a0c24"
+      "source_digest": "0b127c939cff6316bb901084d31fda78be547b93573cccaae94b46c7b1714382"
     },
     {
       "argv_shape": [
@@ -8563,7 +8588,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "b38278299368dee85a65c00025383ad0c562212bbd61a5c75295694668361c1b"
+      "source_digest": "6b75732d9349113854691cda5b7b85274f3b8fd33acabd78b3ffbeef8791c020"
     },
     {
       "command_shape": "system-command",
@@ -8598,7 +8623,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "7e7e151b5ba49825453708bc88969c2affc6a2ac116bb25c58b78f77547f14dd"
+      "source_digest": "a064039e394a837ce78b4b01877f793f97d6116a60b7503b23ca566e0306c2af"
     },
     {
       "command_shape": "system-command",
@@ -8627,7 +8652,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "3f507f9ceb0a13ee1210526ffc3a3d66441cf874052722312d8c29d00e24b8e3"
+      "source_digest": "6359798a52512d079d2957a5280d4e926cb7b994c1f2c30cadd331e9a10d6c56"
     },
     {
       "argv_shape": [
@@ -8654,7 +8679,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "d7ff4b6d4d600218f2dd2e86f73c2885f0c184ca73b827e056974c90731a43ff"
+      "source_digest": "7e94f382b9bdfd2ae8861d334ecad57a7f783ed3ae365a93f76ba7d1c21bc1d8"
     },
     {
       "argv_shape": [
@@ -8687,7 +8712,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ea7b9ff8f83133cae6ab7dbd41c5bd635597c4e973c87a32f377848e10e214bb"
+      "source_digest": "0a4c48a6b5cb92c92206cd8eff22aed7e0257e2609beef0e59df1c7bd3fa38ac"
     },
     {
       "command_shape": "system-command",
@@ -8716,7 +8741,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "4a87cc13755af6ae6aff16c8e120f4c537cfe738f92ca8c324ee6bb370459871"
+      "source_digest": "95f584611a04156dfab483d121b0ba665086724206fa11f41500c71b72416a3d"
     },
     {
       "command_shape": "system-command",
@@ -8751,7 +8776,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "16e685c5c5d77b400626f17196c83b948888952d8b886df2c9136984d6b71af2"
+      "source_digest": "b2ed442d4b7af4985ccbcb43f420f0dcbcbf12becbfa217e20709a34f69b3885"
     },
     {
       "argv_shape": [
@@ -8780,7 +8805,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "a34df51afff2a91e4b867340d11bdb414a596457e993d0f5f7fdb1a0e876ae78"
+      "source_digest": "d1ff5c017474dd0e6560a25a2175590eb052ce2392bff635e9a362f5b3f02ad9"
     },
     {
       "command_shape": "system-command",
@@ -8815,7 +8840,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "209d50ecf14c4bb9ec03906921edfe7a7b6085b63dbf853b9046d2cdfd31963a"
+      "source_digest": "5d8a4cacc467333349d58397c452ba18e7364afc4bc8e9d01b77aafc34007369"
     },
     {
       "command_shape": "system-command",
@@ -8850,7 +8875,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "eba1dae1b5bf8e8f68332ff71261fe31f0ed2b6ff86dc0d40e633d85a56ceb33"
+      "source_digest": "91db0aaf3f1d3dc3cafa050f3c389c9620b99f47794ba160cdeb3e76cf2308b1"
     },
     {
       "command_shape": "system-command",
@@ -8885,7 +8910,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "3a049a23fecb803f9d85180731ef3ca78b89d528968a255fd2a8b53547ee6d27"
+      "source_digest": "1e782d9d1abbe8cd71250590c7e6afb06fa3da2c7b62f68ab569e227a725e0ad"
     },
     {
       "command_shape": "system-command",
@@ -8920,7 +8945,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "fe13b10b380675e42ab3edd298f91336aee00ab189b09726656a6e665fa0275d"
+      "source_digest": "1f32e23f8247b6f33026737a0d82f3aac5d789878648b8a4538fb9c0b55d240b"
     },
     {
       "command_shape": "system-command",
@@ -8955,7 +8980,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "4855c26d8bec58e24a26a3480d68b1c5f5b6bd2a642550a47dc79ddf40fd799f"
+      "source_digest": "3839ab54c563ffa30a77a0e5ec867a359d3ff0c0aca2c9f1e6130131d53f7da3"
     },
     {
       "argv_shape": [
@@ -8982,7 +9007,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "32e31705c1e4eff2dce2ab76332a55cd6d5295337a0acc90e8c860900ca2aa9c"
+      "source_digest": "c430bdacbd77eccceb4061db89db2c9e869097858edd63ffb7af862563ea3efe"
     },
     {
       "command_shape": "system-command",
@@ -9017,7 +9042,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "97f4c20cd046f1b2a88f5d5045a208088ef88e6962df419a3e226b52de1b0a9c"
+      "source_digest": "5c807990b7f4f4e940251827dfe485ee843474e19ddee59db2b13e6ee9b49e43"
     },
     {
       "command_shape": "system-command",
@@ -9052,7 +9077,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "1cd308b72d190aaa350395e0b79939516b95a2e75650e88e7a644f9e2eb28227"
+      "source_digest": "aa46e334a857c521c15c2940c36f5b8409c341d36e676343317b1facb185ae1a"
     },
     {
       "owner": "test-infrastructure",
@@ -9077,7 +9102,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "bc8fcc183f51caf4819914850550eae826ab4b4dada4eac37e0cfe0e154e78a6"
+      "source_digest": "58693c3cb9ce2d8bab8032398d352638781909e26166545028cf95421b037038"
     },
     {
       "argv_shape": [
@@ -9102,7 +9127,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "69c908e32c3fa6f4f6b3c4f4bc5784f05f04d8ca722a432d4f45e894f5e71b56"
+      "source_digest": "e4ea397785d3316f2de142258ff8a9e5f60493767d8884e03073f6b1cad8c675"
     },
     {
       "argv_shape": [
@@ -9127,7 +9152,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "ad3cea08a2bbbfb5306d4306442b7e70ba277bd557865cf8067a38ba862f70e4"
+      "source_digest": "9aa67f03cf0f0ad3bca5d501689650d9398d5af7fbddbb37b01872844b2ec0f9"
     },
     {
       "argv_shape": [
@@ -9152,7 +9177,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "9e81520e69d4cde7148c99107fc5313f0c17e195a9111a5fa9b685e7fdfc8ea0"
+      "source_digest": "e89ef307656860e08eee6a09f9208b186004ac29e6e3af81cc776ffd34f8b760"
     },
     {
       "argv_shape": [
@@ -9177,7 +9202,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "440e0b513a45dd3e4df04e1680bc7051c48ba5e0432394f3b850364f5ff63b55"
+      "source_digest": "d08f829ab3e4104aaa6ab1c712b1a760f46822984f4b231131ffda4dbfd2e09b"
     },
     {
       "argv_shape": [
@@ -9202,7 +9227,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "38cf9eba62b32fd7d6c6ccd1c8c54fe2f314d08ea2359573e825e03ac4076f0b"
+      "source_digest": "80870bc4960ee2066d82d2c81c9d1c1aa0cc923d5ebeb2ff8643365a3bc98634"
     },
     {
       "owner": "test-infrastructure",
@@ -9227,7 +9252,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "cb5ef75f51e0c19e3cb2a3e9150ba795e2d7fd7addc1ff668e28d4d4d870f322"
+      "source_digest": "c88b03369f96e1721d11c17bfac1ebf98d96f8161161d8d6b11f5972aeec9f72"
     },
     {
       "owner": "test-infrastructure",
@@ -9253,7 +9278,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "f830b924560b38472762509ee2ed3711dca554e5ff04cd95c390b63351d8bc2d"
+      "source_digest": "7bb85a0a844e17d604a66da2184dac1deae80e69411a4fc1fcf48649fe600523"
     },
     {
       "argv_shape": [
@@ -9287,7 +9312,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "5f9d8add18fcf14ce26b5fc7769582e105a4ab1f388ba28328925047e4e087b8"
+      "source_digest": "1a5806eef70f0148af375b3cafa0b3a6bbf33038b6ec6b046f054f113272762a"
     },
     {
       "owner": "test-infrastructure",
@@ -9396,7 +9421,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "cd043a28a92975f202ac8e6567bea956db3f8b4b1dac859899fd27e3c005cde2",
+      "source_digest": "071638838683206f51a9ddf101170e3ddcd664ac09df2cbfddcb3c89b706a8d6",
       "windows_artifact_contract": {
         "condition": "canonical native Windows x86_64 baseline target",
         "emitted_artifact_id": "compile:build.zig:build:lib",
@@ -9436,7 +9461,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "d6edf05ac037e72132bf9a3b9b16a02470741f2aa15fd6361346b9ced4b38faf",
+      "source_digest": "6f57eebe8d6050ef2c63a521e4afd746c102458315e102320ef2d98d9b12cd48",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -9465,7 +9490,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "b9bd8434e78c92098db6e49eaa4ebddd1d992f2d5927efe62ba5033dcc0238af"
+      "source_digest": "9d6ce37b2a6a606370d1b804936e9097201e80db9a34f6193b9dec9add28b252"
     },
     {
       "id": "launch:build.zig:build:run",
@@ -9477,7 +9502,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "9b09946ed20a9faac71d04bf902ab16bf87dd730a8ed5833cc830715e3b17564",
+      "source_digest": "df6cd5386423b99ec72e27ee989c39fb672fe5365f3bef35c7881072b1bcd095",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9502,7 +9527,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "95de94ffbbc3f8a5618eaf70c00e879a9343ca57c5edaf3d1f606c91de04ed5a",
+      "source_digest": "d4d970a4a2053105fc622cbc4e3929e32db34fc737baa75e6a68e59162d0a0c1",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9528,7 +9553,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "3238832697571a5114858c672ac3e3cf21628d734d09ed0703468eb4d480ac17",
+      "source_digest": "fe636cfbf82aa5fde53e971255ee4b75180c18ca9af5a79c3cd142ff000dabe0",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9553,7 +9578,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "42dcc7366b1f5b321d5183d6ea57e47c1470b9d8248d53c331d4a01853c77b52",
+      "source_digest": "34aac54562f8ce5e3000ecf2c4bcaa5b11e08920f41baafa2635eab55140a82a",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9578,7 +9603,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c517dc51bf7527c2b27dd6968ba47dc33c45c65b02cec0a0a6b39562464e5730",
+      "source_digest": "b6ccb0da1756f1b614aae86ccbb7da38e6ad61cf46763b0c8857300cfb29f9a4",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9614,7 +9639,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "daaa514e9c26af8d0b90b1f53421456ca4a4062b2f3785705f9687c79a1f9f11",
+      "source_digest": "28d77da1da1937e767f87277ae6c05c993f71cf73b823c821800b54f5b0e32b1",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -9638,7 +9663,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "73fb860f40be0c86766ed0eae265e61806873e118e4c8300e107c47528f2fa36",
+      "source_digest": "aad31fd8b6a5b4fb52e0a17d70bdfb79ac1e3e9838b73fd55c5567a2e6b76bae",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -9686,7 +9711,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "2bc567ec37a8fac8c674322b607f8d1862a848bb472f0e2bff2f3f41d653d29f",
+      "source_digest": "5e63e9d42d36e761caedc30f38537b011f6876f2cd58237b4c0079b64c875dcc",
       "launch_role": "dynamic-dispatch-correctness-only",
       "executor_guard_dependency": "launch:build.zig:build:native_execution_check"
     },
@@ -9709,7 +9734,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "02176e2f158d8ab9a9289244f4d3a5357e61af43b5f29087aca219f299893103",
+      "source_digest": "9a7dfac1c17ce8e9c02803fb6e798911261530f44bceb56777f294848e78f200",
       "launch_role": "dynamic-dispatch-correctness-only",
       "executor_guard_dependency": "launch:build.zig:build:native_execution_check"
     },
@@ -9732,7 +9757,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c4319b653e0e781b339433adf97faf1a9626edf8488e9de9bc7238869eb7d17d",
+      "source_digest": "c20be09fc2c95ddec5de1a08009f0fc2e5f86f9a11ca28c48eb59188cd607ffb",
       "launch_role": "dynamic-dispatch-correctness-only",
       "executor_guard_dependency": "launch:build.zig:build:native_execution_check"
     },
@@ -9755,7 +9780,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "b263933ec753e7e14986c31ab61de739e7b56e82ad65f626df4a9bcd140e9874",
+      "source_digest": "5c33ef9c6059b51a682101da951feb1b2adbcb3b3063a081176597c4a4784efe",
       "launch_role": "dynamic-dispatch-correctness-only",
       "executor_guard_dependency": "launch:build.zig:build:native_execution_check"
     },
@@ -9778,7 +9803,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c200cd6dfc98af5c75dae2bfee1efd06fc0fb3183a487dbdbf74b686fdc0caa6",
+      "source_digest": "9dc3a47874f149be5b0982c1391c655dedfdfaf01b221ace7a6cbf6d91c57755",
       "launch_role": "dynamic-dispatch-correctness-only",
       "executor_guard_dependency": "launch:build.zig:build:native_execution_check"
     },
@@ -9801,7 +9826,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "9e8c9f63e7da3b359f1e8ab75d71a32f7d75cfa503b95fa6cabe8945241177ea",
+      "source_digest": "1346f366fc8aa20b364f1304a9ded6caaf0b673b71c81de1333b41ac32d3be62",
       "launch_role": "dynamic-dispatch-correctness-only",
       "executor_guard_dependency": "launch:build.zig:build:native_execution_check"
     },
@@ -9824,7 +9849,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f342c0dd8b40c398480058a024d545ad765f9f1c52171924f1858179dcb93a21",
+      "source_digest": "83b391672544ce19950c53379e648e9868a393b4da967748e3ecd14f9494d004",
       "test_inventory_barrier": {
         "dependency_step_id": "step:build.zig:build:test-inventory",
         "relation": "direct-step-dependency-before-body-execution"
@@ -9840,7 +9865,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "59e7e9a59e624b749a65bfb0d50690998ab7d512e28b57e3d4b06ad6ff7b8ae4",
+      "source_digest": "73099ba42f5ca16a7f5476748d4b3ffb1a9879849861e280d8fe607aedf549c5",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9865,7 +9890,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "ea190a18165ed3f72345cbfdc8fa20be06c0a0cc3f82dd1cefddd06836d60077",
+      "source_digest": "76dc0ba97a1038b4906a66e5e99200a0f9ffc23dc27bea00bdf0e7206f951b48",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9890,7 +9915,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "1d98b3c63171521aef076c4d2660ee449f0eb51046f75d7533698a2ac7cfdeb2",
+      "source_digest": "cf56bd9517cade3332a686ccfd00681a67a9bb3799a63c0acd3a2c4bcd3ac059",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9918,7 +9943,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "e196b681676ec496bf0de5b3317321737e1e4fd31ac757d6b866d1a7bb29909d",
+      "source_digest": "02c80f3d860e2b9c7c66cebffe722b1d1c6cc845900899ab471e367547762c57",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9954,7 +9979,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f3bd3ccf4f300b811e789d563bd537d749a7332b5d436ded7b0fef4f41fd7bdc",
+      "source_digest": "25993470d92bd54d861c161c0211c8af5cc53cb26390d600f6c996e3443e832d",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -9998,7 +10023,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "1383a207ba3d3e499eafc0d3736a470cf13a7dd0b6b7c5062ab596339c115ceb",
+      "source_digest": "e74bd3c804d72c2a8999f56de5677c5b81e62b28baa627856ffd3cf09dfc626b",
       "launch_role": "test-inventory-enumerator-factory-run",
       "source_factory": "compile:build.zig:build:inventory_tests",
       "argument_contract": {
@@ -10062,7 +10087,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "1d9022b00a636a690581d8efb1390f91dd1d3fd5541392eea0423a74c6dd6d2a",
+      "source_digest": "5e05d49cd02d4168d3dc2eb2a427b4993d4ae46d4fc553ff9fdbf9b87f2e67c0",
       "test_inventory_barrier": {
         "dependency_step_id": "step:build.zig:build:test-inventory",
         "relation": "direct-step-dependency-before-body-execution"
@@ -10078,7 +10103,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "9576edc0e0c92d1dea937cbf3defb05a6cec519d04130e3a97ce49b615ca2ca6",
+      "source_digest": "28e4f1de16bddbe481a9f4d5c3a66b1b5087be06dbdb99893a60f49cc019eb24",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10103,7 +10128,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "b30243cb18b51bc66cb06432308a15d385dc2288f93314e85a319b98ef386589",
+      "source_digest": "789d87a820daaee4b3d51e477350541524ca3b6ae683c34a400e33c44999a27a",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10128,7 +10153,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "40e4cfa5febec25416b034dfdc248d189a06ed0fa7257710ffa88ac0d619bec8",
+      "source_digest": "88c15ee4b67328e91fedd9967fb6d72c5e6c4984cefb5d19527148387454ff85",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10162,7 +10187,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "a5b2827e1a36f2b074ce3daf97b8ade4a22f873c6d90868f6aa8db6586af28f0"
+      "source_digest": "894cb8fcc89bd20b0bc886187a98ab1ad4ddc453627f69c727e7e2eace85c461"
     },
     {
       "id": "launch:build.zig:build:run_modern_tests",
@@ -10174,7 +10199,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f7004d07e12bab97ec8580a5e0793868e5ebf523d14b5987b958c807bf6e5bf0",
+      "source_digest": "f3fb410e632b5700406d22b011f001da015fb998dc1cc279f74fd20c7611e052",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10208,7 +10233,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "085014365d0607099777f177d5f331a14affc5d2c96ab6824796ef10e0414716",
+      "source_digest": "91c8e4fd9bb97e0e384001fb9befae42a1c6538edcb6bc112301600b6e0284f5",
       "launch_role": "native-feature-correctness-only",
       "source_compile_relation": "same-logical-test-compile-and-root-module-pointer",
       "expansion_cases": [
@@ -10365,7 +10390,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f2d2feb75897dbab621431fc32abb3e8f6df95781316bbe58a58f04162f9df6b",
+      "source_digest": "5a5d494774c8e9d878d7b6a1525d5caede2bcc1a343aea3b96d1ccb4e1fb3ca9",
       "test_inventory_barrier": {
         "dependency_step_id": "step:build.zig:build:test-inventory",
         "relation": "direct-step-dependency-before-body-execution"
@@ -10381,7 +10406,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "ebeba58626e78944083a6a9628a11e82dc08c076bfd3801acb10448a409d949d",
+      "source_digest": "210d2d8425de71ae3d3879cbc639d21fa80907c73b362a69b83821445bf9b369",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10416,7 +10441,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "a5b2827e1a36f2b074ce3daf97b8ade4a22f873c6d90868f6aa8db6586af28f0"
+      "source_digest": "894cb8fcc89bd20b0bc886187a98ab1ad4ddc453627f69c727e7e2eace85c461"
     },
     {
       "id": "launch:build.zig:build:run_rank_k_report",
@@ -10428,7 +10453,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "cb87c5da3bb427bbb1a898c6af2dbbcd0f60d8feaf55cdd77e1f8cfe705fd63a",
+      "source_digest": "3b2be549864319c5cae03f7e4f97ee3d561e9de6b645a8a49e746d151c7cf05a",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10461,7 +10486,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "3d5d1342145bb63e72dabe5988b307a414f253e4211cfa3fa04e0d9d2ad06150",
+      "source_digest": "b57388a9a746cd9acd46575360f4cbb8961aa5d0904d75bb39616c43b0b342cf",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10529,7 +10554,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "fbd2e531d69667f7a944f25399eea785e6da50acbe910573e15c3f5918fbf7b2"
+      "source_digest": "61d6e80548546fba0324143af0064db61273793e4df054bca29ca8333761006d"
     },
     {
       "owner": "test-infrastructure",
@@ -10550,7 +10575,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "1273f6600c3815a2c0994cc4796bc193e9a00c3444702cea53940ab447090863",
+      "source_digest": "6f13760f7491a1a760e991c73847fde873ae11b587439a6fb88ac1026c09b9cd",
       "test_inventory_barrier": {
         "dependency_step_id": "step:build.zig:build:test-inventory",
         "relation": "direct-step-dependency-before-body-execution"
@@ -10566,7 +10591,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "d44ea557250d93d8555a77874c2e6e02a90d47fb33fd413d6047ffb5d38dbad2",
+      "source_digest": "c42ea5eb7960fb1f55a822ded0f8868630bcb277874e2b5a4141d02a8cddee0f",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10591,7 +10616,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "b21bc7d2eb19d4b3bc918c9735a1c747f56f1b84ed2321ea696ab922b3a93a92",
+      "source_digest": "541e4a03f60e9a0f095216f7b6bb74939afa436c6a16a77af1ca67d2c83b12d0",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10616,7 +10641,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "e6b8e9eccf739d0ea121f346dec2834652504fba337c4a2ecf7518c80426a60b",
+      "source_digest": "f218573ce87a3341af634e2d4f7e0556fdebd67e043ad98bfaa0b1e443b2405f",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10649,7 +10674,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "f320a046ca11776deae03cb0dbb17f8b86a0b0f77b2ed8a0cf0ba45926ecd568",
+      "source_digest": "83c4d3f5f10a6727541483eef3073ee42878175687f86d80b9b721653db41f56",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10674,7 +10699,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "39802a4c009c103bc8cb636ef2ae17dd2c7cdc213ee7f5433a7c4b039360de1c",
+      "source_digest": "166b31f8031424cc00f62f8ef6c65a6efceb95576e38556624cc219cf41af929",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10699,7 +10724,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "3aea8d5a4c8000a6ab9b57b09d4056da73a330bc64529a2953d4df5828434a47",
+      "source_digest": "52d6c34f296b8675b29e915465a296276c0b2d4293931343e92c9abd6930ce29",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10724,7 +10749,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "a7378b07a81bc94ccd5c801ae734e4d927633071ea3b9770d116993aef4a13e8",
+      "source_digest": "b183c17d372d7d7e2f4e4e4f398bce0ade5ae8888692be44df03765f473b0d92",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10757,7 +10782,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "d1ad4aefbb9f18e09ad516f760235a56c63d7a9640d7b2bbe4ca5fe5cfdd6fb2",
+      "source_digest": "965606c44ac25fdefbcdde541f8bd8f64902e11c3aae1187ca7f23dada17017e",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10782,7 +10807,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "3f0aa0954b0ed1f87e62a627b07bae775cc5ff3bd904a5087cdc0e281f7449dc",
+      "source_digest": "a166f621b5aa76e5b1587ed952f283739df0e92d928841d8606ab1f5d2245f24",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10807,7 +10832,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "4dcf93960799cbeda6091fccbdaa871491d68274ac4e124ffc12ff2f2eccdb67",
+      "source_digest": "0fedd9cb506f3dc1a0806c1124fcf66410fa02fb21686a9ce6efe037638d14c2",
       "owner": "benchmark-maintainers",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10833,7 +10858,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "6cf8844ded328898269cc51ce2cf7c1558855e28514c7d34e92ea5dcbc898562",
+      "source_digest": "2480db633d54f35d31f3c4117108fa5cc0bd4b92a743e30cfea6f5b427e2a99f",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10858,7 +10883,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "c5055c509972d6a5145695beabea8ab898ccb6e14c739714939211cc137e2768",
+      "source_digest": "ba5931eaaafb2785e540900f5b0e97e7e3abff5e486eec7abb70b1bb6126b40c",
       "owner": "test-infrastructure",
       "detail_status": "process-lifecycle-out-of-scope",
       "cwd_shape": "repository-root",
@@ -10904,7 +10929,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "0499af4d7757fca759d651cf70f8dc8f7be8379ba4e462de72a74085c6c44fa5"
+      "source_digest": "876b1359b5924d75bd08e79a75c7c3e76ada16f5ff902597f0b52e338ee844f8"
     },
     {
       "argv_shape": [
@@ -10931,7 +10956,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "606b81fa75b12e877542081c7b1c00773d682bf554193a9d341d09af56812d0c"
+      "source_digest": "02bb62b728a3b6edccf99033228c5cb3f854a7d48d405d3be1bac9aac4f9bfc1"
     },
     {
       "argv_shape": [
@@ -10964,7 +10989,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "f60008cbbef8602c03ccd79a40dc61624eac134de9bf41a04676c1e1c5d11b0c"
+      "source_digest": "eb4e63d347197718da7c4e9eb914fbb5758935f310e30b3d5c4487b765021ba4"
     },
     {
       "argv_shape": [
@@ -10991,7 +11016,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "2b5d1ac3cb225930fd1850120d7a0f65dfc297e5c1bc615f14b167433efae106"
+      "source_digest": "6538fe20b5a6cc12c96e432f698622f8bd289f1583511d9d0bdbc1dc0ef22653"
     },
     {
       "owner": "build-composition",
@@ -11024,7 +11049,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "f60008cbbef8602c03ccd79a40dc61624eac134de9bf41a04676c1e1c5d11b0c"
+      "source_digest": "eb4e63d347197718da7c4e9eb914fbb5758935f310e30b3d5c4487b765021ba4"
     },
     {
       "owner": "test-infrastructure",
@@ -11049,7 +11074,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "2394cd7a748a1f044b645867b3534f3b125d126cb88f62a40862547566d91b0c"
+      "source_digest": "48383b4c644df22afa9008637e6de4742ed1c730ac525e54beff5fb0503eb9ce"
     },
     {
       "owner": "test-infrastructure",
@@ -11077,7 +11102,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "79cb7e27150419398ae6d5411e2fb6ecd321b2fe2342535f78c790e1fc479c4a"
+      "source_digest": "f3993bf3e2c5fb5799ae5b8bfe764fe325e34fb5e0eabdcab6afceccd03640b6"
     },
     {
       "owner": "test-infrastructure",
@@ -11105,7 +11130,7 @@
         "ordinal": 1
       },
       "call": "b.addSystemCommand",
-      "source_digest": "4f84572108055c488f1a90ac657edc7430b28025810ed2121758896eaf35bc34"
+      "source_digest": "dd8feb8aac87a044e17109938b3a324ce6cd347fa16b494bfa53f18e4a6f2cde"
     },
     {
       "owner": "test-infrastructure",
@@ -11128,7 +11153,7 @@
         "ordinal": 1
       },
       "call": "b.addRunArtifact",
-      "source_digest": "06a2386323a43a1c3faf46d972d273e7446f1bd5b69cac91b1d86168b3ff967c"
+      "source_digest": "6641764a6e059bd031bd2f8829a188102ccc6562c4fd376d2b41d345b8a53c15"
     },
     {
       "owner": "test-infrastructure",
@@ -11151,7 +11176,7 @@
         "ordinal": 2
       },
       "call": "b.addRunArtifact",
-      "source_digest": "2a4e0a82ef7d94d2828c962cb4d15671c726a0e14c9522d22cc8569720f0c278"
+      "source_digest": "398e071da97b9a079bc4871a1a07c4eef302a5b8baa055e693c64dd96979a8db"
     },
     {
       "id": "launch:examples/zig/build.zig:build:run",
@@ -11190,7 +11215,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "9a97bc314702dd866b54a9fba2d15226c5e01b6ca35a850e9f71f42729405c22",
+      "source_digest": "48ab74bb97fd8ad53ff486fe7e868180f7a1a909f5ff4b39b1aba22abdb636d4",
       "guard_digest": "8e35ac79229b0d04a5063eff6a229c98a48eb7a33bc3aa2436a06371772a9acf"
     },
     {
@@ -11207,7 +11232,7 @@
         "ordinal": 1
       },
       "call": "linkLibrary",
-      "source_digest": "abeeffd385e31cbef3d3051978cfe94cae66d185c7e2a1e400197a7e01e448a6",
+      "source_digest": "42323101403501c7f571bb1a45fa241d760592c18687c34bc83fb678fb609aa4",
       "guard_digest": "2f04ecf7faa3df35dc8104ee55cdc83870b31113321954a599dcab184ec69652",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
@@ -11225,7 +11250,7 @@
         "ordinal": 1
       },
       "call": "linkLibrary",
-      "source_digest": "abeeffd385e31cbef3d3051978cfe94cae66d185c7e2a1e400197a7e01e448a6",
+      "source_digest": "42323101403501c7f571bb1a45fa241d760592c18687c34bc83fb678fb609aa4",
       "guard_digest": "48e6e5caeb31def4e779dfb2a319f9934acbfcab560c0379840e7d90322d1370",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
@@ -11243,7 +11268,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "b5e770e9d95054e39dd6d2dc94c24e21bd283654e840d7a2ddc606807cfb76b0",
+      "source_digest": "128c753e1d0fb20f6012c213715a30158bd70e705d1c836907eaf070777ace2e",
       "guard_digest": "fc834116792b785779e6564d6b89af037209ccbfd3cb0faeece816dda4811ece"
     },
     {
@@ -11260,7 +11285,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "b3c5ae0115099e65678d3db4c9bbee9c819f405c394d7ff24559401ee02bb0c5",
+      "source_digest": "f5b8d3c51e0882d7255682b71ed29e0e03df5f23840fc896c64fc06d6d1f7af3",
       "guard_digest": "a3be98158d484d40708665e52748d757bcfd6073d9f341fed38537a80e39933c"
     },
     {
@@ -11277,7 +11302,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "60ba0aa03d5f7a2d3ffdbf7789ef157bb485fab792b99873e16edc6f5432fba0",
+      "source_digest": "374fd9295f43ab0eded432e7a0d819f8fd4171d2a29e11499f229e218349e18e",
       "guard_digest": "bcc89d26ff5c1486ed0f64c2d43fc29f4b8bdeeebe4d9e1398ad9559ec868cf9"
     },
     {
@@ -11294,7 +11319,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "9615066523b3c99353414b385da247240742920f0df664e0d15541c4ceb2f2be",
+      "source_digest": "eb2d957977983329cf87f6e799bf96e4c33d5500a4e4059aeaed99aa3d121c6f",
       "guard_digest": "d4348eae43b475539260a106082bbf24dfcbeb946270a10ddbbb76fca426a59e"
     },
     {
@@ -11311,7 +11336,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "9615066523b3c99353414b385da247240742920f0df664e0d15541c4ceb2f2be",
+      "source_digest": "eb2d957977983329cf87f6e799bf96e4c33d5500a4e4059aeaed99aa3d121c6f",
       "guard_digest": "3b322970b27cb6fd95e4c9d930d9578a1644dbb5c9b0d569358b07f6f1617067"
     },
     {
@@ -11328,7 +11353,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "794fd3f05d4f41fc055b60a6c95f2ac6109ddc6646a4c29a707221abf9a4bccf",
+      "source_digest": "85403a51b507b05ba8ce9b57a517fda4ae0946db162ed653af76761b7d54d022",
       "guard_digest": "25a5bffeb9066b1af8bac2f5ed6e8231a636e2133f23c6f16e3a2eba48ef504b"
     },
     {
@@ -11345,7 +11370,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "c345d471c8a805b939c8c4b680f49162508c497ccbfce58bf1b53af452cf234d",
+      "source_digest": "ccce80fdc6134a513330351136ddc91b35f921877758154a1504c81e1f9f2492",
       "guard_digest": "7692c46acd81c5430d84a24ff99d00be7410cb7b40c9fc066d0ba0a4f0fba256"
     },
     {
@@ -11362,7 +11387,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "a1ee26e3f85aef13d224e244eef0ba840c89476af7331f61fcb16c0ae403ce9a",
+      "source_digest": "49e77413e9a9a50c3448ecf876fbbba4f2a2f27dc31d227273f6e901453bdabb",
       "guard_digest": "d77ad889571eac09774a793c073b26144751a5727a2cbd90df8d029b084ca3af"
     },
     {
@@ -11379,7 +11404,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "73f2c8681c887dafc7844c1ed213fc1ae4e5e8af3043b8363b08a601a5273b86",
+      "source_digest": "8c5cc8515b43d58e81c09b82543bdd4f9f7d41f4e3b887f6b68c47903b4694d4",
       "guard_digest": "5c7e926ba18a58930a7a46713cc739f3cf5d9a22e9bfe6da3c27377cd643f552"
     },
     {
@@ -11392,7 +11417,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "38042fb725a19304cec7a79ed530018e6868e312406bf67cea806581e1a7e2b1",
+      "source_digest": "220dc194f2c669c1e62768a2bf4c45aad3a31feb96e8c0175f7dccafb975d174",
       "owner": "build-composition",
       "consumer": "structured_object_test_mod",
       "provider": "structured_isolated_test_library",
@@ -11413,7 +11438,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "b5e770e9d95054e39dd6d2dc94c24e21bd283654e840d7a2ddc606807cfb76b0",
+      "source_digest": "128c753e1d0fb20f6012c213715a30158bd70e705d1c836907eaf070777ace2e",
       "guard_digest": "a6953c46c0670658673d4ae28d7a5d6933dc1d78fa175a39ed1d4ac6d468907c"
     },
     {
@@ -11430,7 +11455,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "2531df9f39ac6be09c42ad1e95d5d041e81a7b569d873593e2808c7477afebaf",
+      "source_digest": "2d10cec5fe8a076eae2cb93e925c56e7357eb0b72b4ac673f8619ee40bb06a5d",
       "guard_digest": "b40169a1ba2aff5f87e373c99b1f1db402e30876925cd1973c36b91b19ccab4a"
     },
     {
@@ -11447,7 +11472,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "1fa22f11aaea5cfa71e980494a7dd520a71c3a39effd9b4161ac89ed0acbdc66",
+      "source_digest": "61f4bfe33f0f1a0e0e0addcd5fbfa8f13076fc92e4d0c39e0dabf1c91446c819",
       "guard_digest": "488a3322f0f4cfb31934862dff0ec038f224826b9454aec927fdc5063b12c481"
     },
     {
@@ -11464,7 +11489,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "23e5c7c20808ada5f333c46e135ace150e1519aa86524813264a5f25c769aee8",
+      "source_digest": "96ec724a3f892d300c19daa93fdf52b63b3a0e8732b98ad24464614d3742aaf2",
       "guard_digest": "77b66f8920e1781916f489ac983d544ac7079c444cbeb377e8fd40f5e1e52db7"
     },
     {
@@ -11481,7 +11506,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "749125e3f27ce534207d9b39d63a8fec49888994ff8e853aa4b5c07373e9e2a1",
+      "source_digest": "22199e1e8d82ad6eb25baa8eb75f10f4af82dbdcb1c421235efe7387a203194c",
       "guard_digest": "84eb1ef1ebe955640fce7f0930c645ab0b5cada000514e06ad8aa7bac2f53ebf"
     },
     {
@@ -11498,7 +11523,7 @@
         "ordinal": 5
       },
       "call": "addObject",
-      "source_digest": "8618eaa1b883bd2eabc2676067a225166aac8fe73bc2cbd5ff3f60c2ad691653",
+      "source_digest": "7cd6d6eeaf83bbb52e6b135d8f9b3be08e50e29c7a9fd323cf94f3d7cbc86bb1",
       "guard_digest": "c989f54e55ea50be08e7cdabbce3e00310c87446893aebf04fd8716a254eed25"
     },
     {
@@ -11515,7 +11540,7 @@
         "ordinal": 3
       },
       "call": "addObject",
-      "source_digest": "794fd3f05d4f41fc055b60a6c95f2ac6109ddc6646a4c29a707221abf9a4bccf",
+      "source_digest": "85403a51b507b05ba8ce9b57a517fda4ae0946db162ed653af76761b7d54d022",
       "guard_digest": "9b39808fdbc4f0c5df314549b54a5fad77c378e3302b7220a9a6f4ea5d2d631f"
     },
     {
@@ -11532,7 +11557,7 @@
         "ordinal": 1
       },
       "call": "addObject",
-      "source_digest": "c345d471c8a805b939c8c4b680f49162508c497ccbfce58bf1b53af452cf234d",
+      "source_digest": "ccce80fdc6134a513330351136ddc91b35f921877758154a1504c81e1f9f2492",
       "guard_digest": "fe633b034e12a28f6d55b1516c393342702a3d50ef2f9f3d49d931e695467b35"
     },
     {
@@ -11549,7 +11574,7 @@
         "ordinal": 4
       },
       "call": "addObject",
-      "source_digest": "a1ee26e3f85aef13d224e244eef0ba840c89476af7331f61fcb16c0ae403ce9a",
+      "source_digest": "49e77413e9a9a50c3448ecf876fbbba4f2a2f27dc31d227273f6e901453bdabb",
       "guard_digest": "1912cf216c57967c99cc7e817210d4bd94e8ef80aefea704c9948d575b435b90"
     },
     {
@@ -11566,7 +11591,7 @@
         "ordinal": 2
       },
       "call": "addObject",
-      "source_digest": "73f2c8681c887dafc7844c1ed213fc1ae4e5e8af3043b8363b08a601a5273b86",
+      "source_digest": "8c5cc8515b43d58e81c09b82543bdd4f9f7d41f4e3b887f6b68c47903b4694d4",
       "guard_digest": "704315c3fc07465d8d768f39e93cf63e14881ca6c92ef8b2466d0a3e80fb2a1f"
     },
     {
@@ -11583,7 +11608,7 @@
         "ordinal": 1
       },
       "call": "linkLibrary",
-      "source_digest": "12f1ce20be1a21a1f5cee498735febfafc9a0634bc57b15fbce31ce8891be64b",
+      "source_digest": "c339c8f901c5845202f0700745c66fadb9c68c5052854752a1d32b8e5b62ac2c",
       "guard_digest": "b6410efffcf14edb8fa58951a4bb185b72e7010f85ae256c5a93f5c219938cf2"
     },
     {
@@ -11598,7 +11623,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "b28c186aa45f6fdebaa4c5ef77ace1bf88406179398689272d70c8c8820b580d"
+      "source_digest": "a6f4732298bddd3042ae75d98b5d65d01cf96b9503a5a085c9e1105399953dc8"
     },
     {
       "id": "option:build.zig:build:bench-accelerate",
@@ -11610,7 +11635,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "55b395452451b9a16cfe84b5b26207c791198d449b604851b81fd030be268a39",
+      "source_digest": "2df0b6eaaada192e0a8dafcfc693571fb10c6a0680b7b458e3bb197855fcba87",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -11624,7 +11649,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "b99246f2433804619a371a37d882c99847dae87af9208c49fa54e9c2dddc7502",
+      "source_digest": "b5d65c8f80c3d0faefa1ea1324aa01d9d3f76ba3b26eee252e773be3f25658fd",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -11638,7 +11663,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "0819d88d114385d3e44324b27a228d55cbeac8ef91dbfcf3f072936ebc9a4eca",
+      "source_digest": "70168956df7b4410c090d5eee7ce0b2520b0d15a36aef492c510b22759c17426",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -11652,7 +11677,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "30f8b5c3f5e970ebeeef3bf866fb85af1fbe39044517da1f5f569f9aa713b82f",
+      "source_digest": "7b9f80d475404af39f26d622549a0bd175ec8fba4922bf7dee89b1677d63c658",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -11667,7 +11692,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "7f7213a2f1b45842e506ed76af39a905e28eb38203dfb3452e6153d4b504fd32"
+      "source_digest": "c30475160aaf75ab76543b2b9fe19fd7382c27e80ecffc4a4063f29b11209b71"
     },
     {
       "owner": "build-composition",
@@ -11681,7 +11706,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "ab379209056d3eba68e28d79d7cdfe8f12c0dba7879ee28bfe3361dfcfcb2c82",
+      "source_digest": "21a79ca254e1fc751aae9dd2680f188bc94a8186528f2ed4f056f88ea0b17dd1",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -11695,7 +11720,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "fd95c1978034757febe1750c290ce3020e2bf86a2d95eee8c40ad2c246d6c0eb"
+      "source_digest": "72df03c0212a63a51753b75b777d53e0464ee3f5c6ee2ad0d6c87cb82fb59c68"
     },
     {
       "owner": "build-composition",
@@ -11709,7 +11734,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "23ed2672bd9291e4d4c92b86794f86c5a91d8de8720b46152a43f4c7b01f021c",
+      "source_digest": "b86c74835d8fc7144cb465e023d4c7854d06c9bdc2fc7d2f8c3f393510d44e83",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -11724,7 +11749,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "05de15506784ac1b6eaeb7962d361f0472ffd47f145a5ab5674be12900be05e5",
+      "source_digest": "9f9cec60cf301eda3696577e56c3d19a896b2121e1d769a8acd4cda54910d569",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -11739,7 +11764,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "43aa68946eef668e32fad5310def706b1e5abd6ca86a0247ec19d0b6104fa3ff",
+      "source_digest": "02d9113ed0ec9fd1597a97e2703ccbc8017baf7924a43de44edeb867d1a9d496",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -11752,7 +11777,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "535b1d040eae97aaa00d29a5f71d23455302020fa6226e0b0ff1169886f9efdf",
+      "source_digest": "e954355132a15573a1a4a9647b1a59243e6ffebdb35bdb0a63ad1fdfdda47a54",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -11767,7 +11792,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "41a9ef57433c925676d4a2dcaa094573a503a94031daea53e5ea2fcbe1055eb4"
+      "source_digest": "bc7e7b099be46dd9ad94dcab3daa0c45903d08fd9b5807e8bc2c230e4269df75"
     },
     {
       "owner": "build-composition",
@@ -11780,7 +11805,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "86016ecf0ae3ca05ef54d9860f330f099f950b2b87a48f7bd9cae60184ebc4cc"
+      "source_digest": "86f2613effe2e38d926ae12623736fcdc85c177ab8ed8ac3181bc477b65602f3"
     },
     {
       "owner": "build-composition",
@@ -11793,7 +11818,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "8c8f0e6b6a4ee13adabb8faf2f32d72d58648b7d645fd1feb912111ce444368a"
+      "source_digest": "5112ef6ab89a211761c58cffd2f4e38ad488e0f31825079aae3cb205cf4cc952"
     },
     {
       "owner": "build-composition",
@@ -11806,7 +11831,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "8c1810fe936b970dc1b74b7591246d5ac87f89b6837621873f429ac20d91c6c2"
+      "source_digest": "9d33e2b8a8670b549ea5d872d2223f59284125a003812a32431df0abe501e676"
     },
     {
       "owner": "build-composition",
@@ -11819,7 +11844,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "0dfa7765aba881747eb14c8ca0da55260528e438c47f8afb76a45bcde735bea5"
+      "source_digest": "598ecd4659335f2c8d1a64d5d7daa7c646206a9eb8dc9a8f7c73571e4b9d1ab7"
     },
     {
       "id": "option:build.zig:build:host-tool-smoke",
@@ -11831,7 +11856,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "6878b05a1dee687cde1cbccddf256ef6d7a95269bf380024ac516a302845861b",
+      "source_digest": "131f9589948e43fa075b4f8d58993ad16b7d8e3600faf9be79a753a160e01367",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -11846,7 +11871,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "7fab894c1a33ff66eb4199b52f18bfe68c781464dd7489ade5890ac8bbd05478"
+      "source_digest": "fe3d73c793fbb19bcf52aec52ef6e174eebeb2f2878f0878ea7362a078067752"
     },
     {
       "owner": "build-composition",
@@ -11859,7 +11884,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "2e220f666525d7f1f71705716d489a1e8a8b999c6267b8d02b35aacdc5666896"
+      "source_digest": "91f0e0fdb166bdb9f13f475bfde5c90a269bf5a7e28edfaf478f2ee45aaa5159"
     },
     {
       "owner": "build-composition",
@@ -11872,7 +11897,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "24c72a6e0d0b5bfd636ba15f5d09c9fe8b71f9f3b88f562e3bce565153db155e"
+      "source_digest": "23f2df399c02aacb4b2ce93f27f265ac59eee6f341e587b42f013d999cf3dcf3"
     },
     {
       "owner": "build-composition",
@@ -11885,7 +11910,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "0fbd38f1ffd7aeebbb942c6733ddb6195d39e5b1c39a4c458fe1cd8ffbc4885f"
+      "source_digest": "502cc9411a3c7ad02d6491e773bf287b97e2345a4c9b9c40b7e1b3ff2c49d491"
     },
     {
       "owner": "build-composition",
@@ -11898,7 +11923,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "2ee0b30cc17a04613bf3691c51e8a54397c57f6b486aa9d14b31ac2cb3cfe6a2"
+      "source_digest": "d7e4ba22d7a88576870c761f5cae1426c5ede1675826c566a23c3a359a0c8adb"
     },
     {
       "owner": "build-composition",
@@ -11911,7 +11936,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "5dbad599c44ba93a01c79b6176fcb3b4fc6ebd0cf58e43a256f1f7515a110a73"
+      "source_digest": "b7a830a6e3f6cfa4e7b853608d9329e4026665a1e97a75349a2799a48b257de2"
     },
     {
       "owner": "build-composition",
@@ -11924,7 +11949,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "9f7ab90400dbb262727082d74610d19d2b00ab760db7597ac7a8dc67c219231a"
+      "source_digest": "a840607bb64edaa0fd835e5c61fd31e7164cb6c76f264403e711f3d02b542c6e"
     },
     {
       "owner": "build-composition",
@@ -11937,7 +11962,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "df2d4672c4c6c2a71e0a1d80a94e080ca92efb12f69fb43dd339516f18f1a50d"
+      "source_digest": "90eb5c2f7611cf7d2ef86bec694198ee8b8b495575be451d51c05af4a1353d58"
     },
     {
       "owner": "build-composition",
@@ -11950,7 +11975,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "a7e35d31964d095c2f64c05bc00a36ae2b97bcdf3d528bb4069f2fb76d00e6bc"
+      "source_digest": "74c3494af06bd35409e7526945972a649845d547bd2ded71721f019b5b68ecca"
     },
     {
       "owner": "build-composition",
@@ -11963,7 +11988,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "883544dea8a06d035f185bbed6adfc10e88d8f23279fa16599ace855a4fceac9"
+      "source_digest": "be613ff3ccd994b05eb21ac6c8cb907277f4d4e835dab7c5ebe9e1cad4352aae"
     },
     {
       "owner": "build-composition",
@@ -11976,7 +12001,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "6de70452a562499b69ccc9ec133c2b9c1b84ad2f2dd78fce757109452330325a"
+      "source_digest": "c523241b4d987e412d4b82542c0173db6ca5772e4f975d3506a6f431738a0639"
     },
     {
       "owner": "build-composition",
@@ -11989,7 +12014,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "721babbb6f5f81b7bb74f0580af6a1c8dcb0f382e3c263f1dbe3e79168a1cc74"
+      "source_digest": "8156e2cc474969937554da07c14050b60732ec033b134eb6d6a2abd658d9ab8b"
     },
     {
       "owner": "build-composition",
@@ -12002,7 +12027,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "03314249468dce0dfef5b2410d32e9e0435a4f952aeab61158eb6d090ba684c2"
+      "source_digest": "afe32945af009cc701b477169a14e105dde36828f07851b0786d9b991d7a4daf"
     },
     {
       "owner": "build-composition",
@@ -12015,7 +12040,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "9cb24a13f0a85a1500b48c9c93b5e797b0805d21fbd1e9a1cab0906677977899"
+      "source_digest": "1fa06f90c73d63c07e0e280aee9a4f507c28cb265df60335a7196c3061d9c2fb"
     },
     {
       "owner": "build-composition",
@@ -12028,7 +12053,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "051d932f8b29ff91a0f66c6bcb35f62d8b3ccea4579916f8997e1154cbb28df0"
+      "source_digest": "8253603a0c0ddebba163b937f6d9cf4685776f06b87bdb962c8a68f5aabba495"
     },
     {
       "id": "option:build.zig:build:level1-fixed-candidates",
@@ -12040,7 +12065,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "6d956c8a2ca5ca5868bec6c36557915753e8a37f4074469114e4494637e12cab",
+      "source_digest": "0a7c46b9b419c8ca2b240cb15fff9a7b6cd1de2300f137501e273e59548f37b8",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12054,7 +12079,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "3374711dc52bfba5a5723b25cff2d18ba2ce77d338b8e4445952dc5432d290ba",
+      "source_digest": "0163a405555e8d6c3081562420a8c99c5da56e14f234352d9c9ec8c8e49f540d",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12068,7 +12093,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "93d8f8f7f95d567ba149b50f1aebd862db907f5345ff805d5d8a427f1c3f7709",
+      "source_digest": "fdc30ffe5ed0a27d15bf69cbc173582e02a59b2b7e2374dc25482863e322a060",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12082,7 +12107,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "746cd4a3eed3b669446af15bbb2d03d6869e468b61ce8648d198479ff365c828",
+      "source_digest": "93084e35da6972e423c0c8166220ac2337d34517e675ce61561fd21e148c4e85",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12096,7 +12121,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "2e1129340b2e46d8892837853a50588e60be3a1560d48533a1eb1fffcfa7e3d3",
+      "source_digest": "5e27f4ce1c5535ea8c74a58809896211f1f89ffcd51be8d26e815946b8aef295",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12111,7 +12136,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "043f4eb2621397d13487cf6caa8f69ffbb376ff0de1e297ddcade13d6abd07a9"
+      "source_digest": "5763a7da442c9c60a665476e5e5c09afcf0c67ee9ab977f9e74e71fc42860639"
     },
     {
       "owner": "build-composition",
@@ -12124,7 +12149,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "adf19f55b92e126c71cad29e2b511c6d9c79793d8ba0b13d737e337b7afeec7f"
+      "source_digest": "a6b30e5591f057201460d65bd2ed114c42907893ee602824ecfbf02a4f9a4f11"
     },
     {
       "id": "option:build.zig:build:optimize",
@@ -12136,7 +12161,7 @@
         "ordinal": 1
       },
       "call": "b.standardOptimizeOption",
-      "source_digest": "36e7bfa557e02eac251c5d53d456d6931c069e5fc048b35d5397e50870e3c731",
+      "source_digest": "dbab277ba7e1b533452a1682645e49f289e0cbe8695e309cca49266655e9962e",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12151,7 +12176,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "43a43124f5c318cfb041b5c2f32ee3f345dde6c770778d61d07107a870ce168e"
+      "source_digest": "1a7e7215ff8339d4cd8ecfd8605b04c72cccdf652ceb3f0b75247a59fbaab583"
     },
     {
       "owner": "build-composition",
@@ -12164,7 +12189,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "d1725ae80c78ebcad018779c591ae4ecfd7d53dd03595da34b24f1819dcdcb76"
+      "source_digest": "035de3e5b66e30fbadf266bc654df9609d4d54d307f08777b4f27b1524bca4f9"
     },
     {
       "owner": "build-composition",
@@ -12177,7 +12202,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "72463ed753da3a16b82696d2c3bb6f2ad55ba088a7a12e2936b2d02ac09aa1f6"
+      "source_digest": "a7656efdba08462bd91b51406f5eeb2ddfa01f6639266a20f6037d7a9087428f"
     },
     {
       "id": "option:build.zig:build:structured-object-baseline",
@@ -12189,7 +12214,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "1d868590d57c6aac873639f9ea735909f436f1ed0ffa3b8b4bef42c47e2fb4ec",
+      "source_digest": "db7cd3060517ff8f687484d74d5a5c3b97876527a396d19e78d02368661a6bfc",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12203,7 +12228,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "88ec0b69f8d4096abc2ff72ba50db2d04f798144f9d820b8c4807d55d436aa12",
+      "source_digest": "1a3dc297627070322fba672dd4b8a4022193246df55fbf381d31d2c4ca5b07b1",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12219,7 +12244,7 @@
         "ordinal": 1
       },
       "call": "b.standardTargetOptionsQueryOnly",
-      "source_digest": "88dd055f922c9c813cf18c076edbad5b685620cd93c2b55ddc84064cab4a0bb1"
+      "source_digest": "6f928db918df5e09b9f785cb411077ef0bae39eda136b52431b282a789165d79"
     },
     {
       "id": "option:build.zig:build:test-optimize",
@@ -12231,7 +12256,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "ef1dc6060874955667901ce4acb9ac091338bfc3cc4f96c4d7ac81f3c7e15b10",
+      "source_digest": "a9f1e78a27b7e41c05e853e68762cb8527c8dafdea1fa1a443877a0f58818bae",
       "owner": "build-composition",
       "observation_role": "source declaration for option surfaces"
     },
@@ -12246,7 +12271,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "c22cc6968b59684d9f44683017c702e03fffe4ca7ef12dff7e2d4b207fa51a9f"
+      "source_digest": "b5152ab3c7429412d23ba3b6a374a31b3bd6783a717cbb9f27b1ec6a0cf37877"
     },
     {
       "owner": "build-composition",
@@ -12259,7 +12284,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "4f8fa6db840da1db5029a79d13442e994319eff1669c74f3410a47e4443eeadc"
+      "source_digest": "81be6df0f8348926f4768d9d4eff417aa9aec882254e29bfe43cf7c9cf24203f"
     },
     {
       "owner": "build-composition",
@@ -12272,7 +12297,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "8bff0be9a1a2ee76dda302c8b37ab7120ef5c2ef69565633b6380edd62ceda32"
+      "source_digest": "c1c35406c276bf66dc0ada673d989265aaa32a60be542587a1032d423b640c2f"
     },
     {
       "owner": "build-composition",
@@ -12285,7 +12310,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "ff3ce41029c9a0a34c723bb30553587231064e9b31df7f60baba84db6f1fc593"
+      "source_digest": "ea2dc7ac441c65e7a7cfcef37ef6f0f1b3f602a276e26dd3f16147c4379873cd"
     },
     {
       "owner": "build-composition",
@@ -12298,7 +12323,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "7f8b93ad064f2d899a9ba482f4d2fa78f075710438b43d7ef4eae27a38330b68"
+      "source_digest": "5d34b6082b981b9caa1eab809868eaa5701e3ebfe3e412f3d658801e7bfe8557"
     },
     {
       "owner": "build-composition",
@@ -12311,7 +12336,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "5d03fb289ba4220f1398a3914f3f6402e4301b5b7c5ce655ce5c28d849e5197b"
+      "source_digest": "70b7b411469b3d508b3e56e0ceab273919a2a32dd0f34d8a0c437afda52bdea0"
     },
     {
       "owner": "build-composition",
@@ -12324,7 +12349,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "b63bd2b12cc910a24298dd93a1b2fbc164bebeca098c8d76d245e08fd7e5e18a"
+      "source_digest": "e9d14f9a3b514a483c298e6cf1cde79311d3ee0c80531f4504a1343e3957f5aa"
     },
     {
       "owner": "build-composition",
@@ -12337,7 +12362,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "932de9068d7215568030a20bc4540a07ee26402c9b6b377fc0b82588dfdca824"
+      "source_digest": "ae65cdcc808ebb7f1097ed160edd57971d2877b0b3531a8495b2182d6f7354d9"
     },
     {
       "owner": "build-composition",
@@ -12350,7 +12375,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "db573848876e888d455c124c96c99a1893560ec036d7bb70d2c7cfea8102949f"
+      "source_digest": "d1bec581a838953fb989c0db0af8a12689fa650e3e9851babc9a054925893894"
     },
     {
       "owner": "build-composition",
@@ -12363,7 +12388,7 @@
         "ordinal": 1
       },
       "call": "b.standardOptimizeOption",
-      "source_digest": "36e7bfa557e02eac251c5d53d456d6931c069e5fc048b35d5397e50870e3c731"
+      "source_digest": "dbab277ba7e1b533452a1682645e49f289e0cbe8695e309cca49266655e9962e"
     },
     {
       "owner": "build-composition",
@@ -12376,7 +12401,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "b4f65930c6090e65f76001b28ec905797104b1bc6df12722cebf6b890e8a38be"
+      "source_digest": "0e4f2fb47e014e75a188242fbce4485bf658f13ef0119e5cff3a2251f52f0ac2"
     },
     {
       "owner": "build-composition",
@@ -12389,7 +12414,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "d1725ae80c78ebcad018779c591ae4ecfd7d53dd03595da34b24f1819dcdcb76"
+      "source_digest": "035de3e5b66e30fbadf266bc654df9609d4d54d307f08777b4f27b1524bca4f9"
     },
     {
       "owner": "build-composition",
@@ -12402,7 +12427,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "24816d0e0493f72c9f22009017ee2d9271ae2d2fab2d5edf628deec65d0d3ad9"
+      "source_digest": "e4a157ebe09e1f2ca26541b90b4aba88c36af395551249588322fd224e6e90dc"
     },
     {
       "owner": "build-composition",
@@ -12415,7 +12440,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "de0e58eeefab0a64027062ed36731b06f088d13e0cb4555df73dc25d6c86c823"
+      "source_digest": "2f21e575a7acf3838b3407fb50543652a8be3d0eedf0deebab11523e82c1031e"
     },
     {
       "owner": "build-composition",
@@ -12428,7 +12453,7 @@
         "ordinal": 1
       },
       "call": "b.standardTargetOptions",
-      "source_digest": "f6f3d8bd06ac7afb1343244f393c7e90ca5988263d73585806b457ee8b9f47c5"
+      "source_digest": "b87af1c6a5032a05dcc97ce220178256d7028074776d266669691094db101777"
     },
     {
       "owner": "build-composition",
@@ -12441,7 +12466,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "ecebd2da8726dba834c2440dc601231681bd5eadb010b59e2a47fc40ec529bd0"
+      "source_digest": "c1a2f1e4609737d4401fa9325974ccc6fee587fdd0ff63a03176a53ae3540cc3"
     },
     {
       "owner": "build-composition",
@@ -12454,7 +12479,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "b602b231eda22f4a3042d560abd99dc7780b4233728d8f3005bce6f3d2e4c56e"
+      "source_digest": "da39260de377eec74edeeb7467aab6bfdbcf48c1792ae2959d65eea1654cc864"
     },
     {
       "owner": "build-composition",
@@ -12467,7 +12492,7 @@
         "ordinal": 1
       },
       "call": "b.option",
-      "source_digest": "0fc2e6c49c084823d7c994f3cbe5e4b2daf019a00696befd04592be05fbc0dc6"
+      "source_digest": "8d6d92b19ac0f6573496ffa32879f85970d6e09984399c455d4b5f7e60aef101"
     },
     {
       "owner": "build-composition",
@@ -12613,6 +12638,10 @@
           "condition": "execution-profile=integrated_native"
         },
         {
+          "id": "install:build.zig:addPlatformLibrary:include/zynum_native_spectral.h",
+          "condition": "execution-profile=integrated_native"
+        },
+        {
           "id": "install:build.zig:addPlatformLibrary:integrations/heteris/include/zynum_standalone.h",
           "condition": "execution-profile=integrated_native; standalone=true"
         }
@@ -12631,7 +12660,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7ae26b493d9f0e556632d023e1c3cd77edcccc9a9b87b22fdef8cbc658a19f1f"
+      "source_digest": "f0e6bd8ba5c69dbde42e02a0086357dc3d78c818acbe781e7cd53946fc80a949"
     },
     {
       "owner": "build-composition",
@@ -12656,7 +12685,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2080d5d49b75776847e72f997d662a0b44e1d3906e59ef1c27509e256d46eb18"
+      "source_digest": "71cc382cb0bfd476e77c8d1af127d0b15cca52f9f8610ed080726d3e9c668840"
     },
     {
       "id": "step:build.zig:build:bench",
@@ -12668,7 +12697,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "52425c883008bb316bec4f1df6c36770dd2ea287a72e2823d635a5443aaa9479",
+      "source_digest": "3b2ca07b0b991eb6696b1f5f86aca7ca15d132c36ef642b81f79212510bc8b1a",
       "owner": "build-composition",
       "description": "Benchmark Zynum BLAS against Accelerate and OpenBLAS",
       "direct_dependencies": [
@@ -12693,7 +12722,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "510ba168a8baf2db86c8fa8b9c4943207e1c4b5f37a735853b8eec5397d0be0c",
+      "source_digest": "5ac4270dc58427fd751fe7e30c776cf648ece34e782f17b49f87e9ecbc5161a0",
       "owner": "build-composition",
       "description": "Sweep GEMM shapes and write CSV results",
       "direct_dependencies": [
@@ -12718,7 +12747,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "218fc570dc34721b740a38036e4fb82d29fc4adb56d9a87b63f09f5e33252a8b",
+      "source_digest": "596b7956b925f44a4062fadd34a48134e07f6e2f3aad0100cb4daa4224cef3c8",
       "owner": "build-composition",
       "description": "Run reportable fresh-process GEMM sweep with correctness checks",
       "direct_dependencies": [
@@ -12743,7 +12772,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "4d62f526201229133db79c92b14fd3981ff2a10bbfc2d64489cf5cf1915a5e0d",
+      "source_digest": "023b739303a8b6c36f44b99524d70422fd3b0243957a64f2c5124a96218159f5",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process SYRK/HERK comparator report",
       "direct_dependencies": [
@@ -12768,7 +12797,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "5c4fcfb34d988a40ca235593ba3e64ce8e1b4c3939e1c5307248df6f6f334b33",
+      "source_digest": "daf7d5ed38e0a6e20af668b578e040cd0e4048571cbfdd25b4db02c527ddb8a9",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process ROTG/ROTMG latency report",
       "direct_dependencies": [
@@ -12793,7 +12822,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "3e0ceb445ce81dc76bf63d4238a2a1de9bee2ea3f9bc3c4eb0303551b0cd5dd8",
+      "source_digest": "4b20ce2018641cb729e40ae14faf0ea24cfa68436a271a15e05d27f019b39ee4",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process SYMM/HEMM comparator report",
       "direct_dependencies": [
@@ -12818,7 +12847,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7e40933d50e21ccd9c62b694b5c1a495c97601c15c6b43b000b8015176b6c60d",
+      "source_digest": "8844316891b2773b4f9d5f5921f8a9f9b66e3a71b55078833dacaecfaf5585b1",
       "owner": "build-composition",
       "description": "Run the opt-in fresh-process TRMM/TRSM comparator report",
       "direct_dependencies": [
@@ -12843,7 +12872,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "46129eb763cc9f77fc10ae20569dc28803f5313335c7be02e8bab4aa9d75bd2d",
+      "source_digest": "32f09546c5d2478bc532cd59cc5c1b3d8c51d539368054ff7de999f87aaf65bd",
       "owner": "build-composition",
       "description": "Sweep representative BLAS Level 1/2 kernels",
       "direct_dependencies": [
@@ -12885,7 +12914,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "47717a08727a3e5986d542919da59ef915134af7a506f082a80e1ee1dcbda915",
+      "source_digest": "0a28488b3e9db11a2fc433399ddd09d28594ceda8f2dc5bbebeda8a586500b62",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -12915,7 +12944,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1168adbb5d82470db249ad0224e3b572312c19507d3bed479e03821760d3750f"
+      "source_digest": "c52a3fb8b77e4b38c981edae6fe0f599bdc7e6b667648317bd6d836edf5de5d7"
     },
     {
       "owner": "build-composition",
@@ -12940,7 +12969,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2e8ff3ae955312e8a2802ea3dd1dcb63178bbb6202c6e7fb245d4f5690da180c",
+      "source_digest": "a727ccf701dd436b08996f6cda95bcec8b9e6769357ee74933df7eb6b46ef8dc",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -12970,7 +12999,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c20c1f5943eb4afcf1eb490e939b5c2c5773cfb1c0f013503aad9f010e114738"
+      "source_digest": "31893b07efb9a09c47fc945fcc976b1403d215143f7ca2bb5b56c47d0f4f7eb0"
     },
     {
       "id": "step:build.zig:build:build-rank-k-probe",
@@ -12982,7 +13011,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "709e7419711f50d2337dcb803a199da59f950c072dffba64f2264fddbe4f98bd",
+      "source_digest": "a2b4186c61673af054c77b6783798d64f823cd43f1e854e47faa957b9d3a016b",
       "owner": "build-composition",
       "description": "Build the opt-in Level 3 rank-k probe",
       "direct_dependencies": [
@@ -13007,7 +13036,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "0d771bcb833ae175e1fb9aac8e32eb888a79fb3397c3f7ef9b9cde5686549f9e",
+      "source_digest": "46e54548b81f7941842326c33d1081bd42334a52504b46c7bd09a954a0e0b218",
       "owner": "build-composition",
       "description": "Build the opt-in Level 1 ROTG/ROTMG latency probe",
       "direct_dependencies": [
@@ -13032,7 +13061,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2851cd12195a2a9bba3e7ebad4c96354b3fb6b425a196d9c9ffe5f0659087250",
+      "source_digest": "b3dd3374b068aa200623cdd0bdedf1b6b412630ae26a23187dd19e2bb64df7a8",
       "owner": "build-composition",
       "description": "Build the opt-in Level 3 SYMM/HEMM probe",
       "direct_dependencies": [
@@ -13057,7 +13086,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2b2de8d32174fe29de36f296b425eef8541211bd81aca0024a629feefdb7a0bb",
+      "source_digest": "3bc7c35b773cea20e520b4b1417931dcde88b08a28c4c092feed9c3842641cc2",
       "owner": "build-composition",
       "description": "Build the opt-in Level 3 TRMM/TRSM probe",
       "direct_dependencies": [
@@ -13099,7 +13128,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c7be06d1cae21cd718194d311e64c0610ab5b9f66029ae71ebbfda2ded77f34d",
+      "source_digest": "9d3634f268029f7316cd2e609100140ae09202c936e8c5d5cbacd41a7c8b7510",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -13125,7 +13154,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c18f61673489df315cd09d91d58a4e3fdb4d0273429039c527d03e3932e47a6f"
+      "source_digest": "3f9640ecb49fd3d2c5a9796f7466389710bf6aecca04dab55693d86f9a95adff"
     },
     {
       "owner": "build-composition",
@@ -13145,7 +13174,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "d3ac5547ebbcd6a501da113c0138c3145809c3c98ce0a32f5e8adc689a263eb5",
+      "source_digest": "1ea4a840395f688e3c28ad812d82db60b8c818d39eae26bd32030144c0b40c9e",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -13166,7 +13195,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "0e7bd2ed5364fdb41db1559a902cc0bfe87549efda77633b35134984880586a1",
+      "source_digest": "fa01c7fe538800a4d052c5eee2b7664da2cf1e6124133b64156cac7655c75fe3",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -13187,7 +13216,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "26fb44dee2e8863134f2904263fcc4363f4cc6ff6563dd7ab25ff0c971bf5f37"
+      "source_digest": "28b7915741dc3cd0739a554e90638c9ef72f0340dd8f0fa71278e7a0f67b26dd"
     },
     {
       "owner": "build-composition",
@@ -13212,7 +13241,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "a465b66f3c036c7e38205c1dc1f56bb43efecead72739bc18557a87feb395342",
+      "source_digest": "910804190e4385eba0d124e8db14ae197643d3654327867339a004e656f38427",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -13225,7 +13254,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "9a4604aeb4ce684255a039b68f63045efb2febf107cbf3605142c38705a56108",
+      "source_digest": "98f50d9cd7a3b4095d997d45b60118e6ec87da74b778fa8499845c46f5065140",
       "owner": "build-composition",
       "description": "Regenerate Zynum BLAS CBLAS and BLAS/Fortran compatibility headers/modules",
       "direct_dependencies": [
@@ -13250,7 +13279,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f9519273343b013da60c790dd8ead695a6ed69a56ecdb5fba11c32d8cd243e4d",
+      "source_digest": "e7765c46d4c2581dfbad82016845e3048c275615475e75a78093edec5f8c0fb1",
       "owner": "build-composition",
       "description": "Regenerate the normalized BLAS kernel coverage artifact",
       "direct_dependencies": [
@@ -13283,7 +13312,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "ae2805f752ff0deac13720ec20fed440f98c1774403be4f4bf746e37ff666dab"
+      "source_digest": "dc924944b8136168e15f5db22e41a9a8d5dd828627bd0265930cbac70eb7ab0f"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -13303,7 +13332,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "f3ab279f006ea7b11bc18a94b9a39ad5d253fb51202b3a468280580eb3545b99"
+      "source_digest": "2593aee43446f5fb772d3ae8f20cf9e570d70573102c17bdf49d5268981d4c5b"
     },
     {
       "id": "step:build.zig:build:install",
@@ -13525,7 +13554,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "a2ad69d6f222e750994d89c26111a6d87230c7397ae429c58565d4cd2011360e"
+      "source_digest": "4cd06ea899bdfadb989c3858470946f6659ddaa23030f71a1af85c125812632b"
     },
     {
       "owner": "build-composition",
@@ -13574,7 +13603,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "701cefac37277e63c3df179fa857b2a3907e742df22b0d6061ad485421519b15",
+      "source_digest": "2d56045e36ad167a443c2d1d0330baeca03c836a2a19adbc7ea39db81501379e",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -13624,7 +13653,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c3b17b446f7a567413137e987fd33e765ce6d11045fc0830efafcc887b3e248b"
+      "source_digest": "f229e41a02b4d7e81c0675aef0f43a208b6dd4239faf52247716df29b6e7bd21"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -13689,7 +13718,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "5cd4b0274ac815a5aa26559ff84d08a4c96cb496a1cb000f209725a7579515e3"
+      "source_digest": "d872be513346e5474a0c43f598d8384f169c97e6225a644c7bf30788058ea419"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -13802,7 +13831,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "cc11ce79166ab342a8837eb058aff0f831ae6ec4d91d8c684bbd6a1065a1a0e8"
+      "source_digest": "cf1922aa6a25c6737380835f415c1d529a007a6e12e233c8595e6528e1992640"
     },
     {
       "owner": "build-composition",
@@ -13835,7 +13864,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "461d31209056b200dc243be96c1babd44581c46e59212f796240b7ed9b39417a"
+      "source_digest": "85e81ac461b4db95cd50608bbf279038c8442f4308c284746c3233fa58f637b6"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -13880,7 +13909,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1c2edde26e9506a1fa5dea419f39fcf4f1275f77461f4fb46f012209c426a95b"
+      "source_digest": "d6ab480f28c612f44b51eb3d5924a5088340af1e78b88f4d28a951cf21c980f5"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -13925,7 +13954,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "fa509a893cf75a713538e625ae8b027f218dbd151f577ed5b2738190cdf01432"
+      "source_digest": "d7a60762f95f4b88d1bc0a820e57a2a934a4fd78784b18e206ec2e5eb71dfcd1"
     },
     {
       "owner": "build-composition",
@@ -13945,7 +13974,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "8e8b2648776d409948c530056095cdf060bfb6571239ee38d599d1d8fb3fb6cf"
+      "source_digest": "5ccb423a8ba4f9bffe47cd97fdfee534544ba483f196642a69e15639d2fed10b"
     },
     {
       "owner": "build-composition",
@@ -13965,7 +13994,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "b32ee2961a15e5228d7869cbb4b06b859c815c84b1690579a8fcfa6a57e06ec5"
+      "source_digest": "35957bb5b872fadc6853436616f90c13c2843e4834b2363a744dd0f41335a846"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -13985,7 +14014,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "bb8a665f9e223ecb76baef7e57f96c4217b500aba423694e752889b41671cceb"
+      "source_digest": "434203394023d10da976b71b21821d41b2d3d4eedbc74d50f68515a17b2c4001"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -14005,7 +14034,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "1a42e48d3925d48a551263489f0bf44b4a17894c3d92f437aea832f9321252e8"
+      "source_digest": "844c0c1df45969780fce546873c3220b63218e4dcd91fae3df795127fe4f7e1f"
     },
     {
       "id": "step:build.zig:build:test",
@@ -14017,7 +14046,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "d5debd781a8d6c874fe4c11529c2228187d89ffd93d1c26fc5fdc3974fb61e10",
+      "source_digest": "6dbdb14956fe5190cae51429abd3d467e6703733bf3dfe2a6149bdea6f93304e",
       "owner": "build-composition",
       "description": "Run correctness tests",
       "direct_dependencies": [
@@ -14170,7 +14199,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1e89ea150b1e40d3285fcb2540b65c10cb555974b741c667556efbcc5dddd88d",
+      "source_digest": "a1cce81c34d8dd0f45ac545b5b5fd5f2c21b97c0215756ad47918e8f35953161",
       "owner": "build-composition",
       "description": "Run fresh-artifact parity parser and verifier tests",
       "direct_dependencies": [
@@ -14195,7 +14224,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "823f83d0cb4fb6a06cc4263817d12930016f567f8db0129d483919bbc533910a",
+      "source_digest": "ca8eaf1077c0f6fd984db36854fd55b5cb9d55d4067f960052ddd5f357b2662d",
       "owner": "build-composition",
       "description": "Run whole-artifact ABI baseline observer tests",
       "direct_dependencies": [
@@ -14220,7 +14249,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7f3f9c08e2e71d55dd121970bcefc6e9794136b3a577a6d5f8c3ed0203b1ca03",
+      "source_digest": "52e64148ac4f25b424749697393dc39e1530da20555ac84937e9db6905a7d7da",
       "owner": "build-composition",
       "description": "Validate the repository build and launch inventory",
       "direct_dependencies": [
@@ -14258,7 +14287,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "261156903bb67507851b0dc345700dc0498a1d357fc5e4f9674cdbd57b6492b9"
+      "source_digest": "4e73cd5e62a6b7b39dcb10794ef7146af38e8a9c6241bb2c2e78d007ec02f498"
     },
     {
       "owner": "build-composition",
@@ -14291,7 +14320,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "df8cbea47b4148e860807f5a3bff0c920af084f59de07e59cd395a9aa8aa438d",
+      "source_digest": "a5fa2f3f81ba0467c4b12b91ea307daea0df8f31361974dd5611ceca12ddc902",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -14317,7 +14346,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "46d9bc6f32017e7ad85b423ffe0869313c53e9da26315fe265198ff910270927"
+      "source_digest": "71562604299058f4da2bc2be19c537ea99ff1a1221fb7807b2d39d1f792ac0d3"
     },
     {
       "owner": "test-infrastructure",
@@ -14342,7 +14371,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "cf5263e7006e4220be1b062ed0376ad2cf20a09a3aadf30e4c22ec39b762520a"
+      "source_digest": "c1461d8662bce9765175cf825fbea5f48e5c05341a2ee6509251394379c19e1a"
     },
     {
       "owner": "build-composition",
@@ -14371,7 +14400,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "048b077fc4b186e9d07f271b481ce627556b3d6b1ce34e5f926f06eb31336a71",
+      "source_digest": "b29241528e3ec655b70b3d6019533d59e57c75ec5c7e4c18cef944d402aa421e",
       "checked_abi_contract_sha256": "e1e0ae7cb5ff5d207ff8b9738f53eb5b99d31c23e6096a9ff4f7b58383cd8b06"
     },
     {
@@ -14397,7 +14426,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7a122bb17932912886b983e0f2dccce1dc2c8bfae3ec98a60fb830be21ec1bda"
+      "source_digest": "9765788112bff8814a633f5750d478a8416a9bb76f11ab4474842e4acec28b5d"
     },
     {
       "owner": "build-composition",
@@ -14434,7 +14463,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "53c5441f0e9062de62a2d4d3c0b160b8c2d52507b866e1c3d851325727321008"
+      "source_digest": "801e85b6e8d62dd113f6a2d9cb5a4b5bacfdfbff531a8b6da17a66d8056e3c22"
     },
     {
       "owner": "build-composition",
@@ -14454,7 +14483,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "a0fa361e72e6eadee1275fb1483d29f3026a3fc041e2b8113b8078215edd31c3"
+      "source_digest": "0a0139dbcc75a9c7a99ef295da7b334bb768052bdfacd4a4e6b73fcd0fbaafa0"
     },
     {
       "owner": "build-composition",
@@ -14479,7 +14508,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "e672dd5572df275ef5bc02a2e900fab3192d3a9400505dca4637ee4888860f39"
+      "source_digest": "c28e1433b4065b65672746949c8a1f6c6aa8eca51de9eb3a3e41ad3b37a1ca06"
     },
     {
       "owner": "test-infrastructure",
@@ -14504,7 +14533,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f7e31bff220adb5de099473dccf4c0b505b8bb8784c53167667f854e3e538fcb"
+      "source_digest": "c6ae273c55fcd45aecea27c3a8df32255176d111da3883d8b416eb4fdbb9f441"
     },
     {
       "id": "step:build.zig:build:test-gemm-registry",
@@ -14516,7 +14545,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "54ed2f804d7eac33b6c9d9f7f715bdad0d2852b6d4430d028750b89a829daceb",
+      "source_digest": "e065111e8246e6a11935ed68dfb9d9bfd00afb665188ef43cf39d44a70efacd2",
       "owner": "build-composition",
       "description": "Run real GEMM registry and forced-path correctness tests",
       "direct_dependencies": [
@@ -14582,7 +14611,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "18b0d6eb3e57448012aa4cd771776657011344ce8ec9a00456c8412695b59ea3"
+      "source_digest": "36be11faa4de68369b39b5c24d30ca1e7d3e6ffca574ea2257f7443ec81a220d"
     },
     {
       "owner": "build-composition",
@@ -14600,7 +14629,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "d196eeafc923737ebdea200ea9564e507b72d40f7a89af99a29c905fe6279f99",
+      "source_digest": "90d6f4d69e2e78b63d5c815f348f0e6aa675a5894e81d72cb4fe04755401fd45",
       "step_role": "test-inventory-enumerator-run",
       "direct_dependencies": [
         {
@@ -14790,7 +14819,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "096912073750e8eadcbd6f99d6da0d6bb384ad85320204a049e5108fcd75830f",
+      "source_digest": "d8233d50695c8a14cc759445bad352e1ee49b05f9cb5c01ef7ef6904454ff9e3",
       "step_role": "test-inventory-enumerator-link",
       "direct_dependencies": [
         {
@@ -14823,7 +14852,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f6708d83a1b5da19891368090456923f12afe0d02303644eaf5f10805e7f2941",
+      "source_digest": "5930e94a1946ce5d4e97074187cd926b6b21385a13ea2cdc53081ca313c03c74",
       "step_role": "windows-native-test-inventory-compile-link-smoke",
       "direct_dependencies": [
         {
@@ -14873,7 +14902,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "92e6251f075181f558704e49187f02218db3daf0325d7cf438e4ff25d4322ae1"
+      "source_digest": "55f4539e77e2636155a1f25ecf9eb15d049638d4ac6e0f082eacf35cf7fec362"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -14898,7 +14927,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1c2044a50604852a1adba9cdc92146472522215a4a410b9895dd02a3d814899c"
+      "source_digest": "1db581203022e72cc6305996e43fc7dae276b241b829cc5fa7034afd35d74657"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -14923,7 +14952,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "5a5bd64bbebd3420d732f588219b4db60c56dbdf6503b17be16b15ba1fdc39cc"
+      "source_digest": "1e9d75ec081592384489817883969574c7c2cc22efaa8f1f3abf7779c9cc517b"
     },
     {
       "owner": "test-infrastructure",
@@ -14952,7 +14981,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "b835c95fa0f2bb5760528e640e706f2716d81dd2c8b400b90a98fe49da3f4a7d"
+      "source_digest": "2167b82ad59dbac3886dd1991170e6f6fe5c083f56724b74f26e8f8b92ae6e4a"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -14977,7 +15006,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "a65205e787323973d5e609aa7785c084f816518b81ca01b83d0dfdd3a12b7cf9"
+      "source_digest": "44d31a89bb7a4a7abbed55f37cf752a56c96ca59ce34c7189f24d4d4d8fe699c"
     },
     {
       "owner": "test-infrastructure",
@@ -15006,7 +15035,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "0ea1b1b600ad8d7eb975591ed7a492d2760a01bc905d799c7ae259637191bbf3"
+      "source_digest": "349a2dc573db1f965693f89a5797b0baaa69b390933f7c3472fbca33c6c5529b"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15031,7 +15060,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "552fe35322977d9b5ceb2222fcde3fd9a0ee80112107380b51d36333946cb484"
+      "source_digest": "df04d9c90b318234e7381400117b60ca1cb7167ef5e1d1303f5c7099a66cbed8"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15056,7 +15085,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "e998fbaa7706a9eda10d82f3563941d689156535c9a9d31aad44631ce59e83de"
+      "source_digest": "57a95243d1fe8cdb5166c0438761a75dfc8fa8c4630378a7c4063a5e5debf02b"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15081,7 +15110,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "8dde81317a07d1599c80a8f513d291fcda458e9f48fff79d5c2591e402190378"
+      "source_digest": "f07cb278907a8e18f6c88463b704e85f94e0da97104f970235a0df0e874bcb2a"
     },
     {
       "owner": "test-infrastructure",
@@ -15106,7 +15135,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "f60cbf146792b3621956379e4cc50148df4a8af6c39aa8db92d93489c41b6d96"
+      "source_digest": "ec9913b9e08fe9772a7a35562bc30eddcf845318479545dcda96e9d2bb1ca34d"
     },
     {
       "owner": "test-infrastructure",
@@ -15131,7 +15160,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c48041b5e29aa2537a7465d75b6184a110be9ce0fd336b68ca2d299c71e4eead"
+      "source_digest": "81057909acccc8ac747172ea047341d83593342cce0975eeafe2116da02a8ae8"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15156,7 +15185,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "0c15d395b3f5f1b943f65591959ca3e451949904fedaaf0e7b81b13844467057"
+      "source_digest": "82a946942065d59f3628268b596354b0c02daefd5e760b7c38678de3aa8b9cd7"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15181,7 +15210,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c8175350fe6afaa33f463728c4fa92bab4a9da0ad235c1e59b2af3b98b85ed79"
+      "source_digest": "408143d50209724a1f2f606e219eb87d02f2a8ea6b4048207810637ba08f38f5"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15206,7 +15235,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "b3b0620eb0213a1a30c2c0fbdeab43efb1aa9161c2f281fe6672324b20e1323b"
+      "source_digest": "172542df2388e30a43adfc88e60f46f0c1f75b1585a16e40dc7f73ffb59deb0f"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15231,7 +15260,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "e7dee155ccad918fae9041722996d554e2816f493d8028c5cdb01da85cf58be0"
+      "source_digest": "e1d94beb2051b0ba2acb1013ccf65a62fd9ff3dce9b7c8849de3b9d9cbaada05"
     },
     {
       "aggregate_condition": "not-applicable",
@@ -15256,7 +15285,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "a6b9a08f6a24ff8ed81bf6696df8cb02d26a837e5f70ba2bb9ada1a7333cd68a"
+      "source_digest": "f2b0b6eab82ccf12bfa9ffaf55cde9a547ba2357c2943f4ae29c0f4572f7c692"
     },
     {
       "id": "step:build.zig:build:test-level1-registry",
@@ -15268,7 +15297,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "d0e35a1cfe9b47c35a6540591abef784611cdcc497904c69ae31cd224059a9d3",
+      "source_digest": "c871dc7ff064766c9838008cf555ca86aa1cea8d67eb58d476b1ad09f8f1de89",
       "owner": "build-composition",
       "description": "Run Level 1 registry and forced-path correctness tests",
       "direct_dependencies": [
@@ -15293,7 +15322,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1f6b5da2f97a44089a978780b42ea8fb8083842b52f17c49bb082951cc8bf4f7",
+      "source_digest": "c796403785221cb32d687cadaaddd806f2ec87ad13828cad33e337afe6940de8",
       "owner": "build-composition",
       "description": "Run isolated Level 1 stride-two bridge tests",
       "direct_dependencies": [
@@ -15318,7 +15347,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1d5ec810e66976aa3bc3f4ef2b7d08702fb830ac6822e4d14a7ed4304c76b51f",
+      "source_digest": "ac9ac8f89161455eb7d81d56731a2688ad75b6feb1708f843d4998a43c4f6a8f",
       "owner": "build-composition",
       "description": "Run compact packed/banded registry and forced-path tests",
       "direct_dependencies": [
@@ -15359,7 +15388,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "8ea97c1ad38d7555a81f06c4428c4082226e5b227b93388af77b125867b32b3d",
+      "source_digest": "caebaf9ba8c2890dc6b4091969cba7eab210a4568543ad484e21b272a0048a46",
       "owner": "build-composition",
       "description": "Run Level 2 fused-body registry and forced-path tests",
       "direct_dependencies": [
@@ -15397,7 +15426,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "d05883d6337ee63d8f189612c9b598b1ee73b5aab236a3a06aa3abbe25215e9b"
+      "source_digest": "7cd76f279cce9f787c09c1b95f7592dc412da2784bbe59e21808c975317aaff3"
     },
     {
       "owner": "build-composition",
@@ -15426,7 +15455,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2a0df4f972247651cd62d496b3fb63b16fa8ed9667697ecce37684d072543bb2"
+      "source_digest": "3db4be769d1558672ab1d1be7cebebb5fd788f1fbe7a078eed6694ce367bdc82"
     },
     {
       "owner": "build-composition",
@@ -15444,7 +15473,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c712b8ad77ad7db29173f8eea6aa56643c38943cc6bd935668b3fa9221bb5f47",
+      "source_digest": "c4e345a4b06312f94af67c99a533e06a19c3e2fdf14993fb94e2a7a4fe040d84",
       "step_role": "native-feature-correctness-only",
       "direct_dependencies": [
         {
@@ -15474,7 +15503,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "045f00904dd5d24946cd35638bfb663403d10320d9e383164ea1af2143e40dd9",
+      "source_digest": "53f4a8152f660db9e52c0d17cf82f14a762bed3c861a41702029ca235f86ce3a",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 3,
       "guard_condition": "build-host CPU features are not a superset of requested target CPU features",
@@ -15498,7 +15527,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "b74fb677dea5b786d2f03b587aa22b2b9c5d4528454d5d672e0d46386ba11880",
+      "source_digest": "34f97c691402cc92582967d28720b09f6511ea11ae238c3f421042d8ba481d7f",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 1,
       "guard_condition": "requested CPU model is baseline or determined by arch/OS",
@@ -15522,7 +15551,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "3316c4c17f9ea707f2b597d766caf6c21bca8d057a6c3f31f9016231cb6ef452",
+      "source_digest": "1e93bb38cadd14f9960d48a1ffd6813a99ffe4be9661b3d09c3216c2e53b73e7",
       "step_role": "native-feature-fail-closed-guard",
       "guard_order": 2,
       "guard_condition": "requested target arch, OS, ABI, or object format differs from the build host",
@@ -15553,7 +15582,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "ddaf1ee179d92a777ed6f7b2757947683c5e015ad0c04798998fb98a5a93a697"
+      "source_digest": "1d2a0a661eb14ca2da22ebc6d63dfb2fe13fed855f3d59b5dcfc6d8c1309fef3"
     },
     {
       "owner": "test-infrastructure",
@@ -15578,7 +15607,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "572079209d79aa12abcab11a5594163a155e55d370a1b4ca925b456ca823f1df"
+      "source_digest": "d69d7f6f137b4eb95e35eb0a417b7f2a944b9dd3b96adddf932a2a94499ddc3b"
     },
     {
       "id": "step:build.zig:build:test-public-api-contract",
@@ -15590,7 +15619,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "814c77aaace83d847414858b562c0d0a0c5e48c54a10db117bc7431e7bb764c2",
+      "source_digest": "5c5ac2dbf06115685bd1cf72d8e7e97a892dfd737ff746fadaf38180af6e7649",
       "owner": "build-composition",
       "description": "Run exhaustive public Zig surface inventory and reflection contracts",
       "direct_dependencies": [
@@ -15637,7 +15666,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "896021d1603242cd254bdff255f0af4b3a2a5761f1b5c304e4eccdd189c0b8a6"
+      "source_digest": "08c8c9bb2fc5d7561745ceedd87bd9ff00a2bdd02e224b551dca96fa25461884"
     },
     {
       "owner": "build-composition",
@@ -15683,7 +15712,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "4334cc110a9b2a64310f10cb1789f63a61e6b5d41e0ee74c9f678ee77f754c5e"
+      "source_digest": "6b8c40a92d3f74816f0aff02a21f82e687f722aa2bdbbf69f07725fd5c7a9439"
     },
     {
       "owner": "build-composition",
@@ -15716,7 +15745,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "5f78f79003b24caa91ffecf8d7a22d6af61a9f220bdc3002a6e19909b4261a5c"
+      "source_digest": "af33586b46a8e3fb6297344d191e2303d146313998e2c7a66f492bbfde16ea6e"
     },
     {
       "id": "step:build.zig:build:test-structured-blocked",
@@ -15728,7 +15757,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "c8e2e13da9dabeddc6dbc59f056a5c3fa518ebf9daeec4837f25780447291fdb",
+      "source_digest": "43c1bbfe4640b2acfbe7c0567ba4d5f1b354e0302cdb151c021e0ea2a6cbfb0c",
       "owner": "build-composition",
       "description": "Run blocked structured Level 3 packing and update tests",
       "direct_dependencies": [
@@ -15753,7 +15782,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "7daeed9362708106c9868085213f56237f04342f95494f367888286d62617426",
+      "source_digest": "ee1904abfe68ea3f0d2a910a168e855259516ffde5d6731e7212985c8d091aa9",
       "owner": "build-composition",
       "description": "Run isolated x86 structured Level 3 ABI and correctness tests",
       "direct_dependencies": [
@@ -15791,7 +15820,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "2eb03c976cb348c002359847898a8f3515a502009998df81c6ff52728521b2fc"
+      "source_digest": "ce7fb50e7ff3a51e3c04c620e117369ac3050b9a15737cc33babfe1646992271"
     },
     {
       "owner": "test-infrastructure",
@@ -15820,7 +15849,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "1d5199f4be8165f2f1fb6d63791fad3013eb921b3e72301f4480f71457f190ca"
+      "source_digest": "2501c4c54f43812a03d9baf360abc0e193543d4626c937a2f761e894c7d0d146"
     },
     {
       "owner": "build-composition",
@@ -15840,7 +15869,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "e2eb6aec39adb1b154eb6dee2800f0569cca44e857ea6193b255e75e01bded80"
+      "source_digest": "9f2e00fb997a14bd3a8b18e3b08c192a4763a57d8780809f20feb8da0cf743d6"
     },
     {
       "id": "step:build.zig:build:uninstall",
@@ -15880,7 +15909,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "a969845f0b6b47bb8bb42db9454e14786e01843d81ab553f1d87a1aea47ff779"
+      "source_digest": "83d3b48d5bbeda0481f8df4e2aa5cfe7ea2b2ad7836652a3df21f92f32deaa0c"
     },
     {
       "owner": "build-composition",
@@ -15917,7 +15946,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "f5a11de6b392563561cf9d3786f30dd5b4b0e01ab8c90c0a150d7a7ff1759546"
+      "source_digest": "7b32a0754404b8123766ad6cab73f19163f20d67f522d4e1f64f8b63cde4ece0"
     },
     {
       "owner": "build-composition",
@@ -15935,7 +15964,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "cba45e279c3585592db1cc227f928db25a76740b17d10d1c52f13436284e2f56",
+      "source_digest": "14f4d7bf0b1592f908a64062d64449e0b69f071104f3c4e44cf87e7aef8f430a",
       "step_role": "unsupported-test-inventory-target-failure",
       "direct_dependencies": [],
       "error_message": "test inventory enumeration is unavailable for the requested target CPU profile"
@@ -15956,7 +15985,7 @@
         "ordinal": 1
       },
       "call": "b.addFail",
-      "source_digest": "8cc39b0353998eaa4712ca78a6404365ffb1f8fa638625f6572b06ce827f24b4",
+      "source_digest": "407ec1e61204c29f53858f12033535504dc953e20b5f437f10beaf7a076e1ff3",
       "step_role": "unsupported-windows-native-inventory-link-failure",
       "direct_dependencies": [],
       "error_message": "test-inventory-link-windows-native-smoke requires an x86_64 Windows host and the exact x86_64-windows-gnu COFF target requested with -Dcpu=baseline and no CPU feature modifiers",
@@ -15986,7 +16015,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "782fb60d5df017f580ac0509cb8697fc799929829e050173ea2d7853c1b39475"
+      "source_digest": "70203f2052381f927e71e27dcf43770b7a84a54756d0d24a800a02f732e211a7"
     },
     {
       "owner": "test-infrastructure",
@@ -16012,7 +16041,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "33ece2e922ba180dc09ca09f39c896644b4734fecfc4d0500c4847f3b20f7075"
+      "source_digest": "b6068b0bc5cd5e00ab86b0504942d9addd0899d1c71e337232feaaecce1f78b4"
     },
     {
       "owner": "test-infrastructure",
@@ -16038,7 +16067,7 @@
         "ordinal": 1
       },
       "call": "b.step",
-      "source_digest": "ac5c2de486591b9f2719a1d015ba6ad6ec3ee15ad4b9ac581bb04fccc7520018"
+      "source_digest": "2ff379e3d393790d386a733b7dd3046b4975427bf755f3bc2beda61b0301c9d7"
     },
     {
       "id": "step:examples/zig/build.zig:build:install",
@@ -32100,6 +32129,12 @@
       "owner": "public-api"
     },
     {
+      "path": "include/zynum_native_spectral.h",
+      "kind": "foreign-language-source",
+      "class": "non-generated-source",
+      "owner": "public-api"
+    },
+    {
       "path": "integrations/heteris/CMakeLists.txt",
       "kind": "other-public-file",
       "class": "non-generated-source",
@@ -32173,6 +32208,12 @@
     },
     {
       "path": "integrations/heteris/src/native_exports.zig",
+      "kind": "zig-source",
+      "class": "non-generated-source",
+      "owner": "library-source"
+    },
+    {
+      "path": "integrations/heteris/src/native_spectral_exports.zig",
       "kind": "zig-source",
       "class": "non-generated-source",
       "owner": "library-source"
@@ -40236,6 +40277,12 @@
       "class": "non-generated-source"
     },
     {
+      "path": "src/numerics/checked_spectral.zig",
+      "kind": "zig-source",
+      "class": "non-generated-source",
+      "owner": "library-source"
+    },
+    {
       "path": "src/numerics/cholesky_inverse.zig",
       "kind": "zig-source",
       "owner": "library-source",
@@ -40540,6 +40587,12 @@
       "kind": "zig-source",
       "owner": "test-infrastructure",
       "class": "non-generated-source"
+    },
+    {
+      "path": "src/numerics/spectral_native.zig",
+      "kind": "zig-source",
+      "class": "non-generated-source",
+      "owner": "library-source"
     },
     {
       "path": "src/numerics/storage.zig",
@@ -41976,7 +42029,7 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "ac0ed10755e30c76b6f095e0e5f8c5d86c338f50663b1b1c5870c2c897ce2962",
+  "repository_file_classifications_digest": "5d0854e4db7d5501b4e55dc851708335697ae58cd2c03f0be1ad848fd74dad61",
   "derived_candidates": [
     {
       "id": "derived:docs/assets/benchmarks/current/gemm-recheck.csv",

@@ -52,6 +52,7 @@ add_custom_command(OUTPUT ${ZYNUM_ARTIFACTS}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.."
     DEPENDS ${ZYNUM_ZIG_SOURCES} "${CMAKE_CURRENT_SOURCE_DIR}/../../build.zig" "${CMAKE_CURRENT_SOURCE_DIR}/../../build.zig.zon"
             "${CMAKE_CURRENT_SOURCE_DIR}/../../include/zynum_native.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../include/zynum_native_spectral.h"
             include/zynum.h include/zynum_spectral.h include/zynum_standalone.h
             "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h"
     VERBATIM)
@@ -146,6 +147,6 @@ install(FILES ${ZYNUM_ARTIFACTS} DESTINATION lib)
 if(ZYNUM_BUILD_STANDALONE)
     install(FILES include/zynum_standalone.h DESTINATION include)
 endif()
-install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h DESTINATION include)
+install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h ../../include/zynum_native_spectral.h DESTINATION include)
 install(FILES "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h" DESTINATION include)
 install(FILES ../../LICENSE ../../COPYING UPSTREAM.md DESTINATION share/licenses/zynum)

@@ -30,6 +30,7 @@ pub const api = blas.api;
 /// Explicit mathematical entrypoints, sharing this original Core.
 pub const native = @import("blas/api/native_operations.zig");
 pub const native_grid = @import("numerics/periodic_laplacian_native.zig");
+pub const native_spectral = @import("numerics/spectral_native.zig");
 
 pub const BlasInt = blas.BlasInt;
 pub const ComplexF32 = blas.ComplexF32;
@@ -106,6 +107,7 @@ pub const internal = struct {
         pub const Storage = @import("numerics/storage.zig");
         pub const Scalar = @import("blas/core/shared/scalar.zig");
         pub const PeriodicLaplacian = @import("numerics/periodic_laplacian.zig");
+        pub const CheckedSpectral = @import("numerics/checked_spectral.zig");
         pub const RecurrenceArithmetic = @import("numerics/recurrence_arithmetic.zig");
         pub const Resources = @import("zynum-numerics-resources");
         pub const Execution = @import("zynum-execution");

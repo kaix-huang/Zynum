@@ -11355,41 +11355,11 @@ def _periodic_laplacian_source_fact_pair() -> tuple[dict[str, Any], dict[str, An
     global _PERIODIC_LAPLACIAN_FACT_PAIR
     if _PERIODIC_LAPLACIAN_FACT_PAIR is not None:
         return copy.deepcopy(_PERIODIC_LAPLACIAN_FACT_PAIR)
-    inventory_path = REPOSITORY_ROOT / "tools/test_inventory.json"
-    inventory = json.loads(inventory_path.read_text())
-    current = copy.deepcopy(CHECKER._host_assembly_source_facts(inventory))
-    context = CHECKER.BUILD_CHECKER._make_discovery_context(REPOSITORY_ROOT, inventory_path)
-    sources = {path: CHECKER._cached_text(context, path)
-               for path in context.public_files.paths if path.endswith(".zig")}
-    graph = CHECKER.BUILD_CHECKER._numerics_resources_build_contract(
-        CHECKER._cached_text(context, "build.zig"))
-    for row in current["test_roots"]:
-        if row["id"] not in _PERIODIC_LAPLACIAN_ROOT_IDS:
-            continue
-        symbol = row["compile_observation_id"].rsplit(":", 1)[1]
-        receipts: list[dict[str, Any]] = []
-        row["source_reachability"] = sorted(CHECKER._zig_source_closure(
-            sources, context.public_files.path_set, CHECKER._zig_source_entries(symbol, graph),
-            resource_root=symbol, resource_graph=graph, named_dependencies=receipts))
-        row["named_dependency_sources"] = receipts
-    for row in current["correctness_only_roots"]:
-        receipts = []
-        owner = _PERIODIC_LAPLACIAN_NATIVE_OWNERS.get(row["id"])
-        if owner is not None:
-            reached, receipts = CHECKER._native_source_closure(
-                sources, context.public_files.path_set, context, owner)
-            if row["language"] == "c":
-                reached.add(row["physical_path"])
-        else:
-            symbol = row["compile_observation_id"].rsplit(":", 1)[1]
-            reached = CHECKER._zig_source_closure(
-                sources, context.public_files.path_set, CHECKER._zig_source_entries(symbol, graph),
-                resource_root=symbol, resource_graph=graph, named_dependencies=receipts)
-        row["source_reachability"] = sorted(reached)
-        row["named_dependency_sources"] = receipts
+    # Recover the exact reviewed Laplacian-era side from the spectral fixture,
+    # then retain the original historical Laplacian/TN reversal below.
+    current, _ = _native_spectral_source_fact_pair()
     provider_path = "src/native_provider_math_test.zig"
     provider = next(row for row in current["zig_test_files"] if row["path"] == provider_path)
-    provider["declarations"] = CHECKER._zig_declarations(sources[provider_path], provider_path)
     if CHECKER._fact_digest(current) != "8222af6680713f6cfd51821eb0239db098b08b69fa34a6f7b7b3223cdac69473":
         raise AssertionError("bounded Laplacian walkers differ from reviewed current source facts")
     previous = copy.deepcopy(current)
@@ -11481,8 +11451,11 @@ class PeriodicLaplacianSourceRefreshTests(unittest.TestCase):
             self.assertEqual(11, len(old["declarations"]))
             self.assertEqual(17, len(new["declarations"]))
             self.assertEqual(old["declarations"], new["declarations"][:11])
-            self.assertEqual(new["declarations"], CHECKER._zig_declarations(
-                (REPOSITORY_ROOT / new["path"]).read_text(), new["path"]))
+            recovered = next(row for row in _native_spectral_source_fact_pair()[0]["zig_test_files"]
+                             if row["path"] == new["path"])["declarations"]
+            self.assertEqual(new["declarations"], recovered)
+            self.assertEqual(recovered, CHECKER._zig_declarations(
+                (REPOSITORY_ROOT / new["path"]).read_text(), new["path"])[:len(recovered)])
         oracle = (REPOSITORY_ROOT / _PERIODIC_LAPLACIAN_ORACLE_PATH).read_text()
         self.assertEqual([], CHECKER._zig_declarations(oracle, _PERIODIC_LAPLACIAN_ORACLE_PATH))
         self.assertEqual(["std"], CHECKER._zig_imports(oracle, _PERIODIC_LAPLACIAN_ORACLE_PATH))
@@ -11600,7 +11573,11 @@ class PeriodicLaplacianSourceRefreshTests(unittest.TestCase):
                 CHECKER._assert_source_only_native_unchanged(self.previous, current)
         data = (REPOSITORY_ROOT / "tools/test_inventory.json").read_bytes()
         self.assertIsNone(CHECKER._reviewed_inventory_bytes_error(data))
-        self.assertIsNotNone(CHECKER._reviewed_inventory_bytes_error(CHECKER._canonical_inventory_bytes(self.current)))
+        # A legitimate fixture may itself be the approved CURRENT before or
+        # after publication. Reject explicit unreviewed bytes in either epoch.
+        unreviewed = copy.deepcopy(self.current)
+        unreviewed["unreviewed-source-refresh-fixture"] = True
+        self.assertIsNotNone(CHECKER._reviewed_inventory_bytes_error(CHECKER._canonical_inventory_bytes(unreviewed)))
         changed = copy.deepcopy(self.current)
         changed["native_observation_bindings"][0]["digest"] = "0" * 64
         self.assertIsNotNone(CHECKER._reviewed_native_projection_error(changed))
@@ -11796,6 +11773,291 @@ class TNOracleSourceRefreshTests(unittest.TestCase):
         native_set["tests"][0]["name"] += " unreviewed"
         with self.assertRaises(CHECKER.InventoryError):
             CHECKER._assert_source_only_native_unchanged(self.previous, changed)
+
+
+
+_NATIVE_SPECTRAL_FACT_PAIR: tuple[dict[str, Any], dict[str, Any]] | None = None
+_NATIVE_SPECTRAL_CORE_PATHS = (
+    "src/numerics/checked_spectral.zig", "src/numerics/spectral_native.zig",
+)
+_NATIVE_SPECTRAL_ROOT_IDS = (
+    "zig-root:blas-module-tests", "zig-root:blas-public-surface-contract-tests",
+    "zig-root:cblas-tests", "zig-root:fortran-tests", "zig-root:lapack-tests",
+    "zig-root:modern-tests", "zig-root:sparse-tests", "zig-root:zynum-public-surface-contract-tests",
+)
+_NATIVE_SPECTRAL_NATIVE_OWNERS = {
+    "correctness-root:heteris-adapter-package": "adapter",
+    "correctness-root:native-provider-math_tests": "math_module",
+    "correctness-root:native-provider-c_tests": "main",
+}
+
+
+def _native_spectral_source_fact_pair() -> tuple[dict[str, Any], dict[str, Any]]:
+    """Original bounded walkers plus exact reviewed reversal; no external facts.
+
+    The full pair is checked independently. No discovery replacement, Git
+    history, copied checker, digest override or validator mock supplies facts.
+    """
+    global _NATIVE_SPECTRAL_FACT_PAIR
+    if _NATIVE_SPECTRAL_FACT_PAIR is not None:
+        return copy.deepcopy(_NATIVE_SPECTRAL_FACT_PAIR)
+    inventory_path = REPOSITORY_ROOT / "tools/test_inventory.json"
+    inventory = json.loads(inventory_path.read_text())
+    current = copy.deepcopy(CHECKER._host_assembly_source_facts(inventory))
+    context = CHECKER.BUILD_CHECKER._make_discovery_context(REPOSITORY_ROOT, inventory_path)
+    sources = {path: CHECKER._cached_text(context, path)
+               for path in context.public_files.paths if path.endswith(".zig")}
+    graph = CHECKER.BUILD_CHECKER._numerics_resources_build_contract(
+        CHECKER._cached_text(context, "build.zig"))
+    for row in current["test_roots"]:
+        if row["id"] not in _NATIVE_SPECTRAL_ROOT_IDS:
+            continue
+        symbol = row["compile_observation_id"].rsplit(":", 1)[1]
+        receipts: list[dict[str, Any]] = []
+        row["source_reachability"] = sorted(CHECKER._zig_source_closure(
+            sources, context.public_files.path_set, CHECKER._zig_source_entries(symbol, graph),
+            resource_root=symbol, resource_graph=graph, named_dependencies=receipts))
+        row["named_dependency_sources"] = receipts
+    for row in current["correctness_only_roots"]:
+        owner = _NATIVE_SPECTRAL_NATIVE_OWNERS.get(row["id"])
+        receipts = []
+        if owner is not None:
+            reached, receipts = CHECKER._native_source_closure(
+                sources, context.public_files.path_set, context, owner)
+            if row["language"] == "c":
+                reached.add(row["physical_path"])
+        else:
+            symbol = row["compile_observation_id"].rsplit(":", 1)[1]
+            reached = CHECKER._zig_source_closure(
+                sources, context.public_files.path_set, CHECKER._zig_source_entries(symbol, graph),
+                resource_root=symbol, resource_graph=graph, named_dependencies=receipts)
+        row["source_reachability"] = sorted(reached)
+        row["named_dependency_sources"] = receipts
+    provider_path = "src/native_provider_math_test.zig"
+    provider = next(row for row in current["zig_test_files"] if row["path"] == provider_path)
+    provider["declarations"] = CHECKER._zig_declarations(sources[provider_path], provider_path)
+    if CHECKER._fact_digest(current) != "954b0bc4db60007969830868fd88665645d73ff4d05cf45400510dea1598b4d5":
+        raise AssertionError("original spectral walkers differ from reviewed current source facts")
+    previous = copy.deepcopy(current)
+    previous_hashes = {
+        "src/zynum.zig": "8a6ec2c54ef3a519c1a9d0cf89edefe041ccff056a34f4ebf395ee21fd3f1274",
+        "src/facades/native.zig": "7c4a15d8a38e9ebd24721a19980dec67c94fe2c0dcb05aee09accb144111169e",
+        "src/facades/scientific_sources.zig": "47f3c39318b07adcf74f195c3c6a2b1b535f2b16d383ce91a687a9fc88a45a3f",
+    }
+    for section in ("test_roots", "correctness_only_roots"):
+        for row in previous[section]:
+            if section == "test_roots" and row["id"] not in _NATIVE_SPECTRAL_ROOT_IDS:
+                continue
+            for path in _NATIVE_SPECTRAL_CORE_PATHS:
+                row["source_reachability"].remove(path)
+            if row["id"] == "correctness-root:native-provider-c_tests":
+                row["source_reachability"].remove("integrations/heteris/src/native_spectral_exports.zig")
+            for receipt in row["named_dependency_sources"]:
+                if receipt.get("path") in previous_hashes:
+                    receipt["source_sha256"] = previous_hashes[receipt["path"]]
+                if receipt["alias"] == "heteris-provider-c":
+                    receipt["input_sha256"] = {
+                        "include/zynum_native.h": "d358631ec5a42d5d7e97b6a5f3488fcd41bece839291b852fb1daa35866cc990"}
+    next(row for row in previous["zig_test_files"] if row["path"] == provider_path)["declarations"] = provider["declarations"][:17]
+    if CHECKER._fact_digest(previous) != "8222af6680713f6cfd51821eb0239db098b08b69fa34a6f7b7b3223cdac69473":
+        raise AssertionError("reversing only reviewed spectral delta changed historical Laplacian facts")
+    _NATIVE_SPECTRAL_FACT_PAIR = previous, current
+    return copy.deepcopy(_NATIVE_SPECTRAL_FACT_PAIR)
+
+
+class NativeSpectralSourceRefreshTests(unittest.TestCase):
+    """Exact source-only migration cannot create native qualification evidence."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.previous_facts, cls.current_facts = _native_spectral_source_fact_pair()
+        inventory = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        cls.previous = copy.deepcopy(inventory)
+        cls.previous.update(copy.deepcopy(cls.previous_facts))
+        cls.current = copy.deepcopy(inventory)
+        cls.current.update(copy.deepcopy(cls.current_facts))
+        for value in (cls.previous, cls.current):
+            value["strict_summary"] = CHECKER._section_summary(value)
+
+    def assert_refresh_rejected(self, previous: dict[str, Any], current: dict[str, Any]) -> None:
+        self.assertFalse(CHECKER._reviewed_native_spectral_source_refresh(
+            CHECKER._fact_digest(CHECKER._host_assembly_source_facts(previous)), current))
+        try:
+            compatible = CHECKER._refresh_base_compatible_discovery(previous, current)
+        except CHECKER.InventoryError:
+            return
+        self.assertTrue(CHECKER._validate_runtime_bound_sections(REPOSITORY_ROOT, previous, compatible))
+
+    def test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change(self) -> None:
+        self.assertEqual(CHECKER.NATIVE_SPECTRAL_PREVIOUS_SOURCE_SHA256, CHECKER._fact_digest(self.previous_facts))
+        self.assertEqual(CHECKER.NATIVE_SPECTRAL_CURRENT_SOURCE_SHA256, CHECKER._fact_digest(self.current_facts))
+        self.assertEqual(_NATIVE_SPECTRAL_ROOT_IDS, CHECKER.NATIVE_SPECTRAL_CHANGED_ROOT_IDS)
+        self.assertTrue(CHECKER._reviewed_native_spectral_source_refresh(
+            CHECKER.NATIVE_SPECTRAL_PREVIOUS_SOURCE_SHA256, self.current_facts))
+        for section in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            self.assertEqual([r["id"] for r in self.previous_facts[section]],
+                             [r["id"] for r in self.current_facts[section]])
+        for section in ("test_roots", "correctness_only_roots"):
+            changed_ids = []
+            for old, new in zip(self.previous_facts[section], self.current_facts[section], strict=True):
+                if old == new:
+                    continue
+                changed_ids.append(new["id"])
+                self.assertEqual({"source_reachability", "named_dependency_sources"},
+                                 {k for k in old if old[k] != new[k]})
+                additions = set(_NATIVE_SPECTRAL_CORE_PATHS)
+                if new["id"] == "correctness-root:native-provider-c_tests":
+                    additions.add("integrations/heteris/src/native_spectral_exports.zig")
+                self.assertEqual(sorted([*old["source_reachability"], *additions]), new["source_reachability"])
+                identity = lambda receipt: {k: v for k, v in receipt.items()
+                                            if k not in {"source_sha256", "input_sha256"}}
+                self.assertEqual([identity(r) for r in old["named_dependency_sources"]],
+                                 [identity(r) for r in new["named_dependency_sources"]])
+            expected = (CHECKER.NATIVE_SPECTRAL_CHANGED_ROOT_IDS if section == "test_roots"
+                        else CHECKER.NATIVE_SPECTRAL_CHANGED_CORRECTNESS_ROOT_IDS)
+            self.assertEqual(expected, tuple(changed_ids))
+        for old, new in zip(self.previous_facts["zig_test_files"], self.current_facts["zig_test_files"], strict=True):
+            if new["path"] != "src/native_provider_math_test.zig":
+                self.assertEqual(old, new)
+                continue
+            self.assertEqual(17, len(old["declarations"]))
+            self.assertEqual(25, len(new["declarations"]))
+            self.assertEqual(old["declarations"], new["declarations"][:17])
+            self.assertEqual(new["declarations"], CHECKER._zig_declarations(
+                (REPOSITORY_ROOT / new["path"]).read_text(), new["path"]))
+
+    def test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict(self) -> None:
+        previous, current = copy.deepcopy(self.previous), copy.deepcopy(self.current)
+        compatible = CHECKER._refresh_base_compatible_discovery(previous, current)
+        self.assertEqual([], CHECKER._validate_runtime_bound_sections(REPOSITORY_ROOT, previous, compatible))
+        for field in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            self.assertEqual(previous[field], compatible[field])
+        CHECKER._assert_source_only_native_unchanged(previous, current)
+        self.assertEqual(CHECKER._native_projection(previous), CHECKER._native_projection(current))
+        self.assertIsNone(CHECKER._reviewed_native_projection_error(current))
+        self.assertIsNone(CHECKER._reviewed_inventory_bytes_error(
+            (REPOSITORY_ROOT / "tools/test_inventory.json").read_bytes()))
+        # Source-current may become approved CURRENT later; only an explicit
+        # unreviewed byte mutation must always fail the existing strict policy.
+        unreviewed = copy.deepcopy(current)
+        unreviewed["unreviewed-source-refresh-fixture"] = True
+        self.assertIsNotNone(CHECKER._reviewed_inventory_bytes_error(CHECKER._canonical_inventory_bytes(unreviewed)))
+        self.assertEqual(self.previous, previous)
+        self.assertEqual(self.current, current)
+        mutated, _ = _native_spectral_source_fact_pair()
+        mutated["test_roots"][0]["unreviewed"] = True
+        self.assertEqual(self.previous_facts, _native_spectral_source_fact_pair()[0])
+
+    def test_single_translation_root_and_two_actual_header_input_receipts(self) -> None:
+        expected = {path: hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest()
+                    for path in ("include/zynum_native.h", "include/zynum_native_spectral.h")}
+        template = CHECKER.BUILD_CHECKER.INJECTION_OBSERVATION_TEMPLATES["compile:build.zig:translateProvider:translated"]
+        self.assertEqual(["include/zynum_native.h"], template["root_source"])
+        for row in self.current_facts["correctness_only_roots"]:
+            receipts = [r for r in row["named_dependency_sources"] if r["alias"] == "heteris-provider-c"]
+            if row["id"] not in _NATIVE_SPECTRAL_NATIVE_OWNERS:
+                self.assertEqual([], receipts)
+            for receipt in receipts:
+                self.assertEqual(expected, receipt["input_sha256"])
+                self.assertEqual("compile:build.zig:translateProvider:translated", receipt["generator_observation_id"])
+                self.assertEqual("generated-non-source", receipt["source_kind"])
+
+    def test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected(self) -> None:
+        self.assertFalse(CHECKER._reviewed_native_spectral_source_refresh("0" * 64, self.current))
+        for section in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            previous = copy.deepcopy(self.previous)
+            previous[section][0]["unreviewed"] = True
+            with self.subTest(previous_section=section):
+                self.assert_refresh_rejected(previous, self.current)
+        for mutation in ("unlisted-root", "missing-core", "extra-bridge", "root-order"):
+            current = copy.deepcopy(self.current)
+            if mutation == "unlisted-root":
+                next(r for r in current["test_roots"] if r["id"].startswith("zig-root:") and r["id"] not in _NATIVE_SPECTRAL_ROOT_IDS)["source_reachability"].append("src/unreviewed.zig")
+            elif mutation == "root-order":
+                current["test_roots"][:2] = reversed(current["test_roots"][:2])
+            else:
+                row = next(r for r in current["test_roots"] if r["id"] == _NATIVE_SPECTRAL_ROOT_IDS[0])
+                if mutation == "missing-core":
+                    row["source_reachability"].remove(_NATIVE_SPECTRAL_CORE_PATHS[0])
+                else:
+                    row["source_reachability"].append("integrations/heteris/src/native_spectral_exports.zig")
+            with self.subTest(mutation=mutation):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_missing_mutated_header_receipt_and_generator_ownership_are_rejected(self) -> None:
+        for mutation in ("omit-nested", "mutate-nested", "wrong-generator", "wrong-owner", "wrong-source", "receipt-order"):
+            current = copy.deepcopy(self.current)
+            row = next(r for r in current["correctness_only_roots"] if r["id"] == "correctness-root:native-provider-c_tests")
+            receipt = next(r for r in row["named_dependency_sources"] if r["alias"] == "heteris-provider-c")
+            if mutation == "omit-nested":
+                del receipt["input_sha256"]["include/zynum_native_spectral.h"]
+            elif mutation == "mutate-nested":
+                receipt["input_sha256"]["include/zynum_native_spectral.h"] = "0" * 64
+            elif mutation == "wrong-generator":
+                receipt["generator_observation_id"] = "compile:unreviewed:second-translation"
+            elif mutation == "wrong-owner":
+                receipt["attachment_owner"] = "unreviewed"
+            elif mutation == "wrong-source":
+                next(r for r in row["named_dependency_sources"] if "source_sha256" in r)["source_sha256"] = "0" * 64
+            else:
+                row["named_dependency_sources"][:2] = reversed(row["named_dependency_sources"][:2])
+            with self.subTest(mutation=mutation):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject(self) -> None:
+        for mutation in ("old-name", "new-name", "kind", "ordinal", "id", "order", "other-file"):
+            current = copy.deepcopy(self.current)
+            row = next(r for r in current["zig_test_files"] if r["path"] == "src/native_provider_math_test.zig")
+            if mutation == "other-file":
+                next(r for r in current["zig_test_files"] if r["path"] != row["path"])["declarations"][0]["name"] += " unreviewed"
+            elif mutation == "order":
+                row["declarations"][:2] = reversed(row["declarations"][:2])
+            elif mutation in ("old-name", "new-name"):
+                row["declarations"][0 if mutation == "old-name" else 17]["name"] += " unreviewed"
+            elif mutation == "ordinal":
+                row["declarations"][17][mutation] += 1
+            else:
+                row["declarations"][17][mutation] += "-unreviewed"
+            with self.subTest(mutation=mutation):
+                self.assert_refresh_rejected(self.previous, current)
+
+    def test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact(self) -> None:
+        CHECKER._assert_source_only_native_unchanged(self.previous, self.current)
+        self.assertEqual("f25ebd580dbfcb572385fd85af4499a86ae898b644108c100ca53dada3aa5094",
+                         CHECKER._native_projection_digest(self.current))
+        self.assertEqual(147, len(self.current["native_observation_bindings"]))
+        pending = [r for r in self.current["test_mode_rows"] if r["expectation_state"] == CHECKER.PENDING_STATE]
+        self.assertEqual(147, len(pending))
+        for mutation in ("environment", "class", "binding", "native-row", "native-name", "pending-state", "pending-order"):
+            current = copy.deepcopy(self.current)
+            if mutation in {"environment", "class", "binding"}:
+                field = {"environment": "environment_profiles", "class": "test_enumeration_classes", "binding": "native_observation_bindings"}[mutation]
+                current[field][0]["unreviewed"] = True
+            elif mutation == "native-row":
+                next(r for r in current["test_mode_rows"] if r["root_id"].startswith("zig-root:"))["unreviewed"] = True
+            elif mutation == "native-name":
+                next(r for r in current["expected_test_sets"] if r["root_id"].startswith("zig-root:"))["tests"][0]["name"] += " unreviewed"
+            else:
+                rows = [r for r in current["test_mode_rows"] if r["expectation_state"] == CHECKER.PENDING_STATE]
+                if mutation == "pending-state":
+                    rows[0]["expectation_state"] = CHECKER.FROZEN_STATE
+                else:
+                    a, b = [current["test_mode_rows"].index(r) for r in rows[:2]]
+                    current["test_mode_rows"][a], current["test_mode_rows"][b] = current["test_mode_rows"][b], current["test_mode_rows"][a]
+            with self.subTest(mutation=mutation), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._assert_source_only_native_unchanged(self.previous, current)
+
+    def test_historical_host_tn_laplacian_pairs_remain_distinct(self) -> None:
+        lap_previous, lap_current = _periodic_laplacian_source_fact_pair()
+        host_current, tn_current = _tn_oracle_source_fact_pair()
+        self.assertEqual(self.previous_facts, lap_current)
+        self.assertEqual(CHECKER.PERIODIC_LAPLACIAN_PREVIOUS_SOURCE_SHA256, CHECKER._fact_digest(lap_previous))
+        self.assertTrue(CHECKER._reviewed_periodic_laplacian_source_refresh(
+            CHECKER.PERIODIC_LAPLACIAN_PREVIOUS_SOURCE_SHA256, lap_current))
+        self.assertTrue(CHECKER._reviewed_tn_oracle_source_refresh(CHECKER.TN_ORACLE_PREVIOUS_SOURCE_SHA256, tn_current))
+        self.assertTrue(CHECKER._reviewed_host_assembly_source_refresh(CHECKER.HOST_ASSEMBLY_PREVIOUS_SOURCE_SHA256, host_current))
+        self.assertFalse(CHECKER._reviewed_periodic_laplacian_source_refresh(
+            CHECKER.PERIODIC_LAPLACIAN_PREVIOUS_SOURCE_SHA256, self.current_facts))
+        self.assertFalse(CHECKER._reviewed_tn_oracle_source_refresh(CHECKER.TN_ORACLE_PREVIOUS_SOURCE_SHA256, self.current_facts))
 
 
 if __name__ == "__main__":

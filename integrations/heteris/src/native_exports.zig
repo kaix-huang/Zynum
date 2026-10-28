@@ -13,6 +13,7 @@ const Policy = c.zynum_native_policy_v1;
 const Requirements = c.zynum_native_context_requirements_v1;
 comptime {
     _ = @import("adapter-root");
+    _ = @import("native_spectral_exports.zig");
 }
 fn validAddress(address: usize, bytes: usize, alignment: usize) bool {
     if (address == 0 or address % alignment != 0) return false;

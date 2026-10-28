@@ -732,3 +732,425 @@ test "native periodic Laplacian IEEE outputs and capacity tails retain direct ou
     try std.testing.expectEqual(@as(f64, 773), y[2]);
     try std.testing.expectEqual(execution.OutputState.complete, fixture.report.output);
 }
+
+// Additive spectral source coverage: existing fixture/provider/Context are reused.
+// These tests enter the trusted Core seam with actual typed objects/ranges;
+// control preflight and passive guard ABI behavior are exercised by C/C++ cases.
+const spectral = @import("zynum-core").native_spectral;
+const SpectralSpan = struct {
+    lease: c.heteris_rp_scratch_v1,
+    values: []f64,
+    fn init(fixture: *Fixture, count: usize) !SpectralSpan {
+        var lease: c.heteris_rp_scratch_v1 = undefined;
+        try std.testing.expectEqual(@as(i32, 0), fixture.api.scratch_allocate.?(fixture.source.provider, count * @sizeOf(f64), @alignOf(f64), &lease));
+        const pointer: [*]f64 = @ptrCast(@alignCast(lease.data.?));
+        const values = pointer[0..count];
+        @memset(values, 991);
+        return .{ .lease = lease, .values = values };
+    }
+    fn deinit(self: *SpectralSpan, fixture: *Fixture) void {
+        if (fixture.api.scratch_release.?(self.lease.lease) != 0) @panic("spectral fixture scratch release");
+    }
+};
+fn spectralBuffer(values: []const f64, ld: u64) spectral.ConstBuffer {
+    return .{ .address = @intFromPtr(values.ptr), .backing = @intCast(values.len), .ld = ld };
+}
+const SpectralProbe = struct {
+    diagonal: [3]f64 = .{ -2, 1, 4 },
+    dense: ?[9]f64 = null,
+    calls: u64 = 0,
+    failure_order: u64 = 0,
+    failure_code: i32 = 0,
+    nonfinite_order: u64 = 0,
+    close_order: u64 = 0,
+    busy_during_close: bool = false,
+    nested: bool = false,
+    nested_admitted: bool = false,
+    owner: std.Thread.Id,
+    fn apply(raw: ?*anyopaque, context: *execution.Context, input: spectral.ConstPanel, output: spectral.Panel) i32 {
+        const self: *SpectralProbe = @ptrCast(@alignCast(raw.?));
+        if (std.Thread.getCurrentId() != self.owner) @panic("spectral loop left its synchronous caller");
+        self.calls += 1;
+        if (input.rows != output.rows or input.columns != output.columns or input.ld != input.rows or output.ld != input.rows) @panic("spectral callback geometry");
+        if (self.nested) {
+            var child = context.begin() catch return -28001;
+            self.nested_admitted = context.snapshot().active_operations == 2;
+            child.end();
+        }
+        if (self.calls == self.close_order) {
+            _ = context.requestClose();
+            var report: execution.CallReport = .{};
+            self.busy_during_close = context.tryProgressClose(&report) == .busy;
+        }
+        if (self.calls == self.failure_order) return self.failure_code;
+        if (input.rows == 0 or input.columns == 0) {
+            if (input.data != null or output.data != null) @panic("empty callback formed pointers");
+            return 0;
+        }
+        for (0..@intCast(input.columns)) |j| for (0..@intCast(input.rows)) |i| {
+            if (self.dense) |matrix| {
+                var product: f128 = 0;
+                for (0..3) |k| product += @as(f128, matrix[k * 3 + i]) * input.cell(k, j).*;
+                output.cell(i, j).* = @floatCast(product);
+            } else output.cell(i, j).* = self.diagonal[i % self.diagonal.len] * input.cell(i, j).*;
+        };
+        if (self.calls == self.nonfinite_order) output.cell(0, 0).* = std.math.nan(f64);
+        return 0;
+    }
+};
+fn spectralRequest(kind: spectral.Kind, probe: *SpectralProbe, rows: u64, columns: u64, orders: u64, x: []const f64, ldx: u64, coefficients: []const f64, y: []f64, ldy: u64, work: []f64, lower: f64, upper: f64) spectral.Args {
+    return .{ .kind = kind, .rows = rows, .columns = columns, .orders = orders, .lower = lower, .upper = upper, .input = spectralBuffer(x, ldx), .coefficients = spectralBuffer(coefficients, orders), .output = spectralBuffer(y, ldy), .work = spectralBuffer(work, rows), .operator = .{ .apply = SpectralProbe.apply, .data = probe } };
+}
+// Closed-form degree <=3 polynomials, independent of the production recurrence.
+fn spectralPolynomial(order: usize, value: f128) f128 {
+    return switch (order) {
+        0 => 1,
+        1 => value,
+        2 => 2 * value * value - 1,
+        3 => 4 * value * value * value - 3 * value,
+        else => unreachable,
+    };
+}
+
+test "native spectral diagonal polynomial and raw moments match independent closed forms with padded borrowed panels" {
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 32);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId(), .nested = true };
+    const x = [_]f64{ 1, 2, 3, std.math.nan(f64), 991, -2, 0.5, 4, std.math.nan(f64), 991 };
+    const coefficients = [_]f64{ 0.5, -0.75, 0.25, 0.125 };
+    var output: [10]f64 = @splat(773);
+    var report: spectral.Report = .{};
+    var request = spectralRequest(.series, &probe, 3, 2, 4, &x, 5, &coefficients, &output, 4, scratch.values, -3, 5);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    for (0..2) |j| for (0..3) |i| {
+        const scaled = (@as(f128, probe.diagonal[i]) - 1) / 4;
+        var expected: f128 = 0;
+        for (coefficients, 0..) |coefficient, k| expected += @as(f128, coefficient) * spectralPolynomial(k, scaled) * x[j * 5 + i];
+        try std.testing.expectApproxEqAbs(@as(f64, @floatCast(expected)), output[j * 4 + i], 1e-13);
+    };
+    try std.testing.expectEqual(@as(f64, 773), output[3]);
+    try std.testing.expectEqual(@as(f64, 773), output[7]);
+    try std.testing.expectEqual(@as(f64, 773), output[8]);
+    try std.testing.expectEqual(@as(u64, 3), probe.calls);
+    try std.testing.expect(probe.nested_admitted and report.admission_succeeded and report.progress.callback_returned);
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), submissions);
+    probe.calls = 0;
+    @memset(&output, 773);
+    request.kind = .moments;
+    request.orders = 4;
+    request.output = spectralBuffer(&output, 5);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    for (0..2) |j| for (0..4) |k| {
+        var expected: f128 = 0;
+        for (0..3) |i| {
+            const scaled = (@as(f128, probe.diagonal[i]) - 1) / 4;
+            expected += @as(f128, x[j * 5 + i]) * x[j * 5 + i] * spectralPolynomial(k, scaled);
+        }
+        try std.testing.expectApproxEqAbs(@as(f64, @floatCast(expected)), output[j * 5 + k], 1e-12);
+    };
+    try std.testing.expectEqual(@as(f64, 773), output[4]);
+    try std.testing.expectEqual(@as(f64, 773), output[9]);
+    for (scratch.values[26..]) |value| try std.testing.expectEqual(@as(f64, 991), value);
+    try std.testing.expectEqual(@as(u64, 3), probe.calls);
+    try std.testing.expectEqual(@as(u64, 3), report.progress.callback_order);
+}
+
+test "native spectral extreme and adjacent intervals preserve widened affine and accumulation arithmetic" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 8);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId() };
+    var output = [_]f64{ 773, 773 };
+    const input = [_]f64{1};
+    const coefficients = [_]f64{ 0, 1 };
+    var report: spectral.Report = .{};
+    // Exact adjacent f64 endpoints. A premature f64 midpoint would be 1.
+    const adjacent: f64 = @bitCast(@as(u64, @bitCast(@as(f64, 1))) + 1);
+    probe.diagonal = .{ 1, 1, 1 };
+    var request = spectralRequest(.series, &probe, 1, 1, 2, &input, 1, &coefficients, &output, 1, scratch.values, 1, adjacent);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(@as(f64, -1), output[0]);
+    probe.diagonal[0] = 0;
+    request.lower = -std.math.floatMax(f64);
+    request.upper = std.math.floatMax(f64);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(@as(f64, 0), output[0]);
+    // Endpoint action and representable cancellation with extreme coefficients.
+    probe.diagonal[0] = std.math.floatMax(f64);
+    const cancelling = [_]f64{ std.math.floatMax(f64), -std.math.floatMax(f64) };
+    request.coefficients = spectralBuffer(&cancelling, 2);
+    request.lower = std.math.floatMax(f64) / 2;
+    request.upper = std.math.floatMax(f64);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(@as(f64, 0), output[0]);
+    try std.testing.expectEqual(@as(f64, 773), output[1]);
+}
+
+test "native spectral moment row order retains wide cancellation and narrows only the final dot" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 13);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId(), .diagonal = .{ 0x1p53, 1, -0x1p53 } };
+    const input = [_]f64{ 1, 1, 1 };
+    var output = [_]f64{ 773, 773, 773 };
+    var report: spectral.Report = .{};
+    const request = spectralRequest(.moments, &probe, 3, 1, 2, &input, 3, &.{}, &output, 2, scratch.values, -0x1p53, 0x1p53);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(@as(f64, 3), output[0]);
+    try std.testing.expectEqual(@as(f64, 0x1p-53), output[1]);
+    try std.testing.expectEqual(@as(f64, 773), output[2]);
+}
+
+test "native spectral numerical and raw callback failures preserve public bytes and distinguish returned status" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 16);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId(), .diagonal = .{ 1, 1, 1 } };
+    var input = [_]f64{ 2, 3 };
+    var coefficients = [_]f64{ 1, 2, 3 };
+    var output = [_]f64{ 773, 773, 773, 773 };
+    const saved = output;
+    var report: spectral.Report = .{};
+    var request = spectralRequest(.series, &probe, 2, 1, 3, &input, 2, &coefficients, &output, 2, scratch.values, -1, 1);
+    for ([_]i32{ std.math.minInt(i32), -1907, 1, 8, 10, std.math.maxInt(i32) }) |code| {
+        probe.calls = 0;
+        probe.failure_order = 2;
+        probe.failure_code = code;
+        try std.testing.expectEqual(spectral.Status.callback_failure, spectral.invoke(&fixture.context, request, &report));
+        try std.testing.expectEqualSlices(f64, &saved, &output);
+        try std.testing.expectEqual(spectral.Phase.apply, report.phase);
+        try std.testing.expectEqual(code, report.progress.callback_status);
+        try std.testing.expectEqual(@as(u64, 2), report.progress.callbacks_returned);
+    }
+    probe.failure_order = 0;
+    probe.calls = 0;
+    probe.nonfinite_order = 1;
+    try std.testing.expectEqual(spectral.Status.numerical_failure, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(spectral.Phase.recurrence, report.phase);
+    try std.testing.expect(report.progress.callback_returned and report.progress.callback_status == 0);
+    probe.nonfinite_order = 0;
+    request.orders = 1;
+    coefficients[0] = std.math.floatMax(f64);
+    try std.testing.expectEqual(spectral.Status.numerical_failure, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(spectral.Phase.initialize, report.phase);
+    try std.testing.expect(!report.progress.callback_returned and report.progress.order == 0);
+    coefficients[0] = 1;
+    input[0] = std.math.floatMax(f64);
+    request.kind = .moments;
+    try std.testing.expectEqual(spectral.Status.numerical_failure, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(spectral.Phase.moment, report.phase);
+    try std.testing.expect(!report.progress.callback_returned);
+    try std.testing.expectEqualSlices(f64, &saved, &output);
+}
+
+test "native spectral admission counter and closing failures preserve validation and callback validity" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 8);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId(), .diagonal = .{ 1, 1, 1 } };
+    var output = [_]f64{773};
+    var report: spectral.Report = .{};
+    const request = spectralRequest(.series, &probe, 1, 1, 3, &.{1}, 1, &.{ 1, 2, 3 }, &output, 1, scratch.values, -1, 1);
+    execution.Context.testing.configure(&fixture.context, 0, null);
+    try std.testing.expectEqual(spectral.Status.context_failure, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(spectral.Admission.counter_overflow, report.admission);
+    try std.testing.expect(report.admission_attempted and !report.admission_succeeded and !report.progress.order_valid and !report.progress.callback_returned);
+    execution.Context.testing.configure(&fixture.context, std.math.maxInt(usize), null);
+    probe.close_order = 2;
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expect(probe.busy_during_close and report.output_complete and report.admission_succeeded);
+    try std.testing.expectEqual(@as(f64, 6), output[0]);
+    try std.testing.expectEqual(spectral.Status.context_failure, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expectEqual(spectral.Admission.closing, report.admission);
+    try std.testing.expect(!report.progress.callback_returned and !report.progress.order_valid);
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+}
+
+test "native spectral dense symmetric degree two agrees with direct matrix polynomial and moments" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 13);
+    defer scratch.deinit(&fixture);
+    const matrix = [9]f64{ 1, 0.25, 0, 0.25, 2, -0.5, 0, -0.5, 3 };
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId(), .dense = matrix };
+    const x = [_]f64{ 1, -2, 0.5 };
+    const coefficients = [_]f64{ 0.5, -0.75, 0.125 };
+    var y = [_]f64{ 773, 773, 773, 773 };
+    // Gershgorin intervals lie in [0,4]. Build K and K^2 directly; no
+    // production recurrence or recurrence_arithmetic helper enters the oracle.
+    var k_matrix: [9]f128 = undefined;
+    var t2_matrix: [9]f128 = undefined;
+    for (0..3) |j| for (0..3) |i| {
+        k_matrix[j * 3 + i] = (@as(f128, matrix[j * 3 + i]) - (if (i == j) @as(f128, 2) else 0)) / 2;
+    };
+    for (0..3) |j| for (0..3) |i| {
+        var squared: f128 = 0;
+        for (0..3) |k| squared += k_matrix[k * 3 + i] * k_matrix[j * 3 + k];
+        t2_matrix[j * 3 + i] = 2 * squared - (if (i == j) @as(f128, 1) else 0);
+    };
+    var reference: [3][3]f128 = undefined;
+    for (0..3) |i| {
+        reference[0][i] = x[i];
+        reference[1][i] = 0;
+        reference[2][i] = 0;
+        for (0..3) |j| {
+            reference[1][i] += k_matrix[j * 3 + i] * x[j];
+            reference[2][i] += t2_matrix[j * 3 + i] * x[j];
+        }
+    }
+    var report: spectral.Report = .{};
+    var request = spectralRequest(.series, &probe, 3, 1, 3, &x, 3, &coefficients, &y, 3, scratch.values, 0, 4);
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    for (0..3) |i| {
+        var expected: f128 = 0;
+        for (coefficients, 0..) |coefficient, k| expected += @as(f128, coefficient) * reference[k][i];
+        try std.testing.expectApproxEqAbs(@as(f64, @floatCast(expected)), y[i], 1e-14);
+    }
+    request.kind = .moments;
+    try std.testing.expectEqual(spectral.Status.ok, spectral.invoke(&fixture.context, request, &report));
+    for (0..3) |k| {
+        var expected: f128 = 0;
+        for (0..3) |i| expected += @as(f128, x[i]) * reference[k][i];
+        try std.testing.expectApproxEqAbs(@as(f64, @floatCast(expected)), y[k], 1e-14);
+    }
+    try std.testing.expectEqual(@as(f64, 773), y[3]);
+    try std.testing.expectEqual(@as(f64, 991), scratch.values[12]);
+}
+
+// Two independent produced-overflow sites, appended under the narrow repair
+// window. Duplicate input columns give real output padding as well as tails.
+test "native spectral finite shifted state reports final series accumulation overflow without publishing bytes" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 10);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralProbe = .{ .owner = std.Thread.getCurrentId(), .diagonal = .{ 1, 1, 1 } };
+    const input = [_]f64{ 1e308, 1e308 };
+    const coefficients = [_]f64{ 1, 1 };
+    const sentinel_nan: f64 = @bitCast(@as(u64, 0x7ff8000000000371));
+    var output = [_]f64{ 773, sentinel_nan, -0.0, 773, sentinel_nan, -0.0, 991, 991 };
+    const saved = output;
+    var report: spectral.Report = .{};
+    // H=I, [-1,1]: initial sum=x and T1=x are finite, but x+x>MAX.
+    // No production arithmetic helper is used to derive this expectation.
+    try std.testing.expect(std.math.isFinite(input[0]));
+    try std.testing.expect(@as(f128, 2) * input[0] > @as(f128, std.math.floatMax(f64)));
+    const request = spectralRequest(.series, &probe, 1, 2, 2, &input, 1, &coefficients, &output, 3, scratch.values, -1, 1);
+    try std.testing.expectEqual(spectral.Status.numerical_failure, spectral.invoke(&fixture.context, request, &report));
+    // Workspace layout is the documented previous/current/next/sum prefix.
+    // The first shifted value was produced and stored before accumulation failed.
+    try std.testing.expectEqual(input[0], scratch.values[4]);
+    try std.testing.expect(std.math.isFinite(scratch.values[4]));
+    try std.testing.expectEqual(input[0], scratch.values[6]);
+    try std.testing.expectEqual(spectral.Phase.recurrence, report.phase);
+    try std.testing.expect(report.admission_attempted and report.admission_succeeded and !report.output_complete);
+    try std.testing.expect(report.progress.order_valid and report.progress.order == 1);
+    try std.testing.expect(report.progress.callback_returned and report.progress.callback_order == 1);
+    try std.testing.expectEqual(@as(i32, 0), report.progress.callback_status);
+    try std.testing.expectEqual(@as(u64, 1), report.progress.callbacks_returned);
+    try std.testing.expectEqual(@as(u64, 1), probe.calls);
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&output));
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), submissions);
+}
+
+const SpectralDyadicShiftProbe = struct {
+    calls: u64 = 0,
+    raw_first: f64 = 0,
+    raw_second: f64 = 0,
+    raw_finite: bool = true,
+    returned_status: i32 = -1,
+    owner: std.Thread.Id,
+    fn apply(raw: ?*anyopaque, context: *execution.Context, input: spectral.ConstPanel, output: spectral.Panel) i32 {
+        const self: *SpectralDyadicShiftProbe = @ptrCast(@alignCast(raw.?));
+        if (std.Thread.getCurrentId() != self.owner or context.snapshot().active_operations != 1) @panic("dyadic spectral callback caller/admission");
+        if (input.rows != 2 or output.rows != 2 or input.columns != output.columns or input.ld != 2 or output.ld != 2) @panic("dyadic spectral callback geometry");
+        self.calls += 1;
+        for (0..@intCast(input.columns)) |j| {
+            // Compute the two finite products separately. Factoring this as
+            // (11/32)*(x0+x1) would overflow inside H and test the wrong site.
+            const left: f64 = (11.0 / 32.0) * input.cell(0, j).*;
+            const right: f64 = (11.0 / 32.0) * input.cell(1, j).*;
+            const first = left + right;
+            const second = left - right;
+            self.raw_finite = self.raw_finite and std.math.isFinite(left) and std.math.isFinite(right) and std.math.isFinite(first) and std.math.isFinite(second);
+            if (j == 0) {
+                self.raw_first = first;
+                self.raw_second = second;
+            }
+            output.cell(0, j).* = first;
+            output.cell(1, j).* = second;
+        }
+        self.returned_status = 0;
+        return 0;
+    }
+};
+
+test "native spectral enclosed dyadic symmetric action reports shifted recurrence overflow after finite callback" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    var scratch = try SpectralSpan.init(&fixture, 18);
+    defer scratch.deinit(&fixture);
+    var probe: SpectralDyadicShiftProbe = .{ .owner = std.Thread.getCurrentId() };
+    const input = [_]f64{ 1.4e308, 1.4e308, 1.4e308, 1.4e308 };
+    const coefficients = [_]f64{ 1, 1 };
+    const sentinel_nan: f64 = @bitCast(@as(u64, 0x7ff8000000000372));
+    var output = [_]f64{ 773, 773, sentinel_nan, -0.0, 773, 773, sentinel_nan, -0.0, 991, 991 };
+    const saved = output;
+    var report: spectral.Report = .{};
+    // H=(11/32)*[[1,1],[1,-1]], H^2=(121/512)I, so the
+    // exact spectral radius is 11*sqrt(2)/32 < 1/2. The enclosure is valid.
+    const radius = (@as(f128, 11) * @sqrt(@as(f128, 2))) / 32;
+    try std.testing.expect(radius < @as(f128, 0.5));
+    // Hx=(9.625e307,0) is finite; interval scaling gives
+    // T1=(1.925e308,0), whose first scalar exceeds f64 MAX.
+    const expected_raw = (@as(f128, 11) / 32) * input[0] + (@as(f128, 11) / 32) * input[1];
+    try std.testing.expect(expected_raw < @as(f128, std.math.floatMax(f64)));
+    try std.testing.expect(2 * expected_raw > @as(f128, std.math.floatMax(f64)));
+    const request: spectral.Args = .{
+        .kind = .series,
+        .rows = 2,
+        .columns = 2,
+        .orders = 2,
+        .lower = -0.5,
+        .upper = 0.5,
+        .input = spectralBuffer(&input, 2),
+        .coefficients = spectralBuffer(&coefficients, 2),
+        .output = spectralBuffer(&output, 4),
+        .work = spectralBuffer(scratch.values, 2),
+        .operator = .{ .apply = SpectralDyadicShiftProbe.apply, .data = &probe },
+    };
+    try std.testing.expectEqual(spectral.Status.numerical_failure, spectral.invoke(&fixture.context, request, &report));
+    try std.testing.expect(probe.raw_finite);
+    try std.testing.expectApproxEqRel(@as(f64, @floatCast(expected_raw)), probe.raw_first, 1e-15);
+    try std.testing.expectEqual(@as(f64, 0), probe.raw_second);
+    try std.testing.expect(2 * @as(f128, probe.raw_first) > @as(f128, std.math.floatMax(f64)));
+    try std.testing.expectEqual(@as(i32, 0), probe.returned_status);
+    try std.testing.expectEqual(@as(u64, 1), probe.calls);
+    // c0*x was finite; the initial sum is intact because the first shift failed.
+    try std.testing.expectEqual(input[0], scratch.values[12]);
+    try std.testing.expectEqual(spectral.Phase.recurrence, report.phase);
+    try std.testing.expect(report.admission_attempted and report.admission_succeeded and !report.output_complete);
+    try std.testing.expect(report.progress.order_valid and report.progress.order == 1);
+    try std.testing.expect(report.progress.callback_returned and report.progress.callback_order == 1);
+    try std.testing.expectEqual(@as(i32, 0), report.progress.callback_status);
+    try std.testing.expectEqual(@as(u64, 1), report.progress.callbacks_returned);
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&output));
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), submissions);
+}

@@ -3465,6 +3465,7 @@ fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
     for ([_][]const u8{ "zynum.h", "zynum_spectral.h" }) |name|
         b.installFile(b.fmt("integrations/heteris/include/{s}", .{name}), b.fmt("include/{s}", .{name}));
     b.installFile("include/zynum_native.h", "include/zynum_native.h");
+    b.installFile("include/zynum_native_spectral.h", "include/zynum_native_spectral.h");
     for ([_][]const u8{ "heteris.h", "heteris_runtime_provider.h" }) |name|
         b.getInstallStep().dependOn(&b.addInstallFileWithDir(.{ .cwd_relative = b.pathJoin(&.{ heteris_include, name }) }, .header, name).step);
     if (standalone) {
