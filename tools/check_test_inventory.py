@@ -848,10 +848,11 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '104c76c215645c3b651ce12813c5d872b567d99ba0cb56d43ca30eb727019968'
+CURRENT_TEST_INVENTORY_SHA256 = '531444aaffec42140ecba01917937f3e2696017a70ea20a25983e2e60ac8baa5'
 NEXT_TEST_INVENTORY_SHA256 = None
-CURRENT_NATIVE_PROJECTION_SHA256 = 'f25ebd580dbfcb572385fd85af4499a86ae898b644108c100ca53dada3aa5094'
+CURRENT_NATIVE_PROJECTION_SHA256 = '9f1f4a649d301d0f75907f3af11a8d25cee038ceca25f92839d7aafb5df32204'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
+RETIRED_NATIVE_SECTION = "retired_native_observations"
 TOP_LEVEL_KEYS = {
     "schema_id",
     "schema_version",
@@ -1679,7 +1680,7 @@ def _native_projection(inventory: dict[str, Any]) -> dict[str, Any]:
         ),
         key=lambda row: row["id"],
     )
-    return {
+    projection = {
         "schema_id": NATIVE_PROJECTION_SCHEMA_ID,
         "schema_version": NATIVE_PROJECTION_SCHEMA_VERSION,
         "environment_profiles": environments,
@@ -1688,6 +1689,9 @@ def _native_projection(inventory: dict[str, Any]) -> dict[str, Any]:
         "expected_test_sets": expected_sets,
         "native_observation_bindings": bindings,
     }
+    if RETIRED_NATIVE_SECTION in inventory:
+        projection[RETIRED_NATIVE_SECTION] = inventory[RETIRED_NATIVE_SECTION]
+    return projection
 
 
 def _native_projection_digest(inventory: dict[str, Any]) -> str:
@@ -2259,6 +2263,8 @@ def _section_summary(inventory: dict[str, Any]) -> dict[str, Any]:
         "workflow_mode_bindings",
         "known_gaps",
     )
+    if RETIRED_NATIVE_SECTION in inventory:
+        sections += (RETIRED_NATIVE_SECTION,)
     return {
         section: {
             "count": len(inventory[section]),
@@ -3583,6 +3589,8 @@ def _prepare_inventory_refresh(
         )
     refreshed = discover(root, inventory_path)
     refreshed["python_skip_contracts"] = existing["python_skip_contracts"]
+    if RETIRED_NATIVE_SECTION in existing:
+        refreshed[RETIRED_NATIVE_SECTION] = existing[RETIRED_NATIVE_SECTION]
 
     sets_by_id = {row["id"]: row for row in refreshed["expected_test_sets"]}
     rows_by_id = {row["id"]: row for row in refreshed["test_mode_rows"]}
@@ -3658,6 +3666,9 @@ def _prepare_inventory_refresh(
             native_bindings_by_row[row_id] = _native_observation_binding(row, set_id)
 
     if reopen_native_rows:
+        refreshed[RETIRED_NATIVE_SECTION] = _retired_native_history(
+            existing, set(reopen_native_rows), existing_snapshot.sha256
+        )
         for identifier in reopen_native_rows:
             row = rows_by_id[identifier]
             row["expectation_state"] = PENDING_STATE
@@ -3669,13 +3680,6 @@ def _prepare_inventory_refresh(
         for row in refreshed["test_mode_rows"]
         if row["expected_test_set_id"] is not None
     }
-    if reopen_native_rows:
-        old_native_ids = {identifier for identifier, row in old_sets.items()
-                          if row["root_id"].startswith("zig-root:")}
-        orphaned = old_native_ids - referenced
-        if orphaned:
-            raise InventoryError("native reopen would orphan historical native sets: "
-                                 + ", ".join(sorted(orphaned)))
     refreshed["expected_test_sets"] = sorted(
         (sets_by_id[set_id] for set_id in referenced), key=lambda row: row["id"]
     )
@@ -3689,7 +3693,9 @@ def _prepare_inventory_refresh(
         if native_slots != (CURRENT_NATIVE_PROJECTION_SHA256, NEXT_NATIVE_PROJECTION_SHA256):
             raise InventoryError("source-only refresh changed reviewed native digest slots")
     if reopen_native_rows:
-        _assert_reopened_native_unchanged(existing, refreshed, reopen_native_rows)
+        _assert_reopened_native_unchanged(
+            existing, refreshed, reopen_native_rows, existing_snapshot.sha256
+        )
         if native_slots != (CURRENT_NATIVE_PROJECTION_SHA256, NEXT_NATIVE_PROJECTION_SHA256):
             raise InventoryError("native reopen changed reviewed native digest slots")
     candidate_bytes = _canonical_inventory_bytes(refreshed)
@@ -3741,8 +3747,30 @@ def _selected_reopen_native_rows(
     return set(row_ids)
 
 
+def _retired_native_history(
+    previous: dict[str, Any], selected: set[str], previous_sha256: str
+) -> list[dict[str, Any]]:
+    rows = [row for row in previous["test_mode_rows"] if row["id"] in selected]
+    set_ids = {row["expected_test_set_id"] for row in rows}
+    existing = previous.get(RETIRED_NATIVE_SECTION, [])
+    if any(batch["previous_inventory_sha256"] == previous_sha256 for batch in existing):
+        raise InventoryError("native reopen would repeat a retirement generation")
+    batch = {
+        "previous_inventory_sha256": previous_sha256,
+        "test_mode_rows": rows,
+        "expected_test_sets": [
+            row for row in previous["expected_test_sets"] if row["id"] in set_ids
+        ],
+        "native_observation_bindings": [
+            row for row in previous["native_observation_bindings"] if row["row_id"] in selected
+        ],
+    }
+    return sorted([*existing, batch], key=lambda item: item["previous_inventory_sha256"])
+
+
 def _assert_reopened_native_unchanged(
-    previous: dict[str, Any], candidate: dict[str, Any], row_ids: tuple[str, ...]
+    previous: dict[str, Any], candidate: dict[str, Any], row_ids: tuple[str, ...],
+    previous_sha256: str,
 ) -> None:
     """Allow only the selected pending transitions in the historical native ledger."""
     selected = _selected_reopen_native_rows(previous, row_ids)
@@ -3757,6 +3785,11 @@ def _assert_reopened_native_unchanged(
     permitted["native_observation_bindings"] = [
         row for row in previous["native_observation_bindings"] if row["row_id"] not in selected
     ]
+    active_sets = {row["expected_test_set_id"] for row in permitted["test_mode_rows"]}
+    permitted["expected_test_sets"] = [
+        row for row in previous["expected_test_sets"] if row["id"] in active_sets
+    ]
+    permitted[RETIRED_NATIVE_SECTION] = _retired_native_history(previous, selected, previous_sha256)
     _assert_source_only_native_unchanged(permitted, candidate)
     for field in ("optimize_modes", "predicates", "matrix_row_contract", "workflow_mode_bindings"):
         if previous[field] != candidate[field]:
@@ -3780,7 +3813,8 @@ def _assert_source_only_native_unchanged(
     previous: dict[str, Any], candidate: dict[str, Any]
 ) -> None:
     """Preserve historical native nameset expectations, never new qualification."""
-    for field in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings"):
+    for field in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings",
+                  RETIRED_NATIVE_SECTION):
         if candidate.get(field) != previous.get(field):
             raise InventoryError("source-only refresh changed native field: " + field)
     if _native_projection(candidate) != _native_projection(previous):
@@ -4376,6 +4410,81 @@ def _validate_python_skip_contracts(
     return errors
 
 
+def _validate_retired_native_observations(
+    inventory: dict[str, Any], discovered_rows: dict[str, dict[str, Any]]
+) -> list[str]:
+    if RETIRED_NATIVE_SECTION not in inventory:
+        return []
+    batches = inventory[RETIRED_NATIVE_SECTION]
+    if not isinstance(batches, list) or not batches:
+        return [f"{RETIRED_NATIVE_SECTION} must be a nonempty array when present"]
+
+    def ordered_records(records: Any) -> dict[str, dict[str, Any]]:
+        if not isinstance(records, list) or not records or any(
+            not isinstance(record, dict) or not isinstance(record.get("id"), str)
+            for record in records
+        ):
+            raise InventoryError("records must be a nonempty array of objects with string IDs")
+        ids = [record["id"] for record in records]
+        if ids != sorted(set(ids)):
+            raise InventoryError("record IDs must be unique and strictly ordered")
+        return dict(zip(ids, records, strict=True))
+
+    previous_sha = ""
+    try:
+        for batch in batches:
+            if not isinstance(batch, dict) or set(batch) != {
+                "previous_inventory_sha256", "test_mode_rows", "expected_test_sets",
+                "native_observation_bindings",
+            }:
+                raise InventoryError("unknown or missing retirement batch fields")
+            sha = batch["previous_inventory_sha256"]
+            if not isinstance(sha, str) or re.fullmatch(r"[0-9a-f]{64}", sha) is None or sha <= previous_sha:
+                raise InventoryError("prior inventory SHA-256 values must be valid, unique and strictly ordered")
+            previous_sha = sha
+            rows = ordered_records(batch["test_mode_rows"])
+            sets = ordered_records(batch["expected_test_sets"])
+            bindings = ordered_records(batch["native_observation_bindings"])
+
+            referenced = set()
+            expected_bindings = {}
+            for row_id, row in rows.items():
+                current = discovered_rows.get(row_id)
+                set_id = row.get("expected_test_set_id")
+                if (current is None or current["disposition"] != "execute"
+                        or not current["root_id"].startswith("zig-root:")
+                        or not isinstance(set_id, str) or set_id not in sets
+                        or row != dict(current, expectation_state=FROZEN_STATE, expected_test_set_id=set_id)
+                        or sets[set_id].get("root_id") != current["root_id"]):
+                    raise InventoryError("retired row is not an exact frozen Zig row joined to its nameset")
+                referenced.add(set_id)
+                binding = _native_observation_binding(row, set_id)
+                expected_bindings[binding["id"]] = binding
+            if set(sets) != referenced or bindings != expected_bindings:
+                raise InventoryError("retired namesets and observation bindings must cover the archived rows exactly")
+            for set_id, record in sets.items():
+                root_id = record["root_id"]
+                tests = record.get("tests")
+                if not isinstance(tests, list) or not tests or any(
+                    not isinstance(test, dict) or not isinstance(test.get("name"), str)
+                    for test in tests
+                ):
+                    raise InventoryError("retired nameset must contain test records with string names")
+                names = [test["name"] for test in tests]
+                canonical = _expected_test_rows(root_id, names)
+                digest = _fact_digest(canonical)
+                if (len(names) != len(set(names)) or _fact_digest(tests) != digest
+                        or set_id != _content_set_id(root_id, canonical)
+                        or record != {"id": set_id, "root_id": root_id, "tests": canonical,
+                                      "count": len(names), "digest": digest,
+                                      "enumeration_source": ZIG_ENUMERATION_SOURCE}
+                        or type(record.get("count")) is not int):
+                    raise InventoryError("retired nameset content is noncanonical")
+    except InventoryError as exc:
+        return [f"{RETIRED_NATIVE_SECTION}: {exc}"]
+    return []
+
+
 def _validate_runtime_bound_sections(
     root: Path, inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> list[str]:
@@ -4674,7 +4783,10 @@ def _validate_runtime_bound_sections(
             )
     if inventory.get("known_gaps") != sorted(expected_gaps, key=lambda row: row["id"]):
         errors.append("known_gaps must match exact current gaps")
-    if inventory.get("strict_summary") != _section_summary(inventory):
+    history_errors = _validate_retired_native_observations(inventory, discovered_rows)
+    if history_errors:
+        errors.extend(history_errors)
+    elif inventory.get("strict_summary") != _section_summary(inventory):
         errors.append("strict_summary count/digest mismatch")
     return errors
 
@@ -4780,6 +4892,26 @@ def _reviewed_native_spectral_source_refresh(previous_sha256: str, current: dict
             _fact_digest(_host_assembly_source_facts(current)) == NATIVE_SPECTRAL_CURRENT_SOURCE_SHA256)
 
 
+# Exact neutral-Poisson source-only migration; native observations remain historical.
+POISSON_PREVIOUS_SOURCE_SHA256 = "954b0bc4db60007969830868fd88665645d73ff4d05cf45400510dea1598b4d5"
+POISSON_CURRENT_SOURCE_SHA256 = "90499435640c177574c7a735afb31ba50c411eebf9e379076c16eff946eca3d9"
+POISSON_CHANGED_ROOT_IDS = frozenset((*NATIVE_SPECTRAL_CHANGED_ROOT_IDS, "zig-root:numerics-contract-tests"))
+POISSON_CHANGED_CORRECTNESS_ROOT_IDS = frozenset(NATIVE_SPECTRAL_CHANGED_CORRECTNESS_ROOT_IDS)
+
+
+def _reviewed_poisson_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    if (_fact_digest(_host_assembly_source_facts(previous)) != POISSON_PREVIOUS_SOURCE_SHA256 or
+            _fact_digest(_host_assembly_source_facts(current)) != POISSON_CURRENT_SOURCE_SHA256):
+        return False
+    for key, allowed in (("test_roots", POISSON_CHANGED_ROOT_IDS),
+                         ("correctness_only_roots", POISSON_CHANGED_CORRECTNESS_ROOT_IDS)):
+        old = {row["id"]: row for row in previous[key]}
+        new = {row["id"]: row for row in current[key]}
+        if old.keys() != new.keys() or {key for key in old if old[key] != new[key]} != allowed:
+            return False
+    return True
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -4792,6 +4924,7 @@ def _refresh_base_compatible_discovery(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     native_spectral_migration = _reviewed_native_spectral_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
+    poisson_migration = _reviewed_poisson_source_refresh(inventory, discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -4813,6 +4946,8 @@ def _refresh_base_compatible_discovery(
             continue  # The complete reviewed pair binds these exact records.
         if native_spectral_migration and recorded.get("id") in NATIVE_SPECTRAL_CHANGED_ROOT_IDS:
             continue  # Exact spectral pair; no other test root may change.
+        if poisson_migration and recorded.get("id") in POISSON_CHANGED_ROOT_IDS:
+            continue  # Entire reviewed fact pair and exact changed root sets were checked.
         legacy = dict(current)
         legacy["launch_observation_ids"] = []
         tooling_migration = (
@@ -5018,7 +5153,7 @@ def _refresh_base_compatible_discovery(
              for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
             key=lambda gap: gap["id"],
         )
-    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration:
+    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration or poisson_migration:
         # Reconstruct the reviewed old source metadata for base validation only.
         # The candidate still comes from discover(); native-ledger immutability
         # and the original whole-file CURRENT/NEXT/publication gates remain.
@@ -5177,7 +5312,7 @@ def _validate_impl(
     if not isinstance(inventory, dict):
         return ["test inventory root must be an object"]
     errors = _privacy_errors(inventory)
-    if set(inventory) != TOP_LEVEL_KEYS:
+    if set(inventory) - {RETIRED_NATIVE_SECTION} != TOP_LEVEL_KEYS:
         errors.append("test inventory top-level keys must match the schema exactly")
     if inventory.get("schema_id") != SCHEMA_ID:
         errors.append(f"schema_id must be {SCHEMA_ID}")

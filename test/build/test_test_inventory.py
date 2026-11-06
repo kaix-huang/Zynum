@@ -199,15 +199,36 @@ class NativeReopenTests(unittest.TestCase):
         self.addCleanup(fixture.tearDown)
         return fixture
 
-    def _candidate(self, base: dict[str, Any]) -> dict[str, Any]:
+    def _candidate(
+        self, base: dict[str, Any], selected: tuple[str, ...] | None = None
+    ) -> dict[str, Any]:
+        if selected is None:
+            selected = self.selected
         candidate = copy.deepcopy(base)
+        retired = [row for row in base["test_mode_rows"] if row["id"] in selected]
+        retired_sets = {row["expected_test_set_id"] for row in retired}
+        before_sha = hashlib.sha256(CHECKER._canonical_inventory_bytes(base)).hexdigest()
+        archive = {
+            "previous_inventory_sha256": before_sha,
+            "test_mode_rows": retired,
+            "expected_test_sets": [row for row in base["expected_test_sets"] if row["id"] in retired_sets],
+            "native_observation_bindings": [
+                row for row in base["native_observation_bindings"] if row["row_id"] in selected
+            ],
+        }
+        field = CHECKER.RETIRED_NATIVE_SECTION
+        candidate[field] = sorted(
+            [*base.get(field, []), archive], key=lambda batch: batch["previous_inventory_sha256"]
+        )
         for row in candidate["test_mode_rows"]:
-            if row["id"] in self.selected:
+            if row["id"] in selected:
                 row["expectation_state"] = CHECKER.PENDING_STATE
                 row["expected_test_set_id"] = None
         candidate["native_observation_bindings"] = [
-            row for row in candidate["native_observation_bindings"] if row["row_id"] not in self.selected
+            row for row in candidate["native_observation_bindings"] if row["row_id"] not in selected
         ]
+        active = {row["expected_test_set_id"] for row in candidate["test_mode_rows"]}
+        candidate["expected_test_sets"] = [row for row in candidate["expected_test_sets"] if row["id"] in active]
         CHECKER._refresh_native_gaps(candidate)
         candidate["strict_summary"] = CHECKER._section_summary(candidate)
         return candidate
@@ -266,8 +287,38 @@ class NativeReopenTests(unittest.TestCase):
 
     def test_transition_guard_rejects_all_other_native_data_and_policy_drift(self) -> None:
         permitted = self._candidate(self.historical)
-        CHECKER._assert_reopened_native_unchanged(self.historical, permitted, self.selected)
+        before_sha = hashlib.sha256(CHECKER._canonical_inventory_bytes(self.historical)).hexdigest()
+        CHECKER._assert_reopened_native_unchanged(self.historical, permitted, self.selected, before_sha)
         mutations = []
+        field = CHECKER.RETIRED_NATIVE_SECTION
+        active = {row["id"]: row for row in permitted["test_mode_rows"]}
+        self.assertEqual([], CHECKER._validate_retired_native_observations(permitted, active))
+        for malformed in (None, [], [None], [{"unreviewed": True}]):
+            bad = copy.deepcopy(permitted)
+            bad[field] = malformed
+            self.assertTrue(CHECKER._validate_retired_native_observations(bad, active))
+            mutations.append(bad)
+        for part in ("test_mode_rows", "expected_test_sets", "native_observation_bindings"):
+            bad = copy.deepcopy(permitted)
+            archive = next(batch for batch in bad[field] if batch["previous_inventory_sha256"] == before_sha)
+            archive[part].pop()
+            self.assertTrue(CHECKER._validate_retired_native_observations(bad, active))
+            mutations.append(bad)
+        bad = copy.deepcopy(permitted)
+        archive = next(batch for batch in bad[field] if batch["previous_inventory_sha256"] == before_sha)
+        archive["previous_inventory_sha256"] = "invalid"
+        self.assertTrue(CHECKER._validate_retired_native_observations(bad, active))
+        mutations.append(bad)
+        forged = copy.deepcopy(permitted)
+        archive = next(batch for batch in forged[field] if batch["previous_inventory_sha256"] == before_sha)
+        archive["previous_inventory_sha256"] = "f" * 64
+        forged[field].sort(key=lambda batch: batch["previous_inventory_sha256"])
+        self.assertEqual([], CHECKER._validate_retired_native_observations(forged, active))
+        # Even coherent history edits change the reviewed projection and cannot
+        # pass the exact-CURRENT transition guard.
+        self.assertNotEqual(CHECKER._native_projection_digest(permitted),
+                            CHECKER._native_projection_digest(forged))
+        mutations.append(forged)
         for selected in (True, False):
             bad = copy.deepcopy(permitted)
             row = next(row for row in bad["test_mode_rows"] if row["root_id"].startswith("zig-root:")
@@ -292,7 +343,7 @@ class NativeReopenTests(unittest.TestCase):
             bad = copy.deepcopy(permitted); bad[field] = {"unreviewed": True}; mutations.append(bad)
         for number, bad in enumerate(mutations):
             with self.subTest(number=number), self.assertRaises(CHECKER.InventoryError):
-                CHECKER._assert_reopened_native_unchanged(self.historical, bad, self.selected)
+                CHECKER._assert_reopened_native_unchanged(self.historical, bad, self.selected, before_sha)
 
     def test_real_candidate_pipeline_retains_historical_sets_and_only_six_native_transitions(self) -> None:
         fixture = self._fixture()
@@ -305,8 +356,12 @@ class NativeReopenTests(unittest.TestCase):
         self.assertEqual(before, fixture.inventory_path.read_bytes())
         self.assertEqual(CHECKER._matrix_incomplete_count(base) + 6, result.incomplete_count)
         self.assertEqual(len(base["native_observation_bindings"]) - 6, len(result.inventory["native_observation_bindings"]))
-        self.assertEqual([row for row in base["expected_test_sets"] if row["root_id"].startswith("zig-root:")],
-                         [row for row in result.inventory["expected_test_sets"] if row["root_id"].startswith("zig-root:")])
+        active_ids = {row["expected_test_set_id"] for row in expected["test_mode_rows"]}
+        self.assertEqual([row for row in base["expected_test_sets"] if row["id"] in active_ids],
+                         result.inventory["expected_test_sets"])
+        with self._reviewed(fixture, base, expected):
+            reordered = CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, self.selected[::-1])
+        self.assertEqual(result.bytes, reordered.bytes)
         self.assertEqual(153, result.incomplete_count)
         self.assertEqual(141, len(result.inventory["native_observation_bindings"]))
 
@@ -325,7 +380,7 @@ class NativeReopenTests(unittest.TestCase):
         python_sets = [row for row in discovered["expected_test_sets"] if row["root_id"].startswith("python-root:")]
         python_set_ids = {row["root_id"]: row["id"] for row in python_sets}
         expected["expected_test_sets"] = sorted(
-            [row for row in base["expected_test_sets"] if row["root_id"].startswith("zig-root:")] + python_sets,
+            [row for row in expected["expected_test_sets"] if row["root_id"].startswith("zig-root:")] + python_sets,
             key=lambda row: row["id"],
         )
         for row in expected["test_mode_rows"]:
@@ -394,15 +449,49 @@ class NativeReopenTests(unittest.TestCase):
             publish.assert_not_called()
 
     def test_reopening_last_historical_set_reference_is_rejected_without_dropping_it(self) -> None:
+        # This declaration name is retained in the inventory. The active orphan
+        # is rejected after the successful retirement, rather than lost.
         fixture = self._fixture()
         base = self._source_base(fixture)
         selected_set = next(row["expected_test_set_id"] for row in base["test_mode_rows"] if row["id"] == self.selected[0])
         all_references = tuple(row["id"] for row in base["test_mode_rows"] if row["expected_test_set_id"] == selected_set)
         before = fixture.inventory_path.read_bytes()
-        with (fixture._reviewed_digest_slots(inventory_current=hashlib.sha256(before).hexdigest()),
-              self.assertRaisesRegex(CHECKER.InventoryError, "orphan historical native sets")):
-            CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, all_references)
+        expected = self._candidate(base, all_references)
+        with self._reviewed(fixture, base, expected):
+            candidate = CHECKER.refresh_reopen_native_rows(fixture.root, fixture.inventory_path, all_references)
+        self.assertEqual(CHECKER._canonical_inventory_bytes(expected), candidate.bytes)
         self.assertEqual(before, fixture.inventory_path.read_bytes())
+
+        history = candidate.inventory[CHECKER.RETIRED_NATIVE_SECTION]
+        prior_sha = hashlib.sha256(before).hexdigest()
+        archive = next(batch for batch in history if batch["previous_inventory_sha256"] == prior_sha)
+        retired_set = next(row for row in base["expected_test_sets"] if row["id"] == selected_set)
+        self.assertEqual([retired_set], archive["expected_test_sets"])
+        self.assertNotIn(retired_set, candidate.inventory["expected_test_sets"])
+
+        fixture.inventory_path.write_bytes(candidate.bytes)
+        with fixture._reviewed_digest_slots(
+            inventory_current=hashlib.sha256(candidate.bytes).hexdigest(),
+            native_current=CHECKER._native_projection_digest(candidate.inventory),
+        ):
+            source_refresh = CHECKER.refresh_source_derived(fixture.root, fixture.inventory_path)
+            self.assertEqual(history, source_refresh.inventory[CHECKER.RETIRED_NATIVE_SECTION])
+            environment_id, log = fixture._native_refresh_protocol(pending=False)
+            replay = CHECKER.refresh_from_protocol(fixture.root, fixture.inventory_path, [(environment_id, log)])
+            self.assertEqual(history, replay.inventory[CHECKER.RETIRED_NATIVE_SECTION])
+            self.assertEqual(candidate.bytes, replay.bytes)
+        active_orphan = copy.deepcopy(candidate.inventory)
+        active_orphan["expected_test_sets"].append(retired_set)
+        active_orphan["expected_test_sets"].sort(key=lambda row: row["id"])
+        active_orphan["strict_summary"] = CHECKER._section_summary(active_orphan)
+        bad_bytes = CHECKER._canonical_inventory_bytes(active_orphan)
+        fixture.inventory_path.write_bytes(bad_bytes)
+        with fixture._reviewed_digest_slots(
+            inventory_current=hashlib.sha256(bad_bytes).hexdigest(),
+            native_current=CHECKER._native_projection_digest(active_orphan),
+        ):
+            errors = CHECKER.validate(fixture.root, fixture.inventory_path, structure_only=True)
+        self.assertTrue(any("expected_test_sets contain orphan variants" in error for error in errors))
 
 
 def _referenced_set_count(inventory: dict[str, Any]) -> int:

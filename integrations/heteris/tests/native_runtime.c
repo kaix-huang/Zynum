@@ -21,15 +21,17 @@ static pthread_t caller;
 static _Atomic unsigned bulk_calls, callback_calls, caller_callbacks;
 enum death_fault { DEATH_NONE, DEATH_MALFORMED, DEATH_NONQUIESCENT, DEATH_RELEASE };
 static enum death_fault death_fault;
-static int laplacian_death;
+enum death_operation { DEATH_TN, DEATH_LAPLACIAN, DEATH_PERIODIC_SOLVE };
+static enum death_operation death_operation;
+static const char *const death_labels[] = { "TN", "LAPLACIAN", "PERIODIC_SOLVE" };
 static unsigned death_phase, death_allocations, death_release_site;
-static heteris_rp_token death_leases[5];
+static heteris_rp_token death_leases[6];
 static heteris_status death_allocate(heteris_rp_token p,uint64_t bytes,uint64_t alignment,heteris_rp_scratch_v1 *out) {
  heteris_status status=real_api.scratch_allocate(p,bytes,alignment,out);
- if(status==HETERIS_OK){assert(death_allocations<5);death_leases[death_allocations++]=out->lease;}return status;
+ if(status==HETERIS_OK){assert(death_allocations<6);death_leases[death_allocations++]=out->lease;}return status;
 }
 static heteris_status death_release(heteris_rp_token lease) {
- if(death_fault==DEATH_RELEASE&&death_allocations>=death_release_site&&lease.serial==death_leases[death_release_site-1].serial){fprintf(stderr,"%s_DEATH release_site=%u\n",laplacian_death?"LAPLACIAN":"TN",death_release_site);return -1942;}
+ if(death_fault==DEATH_RELEASE&&death_allocations>=death_release_site&&lease.serial==death_leases[death_release_site-1].serial){fprintf(stderr,"%s_DEATH release_site=%u\n",death_labels[death_operation],death_release_site);return -1942;}
  return real_api.scratch_release(lease);
 }
 struct invocation { heteris_rp_cpu_range_fn callback; void *data; };
@@ -42,7 +44,7 @@ static heteris_status traced_bulk(heteris_rp_token p,uint64_t count,uint64_t gra
  struct invocation call={callback,data};atomic_fetch_add(&bulk_calls,1);
  heteris_status status=real_api.cpu_bulk_sync(p,count,grain,scratch,cap,range,&call,out);
  if(death_fault!=DEATH_NONE&&atomic_load(&bulk_calls)==death_phase){
-  fprintf(stderr,"%s_DEATH phase=%u fault=%u\n",laplacian_death?"LAPLACIAN":"TN",death_phase,(unsigned)death_fault);
+  fprintf(stderr,"%s_DEATH phase=%u fault=%u\n",death_labels[death_operation],death_phase,(unsigned)death_fault);
   if(death_fault==DEATH_MALFORMED)out->reserved=1;
   if(death_fault==DEATH_NONQUIESCENT){assert(out->callbacks_started>0);out->callbacks_completed=out->callbacks_started-1;}
  }return status;
@@ -68,7 +70,13 @@ static void tn_death_case(enum death_fault fault,unsigned phase,unsigned release
  zynum_native_policy_v1 policy={1,sizeof policy,1,limit,{0,0}};zynum_native_report_v1 report;
  assert(zynum_native_context_init_v1(context.data,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  const double a[4]={1,2,3,4};double output[4]={7,7,7,7};
- if(laplacian_death)(void)zynum_native_laplacian_periodic_3d_f64_v1(context.data,1,2,2,a,4,output,4,2,3,4,&report);
+ if(death_operation==DEATH_PERIODIC_SOLVE){
+  const zynum_native_periodic_neg_laplacian_problem_v1 problem={1,sizeof problem,{1,2,2},{2,3,4},4,0,1e-12,0,{0,0}};
+  const double rhs[4]={12,12,-12,-12};double work[48];
+  zynum_native_periodic_neg_laplacian_report_v1 solve_report;
+  (void)zynum_native_periodic_neg_laplacian_solve_f64_v1(context.data,&problem,rhs,4,output,4,work,48,&solve_report);
+ }
+ else if(death_operation==DEATH_LAPLACIAN)(void)zynum_native_laplacian_periodic_3d_f64_v1(context.data,1,2,2,a,4,output,4,2,3,4,&report);
  else (void)zynum_native_gemm_f64_tn_v1(context.data,2,2,2,1,a,4,2,a,4,2,1,output,4,2,&report);
  _exit(99); /* A returning API is never accepted as fail-stop evidence. */
 }
@@ -80,8 +88,8 @@ static void expect_tn_death(enum death_fault fault,unsigned phase,unsigned relea
  assert(amount==0);close(channel[0]);output[used]=0;int status;assert(waitpid(child,&status,0)==child);
  assert(WIFSIGNALED(status));assert(WTERMSIG(status)==SIGABRT);
  char marker[96];
- if(fault==DEATH_RELEASE)snprintf(marker,sizeof marker,"%s_DEATH release_site=%u",laplacian_death?"LAPLACIAN":"TN",release_site);
- else snprintf(marker,sizeof marker,"%s_DEATH phase=%u fault=%u",laplacian_death?"LAPLACIAN":"TN",phase,(unsigned)fault);
+ if(fault==DEATH_RELEASE)snprintf(marker,sizeof marker,"%s_DEATH release_site=%u",death_labels[death_operation],release_site);
+ else snprintf(marker,sizeof marker,"%s_DEATH phase=%u fault=%u",death_labels[death_operation],phase,(unsigned)fault);
  assert(strstr(output,marker)!=NULL);
  assert(strstr(output,"HETERIS_PROVIDER_CONTRACT_FAILURE")!=NULL);
  const char *reason=fault==DEATH_MALFORMED?"malformed bulk completion prefix/counts":fault==DEATH_NONQUIESCENT?"bulk returned before all callbacks completed":"valid scratch release failed";
@@ -97,21 +105,38 @@ static void tn_death_cases(void) {
  printf("native TN fail-stop cases passed: 18 real-Runtime child processes\n");
 }
 static void laplacian_death_cases(void) {
- laplacian_death=1;
+ death_operation=DEATH_LAPLACIAN;
  for(uint32_t limit=1;limit<=2;++limit){
   expect_tn_death(DEATH_MALFORMED,1,0,limit);
   expect_tn_death(DEATH_NONQUIESCENT,1,0,limit);
   for(unsigned site=1;site<=2;++site)expect_tn_death(DEATH_RELEASE,0,site,limit);
  }
- laplacian_death=0;
+ death_operation=DEATH_TN;
  printf("native periodic Laplacian fail-stop cases passed: 8 real-Runtime child processes\n");
 }
 
+static void periodic_solve_death_cases(void) {
+ death_operation=DEATH_PERIODIC_SOLVE;
+ for(uint32_t limit=1;limit<=2;++limit){
+  /* One eigenmode has two solver applications, then final verification. */
+  expect_tn_death(DEATH_MALFORMED,2,0,limit);
+  expect_tn_death(DEATH_NONQUIESCENT,3,0,limit);
+  expect_tn_death(DEATH_RELEASE,0,5,limit);
+  expect_tn_death(DEATH_RELEASE,0,6,limit);
+ }
+ death_operation=DEATH_TN;
+ printf("native projected periodic solve fail-stop cases passed: 8 real-Runtime child processes\n");
+}
+
+static void f64_summary_cases(void);
+static void periodic_solve_cases(void *context,double *rhs,double *solution,double *workspace);
 static void laplacian_runtime_cases(void);
 static void spectral_runtime_cases(void);
 int main(int argc,char **argv) {
  tn_death_cases();
  laplacian_death_cases();
+ periodic_solve_death_cases();
+ f64_summary_cases();
  gemm_fn call_gemm=zynum_native_gemm_f64_nn_v1;
 #ifdef ZYNUM_NATIVE_DSO_CLIENT_TESTS
  assert(argc==3);void *clients[2];
@@ -222,13 +247,16 @@ static void laplacian_runtime_cases(void) {
  heteris_runtime_provider_v1 provider;assert(heteris_cpu_runtime_export_provider_v1(runtime,&provider)==HETERIS_OK);
  real_api=*provider.api;heteris_runtime_provider_api_v1 proxy=real_api;proxy.cpu_bulk_sync=traced_bulk;provider.api=&proxy;
  zynum_native_context_requirements_v1 req;assert(zynum_native_context_query_v1(&req)==ZYNUM_NATIVE_OK);
- heteris_rp_scratch_v1 context,data[2];allocate(provider.provider,req.bytes,req.alignment,&context);
+ heteris_rp_scratch_v1 context,data[3];allocate(provider.provider,req.bytes,req.alignment,&context);
  for(unsigned i=0;i<2;++i)allocate(provider.provider,64,8,&data[i]);
+ allocate(provider.provider,73*sizeof(double),_Alignof(double),&data[2]);
  double *x=data[0].data,*y=data[1].data;
  for(unsigned i=0;i<8;++i){x[i]=i<6?(double)i:991;y[i]=773;}
  zynum_native_policy_v1 policy={1,sizeof policy,1,2,{0,0}};zynum_native_report_v1 report,sentinel;
  assert(zynum_native_context_init_v1(context.data,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  assert(real_api.provider_release(provider.provider)==HETERIS_OK);memset(&provider,0,sizeof provider);
+ periodic_solve_cases(context.data,x,y,data[2].data);
+ for(unsigned i=0;i<8;++i){x[i]=i<6?(double)i:991;y[i]=773;}
  unsigned before=atomic_load(&bulk_calls);
  memset(&report,0x5a,sizeof report);sentinel=report;
  assert(zynum_native_laplacian_periodic_3d_f64_v1(NULL,1,2,3,x,8,y,8,2,3,4,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
@@ -281,11 +309,154 @@ static void laplacian_runtime_cases(void) {
  assert(zynum_native_context_request_close_v1(context.data,&report)==ZYNUM_NATIVE_OK);
  assert(zynum_native_laplacian_periodic_3d_f64_v1(context.data,0,1,1,NULL,0,NULL,0,-1,3,4,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
  assert(zynum_native_laplacian_periodic_3d_f64_v1(context.data,0,1,1,NULL,0,NULL,0,2,3,4,&report)==ZYNUM_NATIVE_CONTEXT_CLOSING);
+ const zynum_native_periodic_neg_laplacian_problem_v1 problem={1,sizeof problem,{1,1,1},{2,3,4},0,0,0,0,{0,0}};
+ zynum_native_periodic_neg_laplacian_report_v1 solve_report;
+ x[0]=0;
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context.data,&problem,x,8,y,8,data[2].data,73,&solve_report)==ZYNUM_NATIVE_CONTEXT_CLOSING);
+ assert(solve_report.phase==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_ADMISSION&&solve_report.stop_reason==0);
+ assert(solve_report.valid_flags==0&&solve_report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
  assert(zynum_native_context_progress_close_v1(context.data,&report)==ZYNUM_NATIVE_OK);
- for(unsigned i=0;i<2;++i)assert(real_api.scratch_release(data[i].lease)==HETERIS_OK);
+ for(unsigned i=0;i<3;++i)assert(real_api.scratch_release(data[i].lease)==HETERIS_OK);
  assert(real_api.scratch_release(context.lease)==HETERIS_OK);
  assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_OK);
  printf("native periodic Laplacian C validation and direct output cases passed\n");
+}
+
+
+static void periodic_solve_cases(void *context,double *rhs,double *solution,double *workspace) {
+ zynum_native_periodic_neg_laplacian_problem_v1 problem={1,sizeof problem,{2,1,3},{2,3,4},4,0,1e-12,0,{0,0}};
+ zynum_native_periodic_neg_laplacian_requirements_v1 sizes,saved_sizes;
+ memset(&sizes,0xa5,sizeof sizes);saved_sizes=sizes;
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,(zynum_native_periodic_neg_laplacian_requirements_v1*)&problem)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ problem.reserved[1]=1;
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,&sizes)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ problem.reserved[1]=0;
+ problem.shape[1]=0;
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,&sizes)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ problem.shape[1]=1;
+ problem.shape[0]=UINT64_MAX;
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,&sizes)==ZYNUM_NATIVE_OVERFLOW);
+ problem.shape[0]=UINT64_MAX/96+1;problem.shape[2]=1;
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,&sizes)==ZYNUM_NATIVE_OVERFLOW);
+ assert(memcmp(&sizes,&saved_sizes,sizeof sizes)==0);
+ problem.shape[0]=2;problem.shape[2]=3;
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,&sizes)==ZYNUM_NATIVE_OK);
+ assert(sizes.abi_version==1&&sizes.struct_size==sizeof sizes&&sizes.points==6&&sizes.workspace_elements==72);
+ assert(sizes.workspace_bytes==576&&sizes.workspace_alignment==_Alignof(double)&&sizes.reserved[0]==0&&sizes.reserved[1]==0);
+ for(size_t i=0;i<8;++i){rhs[i]=i<3?8:i<6?-8:991;solution[i]=773;}
+ workspace[72]=881;
+ zynum_native_periodic_neg_laplacian_report_v1 report,saved;
+ memset(&report,0x5a,sizeof report);saved=report;
+ const unsigned before=atomic_load(&bulk_calls);
+ struct {
+  zynum_native_periodic_neg_laplacian_problem_v1 problem;
+  union {
+   zynum_native_periodic_neg_laplacian_requirements_v1 requirements;
+   zynum_native_periodic_neg_laplacian_report_v1 report;
+  } tail;
+ } extended;
+ memset(&extended,0x5a,sizeof extended);
+ extended.problem=problem;
+ extended.problem.struct_size=sizeof extended;
+ unsigned char saved_extended[sizeof extended];
+ memcpy(saved_extended,&extended,sizeof extended);
+ assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&extended.problem,&extended.tail.requirements)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&extended.problem,rhs,8,solution,8,workspace,73,&extended.tail.report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(memcmp(&extended,saved_extended,sizeof extended)==0);
+ saved_sizes=sizes;
+ const uint32_t invalid_sizes[2]={sizeof problem-1,sizeof problem+1};
+ for(size_t i=0;i<2;++i){
+  problem.struct_size=invalid_sizes[i];
+  assert(zynum_native_periodic_neg_laplacian_query_f64_v1(&problem,&sizes)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+  assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+  assert(memcmp(&sizes,&saved_sizes,sizeof sizes)==0&&memcmp(&report,&saved,sizeof report)==0);
+ }
+ problem.struct_size=sizeof problem;
+ assert(atomic_load(&bulk_calls)==before);
+ for(size_t i=0;i<8;++i)assert(solution[i]==773);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,UINT64_MAX,solution,8,workspace,73,&report)==ZYNUM_NATIVE_OVERFLOW);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,(const double*)(UINTPTR_MAX-7),2,solution,8,workspace,73,&report)==ZYNUM_NATIVE_OVERFLOW);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,(const double*)context,6,solution,8,workspace,73,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,(double*)&problem,73,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,(double*)&report,73,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,(zynum_native_periodic_neg_laplacian_report_v1*)((uintptr_t)&report+1))==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(memcmp(&report,&saved,sizeof report)==0);
+ /* The solution prefix fits inside this local array, but its first element
+    lies in the RHS's declared tail, outside the RHS's six used values. */
+ double overlapping[14]={0};
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,overlapping,8,overlapping+7,7,workspace,73,&report)==ZYNUM_NATIVE_VIEW_INVALID);
+ assert(memcmp(&report,&saved,sizeof report)==0);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,71,&report)==ZYNUM_NATIVE_VIEW_INVALID);
+ assert(report.phase==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_PREFLIGHT&&report.valid_flags==0);
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,(const double*)((uintptr_t)rhs+1),6,solution,8,workspace,73,&report)==ZYNUM_NATIVE_VIEW_INVALID);
+ rhs[0]=NAN;
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(report.phase==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_PREFLIGHT&&report.stop_reason==0&&report.valid_flags==0);
+ rhs[0]=8;
+ problem.max_iterations=0;
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,&report)==ZYNUM_NATIVE_OK);
+ assert(report.phase==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_ITERATION);
+ assert(report.stop_reason==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_ITERATION_LIMIT);
+ assert(report.valid_flags==(ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_RHS_VALID|ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_SOLVER_VALID));
+ assert(report.iterations==0&&report.solver_actions==0&&report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
+ assert(atomic_load(&bulk_calls)==before);
+ for(size_t i=0;i<8;++i)assert(solution[i]==773);
+ for(size_t i=0;i<6;++i)rhs[i]=2;
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,&report)==ZYNUM_NATIVE_OK);
+ assert(report.phase==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_FINAL_VERIFICATION);
+ assert(report.stop_reason==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_FINAL_RESIDUAL_REJECTED&&report.valid_flags==7);
+ assert(report.rhs_mean==2&&report.projected_rhs_l2==0&&report.residual_l2==report.rhs_l2&&report.rhs_l2>4);
+ assert(report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED&&atomic_load(&bulk_calls)==before+1);
+ for(size_t i=0;i<8;++i)assert(solution[i]==773);
+ for(size_t i=0;i<6;++i)rhs[i]=i<3?8:-8;
+ problem.max_iterations=4;
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,&report)==ZYNUM_NATIVE_OK);
+ assert(report.abi_version==1&&report.struct_size==sizeof report&&report.native.abi_version==1&&report.native.struct_size==sizeof report.native);
+ assert(report.reserved0==0&&report.reserved[0]==0&&report.reserved[1]==0);
+ assert(report.phase==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_PUBLISHED&&report.valid_flags==7);
+ assert(report.stop_reason==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_CONVERGED&&report.native.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE);
+ assert(report.native.callbacks_completed==2&&report.solver_actions==2&&atomic_load(&bulk_calls)==before+4);
+ assert(report.residual_l2<1e-12&&fabs(report.solution_mean)<1e-15);
+ const double expected[8]={1,1,1,-1,-1,-1,773,773};equals(solution,expected,8);
+ for(size_t i=0;i<8;++i)assert(rhs[i]==(i<3?8:i<6?-8:991));
+ assert(workspace[72]==881);
+ const double retained=solution[1];
+ problem.shape[0]=1;problem.shape[2]=1;problem.max_iterations=0;rhs[0]=0;
+ assert(zynum_native_periodic_neg_laplacian_solve_f64_v1(context,&problem,rhs,8,solution,8,workspace,73,&report)==ZYNUM_NATIVE_OK);
+ assert(report.stop_reason==ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_CONVERGED&&report.native.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE);
+ assert(report.native.callbacks_completed==1&&report.solver_actions==0&&report.residual_l2==0&&solution[0]==0&&solution[1]==retained);
+ printf("native projected periodic solve C validation, stopping and publication cases passed\n");
+}
+
+static void f64_summary_cases(void) {
+ const double exact[4]={0x1p100,1,-0x1p100,NAN};
+ zynum_native_f64_sum_summary_report_v1 report,saved;
+ memset(&report,0x5a,sizeof report);saved=report;
+ assert(zynum_native_f64_sum_summary_v1(exact,4,0,1,1,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_f64_sum_summary_v1(NULL,4,3,1,1,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_f64_sum_summary_v1(exact,4,3,1,1,NULL)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_f64_sum_summary_v1(exact,4,3,-0.0,1,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_f64_sum_summary_v1(exact,4,4,1,1,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_f64_sum_summary_v1(exact,UINT64_MAX,3,1,1,&report)==ZYNUM_NATIVE_OVERFLOW);
+ assert(zynum_native_f64_sum_summary_v1(exact,4,3,0,1,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_f64_sum_summary_v1(exact,4,3,0x1p1023,1,&report)==ZYNUM_NATIVE_OVERFLOW);
+ assert(memcmp(&report,&saved,sizeof report)==0);
+ union {
+  double backing[2+sizeof report/sizeof(double)];
+  struct { double prefix[2];zynum_native_f64_sum_summary_report_v1 output; } control;
+ } alias={0};
+ assert(zynum_native_f64_sum_summary_v1(alias.backing,sizeof alias.backing/sizeof(double),2,1,1,&alias.control.output)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(alias.control.output.abi_version==0);
+ assert(zynum_native_f64_sum_summary_v1(exact,4,3,0.5,0.5,&report)==ZYNUM_NATIVE_OK);
+ assert(report.abi_version==1&&report.struct_size==sizeof report&&report.count==3&&report.sum_sign==1);
+ assert(report.flags==(ZYNUM_NATIVE_F64_SUM_QUANTIZATION_ZERO_INTERIOR|ZYNUM_NATIVE_F64_SUM_SCALED_ABS_WITHIN_LIMIT));
+ assert(report.scaled_sum_lower==0.5&&report.scaled_sum_upper==0.5&&report.maximum_absolute==0x1p100);
+ assert(report.mean_lower==1.0/3.0&&report.mean_upper==nextafter(1.0/3.0,INFINITY));
+ assert(report.reserved[0]==0&&report.reserved[1]==0);
+ const double negative_zero[1]={-0.0};
+ assert(zynum_native_f64_sum_summary_v1(negative_zero,1,1,1,-0.0,&report)==ZYNUM_NATIVE_OK);
+ assert(report.sum_sign==0&&report.flags==7&&report.mean_lower==0&&!signbit(report.mean_lower));
+ printf("native F64 exact summary C validation and bound cases passed\n");
 }
 
 

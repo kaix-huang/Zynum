@@ -637,6 +637,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -660,6 +661,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -721,7 +723,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "blas_module_tests",
@@ -926,6 +928,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -949,6 +952,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -1001,7 +1005,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
@@ -1209,6 +1213,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -1232,6 +1237,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -1264,7 +1270,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "cblas_tests",
@@ -1557,6 +1563,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -1580,6 +1587,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -1613,7 +1621,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "fortran_tests",
@@ -1673,7 +1681,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "fortran_tests",
@@ -2194,6 +2202,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -2217,6 +2226,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -2320,7 +2330,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2358,7 +2368,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2408,7 +2418,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2438,7 +2448,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2468,7 +2478,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -3052,6 +3062,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -3075,6 +3086,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -3156,7 +3168,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3186,7 +3198,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3196,7 +3208,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3206,7 +3218,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3364,6 +3376,8 @@
         "src/numerics/contour_quadrature.zig",
         "src/numerics/contour_quadrature_test.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
+        "src/numerics/exact_f64_summary_test.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -3760,6 +3774,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -3783,6 +3798,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -3830,7 +3846,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3860,7 +3876,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3890,7 +3906,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3950,7 +3966,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -5495,6 +5511,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -5518,6 +5535,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -5590,7 +5608,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
@@ -5784,6 +5802,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -5807,6 +5826,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -5837,7 +5857,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "dynamic_tests",
@@ -5857,7 +5877,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "dynamic_tests",
@@ -6059,6 +6079,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -6082,6 +6103,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -6112,7 +6134,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
@@ -6357,6 +6379,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -6380,6 +6403,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -6423,7 +6447,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
@@ -6632,6 +6656,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -6655,6 +6680,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -6736,7 +6762,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -6771,7 +6797,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -6785,7 +6811,7 @@
           "module": "core",
           "attachment_owner": "upstream",
           "target": "requested-target",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47"
         }
       ]
@@ -6950,6 +6976,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -6973,6 +7000,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -7037,7 +7065,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7081,7 +7109,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7104,7 +7132,7 @@
           "module": "core",
           "attachment_owner": "math_module",
           "target": "requested-target",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47"
         },
         {
@@ -7125,7 +7153,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7309,6 +7337,7 @@
         "src/numerics/contour_eigensolver.zig",
         "src/numerics/contour_quadrature.zig",
         "src/numerics/dense.zig",
+        "src/numerics/exact_f64_summary.zig",
         "src/numerics/execution/call_resources.zig",
         "src/numerics/execution/context.zig",
         "src/numerics/execution/context_scratch_test.zig",
@@ -7332,6 +7361,7 @@
         "src/numerics/operator.zig",
         "src/numerics/periodic_laplacian.zig",
         "src/numerics/periodic_laplacian_native.zig",
+        "src/numerics/periodic_laplacian_solve_native.zig",
         "src/numerics/pivot.zig",
         "src/numerics/rank_reduced_ritz.zig",
         "src/numerics/rational_filter.zig",
@@ -7413,7 +7443,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7457,7 +7487,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7489,7 +7519,7 @@
           "module": "native",
           "attachment_owner": "main",
           "target": "requested-target",
-          "source_sha256": "452b12c6eb4aff012b9b741f61051166daf4f80387535f4baa86d25b2667a083",
+          "source_sha256": "47d711395098be0c95d21059ed00f3e75c74250cc058cfd3e5cd089efa8c8d19",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47"
         },
         {
@@ -7498,7 +7528,7 @@
           "module": "core",
           "attachment_owner": "native",
           "target": "requested-target",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47"
         },
         {
@@ -7519,7 +7549,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7533,7 +7563,7 @@
           "module": "core",
           "attachment_owner": "upstream",
           "target": "requested-target",
-          "source_sha256": "a1c3b39b63f4da1c27f63bc7e8519b04a8f45e4560686a1e65a639c3d821807f",
+          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47"
         }
       ]
@@ -10522,6 +10552,24 @@
           "name": "native spectral enclosed dyadic symmetric action reports shifted recurrence overflow after finite callback",
           "ordinal": 24,
           "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:25",
+          "name": "projected periodic solve matches an independent anisotropic matrix through one closing admission",
+          "ordinal": 25,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:26",
+          "name": "projected periodic solve preserves solution after a later rejection and a failed final callback",
+          "ordinal": 26,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:27",
+          "name": "projected periodic solve reports produced nonfinite stencil arithmetic without publishing",
+          "ordinal": 27,
+          "kind": "named"
         }
       ],
       "reaching_root_ids": [
@@ -10864,6 +10912,71 @@
         "zig-root:numerics-contract-tests",
         "zig-root:sparse-tests",
         "zig-root:zynum-public-surface-contract-tests"
+      ],
+      "gap_id": null
+    },
+    {
+      "id": "zig-file:src/numerics/exact_f64_summary_test.zig",
+      "path": "src/numerics/exact_f64_summary_test.zig",
+      "classification": "permitted-source-local",
+      "declarations": [
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:0",
+          "name": "reject malformed arguments and every class of nonfinite sample",
+          "ordinal": 0,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:1",
+          "name": "signed zero samples have zero width and canonical positive zero reports",
+          "ordinal": 1,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:2",
+          "name": "subnormal sample half-width and underflowing scaled signed sum remain enclosed",
+          "ordinal": 2,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:3",
+          "name": "strict quantization boundary, interior, and zero contributing no width",
+          "ordinal": 3,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:4",
+          "name": "normal binade edge uses the half-spacing toward zero",
+          "ordinal": 4,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:5",
+          "name": "sum and directional width survive cancellation and permutation",
+          "ordinal": 5,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:6",
+          "name": "budget ties and values just above an exact limit",
+          "ordinal": 6,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:7",
+          "name": "large exact sum with small scale and finite endpoint failures",
+          "ordinal": 7,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/numerics/exact_f64_summary_test.zig:8",
+          "name": "mean bounds use exact rational division and reverse on sign change",
+          "ordinal": 8,
+          "kind": "named"
+        }
+      ],
+      "reaching_root_ids": [
+        "zig-root:numerics-contract-tests"
       ],
       "gap_id": null
     },
@@ -43862,7 +43975,7 @@
       "enumeration_source": "zig-0.17-builtin-test-functions"
     },
     {
-      "id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+      "id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
       "root_id": "zig-root:numerics-contract-tests",
       "tests": [
         {
@@ -44642,282 +44755,327 @@
         },
         {
           "id": "test:zig-root-numerics-contract-tests:155",
-          "name": "numerics.subspace_projection_test.test.subspace projection four scalars all layouts match exact weighted complex Gram oracle",
+          "name": "numerics.exact_f64_summary_test.test.reject malformed arguments and every class of nonfinite sample",
           "ordinal": 155
         },
         {
           "id": "test:zig-root-numerics-contract-tests:156",
-          "name": "numerics.subspace_projection_test.test.subspace projection one packed reduction serves both matrices and fails transactionally with retry",
+          "name": "numerics.exact_f64_summary_test.test.signed zero samples have zero width and canonical positive zero reports",
           "ordinal": 156
         },
         {
           "id": "test:zig-root-numerics-contract-tests:157",
-          "name": "numerics.subspace_projection_test.test.subspace projection invalid shape metric finite inputs alias and short scratch fail before reduction",
+          "name": "numerics.exact_f64_summary_test.test.subnormal sample half-width and underflowing scaled signed sum remain enclosed",
           "ordinal": 157
         },
         {
           "id": "test:zig-root-numerics-contract-tests:158",
-          "name": "numerics.subspace_projection_test.test.subspace projection arithmetic overflow preserves both outputs and releases the operation",
+          "name": "numerics.exact_f64_summary_test.test.strict quantization boundary, interior, and zero contributing no width",
           "ordinal": 158
         },
         {
           "id": "test:zig-root-numerics-contract-tests:159",
-          "name": "numerics.subspace_projection_test.test.subspace projection final and local remote rejection preserves both matrices",
+          "name": "numerics.exact_f64_summary_test.test.normal binade edge uses the half-spacing toward zero",
           "ordinal": 159
         },
         {
           "id": "test:zig-root-numerics-contract-tests:160",
-          "name": "numerics.subspace_projection_test.test.subspace projection closing callback and OOM preserve shared owner lifetime",
+          "name": "numerics.exact_f64_summary_test.test.sum and directional width survive cancellation and permutation",
           "ordinal": 160
         },
         {
           "id": "test:zig-root-numerics-contract-tests:161",
-          "name": "numerics.subspace_projection_test.test.subspace projection empty column set is no-op while empty shard still participates in reduction",
+          "name": "numerics.exact_f64_summary_test.test.budget ties and values just above an exact limit",
           "ordinal": 161
         },
         {
           "id": "test:zig-root-numerics-contract-tests:162",
-          "name": "numerics.subspace_projection_test.test.subspace projection stable Hermitian average avoids overflowing equal finite entries",
+          "name": "numerics.exact_f64_summary_test.test.large exact sum with small scale and finite endpoint failures",
           "ordinal": 162
         },
         {
           "id": "test:zig-root-numerics-contract-tests:163",
-          "name": "numerics.series_set_test.test.series set four scalars ragged coefficients and both panel layouts match independent cosine oracle",
+          "name": "numerics.exact_f64_summary_test.test.mean bounds use exact rational division and reverse on sign change",
           "ordinal": 163
         },
         {
           "id": "test:zig-root-numerics-contract-tests:164",
-          "name": "numerics.series_set_test.test.series set packs aliased input before committing every output column",
+          "name": "numerics.subspace_projection_test.test.subspace projection four scalars all layouts match exact weighted complex Gram oracle",
           "ordinal": 164
         },
         {
           "id": "test:zig-root-numerics-contract-tests:165",
-          "name": "numerics.series_set_test.test.series set validates counts finite prefixes geometry scratch aliases and overflow before actions",
+          "name": "numerics.subspace_projection_test.test.subspace projection one packed reduction serves both matrices and fails transactionally with retry",
           "ordinal": 165
         },
         {
           "id": "test:zig-root-numerics-contract-tests:166",
-          "name": "numerics.series_set_test.test.series set callback failures and nonfinite arithmetic preserve all output columns then permit retry",
+          "name": "numerics.subspace_projection_test.test.subspace projection invalid shape metric finite inputs alias and short scratch fail before reduction",
           "ordinal": 166
         },
         {
           "id": "test:zig-root-numerics-contract-tests:167",
-          "name": "numerics.series_set_test.test.series set remote coefficient arithmetic and final commit failures preserve every output",
+          "name": "numerics.subspace_projection_test.test.subspace projection arithmetic overflow preserves both outputs and releases the operation",
           "ordinal": 167
         },
         {
           "id": "test:zig-root-numerics-contract-tests:168",
-          "name": "numerics.series_set_test.test.series set allocation failure and closing owner release the same operation and scratch",
+          "name": "numerics.subspace_projection_test.test.subspace projection final and local remote rejection preserves both matrices",
           "ordinal": 168
         },
         {
           "id": "test:zig-root-numerics-contract-tests:169",
-          "name": "numerics.series_set_test.test.series set empty output and empty participating shard retain callback and padding contracts",
+          "name": "numerics.subspace_projection_test.test.subspace projection closing callback and OOM preserve shared owner lifetime",
           "ordinal": 169
         },
         {
           "id": "test:zig-root-numerics-contract-tests:170",
-          "name": "numerics.series_set_test.test.series set widened accumulation retains finite values beyond native intermediate range",
+          "name": "numerics.subspace_projection_test.test.subspace projection empty column set is no-op while empty shard still participates in reduction",
           "ordinal": 170
         },
         {
           "id": "test:zig-root-numerics-contract-tests:171",
-          "name": "numerics.series_set_test.test.series set non diagonal real and complex Hermitian actions match spectral projectors",
+          "name": "numerics.subspace_projection_test.test.subspace projection stable Hermitian average avoids overflowing equal finite entries",
           "ordinal": 171
         },
         {
           "id": "test:zig-root-numerics-contract-tests:172",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev four scalar families match independent polynomial ratios through degree 512",
+          "name": "numerics.series_set_test.test.series set four scalars ragged coefficients and both panel layouts match independent cosine oracle",
           "ordinal": 172
         },
         {
           "id": "test:zig-root-numerics-contract-tests:173",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev in-place row-major panels preserve padding and share fused or column fallback semantics",
+          "name": "numerics.series_set_test.test.series set packs aliased input before committing every output column",
           "ordinal": 173
         },
         {
           "id": "test:zig-root-numerics-contract-tests:174",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev rejects bad bounds geometry capacity alias and nonfinite input before callbacks",
+          "name": "numerics.series_set_test.test.series set validates counts finite prefixes geometry scratch aliases and overflow before actions",
           "ordinal": 174
         },
         {
           "id": "test:zig-root-numerics-contract-tests:175",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev callback failure nonfinite result and close retain transactional output and release shared resources",
+          "name": "numerics.series_set_test.test.series set callback failures and nonfinite arithmetic preserve all output columns then permit retry",
           "ordinal": 175
         },
         {
           "id": "test:zig-root-numerics-contract-tests:176",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev lower-bound normalization survives subnormal and full finite-range spectral intervals",
+          "name": "numerics.series_set_test.test.series set remote coefficient arithmetic and final commit failures preserve every output",
           "ordinal": 176
         },
         {
           "id": "test:zig-root-numerics-contract-tests:177",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev remote configuration arithmetic and commit failures converge before final publication",
+          "name": "numerics.series_set_test.test.series set allocation failure and closing owner release the same operation and scratch",
           "ordinal": 177
         },
         {
           "id": "test:zig-root-numerics-contract-tests:178",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev empty distributed panels retain callbacks while workspace arithmetic stays native width",
+          "name": "numerics.series_set_test.test.series set empty output and empty participating shard retain callback and padding contracts",
           "ordinal": 178
         },
         {
           "id": "test:zig-root-numerics-contract-tests:179",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev shared scratch allocation failure never invokes the operator",
+          "name": "numerics.series_set_test.test.series set widened accumulation retains finite values beyond native intermediate range",
           "ordinal": 179
         },
         {
           "id": "test:zig-root-numerics-contract-tests:180",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev acts on non-diagonal Hermitian operators against independent spectral projectors",
+          "name": "numerics.series_set_test.test.series set non diagonal real and complex Hermitian actions match spectral projectors",
           "ordinal": 180
         },
         {
           "id": "test:zig-root-numerics-contract-tests:181",
-          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev reports final arithmetic overflow after a finite callback without publishing",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev four scalar families match independent polynomial ratios through degree 512",
           "ordinal": 181
         },
         {
           "id": "test:zig-root-numerics-contract-tests:182",
-          "name": "fft.core_test.test.FFT complex arbitrary lengths match direct DFT and unnormalized inverse",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev in-place row-major panels preserve padding and share fused or column fallback semantics",
           "ordinal": 182
         },
         {
           "id": "test:zig-root-numerics-contract-tests:183",
-          "name": "fft.core_test.test.FFT real half spectrum and DCT-I match analytic definitions",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev rejects bad bounds geometry capacity alias and nonfinite input before callbacks",
           "ordinal": 183
         },
         {
           "id": "test:zig-root-numerics-contract-tests:184",
-          "name": "fft.core_test.test.FFT errors preserve output and reject overflow alias and nonfinite inputs",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev callback failure nonfinite result and close retain transactional output and release shared resources",
           "ordinal": 184
         },
         {
           "id": "test:zig-root-numerics-contract-tests:185",
-          "name": "fft.core_test.test.FFT volumes match direct DFT and Hermitian real inverse across odd axes",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev lower-bound normalization survives subnormal and full finite-range spectral intervals",
           "ordinal": 185
         },
         {
           "id": "test:zig-root-numerics-contract-tests:186",
-          "name": "fft.core_test.test.FFT real and volume failures preserve all output and workspace tails",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev remote configuration arithmetic and commit failures converge before final publication",
           "ordinal": 186
         },
         {
           "id": "test:zig-root-numerics-contract-tests:187",
-          "name": "numerics.triangular_ieee_test.test.shared triangular independently assembled N T H equations cover 432 scalar triangle diagonal shape combinations",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev empty distributed panels retain callbacks while workspace arithmetic stays native width",
           "ordinal": 187
         },
         {
           "id": "test:zig-root-numerics-contract-tests:188",
-          "name": "numerics.triangular_ieee_test.test.shared triangular first exact zero rejects before RHS mutation even with zero RHS columns",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev shared scratch allocation failure never invokes the operator",
           "ordinal": 188
         },
         {
           "id": "test:zig-root-numerics-contract-tests:189",
-          "name": "numerics.triangular_ieee_test.test.shared triangular unit empty native-width calls and normal IEEE zero skips retain nonreads",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev acts on non-diagonal Hermitian operators against independent spectral projectors",
           "ordinal": 189
         },
         {
           "id": "test:zig-root-numerics-contract-tests:190",
-          "name": "numerics.triangular_inverse_test.test.triangular inverse matches independent f128 finite series and both identity products in 864 configurations",
+          "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev reports final arithmetic overflow after a finite callback without publishing",
           "ordinal": 190
         },
         {
           "id": "test:zig-root-numerics-contract-tests:191",
-          "name": "numerics.triangular_inverse_test.test.triangular inverse rejects every first exact zero before any store and ignores earlier NaNs in the preflight",
+          "name": "fft.core_test.test.FFT complex arbitrary lengths match direct DFT and unnormalized inverse",
           "ordinal": 191
         },
         {
           "id": "test:zig-root-numerics-contract-tests:192",
-          "name": "numerics.triangular_inverse_test.test.triangular inverse unit empty singleton and clipped strict-triangle views do not access unused storage",
+          "name": "fft.core_test.test.FFT real half spectrum and DCT-I match analytic definitions",
           "ordinal": 192
         },
         {
           "id": "test:zig-root-numerics-contract-tests:193",
-          "name": "numerics.triangular_inverse_test.test.triangular inverse finite reciprocal covers signed phases large tiny and subnormal output",
+          "name": "fft.core_test.test.FFT errors preserve output and reject overflow alias and nonfinite inputs",
           "ordinal": 193
         },
         {
           "id": "test:zig-root-numerics-contract-tests:194",
-          "name": "numerics.triangular_inverse_test.test.triangular inverse ordinary NaN Inf and purely imaginary nonzero diagonals retain own IEEE classification",
+          "name": "fft.core_test.test.FFT volumes match direct DFT and Hermitian real inverse across odd axes",
           "ordinal": 194
         },
         {
           "id": "test:zig-root-numerics-contract-tests:195",
-          "name": "numerics.triangular_inverse_test.test.triangular inverse short and exact borrowed workspaces preserve matrices and workspace guards in 48 configurations",
+          "name": "fft.core_test.test.FFT real and volume failures preserve all output and workspace tails",
           "ordinal": 195
         },
         {
           "id": "test:zig-root-numerics-contract-tests:196",
-          "name": "numerics.triangular_inverse_range_test.test.triangular inverse retains representable cross-column entries despite earlier rounded underflow and intermediate overflow",
+          "name": "numerics.triangular_ieee_test.test.shared triangular independently assembled N T H equations cover 432 scalar triangle diagonal shape combinations",
           "ordinal": 196
         },
         {
           "id": "test:zig-root-numerics-contract-tests:197",
-          "name": "numerics.lu_inverse_test.test.LU inverse matches independent nilpotent products and explicit permutations in 216 configurations",
+          "name": "numerics.triangular_ieee_test.test.shared triangular first exact zero rejects before RHS mutation even with zero RHS columns",
           "ordinal": 197
         },
         {
           "id": "test:zig-root-numerics-contract-tests:198",
-          "name": "numerics.lu_inverse_test.test.LU inverse rejects short and overflowing workspace before stores and pivot reads",
+          "name": "numerics.triangular_ieee_test.test.shared triangular unit empty native-width calls and normal IEEE zero skips retain nonreads",
           "ordinal": 198
         },
         {
           "id": "test:zig-root-numerics-contract-tests:199",
-          "name": "numerics.lu_inverse_test.test.LU inverse first exact zero precedes all mutation and pivot or workspace access",
+          "name": "numerics.triangular_inverse_test.test.triangular inverse matches independent f128 finite series and both identity products in 864 configurations",
           "ordinal": 199
         },
         {
           "id": "test:zig-root-numerics-contract-tests:200",
-          "name": "numerics.lu_inverse_test.test.LU inverse empty and singleton use no workspace or pivot and retain ordinary IEEE classification",
+          "name": "numerics.triangular_inverse_test.test.triangular inverse rejects every first exact zero before any store and ignores earlier NaNs in the preflight",
           "ordinal": 200
         },
         {
           "id": "test:zig-root-numerics-contract-tests:201",
-          "name": "numerics.lu_inverse_range_test.test.LU inverse retains representable lower-chain entries after an underflowing intermediate in eight extreme-scale cases",
+          "name": "numerics.triangular_inverse_test.test.triangular inverse unit empty singleton and clipped strict-triangle views do not access unused storage",
           "ordinal": 201
         },
         {
           "id": "test:zig-root-numerics-contract-tests:202",
-          "name": "numerics.cholesky_inverse_test.test.Cholesky inverse matches independent f128 full-matrix elimination and both identities in 432 configurations",
+          "name": "numerics.triangular_inverse_test.test.triangular inverse finite reciprocal covers signed phases large tiny and subnormal output",
           "ordinal": 202
         },
         {
           "id": "test:zig-root-numerics-contract-tests:203",
-          "name": "numerics.cholesky_inverse_test.test.wide triangular inverse reuses both scalar diagonal policies without factor mutation in 48 configurations",
+          "name": "numerics.triangular_inverse_test.test.triangular inverse ordinary NaN Inf and purely imaginary nonzero diagonals retain own IEEE classification",
           "ordinal": 203
         },
         {
           "id": "test:zig-root-numerics-contract-tests:204",
-          "name": "numerics.cholesky_inverse_test.test.Cholesky inverse rejects short overflow and first-zero cases before stores and keeps singleton work untouched",
+          "name": "numerics.triangular_inverse_test.test.triangular inverse short and exact borrowed workspaces preserve matrices and workspace guards in 48 configurations",
           "ordinal": 204
         },
         {
           "id": "test:zig-root-numerics-contract-tests:205",
-          "name": "numerics.cholesky_inverse_test.test.Cholesky inverse ordinary nonfinite singletons keep IEEE classes and exact-real complex diagonals",
+          "name": "numerics.triangular_inverse_range_test.test.triangular inverse retains representable cross-column entries despite earlier rounded underflow and intermediate overflow",
           "ordinal": 205
         },
         {
           "id": "test:zig-root-numerics-contract-tests:206",
-          "name": "numerics.cholesky_inverse_range_test.test.Cholesky inverse retains Hermitian couplings from inverse-factor entries below storage range in sixteen cases",
+          "name": "numerics.lu_inverse_test.test.LU inverse matches independent nilpotent products and explicit permutations in 216 configurations",
           "ordinal": 206
         },
         {
           "id": "test:zig-root-numerics-contract-tests:207",
-          "name": "numerics.cholesky_inverse_range_test.test.Cholesky inverse cancels individually overflowing Gram products before narrowing in eight cases",
+          "name": "numerics.lu_inverse_test.test.LU inverse rejects short and overflowing workspace before stores and pivot reads",
           "ordinal": 207
         },
         {
           "id": "test:zig-root-numerics-contract-tests:208",
-          "name": "blas.core.execution.thread_pool.test.BLAS wrappers and neutral default share admission and policy",
+          "name": "numerics.lu_inverse_test.test.LU inverse first exact zero precedes all mutation and pivot or workspace access",
           "ordinal": 208
         },
         {
           "id": "test:zig-root-numerics-contract-tests:209",
-          "name": "blas.core.execution.thread_pool.test.BLAS typed adapters preserve function types and exactly-once task slices",
+          "name": "numerics.lu_inverse_test.test.LU inverse empty and singleton use no workspace or pivot and retain ordinary IEEE classification",
           "ordinal": 209
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:210",
+          "name": "numerics.lu_inverse_range_test.test.LU inverse retains representable lower-chain entries after an underflowing intermediate in eight extreme-scale cases",
+          "ordinal": 210
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:211",
+          "name": "numerics.cholesky_inverse_test.test.Cholesky inverse matches independent f128 full-matrix elimination and both identities in 432 configurations",
+          "ordinal": 211
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:212",
+          "name": "numerics.cholesky_inverse_test.test.wide triangular inverse reuses both scalar diagonal policies without factor mutation in 48 configurations",
+          "ordinal": 212
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:213",
+          "name": "numerics.cholesky_inverse_test.test.Cholesky inverse rejects short overflow and first-zero cases before stores and keeps singleton work untouched",
+          "ordinal": 213
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:214",
+          "name": "numerics.cholesky_inverse_test.test.Cholesky inverse ordinary nonfinite singletons keep IEEE classes and exact-real complex diagonals",
+          "ordinal": 214
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:215",
+          "name": "numerics.cholesky_inverse_range_test.test.Cholesky inverse retains Hermitian couplings from inverse-factor entries below storage range in sixteen cases",
+          "ordinal": 215
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:216",
+          "name": "numerics.cholesky_inverse_range_test.test.Cholesky inverse cancels individually overflowing Gram products before narrowing in eight cases",
+          "ordinal": 216
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:217",
+          "name": "blas.core.execution.thread_pool.test.BLAS wrappers and neutral default share admission and policy",
+          "ordinal": 217
+        },
+        {
+          "id": "test:zig-root-numerics-contract-tests:218",
+          "name": "blas.core.execution.thread_pool.test.BLAS typed adapters preserve function types and exactly-once task slices",
+          "ordinal": 218
         }
       ],
-      "count": 210,
-      "digest": "5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+      "count": 219,
+      "digest": "a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
       "enumeration_source": "zig-0.17-builtin-test-functions"
     },
     {
@@ -49297,6 +49455,16 @@
       "digest": "0a79aafa3352154758212a54d00e3aed5a18a6c7a3aa6e42e882efdb56fc26a4"
     },
     {
+      "id": "native-observation:0cd57bd5b68fe7aabdb6273e9c1691122aaac17949ab5c5009a0dbed6947f3d2",
+      "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
+      "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+      "optimize_mode_id": "mode:safe",
+      "expected_test_set_id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
+      "enumeration_source": "zig-0.17-builtin-test-functions",
+      "digest": "0cd57bd5b68fe7aabdb6273e9c1691122aaac17949ab5c5009a0dbed6947f3d2"
+    },
+    {
       "id": "native-observation:0f1e5da2287bd5e1c5cfc48a38ed7531edac7113e0a707cffbda6cea78639b9e",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-header-smoke-tests:debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-header-smoke-tests:debug",
@@ -49435,6 +49603,16 @@
       "expected_test_set_id": "set:zig-root:triangular-parallel-tests:f0186d67a24ec499838200fb0e8eb90baca0a77f8fcf0c3b2ba58c12de2a7e3c",
       "enumeration_source": "zig-0.17-builtin-test-functions",
       "digest": "2424e24afa58bc7d38d421de73724edc408f8dd45dcdafdf6d54afe055918e92"
+    },
+    {
+      "id": "native-observation:263c29c4ce3dd3c26a339408e488ceca7d8fbf0d36e868e23c57bba170fdd1a5",
+      "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
+      "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+      "optimize_mode_id": "mode:fast",
+      "expected_test_set_id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
+      "enumeration_source": "zig-0.17-builtin-test-functions",
+      "digest": "263c29c4ce3dd3c26a339408e488ceca7d8fbf0d36e868e23c57bba170fdd1a5"
     },
     {
       "id": "native-observation:2b5ef453809be1d57a435fd9e43624de6adf3bd3758f39520a045599aded3eee",
@@ -49605,16 +49783,6 @@
       "expected_test_set_id": "set:zig-root:vector-stride2-parallel-tests:9dd8e906daeb8d686ddd9c6da13b26ed36d65e8826e3b44cdd350ba87b772074",
       "enumeration_source": "zig-0.17-builtin-test-functions",
       "digest": "47abf6a4156c75cc2ddfaa0d7796335e6ac63415787c35307eef02d0f81cbb01"
-    },
-    {
-      "id": "native-observation:49f01bc541f7f89a0658c2514d2d1b57c22328ffaeaae817dc2256b03dafb9a0",
-      "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
-      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
-      "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
-      "optimize_mode_id": "mode:fast",
-      "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
-      "enumeration_source": "zig-0.17-builtin-test-functions",
-      "digest": "49f01bc541f7f89a0658c2514d2d1b57c22328ffaeaae817dc2256b03dafb9a0"
     },
     {
       "id": "native-observation:4a6ac92a3590f3dfb7801ae08f9ce42f53d1c7accf29db792f12e76c103fc044",
@@ -49997,6 +50165,16 @@
       "digest": "83ec8c5a51d63e3e9c09023feac5af084099023430175fc094d46c32540af9c2"
     },
     {
+      "id": "native-observation:84bdf1cca7e0a375ab4a09c0d046c00165b718023153166e4297ca2bf6ffe2a9",
+      "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
+      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
+      "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+      "optimize_mode_id": "mode:debug",
+      "expected_test_set_id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
+      "enumeration_source": "zig-0.17-builtin-test-functions",
+      "digest": "84bdf1cca7e0a375ab4a09c0d046c00165b718023153166e4297ca2bf6ffe2a9"
+    },
+    {
       "id": "native-observation:8500b0b05a9cd7bf8fedaa72189660f7c2207d429f37a563efe96f8db588daa4",
       "row_id": "row:env-aarch64-macos-baseline:zig-root-symm-dense-gemm-tests:debug",
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:zig-root-symm-dense-gemm-tests:debug",
@@ -50097,16 +50275,6 @@
       "digest": "9e14ea526d9a71a462a09e0b917414f91831f142c165fbd90c4d89cbd23c8fd1"
     },
     {
-      "id": "native-observation:9f31eb69e2e6c94afa765f686289bcbe02a8582a5a975716729e2a8dd4b5bd3e",
-      "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
-      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
-      "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
-      "optimize_mode_id": "mode:debug",
-      "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
-      "enumeration_source": "zig-0.17-builtin-test-functions",
-      "digest": "9f31eb69e2e6c94afa765f686289bcbe02a8582a5a975716729e2a8dd4b5bd3e"
-    },
-    {
       "id": "native-observation:a0eeb9b4662528415f97d6a99b955044317684aa07c270d8ad1a5e2a7f98675f",
       "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-level2-fused-registry-tests:debug",
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-level2-fused-registry-tests:debug",
@@ -50185,16 +50353,6 @@
       "expected_test_set_id": "set:zig-root:blas-module-tests:522077acfd59050ba7f2dc52eba4e8e9f8a52d1ecdaa3ad22771159f9a5e2d7d",
       "enumeration_source": "zig-0.17-builtin-test-functions",
       "digest": "ac781c1b9c6b9b2e744fd193c35f30bd2048ef967828d387e57a879072a6af50"
-    },
-    {
-      "id": "native-observation:aea30d022a2fe15a6f6b264a287ab063a0320ac861d8ca3e71b724b99a9504c5",
-      "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
-      "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
-      "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
-      "optimize_mode_id": "mode:safe",
-      "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
-      "enumeration_source": "zig-0.17-builtin-test-functions",
-      "digest": "aea30d022a2fe15a6f6b264a287ab063a0320ac861d8ca3e71b724b99a9504c5"
     },
     {
       "id": "native-observation:afe695d4f2ebad34480509af929753bbf0d7e31a1e81ca1f10026cf74434fb92",
@@ -56730,7 +56888,7 @@
       "expected_actual_module_optimize": "debug",
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
       "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
-      "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+      "expected_test_set_id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -56745,7 +56903,7 @@
       "expected_actual_module_optimize": "fast",
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
       "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
-      "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+      "expected_test_set_id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -56760,7 +56918,7 @@
       "expected_actual_module_optimize": "safe",
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
       "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
-      "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+      "expected_test_set_id": "set:zig-root:numerics-contract-tests:a530b043e24076da4b1e55157fda93f1374593b0ba01e6eaca4ce112b13ed5a0",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -60354,15 +60512,15 @@
     },
     "test_roots": {
       "count": 49,
-      "digest": "a94ba3c8c863596a332358eefe89df824fc3f1d9f04cce975e9526710b9bf021"
+      "digest": "ad3747e19fa86418d43c556a1f6aafa8d9597d8eee0299f6fc0068e3a0510730"
     },
     "correctness_only_roots": {
       "count": 6,
-      "digest": "e1842d769f0bee298ccb45aafc7caee1b9b993d1c1bcd9349ddcdd39b08276bd"
+      "digest": "bd166966274606a70323425729640caf80aed27bafc907d1accac7113ab75c59"
     },
     "zig_test_files": {
-      "count": 173,
-      "digest": "4d6ad49553da8d01fec4a33c66e445a0440fcd0f1b6a3ca2bdd9237b1b19df4e"
+      "count": 174,
+      "digest": "de781d5eb894739503c76b4ee24b3ad939767ad78574b262379f85e797c7a842"
     },
     "python_test_modules": {
       "count": 42,
@@ -60370,15 +60528,15 @@
     },
     "expected_test_sets": {
       "count": 66,
-      "digest": "1ea3a0ab4fcaadbba524d2fc7659d74a4f36b153e6e618ee1155f4d714c23007"
+      "digest": "e51142fe3825f569334bf7e31f74a481ae37fa036464537f521507a8c34bab7f"
     },
     "native_observation_bindings": {
       "count": 147,
-      "digest": "98c0ed15302b46e8cd2fc5a9437bf084af1fc64805857e645beb4f76c89de9cd"
+      "digest": "73907ac110e019b85c0f6365c8f33bef0ea546e534a30768037e5f55f54ef271"
     },
     "test_mode_rows": {
       "count": 588,
-      "digest": "6ba242613fe8bfb8b23904bf8b1b8c0abd6b01e5f07fce5d315b2de31204b706"
+      "digest": "3470eabc8cd65a5eeb6b01f6946cc2c6fb03a35e20ece22b5b64f91fddaf423b"
     },
     "workflow_mode_bindings": {
       "count": 4,
@@ -60387,6 +60545,1155 @@
     "known_gaps": {
       "count": 10,
       "digest": "8e89d950f090aba5391f76a0a98df8323168763f56454d034f9dc8b77fd1053d"
+    },
+    "retired_native_observations": {
+      "count": 1,
+      "digest": "c115cf595d8427b91ca5cb4b98db24d36e384f2244e8a878f6ab1dbed2ad803a"
     }
-  }
+  },
+  "retired_native_observations": [
+    {
+      "previous_inventory_sha256": "6e3ea49f8e443b2ea4a061fbb1034b0259817a18daecfd73eba7310506dc1b86",
+      "test_mode_rows": [
+        {
+          "id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
+          "environment_id": "env:x86-64-linux-gnu-baseline",
+          "root_id": "zig-root:numerics-contract-tests",
+          "optimize_mode_id": "mode:debug",
+          "disposition": "execute",
+          "predicate_id": "predicate:always",
+          "command_template": "zig build test -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dtest-optimize=debug -Dhost-tool-smoke=true --summary failures",
+          "mode_effect": "test-module-optimize",
+          "expected_actual_module_optimize": "debug",
+          "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
+          "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+          "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "expectation_state": "frozen-compiler-enumeration"
+        },
+        {
+          "id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
+          "environment_id": "env:x86-64-linux-gnu-baseline",
+          "root_id": "zig-root:numerics-contract-tests",
+          "optimize_mode_id": "mode:fast",
+          "disposition": "execute",
+          "predicate_id": "predicate:always",
+          "command_template": "zig build --release=fast test -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dtest-optimize=fast -Dhost-tool-smoke=true --summary failures",
+          "mode_effect": "test-module-optimize",
+          "expected_actual_module_optimize": "fast",
+          "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
+          "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+          "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "expectation_state": "frozen-compiler-enumeration"
+        },
+        {
+          "id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
+          "environment_id": "env:x86-64-linux-gnu-baseline",
+          "root_id": "zig-root:numerics-contract-tests",
+          "optimize_mode_id": "mode:safe",
+          "disposition": "execute",
+          "predicate_id": "predicate:always",
+          "command_template": "zig build --release=safe test -Dtarget=x86_64-linux-gnu -Dcpu=baseline -Dtest-optimize=safe -Dhost-tool-smoke=true --summary failures",
+          "mode_effect": "test-module-optimize",
+          "expected_actual_module_optimize": "safe",
+          "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
+          "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+          "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "expectation_state": "frozen-compiler-enumeration"
+        }
+      ],
+      "expected_test_sets": [
+        {
+          "id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "root_id": "zig-root:numerics-contract-tests",
+          "tests": [
+            {
+              "id": "test:zig-root-numerics-contract-tests:0",
+              "name": "numerics_contract_test.test.complex Cholesky core computes actual one-element factors and solves with native-width strides",
+              "ordinal": 0
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:1",
+              "name": "numerics_contract_test.test.complex checked factor preserves geometry finite and real-diagonal preflight precedence",
+              "ordinal": 1
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:2",
+              "name": "numerics_contract_test.test.complex checked solve preserves adapter preflight and zero-RHS positivity policy",
+              "ordinal": 2
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:3",
+              "name": "numerics_contract_test.test.complex Cholesky core and checked factor retain exactly the successful prefix before narrowing failure",
+              "ordinal": 3
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:4",
+              "name": "numerics_contract_test.test.complex Cholesky core substitution retains earlier columns and failing-assignment prefix",
+              "ordinal": 4
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:5",
+              "name": "numerics_contract_test.test.complex core numerical failure is distinct from checked full-input rejection",
+              "ordinal": 5
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:6",
+              "name": "numerics_contract_test.test.LU core computes native-width single-element systems and empty shapes with every pivot encoding",
+              "ordinal": 6
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:7",
+              "name": "numerics_contract_test.test.LU core zero and one based encodings solve the same independent pivoted real and complex systems",
+              "ordinal": 7
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:8",
+              "name": "numerics_contract_test.test.LU numeric info retains an earlier singularity while both completed pivots are immediately encoded",
+              "ordinal": 8
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:9",
+              "name": "numerics_contract_test.test.LU core diagonal preflight and arithmetic failure distinguish untouched RHS from completed permutation",
+              "ordinal": 9
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:10",
+              "name": "numerics_contract_test.test.LU checked wrappers preserve pivot alias finite and empty RHS preflight ordering",
+              "ordinal": 10
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:11",
+              "name": "numerics_contract_test.test.compressed product independent dense reference covers mixed widths bases axes transforms and physical gaps",
+              "ordinal": 11
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:12",
+              "name": "numerics_contract_test.test.compressed product empty ranges beyond values and zero scales do not use numerical inputs",
+              "ordinal": 12
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:13",
+              "name": "numerics_contract_test.test.compressed product preserves duplicate accumulation order and gathered empty-major arithmetic",
+              "ordinal": 13
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:14",
+              "name": "numerics_contract_test.test.compressed product conjugation and signed zero obey scalar expression order",
+              "ordinal": 14
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:15",
+              "name": "numerics_contract_test.test.compressed product borrowed metadata is revalidated before each execution",
+              "ordinal": 15
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:16",
+              "name": "numerics_contract_test.test.checked SpMV preserves structural dimensions and alias precedence even with zero alpha",
+              "ordinal": 16
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:17",
+              "name": "numerics_contract_test.test.real factor contracts preserve exact Gram factors opposite triangle and padded storage",
+              "ordinal": 17
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:18",
+              "name": "numerics_contract_test.test.real factor policies satisfy independent Gram residuals across scalar and vector update sizes",
+              "ordinal": 18
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:19",
+              "name": "numerics_contract_test.test.real factor policies distinguish positive infinity and reject NaN signed zero and negative pivots",
+              "ordinal": 19
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:20",
+              "name": "numerics_contract_test.test.real POTRF policy reports negative Schur pivot without a POTF2 residue store",
+              "ordinal": 20
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:21",
+              "name": "numerics_contract_test.test.real POTRF policy propagates nonfinite offdiagonal values to the later failing pivot",
+              "ordinal": 21
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:22",
+              "name": "numerics_contract_test.test.real POTRF policy stores finite-input division overflow while checked retains the failing assignment",
+              "ordinal": 22
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:23",
+              "name": "numerics_contract_test.test.real checked default retains lower update mutation before an overflowing second column division",
+              "ordinal": 23
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:24",
+              "name": "numerics_contract_test.test.real checked frontend retains nonfinite preflight and geometry error precedence under the new core policy",
+              "ordinal": 24
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:25",
+              "name": "numerics_contract_test.test.complex factor contracts reconstruct independent Hermitian products and preserve inactive bytes",
+              "ordinal": 25
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:26",
+              "name": "numerics_contract_test.test.complex factor pivot policies normalize imaginary bytes only after acceptance and allow native width empties",
+              "ordinal": 26
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:27",
+              "name": "numerics_contract_test.test.complex factor contracts retain failed Schur pivot and later storage without POTF2 residue assignment",
+              "ordinal": 27
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:28",
+              "name": "numerics_contract_test.test.complex POTRF policy stores offdiagonal IEEE results and permits positive infinite pivots",
+              "ordinal": 28
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:29",
+              "name": "numerics_contract_test.test.complex finite narrowing overflow retains checked completed prefix while POTRF stores and continues",
+              "ordinal": 29
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:30",
+              "name": "numerics_contract_test.test.complex checked frontend keeps geometry finite and diagonal errors before mutation with explicit core policies",
+              "ordinal": 30
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:31",
+              "name": "numerics_contract_test.test.solve contracts share scalar identity and distinguish status from finite void result",
+              "ordinal": 31
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:32",
+              "name": "numerics_contract_test.test.finite full complex diagonals satisfy exact independent one element oracles",
+              "ordinal": 32
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:33",
+              "name": "numerics_contract_test.test.finite solve scaled complex diagonal avoids squared denominator overflow and underflow",
+              "ordinal": 33
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:34",
+              "name": "numerics_contract_test.test.finite complex solve matches frozen rational two RHS factors with padded poison",
+              "ordinal": 34
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:35",
+              "name": "numerics_contract_test.test.finite solve independent dense products and residuals cover real complex tails and multiple RHS",
+              "ordinal": 35
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:36",
+              "name": "numerics_contract_test.test.finite solve computes native-width strides and empty shapes without reading numerical inputs",
+              "ordinal": 36
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:37",
+              "name": "numerics_contract_test.test.finite normal substitution skips signed zero before division instead of after it",
+              "ordinal": 37
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:38",
+              "name": "numerics_contract_test.test.IEEE solve contract remains void with the same scalar and factor policy identities",
+              "ordinal": 38
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:39",
+              "name": "numerics_contract_test.test.IEEE complex quotient follows the independent explicit classification table",
+              "ordinal": 39
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:40",
+              "name": "numerics_contract_test.test.IEEE complex quotient retains the unchanged finite scaled leaf bytes",
+              "ordinal": 40
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:41",
+              "name": "numerics_contract_test.test.IEEE complex complete solves retain full diagonal conjugation one times seed and zero gates",
+              "ordinal": 41
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:42",
+              "name": "numerics_contract_test.test.IEEE real complete solves continue division and scatter even when a quotient becomes zero",
+              "ordinal": 42
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:43",
+              "name": "numerics_contract_test.test.IEEE solves continue across range failure and later RHS with exact inactive preservation",
+              "ordinal": 43
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:44",
+              "name": "numerics_contract_test.test.IEEE empty and native-width solves keep borrowed geometry separate from numerical classification",
+              "ordinal": 44
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:45",
+              "name": "numerics_contract_test.test.structured product independent dense oracle covers all scalars mixed index widths bases axes halves and operations",
+              "ordinal": 45
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:46",
+              "name": "numerics_contract_test.test.structured complex products distinguish symmetric Hermitian triangular and diagonal literal oracles",
+              "ordinal": 46
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:47",
+              "name": "numerics_contract_test.test.structured unit identity survives empty physical storage and zero scales avoid numerical reads",
+              "ordinal": 47
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:48",
+              "name": "numerics_contract_test.test.structured Hermitian imaginary diagonal and ignored stored unit values have no numerical dependency",
+              "ordinal": 48
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:49",
+              "name": "numerics_contract_test.test.structured overlapping nonmonotone ranges preserve per-reference coordinates and unit-first duplicate order",
+              "ordinal": 49
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:50",
+              "name": "numerics_contract_test.test.structured general delegation retains complete output bytes and native empty shape contracts",
+              "ordinal": 50
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:51",
+              "name": "numerics_contract_test.test.structured duplicate diagonals preserve stored order and unit ignores every stored diagonal reference",
+              "ordinal": 51
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:52",
+              "name": "numerics_contract_test.test.structured implicit complex identity avoids synthetic one times input and specifies signed zero addition",
+              "ordinal": 52
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:53",
+              "name": "numerics_contract_test.test.regular dense panels retain Matrix policy and check layout capacity empty offsets and overflow",
+              "ordinal": 53
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:54",
+              "name": "numerics_contract_test.test.panel general products match independent rectangular dense oracle across layouts lanes axes bases and mixed widths",
+              "ordinal": 54
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:55",
+              "name": "numerics_contract_test.test.panel structured products use independent dense expectations for both halves unit modes and transforms",
+              "ordinal": 55
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:56",
+              "name": "numerics_contract_test.test.panel implicit unit and zero scale paths preserve nonreads and unused padding",
+              "ordinal": 56
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:57",
+              "name": "numerics_contract_test.test.panel empty K and empty output never derive unused huge column offsets",
+              "ordinal": 57
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:58",
+              "name": "numerics_contract_test.test.panel gathered empty majors and split repeated references preserve stored arithmetic order",
+              "ordinal": 58
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:59",
+              "name": "numerics_contract_test.test.panel Hermitian literal complex oracle ignores imaginary diagonal and opposite triangle poison",
+              "ordinal": 59
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:60",
+              "name": "numerics_contract_test.test.panel implicit complex identity retains infinity and signed zero expression choices in two lanes and tail",
+              "ordinal": 60
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:61",
+              "name": "sparse.pattern.test.all independent offset ordinal types bases and orientations preserve contiguous physical order",
+              "ordinal": 61
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:62",
+              "name": "sparse.pattern.test.rectangular column-compressed geometry keeps major and minor dimensions distinct",
+              "ordinal": 62
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:63",
+              "name": "sparse.pattern.test.split gaps are not nonzeros and physical value locations stay explicit for every type pair",
+              "ordinal": 63
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:64",
+              "name": "sparse.pattern.test.internal overlapping nonmonotonic split intervals preserve logical references and duplicates",
+              "ordinal": 64
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:65",
+              "name": "sparse.pattern.test.empty contiguous and gapped shapes ignore all unused numerical storage",
+              "ordinal": 65
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:66",
+              "name": "sparse.pattern.test.geometry rejects negative reversed out of bounds and malformed metadata before ordinal reads",
+              "ordinal": 66
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:67",
+              "name": "sparse.pattern.test.dimensions beyond narrow ordinal range and one based ordinal endpoints remain valid",
+              "ordinal": 67
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:68",
+              "name": "sparse.pattern.test.borrowed metadata is revalidated on every check including after successful construction",
+              "ordinal": 68
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:69",
+              "name": "sparse.pattern.test.local accessors bound metadata and retain physical coordinates",
+              "ordinal": 69
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:70",
+              "name": "sparse.pattern.test.real and complex operands separate values operation and active physical capacity",
+              "ordinal": 70
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:71",
+              "name": "numerics.dense.test.native width descriptors validate dimensions beyond i32 without allocation",
+              "ordinal": 71
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:72",
+              "name": "numerics.dense.test.descriptor checks distinguish stride capacity overflow and physical padding",
+              "ordinal": 72
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:73",
+              "name": "lapack.core.cholesky.test.real Cholesky core computes with valid native width strides and empty dimensions",
+              "ordinal": 73
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:74",
+              "name": "lapack.core.cholesky.test.computational core has numerical failure policy without strict full input scan",
+              "ordinal": 74
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:75",
+              "name": "lapack.core.lu.test.LU IEEE isolated unit lower leg does not read the U-owned diagonal or upper triangle",
+              "ordinal": 75
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:76",
+              "name": "numerics.pivot.test.all encodings share logical swaps and write the caller buffer immediately without a copy",
+              "ordinal": 76
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:77",
+              "name": "numerics.pivot.test.signedness base and complete-sequence semantic checks remain distinct",
+              "ordinal": 77
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:78",
+              "name": "numerics.pivot.test.row encoding is not restricted by i32 geometry or numerical info representation",
+              "ordinal": 78
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:79",
+              "name": "numerics.pivot.test.mutating borrowed pivots invalidates an earlier check and must be revalidated",
+              "ordinal": 79
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:80",
+              "name": "numerics.pivot.test.wide pivot encodings normalize before target-width conversion and preserve maximum native rows",
+              "ordinal": 80
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:81",
+              "name": "lapack.core.lu_policy_test.test.LU GETRF policy reconstructs independent rectangular real complex matrices and preserves all padding",
+              "ordinal": 81
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:82",
+              "name": "lapack.core.lu_policy_test.test.LU GETRS policies solve known factors with noncommuting swaps and independent dense N T H right hand sides",
+              "ordinal": 82
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:83",
+              "name": "lapack.core.lu_policy_test.test.LU GETRF IEEE continues every trailing column after overflow while checked retains its original partial state",
+              "ordinal": 83
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:84",
+              "name": "lapack.core.lu_policy_test.test.LU GETRF IEEE completes vector update tails rather than ignoring a finite-update failure",
+              "ordinal": 84
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:85",
+              "name": "lapack.core.lu_policy_test.test.LU GETRF IEEE preserves first singular info but completes pivots after later overflow and nonfinite selected pivots",
+              "ordinal": 85
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:86",
+              "name": "lapack.core.lu_policy_test.test.LU GETRS IEEE normal zero skips and transpose dot evaluation have distinct nonfinite semantics",
+              "ordinal": 86
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:87",
+              "name": "lapack.core.lu_policy_test.test.LU GETRS IEEE stores overflow and continues later RHS instead of returning checked failure information",
+              "ordinal": 87
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:88",
+              "name": "lapack.core.lu_policy_test.test.LU IEEE empty shapes and single element native strides avoid unused factors and pivot access",
+              "ordinal": 88
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:89",
+              "name": "numerics.residual_filter_test.test.Residual contour filter two precisions independent triangular resolvent all layouts",
+              "ordinal": 89
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:90",
+              "name": "numerics.residual_filter_test.test.Residual contour filter full input basis output overlap late failures retry and original close",
+              "ordinal": 90
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:91",
+              "name": "numerics.residual_filter_test.test.Residual contour filter correction geometry shifts byte aliases finite policy and scratch tails",
+              "ordinal": 91
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:92",
+              "name": "numerics.residual_filter_test.test.Residual contour filter widens opposite extreme shift and Ritz values before division",
+              "ordinal": 92
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:93",
+              "name": "numerics.pattern_operator_test.test.Pattern operator mixed indices two bases CSR CSC half Hermitian transforms and both panels",
+              "ordinal": 93
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:94",
+              "name": "numerics.pattern_operator_test.test.Pattern operator revalidates metadata byte aliases and borrowed closing operation",
+              "ordinal": 94
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:95",
+              "name": "interop.feast_test.test.FEAST typed LP64 parameter initialization defaults and reviewed error boundaries",
+              "ordinal": 95
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:96",
+              "name": "interop.feast_test.test.FEAST typed LP64 full lower upper CSR random and supplied starts recover Hermitian spectrum",
+              "ordinal": 96
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:97",
+              "name": "interop.feast_test.test.FEAST typed LP64 trace stopping finite budget capacity warning and empty interval",
+              "ordinal": 97
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:98",
+              "name": "interop.feast_test.test.FEAST typed LP64 invalid CSR finite values capacity and byte aliases are transactional",
+              "ordinal": 98
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:99",
+              "name": "interop.feast_test.test.FEAST typed LP64 seven scratch allocation rollback and captured closing operation",
+              "ordinal": 99
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:100",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver two precisions both panels recover complex independent projectors",
+              "ordinal": 100
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:101",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver overlapping initial output publishes only selected columns",
+              "ordinal": 101
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:102",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver capacity warning and closed endpoint multiplicity preserve semantics",
+              "ordinal": 102
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:103",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver zero space absent interval and zero budget never certify missing spectrum",
+              "ordinal": 103
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:104",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver linear and reduced solver stops retain full output and diagnostics",
+              "ordinal": 104
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:105",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver late action failure nonfinite final action and retry are transactional",
+              "ordinal": 105
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:106",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver borrowed capacity aliases options overflow and scratch tails",
+              "ordinal": 106
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:107",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver allocation rollback closing operation and synchronization rejection",
+              "ordinal": 107
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:108",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver twelve dimensional Fourier oracle resolves interior zero multiplicity",
+              "ordinal": 108
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:109",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver empty local shard replays global reductions and all backend participation",
+              "ordinal": 109
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:110",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver globally empty geometry and zero iterations use no scratch allocation",
+              "ordinal": 110
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:111",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver all Ritz candidates place selected pairs first and preserve unused tails",
+              "ordinal": 111
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:112",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver explicit finite stop publication retains error rollback and capacity diagnostics",
+              "ordinal": 112
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:113",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver inexact residual scaled solves converge through finite inner limits",
+              "ordinal": 113
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:114",
+              "name": "numerics.contour_eigensolver_test.test.Contour eigensolver residual inverse two precisions converge with one step inner budgets",
+              "ordinal": 114
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:115",
+              "name": "numerics.rank_reduced_ritz_test.test.Rank reduced Ritz two precisions redundant complex basis recovers independent physical projectors",
+              "ordinal": 115
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:116",
+              "name": "numerics.rank_reduced_ritz_test.test.Rank reduced Ritz input output overlap stages the entire projected problem",
+              "ordinal": 116
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:117",
+              "name": "numerics.rank_reduced_ritz_test.test.Rank reduced Ritz zero rank indefinite metric and controlled eigensolver stops preserve all output",
+              "ordinal": 117
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:118",
+              "name": "numerics.rank_reduced_ritz_test.test.Rank reduced Ritz tiny metric scales and final range failure remain transactional",
+              "ordinal": 118
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:119",
+              "name": "numerics.rank_reduced_ritz_test.test.Rank reduced Ritz borrowed capacity byte aliases options and overflow fail before publication",
+              "ordinal": 119
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:120",
+              "name": "numerics.rank_reduced_ritz_test.test.Rank reduced Ritz allocation rollback and closing captured operation retain common ownership",
+              "ordinal": 120
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:121",
+              "name": "numerics.contour_quadrature_test.test.Contour quadrature two precisions two rules satisfy Cauchy projector and Laurent moments",
+              "ordinal": 121
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:122",
+              "name": "numerics.contour_quadrature_test.test.Contour quadrature conjugate pairs and tails are exact and caller buffers stay separate",
+              "ordinal": 122
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:123",
+              "name": "numerics.contour_quadrature_test.test.Contour quadrature widened geometry accepts opposite extreme endpoints without overflow",
+              "ordinal": 123
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:124",
+              "name": "numerics.contour_quadrature_test.test.Contour quadrature options capacity aliases overflow and iteration failure preserve outputs",
+              "ordinal": 124
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:125",
+              "name": "numerics.contour_quadrature_test.test.Contour quadrature late range failure rolls back both arrays and tiny imaginary geometry rejects",
+              "ordinal": 125
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:126",
+              "name": "numerics.contour_quadrature_test.test.Contour quadrature both rules feed shared rational solver and recover analytic complex projector",
+              "ordinal": 126
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:127",
+              "name": "numerics.rational_filter_test.test.Rational filter explicit inexact iteration limit matches independent one step oracle",
+              "ordinal": 127
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:128",
+              "name": "numerics.rational_filter_test.test.Rational filter complex two precisions multi-RHS independent triangular oracle all layouts",
+              "ordinal": 128
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:129",
+              "name": "numerics.rational_filter_test.test.Rational filter input output alias stages every RHS before publication",
+              "ordinal": 129
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:130",
+              "name": "numerics.rational_filter_test.test.Rational filter widened sums cancel individually overflowing weighted solutions",
+              "ordinal": 130
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:131",
+              "name": "numerics.rational_filter_test.test.Rational filter zero coefficients empty sum and empty geometry ignore unused values and callbacks",
+              "ordinal": 131
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:132",
+              "name": "numerics.rational_filter_test.test.Rational filter controlled stops after earlier systems preserve the entire output",
+              "ordinal": 132
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:133",
+              "name": "numerics.rational_filter_test.test.Rational filter late action nonfinite and final narrowing errors roll back and retry",
+              "ordinal": 133
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:134",
+              "name": "numerics.rational_filter_test.test.Rational filter remote final commit rejection preserves all systems and shares admission",
+              "ordinal": 134
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:135",
+              "name": "numerics.rational_filter_test.test.Rational filter closing owner continues all admitted nodes and RHS",
+              "ordinal": 135
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:136",
+              "name": "numerics.rational_filter_test.test.Rational filter allocation failures release earlier leases before retry",
+              "ordinal": 136
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:137",
+              "name": "numerics.rational_filter_test.test.Rational filter borrowed workspace capacities byte aliases options and overflow reject before callbacks",
+              "ordinal": 137
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:138",
+              "name": "numerics.rational_filter_test.test.Rational filter shared reductions and preconditioner errors preserve output and diagnostics count real calls",
+              "ordinal": 138
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:139",
+              "name": "numerics.rational_filter_test.test.Rational filter empty local shard participates in global solves and cannot infer convergence",
+              "ordinal": 139
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:140",
+              "name": "numerics.rational_filter_test.test.Rational filter full circular contour recovers complex Hermitian spectral projector",
+              "ordinal": 140
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:141",
+              "name": "numerics.bicgstab_test.test.BiCGStab four scalar nonsymmetric solves and nonzero initial states",
+              "ordinal": 141
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:142",
+              "name": "numerics.bicgstab_test.test.BiCGStab tiny RHS and widened alpha avoid false underflow breakdown",
+              "ordinal": 142
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:143",
+              "name": "numerics.bicgstab_test.test.BiCGStab controlled alpha and omega breakdowns return verified finite candidates",
+              "ordinal": 143
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:144",
+              "name": "numerics.bicgstab_test.test.BiCGStab optional right preconditioning and aliased initial output",
+              "ordinal": 144
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:145",
+              "name": "numerics.bicgstab_test.test.BiCGStab zero budget and empty systems retain explicit stop semantics",
+              "ordinal": 145
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:146",
+              "name": "numerics.bicgstab_test.test.BiCGStab rho breakdown returns independently verified physical residual",
+              "ordinal": 146
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:147",
+              "name": "numerics.bicgstab_test.test.BiCGStab preflight rejects aliases geometry flags and short scratch before callbacks",
+              "ordinal": 147
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:148",
+              "name": "numerics.bicgstab_test.test.BiCGStab final verification and preconditioner callback failures roll back and retry",
+              "ordinal": 148
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:149",
+              "name": "numerics.bicgstab_test.test.BiCGStab final phase rejection preserves candidate and retry releases leases",
+              "ordinal": 149
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:150",
+              "name": "numerics.bicgstab_test.test.BiCGStab closing owner completes admitted work and allocation failure leaves output",
+              "ordinal": 150
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:151",
+              "name": "numerics.bicgstab_test.test.BiCGStab borrowed scalar reduction errors are transactional",
+              "ordinal": 151
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:152",
+              "name": "numerics.bicgstab_test.test.BiCGStab underestimated recurrence residual forces true verification and budgeted restart",
+              "ordinal": 152
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:153",
+              "name": "numerics.bicgstab_test.test.BiCGStab empty local shard participates and cannot infer global convergence",
+              "ordinal": 153
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:154",
+              "name": "numerics.bicgstab_test.test.BiCGStab native affine system covers complex contour shifts and zero action scale",
+              "ordinal": 154
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:155",
+              "name": "numerics.subspace_projection_test.test.subspace projection four scalars all layouts match exact weighted complex Gram oracle",
+              "ordinal": 155
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:156",
+              "name": "numerics.subspace_projection_test.test.subspace projection one packed reduction serves both matrices and fails transactionally with retry",
+              "ordinal": 156
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:157",
+              "name": "numerics.subspace_projection_test.test.subspace projection invalid shape metric finite inputs alias and short scratch fail before reduction",
+              "ordinal": 157
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:158",
+              "name": "numerics.subspace_projection_test.test.subspace projection arithmetic overflow preserves both outputs and releases the operation",
+              "ordinal": 158
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:159",
+              "name": "numerics.subspace_projection_test.test.subspace projection final and local remote rejection preserves both matrices",
+              "ordinal": 159
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:160",
+              "name": "numerics.subspace_projection_test.test.subspace projection closing callback and OOM preserve shared owner lifetime",
+              "ordinal": 160
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:161",
+              "name": "numerics.subspace_projection_test.test.subspace projection empty column set is no-op while empty shard still participates in reduction",
+              "ordinal": 161
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:162",
+              "name": "numerics.subspace_projection_test.test.subspace projection stable Hermitian average avoids overflowing equal finite entries",
+              "ordinal": 162
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:163",
+              "name": "numerics.series_set_test.test.series set four scalars ragged coefficients and both panel layouts match independent cosine oracle",
+              "ordinal": 163
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:164",
+              "name": "numerics.series_set_test.test.series set packs aliased input before committing every output column",
+              "ordinal": 164
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:165",
+              "name": "numerics.series_set_test.test.series set validates counts finite prefixes geometry scratch aliases and overflow before actions",
+              "ordinal": 165
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:166",
+              "name": "numerics.series_set_test.test.series set callback failures and nonfinite arithmetic preserve all output columns then permit retry",
+              "ordinal": 166
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:167",
+              "name": "numerics.series_set_test.test.series set remote coefficient arithmetic and final commit failures preserve every output",
+              "ordinal": 167
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:168",
+              "name": "numerics.series_set_test.test.series set allocation failure and closing owner release the same operation and scratch",
+              "ordinal": 168
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:169",
+              "name": "numerics.series_set_test.test.series set empty output and empty participating shard retain callback and padding contracts",
+              "ordinal": 169
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:170",
+              "name": "numerics.series_set_test.test.series set widened accumulation retains finite values beyond native intermediate range",
+              "ordinal": 170
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:171",
+              "name": "numerics.series_set_test.test.series set non diagonal real and complex Hermitian actions match spectral projectors",
+              "ordinal": 171
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:172",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev four scalar families match independent polynomial ratios through degree 512",
+              "ordinal": 172
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:173",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev in-place row-major panels preserve padding and share fused or column fallback semantics",
+              "ordinal": 173
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:174",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev rejects bad bounds geometry capacity alias and nonfinite input before callbacks",
+              "ordinal": 174
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:175",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev callback failure nonfinite result and close retain transactional output and release shared resources",
+              "ordinal": 175
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:176",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev lower-bound normalization survives subnormal and full finite-range spectral intervals",
+              "ordinal": 176
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:177",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev remote configuration arithmetic and commit failures converge before final publication",
+              "ordinal": 177
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:178",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev empty distributed panels retain callbacks while workspace arithmetic stays native width",
+              "ordinal": 178
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:179",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev shared scratch allocation failure never invokes the operator",
+              "ordinal": 179
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:180",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev acts on non-diagonal Hermitian operators against independent spectral projectors",
+              "ordinal": 180
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:181",
+              "name": "numerics.normalized_chebyshev_test.test.normalized Chebyshev reports final arithmetic overflow after a finite callback without publishing",
+              "ordinal": 181
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:182",
+              "name": "fft.core_test.test.FFT complex arbitrary lengths match direct DFT and unnormalized inverse",
+              "ordinal": 182
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:183",
+              "name": "fft.core_test.test.FFT real half spectrum and DCT-I match analytic definitions",
+              "ordinal": 183
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:184",
+              "name": "fft.core_test.test.FFT errors preserve output and reject overflow alias and nonfinite inputs",
+              "ordinal": 184
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:185",
+              "name": "fft.core_test.test.FFT volumes match direct DFT and Hermitian real inverse across odd axes",
+              "ordinal": 185
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:186",
+              "name": "fft.core_test.test.FFT real and volume failures preserve all output and workspace tails",
+              "ordinal": 186
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:187",
+              "name": "numerics.triangular_ieee_test.test.shared triangular independently assembled N T H equations cover 432 scalar triangle diagonal shape combinations",
+              "ordinal": 187
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:188",
+              "name": "numerics.triangular_ieee_test.test.shared triangular first exact zero rejects before RHS mutation even with zero RHS columns",
+              "ordinal": 188
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:189",
+              "name": "numerics.triangular_ieee_test.test.shared triangular unit empty native-width calls and normal IEEE zero skips retain nonreads",
+              "ordinal": 189
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:190",
+              "name": "numerics.triangular_inverse_test.test.triangular inverse matches independent f128 finite series and both identity products in 864 configurations",
+              "ordinal": 190
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:191",
+              "name": "numerics.triangular_inverse_test.test.triangular inverse rejects every first exact zero before any store and ignores earlier NaNs in the preflight",
+              "ordinal": 191
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:192",
+              "name": "numerics.triangular_inverse_test.test.triangular inverse unit empty singleton and clipped strict-triangle views do not access unused storage",
+              "ordinal": 192
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:193",
+              "name": "numerics.triangular_inverse_test.test.triangular inverse finite reciprocal covers signed phases large tiny and subnormal output",
+              "ordinal": 193
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:194",
+              "name": "numerics.triangular_inverse_test.test.triangular inverse ordinary NaN Inf and purely imaginary nonzero diagonals retain own IEEE classification",
+              "ordinal": 194
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:195",
+              "name": "numerics.triangular_inverse_test.test.triangular inverse short and exact borrowed workspaces preserve matrices and workspace guards in 48 configurations",
+              "ordinal": 195
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:196",
+              "name": "numerics.triangular_inverse_range_test.test.triangular inverse retains representable cross-column entries despite earlier rounded underflow and intermediate overflow",
+              "ordinal": 196
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:197",
+              "name": "numerics.lu_inverse_test.test.LU inverse matches independent nilpotent products and explicit permutations in 216 configurations",
+              "ordinal": 197
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:198",
+              "name": "numerics.lu_inverse_test.test.LU inverse rejects short and overflowing workspace before stores and pivot reads",
+              "ordinal": 198
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:199",
+              "name": "numerics.lu_inverse_test.test.LU inverse first exact zero precedes all mutation and pivot or workspace access",
+              "ordinal": 199
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:200",
+              "name": "numerics.lu_inverse_test.test.LU inverse empty and singleton use no workspace or pivot and retain ordinary IEEE classification",
+              "ordinal": 200
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:201",
+              "name": "numerics.lu_inverse_range_test.test.LU inverse retains representable lower-chain entries after an underflowing intermediate in eight extreme-scale cases",
+              "ordinal": 201
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:202",
+              "name": "numerics.cholesky_inverse_test.test.Cholesky inverse matches independent f128 full-matrix elimination and both identities in 432 configurations",
+              "ordinal": 202
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:203",
+              "name": "numerics.cholesky_inverse_test.test.wide triangular inverse reuses both scalar diagonal policies without factor mutation in 48 configurations",
+              "ordinal": 203
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:204",
+              "name": "numerics.cholesky_inverse_test.test.Cholesky inverse rejects short overflow and first-zero cases before stores and keeps singleton work untouched",
+              "ordinal": 204
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:205",
+              "name": "numerics.cholesky_inverse_test.test.Cholesky inverse ordinary nonfinite singletons keep IEEE classes and exact-real complex diagonals",
+              "ordinal": 205
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:206",
+              "name": "numerics.cholesky_inverse_range_test.test.Cholesky inverse retains Hermitian couplings from inverse-factor entries below storage range in sixteen cases",
+              "ordinal": 206
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:207",
+              "name": "numerics.cholesky_inverse_range_test.test.Cholesky inverse cancels individually overflowing Gram products before narrowing in eight cases",
+              "ordinal": 207
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:208",
+              "name": "blas.core.execution.thread_pool.test.BLAS wrappers and neutral default share admission and policy",
+              "ordinal": 208
+            },
+            {
+              "id": "test:zig-root-numerics-contract-tests:209",
+              "name": "blas.core.execution.thread_pool.test.BLAS typed adapters preserve function types and exactly-once task slices",
+              "ordinal": 209
+            }
+          ],
+          "count": 210,
+          "digest": "5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "enumeration_source": "zig-0.17-builtin-test-functions"
+        }
+      ],
+      "native_observation_bindings": [
+        {
+          "id": "native-observation:49f01bc541f7f89a0658c2514d2d1b57c22328ffaeaae817dc2256b03dafb9a0",
+          "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
+          "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:fast",
+          "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+          "optimize_mode_id": "mode:fast",
+          "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "enumeration_source": "zig-0.17-builtin-test-functions",
+          "digest": "49f01bc541f7f89a0658c2514d2d1b57c22328ffaeaae817dc2256b03dafb9a0"
+        },
+        {
+          "id": "native-observation:9f31eb69e2e6c94afa765f686289bcbe02a8582a5a975716729e2a8dd4b5bd3e",
+          "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
+          "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:debug",
+          "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+          "optimize_mode_id": "mode:debug",
+          "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "enumeration_source": "zig-0.17-builtin-test-functions",
+          "digest": "9f31eb69e2e6c94afa765f686289bcbe02a8582a5a975716729e2a8dd4b5bd3e"
+        },
+        {
+          "id": "native-observation:aea30d022a2fe15a6f6b264a287ab063a0320ac861d8ca3e71b724b99a9504c5",
+          "row_id": "row:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
+          "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:zig-root-numerics-contract-tests:safe",
+          "enumeration_class_id": "enumeration-class:x86-64-linux-gnu-elf",
+          "optimize_mode_id": "mode:safe",
+          "expected_test_set_id": "set:zig-root:numerics-contract-tests:5cc6569b6f1fddab611ddc7b55b47c5286c839aaa0e67b9c6117976f553eb5a9",
+          "enumeration_source": "zig-0.17-builtin-test-functions",
+          "digest": "aea30d022a2fe15a6f6b264a287ab063a0320ac861d8ca3e71b724b99a9504c5"
+        }
+      ]
+    }
+  ]
 }

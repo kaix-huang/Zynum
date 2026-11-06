@@ -3,6 +3,7 @@
 //! Local original-Heteris numerical/ownership evidence; no cluster qualification.
 const std = @import("std");
 const native = @import("zynum-core").native;
+const grid_solve = @import("zynum-core").native_grid_solve;
 const execution = @import("zynum-execution");
 const c = @import("heteris-provider-c");
 const tn_reference = @import("gemm-test-reference").referenceGemmTransposedA;
@@ -56,6 +57,11 @@ fn callback(data: ?*anyopaque, begin: u64, end: u64) callconv(.c) i32 {
 }
 fn submit(token: c.heteris_rp_token, begin: u64, end: u64, grain: u64, limit: u32, task_fn: c.heteris_rp_cpu_range_fn, data: ?*anyopaque, out: [*c]c.heteris_rp_bulk_result_v1) callconv(.c) i32 {
     submissions += 1;
+    if (grid_close_during) |context| {
+        const snapshot = context.snapshot();
+        if (snapshot.active_operations != 1 or snapshot.resource_pins != 2 or live_scratch != 2)
+            @panic("expected one grid admission and exactly two live stencil leases");
+    }
     if (mode == .reject or (submissions == fail_submission and bulk_failure == .reject)) {
         out[0] = .{ .abi_version = 1, .struct_size = @sizeOf(c.heteris_rp_bulk_result_v1), .state = c.HETERIS_RP_REJECTED, .reserved = 0, .execution_status = -778, .callback_status = 0, .callbacks_started = 0, .callbacks_completed = 0 };
         if (submissions <= 2) {
@@ -1153,4 +1159,132 @@ test "native spectral enclosed dyadic symmetric action reports shifted recurrenc
     try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&output));
     try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
     try std.testing.expectEqual(@as(usize, 0), submissions);
+}
+
+test "projected periodic solve matches an independent anisotropic matrix through one closing admission" {
+    // The singleton axis contributes zero. The size-two axis contributes its
+    // neighbor twice. Independent dense A=-Delta for [1,2,3], h^-2=[2,3,4].
+    const matrix = [6][6]f64{
+        .{ 14, -4, -4, -6, 0, 0 },
+        .{ -4, 14, -4, 0, -6, 0 },
+        .{ -4, -4, 14, 0, 0, -6 },
+        .{ -6, 0, 0, 14, -4, -4 },
+        .{ 0, -6, 0, -4, 14, -4 },
+        .{ 0, 0, -6, -4, -4, 14 },
+    };
+    const expected = [6]f64{ 1, 2, -1, 3, -4, -1 };
+    var rhs = [7]f64{ 0, 0, 0, 0, 0, 0, 123 };
+    for (matrix, rhs[0..6]) |row, *b| {
+        for (row, expected) |a, x| b.* += a * x;
+    }
+    const original_rhs = rhs;
+
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    grid_close_during = &fixture.context;
+    defer grid_close_during = null;
+    const problem: grid_solve.Problem = .{
+        .shape = .{ 1, 2, 3 },
+        .inv_h2 = .{ 2, 3, 4 },
+        .max_iterations = 24,
+        .absolute_tolerance_l2 = 1e-11,
+        .relative_tolerance = 0,
+    };
+    const sizes = try grid_solve.query(problem);
+    try std.testing.expectEqual(@as(usize, 6), sizes.points);
+    try std.testing.expectEqual(@as(usize, 72), sizes.workspace_elements);
+    try std.testing.expectEqual(@as(usize, 576), sizes.workspace_bytes);
+    var work: [73]f64 = @splat(999);
+    var out: [7]f64 = @splat(777);
+    var report: grid_solve.Report = .{};
+    try grid_solve.solve(&fixture.context, problem, &rhs, &out, &work, &report);
+    try std.testing.expectEqual(grid_solve.Phase.published, report.phase);
+    try std.testing.expectEqual(grid_solve.StopReason.converged, report.stop_reason);
+    try std.testing.expectEqual(.complete, report.native.output);
+    try std.testing.expectEqual(@as(f64, 0), report.rhs.?.mean);
+    try std.testing.expectEqual(report.rhs.?.norm_l2, report.rhs.?.projected_norm_l2);
+    try std.testing.expectApproxEqAbs(@as(f64, 0), report.final.?.solution_mean, 1e-15);
+    try std.testing.expect(report.solver.?.iterations > 1);
+    try std.testing.expectEqual(report.solver.?.action_count + 1, submissions);
+    try std.testing.expectEqual(submissions * 2, allocations);
+    try std.testing.expectEqual(@as(u64, 2), report.native.provider.callbacks_completed);
+    try std.testing.expect(grid_close_during_busy.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+    try std.testing.expectEqual(@as(usize, 0), live_scratch);
+    var residual_squares: f128 = 0;
+    for (matrix, rhs[0..6]) |row, b| {
+        var ax: f128 = 0;
+        for (row, out[0..6]) |a, x| ax += @as(f128, a) * x;
+        const residual = b - ax;
+        residual_squares += residual * residual;
+    }
+    try std.testing.expect(@sqrt(residual_squares) <= problem.absolute_tolerance_l2);
+    for (expected, out[0..6]) |wanted, actual| try std.testing.expectApproxEqAbs(wanted, actual, 1e-12);
+    try std.testing.expectEqualSlices(f64, &original_rhs, &rhs);
+    try std.testing.expectEqual(@as(f64, 777), out[6]);
+    try std.testing.expectEqual(@as(f64, 999), work[72]);
+}
+
+test "projected periodic solve preserves solution after a later rejection and a failed final callback" {
+    const problem: grid_solve.Problem = .{
+        .shape = .{ 2, 1, 3 },
+        .inv_h2 = .{ 2, 3, 4 },
+        .max_iterations = 4,
+        .absolute_tolerance_l2 = 1e-12,
+        .relative_tolerance = 0,
+    };
+    const rhs = [6]f64{ 8, 8, 8, -8, -8, -8 };
+    for ([_]usize{ 2, 3 }) |failing| {
+        var fixture: Fixture = .{};
+        try fixture.init(2);
+        defer fixture.deinit();
+        fail_submission = failing;
+        bulk_failure = if (failing == 2) .reject else .callback;
+        var work: [72]f64 = undefined;
+        var out = [_]f64{ 777, -0.0, 778, 779, 780, 781, 991 };
+        const saved = out;
+        var report: grid_solve.Report = .{};
+        try std.testing.expectError(if (failing == 2) error.ProviderRejected else error.ProviderCallbackFailed, grid_solve.solve(&fixture.context, problem, &rhs, &out, &work, &report));
+        try std.testing.expectEqual(if (failing == 2) grid_solve.Phase.iteration else .final_verification, report.phase);
+        try std.testing.expectEqual(grid_solve.StopReason.none, report.stop_reason);
+        try std.testing.expect(report.rhs != null and report.final == null);
+        try std.testing.expectEqual(failing == 3, report.solver != null);
+        try std.testing.expectEqual(.unchanged, report.native.output);
+        try std.testing.expectEqual(.submit, report.native.provider.stage);
+        try std.testing.expectEqual(@as(i32, if (failing == 2) -778 else -1903), report.native.provider.returned_status);
+        try std.testing.expectEqual(@as(i32, if (failing == 2) -778 else 0), report.native.provider.execution_status);
+        try std.testing.expectEqual(@as(i32, if (failing == 2) 0 else -1903), report.native.provider.callback_status);
+        try std.testing.expectEqual(failing, submissions);
+        try std.testing.expectEqual(failing * 2, allocations);
+        try std.testing.expectEqual(@as(usize, 0), live_scratch);
+        try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+        try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&out));
+    }
+}
+
+test "projected periodic solve reports produced nonfinite stencil arithmetic without publishing" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    const problem: grid_solve.Problem = .{
+        .shape = .{ 2, 1, 1 },
+        .inv_h2 = .{ std.math.floatMax(f64), 1, 1 },
+        .max_iterations = 4,
+        .absolute_tolerance_l2 = 0,
+        .relative_tolerance = 0,
+    };
+    var work: [24]f64 = undefined;
+    var out = [_]f64{ 777, -0.0, 991 };
+    const saved = out;
+    var report: grid_solve.Report = .{};
+    try grid_solve.solve(&fixture.context, problem, &.{ 1, -1 }, &out, &work, &report);
+    try std.testing.expectEqual(grid_solve.Phase.iteration, report.phase);
+    try std.testing.expectEqual(grid_solve.StopReason.numerical_failure, report.stop_reason);
+    try std.testing.expect(report.rhs != null and report.solver == null and report.final == null);
+    try std.testing.expectEqual(.unchanged, report.native.output);
+    try std.testing.expectEqual(.quiescent, report.native.provider.state);
+    try std.testing.expectEqual(@as(usize, 1), submissions);
+    try std.testing.expectEqual(@as(usize, 2), allocations);
+    try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&out));
 }

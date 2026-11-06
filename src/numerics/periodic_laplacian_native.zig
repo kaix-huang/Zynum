@@ -80,6 +80,11 @@ fn applyAdmitted(operation: *const execution.Operation, args: PeriodicLaplacianF
     }
     try resources.runChecked(Task.run, @ptrCast(tasks.values.ptr), tasks.values.len, report);
 }
+/// Reuse the checked original stencil under an existing synchronous admission.
+pub fn periodicLaplacianBorrowedAdmittedF64(operation: *const execution.Operation, args: PeriodicLaplacianF64, report: *execution.CallReport) Error!void {
+    report.* = .{};
+    try applyAdmitted(operation, args, try check(args), report);
+}
 /// No finite-output promise: success means completed original IEEE arithmetic.
 /// Caller buffers, Context, report and implementation remain live through return.
 pub fn periodicLaplacianF64(context: *execution.Context, args: PeriodicLaplacianF64, report: *execution.CallReport) Error!void {

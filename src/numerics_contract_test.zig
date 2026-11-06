@@ -13,6 +13,7 @@ comptime {
     _ = @import("numerics/contour_quadrature_test.zig");
     _ = @import("numerics/rational_filter_test.zig");
     _ = @import("numerics/bicgstab_test.zig");
+    _ = @import("numerics/exact_f64_summary_test.zig");
     _ = @import("numerics/subspace_projection_test.zig");
     _ = @import("numerics/series_set_test.zig");
     _ = @import("numerics/normalized_chebyshev_test.zig");

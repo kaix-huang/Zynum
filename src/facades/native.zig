@@ -17,4 +17,6 @@ pub const coreIdentity = core.internal.nativeCoreIdentity;
 pub const PeriodicLaplacianF64 = core.native_grid.PeriodicLaplacianF64;
 pub const PeriodicLaplacianError = core.native_grid.Error;
 pub const periodicLaplacianF64 = core.native_grid.periodicLaplacianF64;
+pub const periodic_neg_laplacian = core.native_grid_solve;
+pub const f64_sum_summary = core.native_f64_summary;
 pub const spectral = core.native_spectral;

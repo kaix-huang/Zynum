@@ -30,6 +30,8 @@ pub const api = blas.api;
 /// Explicit mathematical entrypoints, sharing this original Core.
 pub const native = @import("blas/api/native_operations.zig");
 pub const native_grid = @import("numerics/periodic_laplacian_native.zig");
+pub const native_grid_solve = @import("numerics/periodic_laplacian_solve_native.zig");
+pub const native_f64_summary = @import("numerics/exact_f64_summary.zig");
 pub const native_spectral = @import("numerics/spectral_native.zig");
 
 pub const BlasInt = blas.BlasInt;

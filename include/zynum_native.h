@@ -83,6 +83,105 @@ zynum_native_status zynum_native_laplacian_periodic_3d_f64_v1(void *storage,
  uint64_t n0, uint64_t n1, uint64_t n2,
  const double *x, uint64_t x_backing_elements, double *y, uint64_t y_backing_elements,
  double inv_h2_0, double inv_h2_1, double inv_h2_2, zynum_native_report_v1 *report);
+/* Single-grid negative periodic Laplacian solve, axis 2 fastest. All axes
+   are positive; singleton axes and repeated neighbors retain stencil semantics.
+   Query writes an output-only v1 requirements struct on success. The input
+   problem requires the exact v1 struct_size and zero reserved fields. An
+   unsupported struct_size leaves query output and solve report untouched.
+   Workspace is 12 F64 per point;
+   each stencil application also borrows transient Task and Invocation scratch
+   from the admitted provider, outside these caller workspace requirements. */
+enum {
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_PREFLIGHT=0,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_ADMISSION=1,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_RHS_PROJECTION=2,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_ITERATION=3,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_FINAL_VERIFICATION=4,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_PHASE_PUBLISHED=5
+};
+enum {
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_NONE=0,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_CONVERGED=1,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_ITERATION_LIMIT=2,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_RHO_BREAKDOWN=3,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_ALPHA_BREAKDOWN=4,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_OMEGA_BREAKDOWN=5,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_FINAL_RESIDUAL_REJECTED=6,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_STOP_NUMERICAL_FAILURE=7
+};
+enum {
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_RHS_VALID=1,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_SOLVER_VALID=2,
+ ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_FINAL_VALID=4
+};
+typedef struct zynum_native_periodic_neg_laplacian_problem_v1 {
+ uint32_t abi_version, struct_size;
+ uint64_t shape[3];
+ double inv_h2[3];
+ uint32_t max_iterations, reserved0;
+ double absolute_tolerance_l2, relative_tolerance;
+ uint64_t reserved[2];
+} zynum_native_periodic_neg_laplacian_problem_v1;
+typedef struct zynum_native_periodic_neg_laplacian_requirements_v1 {
+ uint32_t abi_version, struct_size;
+ uint64_t points, workspace_elements, workspace_bytes, workspace_alignment;
+ uint64_t reserved[2];
+} zynum_native_periodic_neg_laplacian_requirements_v1;
+typedef struct zynum_native_periodic_neg_laplacian_report_v1 {
+ uint32_t abi_version, struct_size, phase, stop_reason;
+ uint32_t valid_flags, reserved0;
+ uint64_t iterations, solver_actions, residual_restarts;
+ double rhs_mean, solution_mean, rhs_l2, projected_rhs_l2, residual_l2;
+ zynum_native_report_v1 native;
+ uint64_t reserved[2];
+} zynum_native_periodic_neg_laplacian_report_v1;
+zynum_native_status zynum_native_periodic_neg_laplacian_query_f64_v1(
+ const zynum_native_periodic_neg_laplacian_problem_v1 *problem,
+ zynum_native_periodic_neg_laplacian_requirements_v1 *out);
+/* From zero, solve PAP*x=P*b by BiCGStab for A=-Delta_h and P the mean
+   projection. Reapply A to the projected F64 candidate and compare the original
+   ||b-A*x||_2 with max(absolute_tolerance_l2,relative_tolerance*||b||_2).
+   solution is written only on OK + CONVERGED + native.output_state COMPLETE.
+   All returning failures preserve solution and its tail. RHS stays read-only.
+   The three control ranges and full declared backing ranges must be pairwise
+   disjoint. Unprovable control/backing ranges and aliases leave report untouched.
+   The report is output-only. Its native diagnostics describe the last provider
+   call, with output_state describing caller solution. solver_actions excludes
+   the final verification application. Numerical stops return OK, while
+   admission/provider failures return their existing native status. */
+zynum_native_status zynum_native_periodic_neg_laplacian_solve_f64_v1(
+ void *context_storage,
+ const zynum_native_periodic_neg_laplacian_problem_v1 *problem,
+ const double *rhs, uint64_t rhs_backing_elements,
+ double *solution, uint64_t solution_backing_elements,
+ double *workspace, uint64_t workspace_backing_elements,
+ zynum_native_periodic_neg_laplacian_report_v1 *report);
+/* Exact, context-free summary of count finite F64 values, with count > 0.
+   scale must be positive finite and limit nonnegative finite. Lower/upper
+   fields enclose the exact quantities, and sum_sign is -1, 0 or 1. The
+   directional half-width is toward zero relative to the exact sum.
+   The complete declared backing and output report must be disjoint and
+   remain valid through return. Any rejection leaves the report untouched.
+   No allocation, provider, Context or runtime is used. */
+enum {
+ ZYNUM_NATIVE_F64_SUM_EXACT_ZERO=1,
+ ZYNUM_NATIVE_F64_SUM_QUANTIZATION_ZERO_INTERIOR=2,
+ ZYNUM_NATIVE_F64_SUM_SCALED_ABS_WITHIN_LIMIT=4
+};
+typedef struct zynum_native_f64_sum_summary_report_v1 {
+ uint32_t abi_version, struct_size;
+ uint64_t count;
+ int32_t sum_sign;
+ uint32_t flags;
+ double mean_lower, mean_upper, scaled_sum_lower, scaled_sum_upper;
+ double scaled_l1_lower, scaled_l1_upper;
+ double scaled_direction_half_width_lower, scaled_direction_half_width_upper;
+ double maximum_absolute;
+ uint64_t reserved[2];
+} zynum_native_f64_sum_summary_report_v1;
+zynum_native_status zynum_native_f64_sum_summary_v1(
+ const double *values, uint64_t backing_elements, uint64_t count,
+ double scale, double limit, zynum_native_f64_sum_summary_report_v1 *out);
 #ifdef ZYNUM_NATIVE_IDENTITY_TESTING
 const void *zynum_native_core_identity_v1(void);
 const void *zynum_native_execution_identity_v1(void);

@@ -4948,7 +4948,7 @@
         "heteris_runtime_provider.h"
       ],
       "input_sha256": {
-        "include/zynum_native.h": "f180c1bccadce740570f7b5dc30c3b5262c5a280eeb21915eb36d092c69f4e43",
+        "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
         "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
       }
     },
@@ -40337,6 +40337,18 @@
       "owner": "library-source"
     },
     {
+      "path": "src/numerics/exact_f64_summary.zig",
+      "kind": "zig-source",
+      "owner": "library-source",
+      "class": "non-generated-source"
+    },
+    {
+      "path": "src/numerics/exact_f64_summary_test.zig",
+      "kind": "zig-source",
+      "owner": "test-infrastructure",
+      "class": "non-generated-source"
+    },
+    {
       "path": "src/numerics/execution/actual_provider_test.zig",
       "kind": "zig-source",
       "class": "non-generated-source",
@@ -40527,6 +40539,12 @@
       "kind": "zig-source",
       "class": "non-generated-source",
       "owner": "library-source"
+    },
+    {
+      "path": "src/numerics/periodic_laplacian_solve_native.zig",
+      "kind": "zig-source",
+      "owner": "library-source",
+      "class": "non-generated-source"
     },
     {
       "path": "src/numerics/pivot.zig",
@@ -42029,7 +42047,7 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "5d0854e4db7d5501b4e55dc851708335697ae58cd2c03f0be1ad848fd74dad61",
+  "repository_file_classifications_digest": "ad21deaaef69da79bce58049d102ffda55e7dd7dfee6be4837558586b5c75f83",
   "derived_candidates": [
     {
       "id": "derived:docs/assets/benchmarks/current/gemm-recheck.csv",

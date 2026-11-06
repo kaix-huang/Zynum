@@ -123,7 +123,13 @@ pending; repeat the option explicitly for each reviewed row. Start from exact
 CURRENT inventory, review the exact whole-file and native-projection NEXT
 pins, and synchronize the runner before publication. Do not combine reopening
 with source-only refresh, protocol refresh/log input or CURRENT-only checking.
-Other native observations and historical native sets are retained.
+Other active native observations are retained. The checker copies the selected
+old frozen rows, bindings and deduplicated complete namesets into
+`retired_native_observations`, with the SHA-256 of the exact prior CURRENT
+inventory bytes. Existing history survives later refreshes unchanged and is
+covered by both inventory digest policies. Only active rows and bindings can
+supply test expectations. A retired nameset stays in the active section only
+while an active row still references it.
 
 Then run the official `test-inventory` enumerators on the applicable native
 machine and modes to capture real V2 protocol blocks. Pending rows emit their

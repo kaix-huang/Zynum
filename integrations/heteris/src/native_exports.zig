@@ -386,3 +386,192 @@ export fn zynum_native_laplacian_periodic_3d_f64_v1(storage: ?*anyopaque, n0: u6
     reportResult(report, result);
     return c.ZYNUM_NATIVE_OK;
 }
+
+const solve = native.periodic_neg_laplacian;
+const SolveProblem = c.zynum_native_periodic_neg_laplacian_problem_v1;
+const SolveRequirements = c.zynum_native_periodic_neg_laplacian_requirements_v1;
+const SolveReport = c.zynum_native_periodic_neg_laplacian_report_v1;
+
+fn solveProblem(problem: *const SolveProblem) error{ InvalidArgument, ExtentOverflow }!solve.Problem {
+    if (problem.abi_version != 1 or problem.reserved0 != 0 or problem.reserved[0] != 0 or problem.reserved[1] != 0)
+        return error.InvalidArgument;
+    var shape: [3]usize = undefined;
+    for (problem.shape, &shape) |axis, *length| length.* = std.math.cast(usize, axis) orelse return error.ExtentOverflow;
+    return .{
+        .shape = shape,
+        .inv_h2 = problem.inv_h2,
+        .max_iterations = problem.max_iterations,
+        .absolute_tolerance_l2 = problem.absolute_tolerance_l2,
+        .relative_tolerance = problem.relative_tolerance,
+    };
+}
+
+fn solveErrorStatus(err: solve.Error) i32 {
+    return switch (err) {
+        error.InvalidArgument => c.ZYNUM_NATIVE_INVALID_ARGUMENT,
+        else => |grid_error| gridErrorStatus(grid_error),
+    };
+}
+
+export fn zynum_native_periodic_neg_laplacian_query_f64_v1(problem_arg: ?*align(1) const SolveProblem, out_arg: ?*align(1) SolveRequirements) i32 {
+    const raw_problem = problem_arg orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const raw_out = out_arg orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const problem_address = @intFromPtr(raw_problem);
+    const out_address = @intFromPtr(raw_out);
+    if (!validAddress(problem_address, @sizeOf(SolveProblem), @alignOf(SolveProblem)) or
+        !validAddress(out_address, @sizeOf(SolveRequirements), @alignOf(SolveRequirements)) or
+        overlaps(problem_address, @sizeOf(SolveProblem), out_address, @sizeOf(SolveRequirements))) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const input: *const SolveProblem = @alignCast(raw_problem);
+    if (input.struct_size != @sizeOf(SolveProblem)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const problem = solveProblem(input) catch |err| return solveErrorStatus(err);
+    const sizes = solve.query(problem) catch |err| return solveErrorStatus(err);
+    const out: *SolveRequirements = @alignCast(raw_out);
+    out.* = std.mem.zeroes(SolveRequirements);
+    out.abi_version = 1;
+    out.struct_size = @sizeOf(SolveRequirements);
+    out.points = sizes.points;
+    out.workspace_elements = sizes.workspace_elements;
+    out.workspace_bytes = sizes.workspace_bytes;
+    out.workspace_alignment = solve.Requirements.workspace_alignment;
+    return c.ZYNUM_NATIVE_OK;
+}
+
+fn writeSolveReport(out: *SolveReport, result: solve.Report) void {
+    out.* = std.mem.zeroes(SolveReport);
+    out.abi_version = 1;
+    out.struct_size = @sizeOf(SolveReport);
+    out.phase = @backingInt(result.phase);
+    out.stop_reason = @backingInt(result.stop_reason);
+    if (result.rhs) |rhs| {
+        out.valid_flags |= c.ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_RHS_VALID;
+        out.rhs_mean = rhs.mean;
+        out.rhs_l2 = rhs.norm_l2;
+        out.projected_rhs_l2 = rhs.projected_norm_l2;
+    }
+    if (result.solver) |solver| {
+        out.valid_flags |= c.ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_SOLVER_VALID;
+        out.iterations = solver.iterations;
+        out.solver_actions = solver.action_count;
+        out.residual_restarts = solver.residual_restarts;
+    }
+    if (result.final) |final| {
+        out.valid_flags |= c.ZYNUM_NATIVE_PERIODIC_NEG_LAPLACIAN_FINAL_VALID;
+        out.solution_mean = final.solution_mean;
+        out.residual_l2 = final.residual_l2;
+    }
+    out.native.abi_version = 1;
+    out.native.struct_size = @sizeOf(Report);
+    reportResult(&out.native, result.native);
+}
+
+const CheckedRange = struct {
+    address: usize,
+    bytes: usize,
+    fn control(pointer: anytype) ?CheckedRange {
+        const T = @typeInfo(@TypeOf(pointer)).pointer.child;
+        const address = @intFromPtr(pointer);
+        if (!validAddress(address, @sizeOf(T), @alignOf(T))) return null;
+        return .{ .address = address, .bytes = @sizeOf(T) };
+    }
+    fn backing(pointer: anytype, count: u64) BufferError!CheckedRange {
+        const address = if (pointer) |value| @intFromPtr(value) else 0;
+        if (address == 0 and count != 0) return error.InvalidView;
+        const bytes = gridDeclaredBytes(address, count) orelse return error.Overflow;
+        if (bytes > std.math.maxInt(isize)) return error.Overflow;
+        return .{ .address = address, .bytes = bytes };
+    }
+    fn intersects(self: CheckedRange, other: CheckedRange) bool {
+        return overlaps(self.address, self.bytes, other.address, other.bytes);
+    }
+    fn fits(self: CheckedRange, count: usize) bool {
+        return self.address != 0 and self.address % @alignOf(f64) == 0 and self.bytes / @sizeOf(f64) >= count;
+    }
+};
+
+export fn zynum_native_periodic_neg_laplacian_solve_f64_v1(
+    storage: ?*anyopaque,
+    problem_arg: ?*align(1) const SolveProblem,
+    rhs_arg: ?*align(1) const f64,
+    rhs_count: u64,
+    solution_arg: ?*align(1) f64,
+    solution_count: u64,
+    workspace_arg: ?*align(1) f64,
+    workspace_count: u64,
+    report_arg: ?*align(1) SolveReport,
+) i32 {
+    const ctx_raw: *align(1) Context = @ptrCast(storage orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT);
+    const problem_raw = problem_arg orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_raw = report_arg orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const ctx_range = CheckedRange.control(ctx_raw) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const problem_range = CheckedRange.control(problem_raw) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_range = CheckedRange.control(report_raw) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const rhs = CheckedRange.backing(rhs_arg, rhs_count) catch |err| return bufferStatus(err);
+    const solution = CheckedRange.backing(solution_arg, solution_count) catch |err| return bufferStatus(err);
+    const workspace = CheckedRange.backing(workspace_arg, workspace_count) catch |err| return bufferStatus(err);
+    const controls = [_]CheckedRange{ ctx_range, problem_range, report_range };
+    const buffers = [_]CheckedRange{ rhs, solution, workspace };
+    for (controls, 0..) |control, i| {
+        for (controls[i + 1 ..]) |other| if (control.intersects(other)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+        for (buffers) |buffer| if (control.intersects(buffer)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    }
+    if (rhs.intersects(solution) or rhs.intersects(workspace) or solution.intersects(workspace))
+        return c.ZYNUM_NATIVE_VIEW_INVALID;
+
+    const input: *const SolveProblem = @alignCast(problem_raw);
+    // Only the fixed v1 range was checked. An unsupported declared size
+    // cannot establish that the report is outside the caller's descriptor.
+    if (input.struct_size != @sizeOf(SolveProblem)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+
+    const report: *SolveReport = @alignCast(report_raw);
+    var result: solve.Report = .{};
+    defer writeSolveReport(report, result);
+    const problem = solveProblem(input) catch |err| return solveErrorStatus(err);
+    const sizes = solve.query(problem) catch |err| return solveErrorStatus(err);
+    if (!rhs.fits(sizes.points) or !solution.fits(sizes.points) or !workspace.fits(sizes.workspace_elements))
+        return c.ZYNUM_NATIVE_VIEW_INVALID;
+
+    const b: [*]const f64 = @ptrFromInt(rhs.address);
+    const x: [*]f64 = @ptrFromInt(solution.address);
+    const w: [*]f64 = @ptrFromInt(workspace.address);
+    const ctx: *Context = @alignCast(ctx_raw);
+    solve.solve(ctx, problem, b[0..@intCast(rhs_count)], x[0..@intCast(solution_count)], w[0..@intCast(workspace_count)], &result) catch |err| return solveErrorStatus(err);
+    return c.ZYNUM_NATIVE_OK;
+}
+
+const F64SumReport = c.zynum_native_f64_sum_summary_report_v1;
+
+export fn zynum_native_f64_sum_summary_v1(values_arg: ?*align(1) const f64, backing_elements: u64, count: u64, scale: f64, limit: f64, out_arg: ?*align(1) F64SumReport) i32 {
+    const raw_out = out_arg orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const out_range = CheckedRange.control(raw_out) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const values_range = CheckedRange.backing(values_arg, backing_elements) catch |err| return switch (err) {
+        error.InvalidView => c.ZYNUM_NATIVE_INVALID_ARGUMENT,
+        error.Overflow => c.ZYNUM_NATIVE_OVERFLOW,
+    };
+    if (count == 0 or count > backing_elements or !values_range.fits(@intCast(count)) or out_range.intersects(values_range))
+        return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+
+    const values: [*]const f64 = @ptrFromInt(values_range.address);
+    const result = native.f64_sum_summary.summarizeF64(values[0..@intCast(count)], scale, limit) catch |err| return switch (err) {
+        error.OutputRange, error.AccumulatorRange => c.ZYNUM_NATIVE_OVERFLOW,
+        error.InvalidLength, error.InvalidScale, error.InvalidLimit, error.NonFiniteInput => c.ZYNUM_NATIVE_INVALID_ARGUMENT,
+    };
+    const out: *F64SumReport = @alignCast(raw_out);
+    out.* = std.mem.zeroes(F64SumReport);
+    out.abi_version = 1;
+    out.struct_size = @sizeOf(F64SumReport);
+    out.count = result.count;
+    out.sum_sign = result.sum_sign;
+    if (result.exact_zero) out.flags |= c.ZYNUM_NATIVE_F64_SUM_EXACT_ZERO;
+    if (result.quantization_zero_interior) out.flags |= c.ZYNUM_NATIVE_F64_SUM_QUANTIZATION_ZERO_INTERIOR;
+    if (result.scaled_abs_sum_within_limit) out.flags |= c.ZYNUM_NATIVE_F64_SUM_SCALED_ABS_WITHIN_LIMIT;
+    out.mean_lower = result.mean_lower;
+    out.mean_upper = result.mean_upper;
+    out.scaled_sum_lower = result.scaled_sum_lower;
+    out.scaled_sum_upper = result.scaled_sum_upper;
+    out.scaled_l1_lower = result.scaled_l1_lower;
+    out.scaled_l1_upper = result.scaled_l1_upper;
+    out.scaled_direction_half_width_lower = result.scaled_direction_half_width_lower;
+    out.scaled_direction_half_width_upper = result.scaled_direction_half_width_upper;
+    out.maximum_absolute = result.maximum_absolute;
+    return c.ZYNUM_NATIVE_OK;
+}

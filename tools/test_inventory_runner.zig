@@ -8,7 +8,7 @@ const builtin = @import("builtin");
 const Io = std.Io;
 const runner_io: Io = Io.Threaded.global_single_threaded.io();
 const maximum_inventory_bytes = 4 * 1024 * 1024;
-const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "104c76c215645c3b651ce12813c5d872b567d99ba0cb56d43ca30eb727019968";
+const CURRENT_TEST_INVENTORY_SHA256: []const u8 = "531444aaffec42140ecba01917937f3e2696017a70ea20a25983e2e60ac8baa5";
 const NEXT_TEST_INVENTORY_SHA256: ?[]const u8 = null;
 
 const Inventory = struct {
@@ -26,6 +26,8 @@ const Inventory = struct {
     python_skip_contracts: std.json.Value,
     expected_test_sets: []const ExpectedTestSet,
     native_observation_bindings: []const NativeObservationBinding,
+    // Audit metadata, covered by the whole-file pin. Never used for execution.
+    retired_native_observations: ?[]const RetiredNativeObservation = null,
     test_mode_rows: []const TestModeRow,
     workflow_mode_bindings: std.json.Value,
     known_gaps: std.json.Value,
@@ -85,6 +87,13 @@ const NativeObservationBinding = struct {
     expected_test_set_id: []const u8,
     enumeration_source: []const u8,
     digest: []const u8,
+};
+
+const RetiredNativeObservation = struct {
+    previous_inventory_sha256: []const u8,
+    test_mode_rows: []const TestModeRow,
+    expected_test_sets: []const ExpectedTestSet,
+    native_observation_bindings: []const NativeObservationBinding,
 };
 
 const TestModeRow = struct {
