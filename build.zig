@@ -3437,6 +3437,23 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
     return complete;
 }
 
+fn configurePlatformCompilerRuntime(b: *std.Build, target: std.Build.ResolvedTarget, library: *std.Build.Step.Compile) void {
+    const linux_x86_64_gnu = target.result.cpu.arch == .x86_64 and target.result.os.tag == .linux and target.result.abi == .gnu;
+    const system_runtime = linux_x86_64_gnu and library.isStaticLibrary();
+    library.bundle_compiler_rt = !system_runtime;
+    library.bundle_ubsan_rt = true;
+    if (system_runtime) {
+        // Zig 0.17 compiler_rt's complex f80 return uses a struct instead of
+        // the SysV C complex ABI. A static consumer can bind to that hidden
+        // symbol even when compiler_rt was pulled in for a scalar builtin.
+        // Keep Zig's stack probing and leave C ABI builtins to the system.
+        library.root_module.addAssemblyFile(b.path("integrations/heteris/src/linux_x86_64_gnu_stack_probe.S"));
+    } else if (linux_x86_64_gnu) {
+        // ELF shared libraries keep the hidden builtins private to their image.
+        library.link_z_defs = true;
+    }
+}
+
 fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, heteris_include: []const u8, graph: ImplementationGraph, shared: bool, standalone: bool) *std.Build.Step.Compile {
     const upstream = b.createModule(.{ .root_source_file = b.path("src/facades/scientific_sources.zig"), .target = target, .optimize = optimize });
     upstream.addImport("zynum-core", graph.core);
@@ -3457,8 +3474,7 @@ fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
     main.addImport("heteris-provider-c", graph.provider_c);
     main.addImport("zynum-build-options", graph.options);
     const library = b.addLibrary(.{ .name = "zynum", .root_module = main, .linkage = if (shared) .dynamic else .static, .use_llvm = true, .use_lld = true });
-    library.bundle_compiler_rt = true;
-    library.bundle_ubsan_rt = true;
+    configurePlatformCompilerRuntime(b, target, library);
     const installed = b.addInstallArtifact(library, .{});
     b.getInstallStep().dependOn(&installed.step);
     b.step("platform", "Build the single main libzynum with the configured original Core").dependOn(b.getInstallStep());
@@ -3466,14 +3482,14 @@ fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
         b.installFile(b.fmt("integrations/heteris/include/{s}", .{name}), b.fmt("include/{s}", .{name}));
     b.installFile("include/zynum_native.h", "include/zynum_native.h");
     b.installFile("include/zynum_native_spectral.h", "include/zynum_native_spectral.h");
+    b.installFile("integrations/heteris/ZIG-MIT", "share/licenses/zynum/ZIG-MIT");
     for ([_][]const u8{ "heteris.h", "heteris_runtime_provider.h" }) |name|
         b.getInstallStep().dependOn(&b.addInstallFileWithDir(.{ .cwd_relative = b.pathJoin(&.{ heteris_include, name }) }, .header, name).step);
     if (standalone) {
         const module = b.createModule(.{ .root_source_file = b.path("integrations/heteris/src/standalone.zig"), .target = target, .optimize = optimize, .link_libc = true, .pic = true });
         module.addImport("zynum_c", adapter_c);
         const provider = b.addLibrary(.{ .name = "zynum-standalone", .root_module = module, .linkage = if (shared) .dynamic else .static, .use_llvm = true, .use_lld = true });
-        provider.bundle_compiler_rt = true;
-        provider.bundle_ubsan_rt = true;
+        configurePlatformCompilerRuntime(b, target, provider);
         b.installArtifact(provider);
         b.installFile("integrations/heteris/include/zynum_standalone.h", "include/zynum_standalone.h");
     }

@@ -37,7 +37,7 @@ else()
     endforeach()
 endif()
 set(ZYNUM_OPTIMIZE "$<IF:$<CONFIG:Debug>,debug,safe>")
-file(GLOB_RECURSE ZYNUM_ZIG_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.zig" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/../../src/*.zig")
+file(GLOB_RECURSE ZYNUM_ZIG_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.zig" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.S" "${CMAKE_CURRENT_SOURCE_DIR}/../../src/*.zig")
 list(APPEND ZYNUM_ZIG_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../src/scientific_platform_sources.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/blas/types.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/blas/core/shared/scalar.zig"
@@ -102,6 +102,32 @@ if(BUILD_TESTING)
     endif()
     add_test(NAME zynum_native_context COMMAND zynum_native_context)
     add_dependencies(zynum_test_build zynum_native_context)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_C_COMPILER_ID MATCHES "^(GNU|Clang)$")
+        include(CheckCSourceCompiles)
+        check_c_source_compiles([=[
+            #include <features.h>
+            #if !defined(__x86_64__) || !defined(__GLIBC__) || defined(__ILP32__)
+            #error Requires the Linux x86-64 GNU ABI
+            #endif
+            int main(void) { return 0; }
+        ]=] ZYNUM_X86_64_LINUX_GNU)
+        if(ZYNUM_X86_64_LINUX_GNU)
+            add_executable(zynum_native_complex_abi_c tests/native_complex_abi.c)
+            target_link_libraries(zynum_native_complex_abi_c PRIVATE zynum)
+            target_compile_features(zynum_native_complex_abi_c PRIVATE c_std_11)
+            target_compile_options(zynum_native_complex_abi_c PRIVATE -Wall -Wextra -Werror -UNDEBUG -fno-fast-math)
+            add_test(NAME zynum_native_complex_abi_c COMMAND zynum_native_complex_abi_c)
+            add_dependencies(zynum_test_build zynum_native_complex_abi_c)
+            if(CMAKE_CXX_COMPILER_LOADED AND CMAKE_CXX_COMPILER_ID MATCHES "^(GNU|Clang)$")
+                add_executable(zynum_native_complex_abi_cpp tests/native_complex_abi.cpp)
+                target_link_libraries(zynum_native_complex_abi_cpp PRIVATE zynum)
+                target_compile_features(zynum_native_complex_abi_cpp PRIVATE cxx_std_20)
+                target_compile_options(zynum_native_complex_abi_cpp PRIVATE -Wall -Wextra -Werror -UNDEBUG -fno-fast-math)
+                add_test(NAME zynum_native_complex_abi_cpp COMMAND zynum_native_complex_abi_cpp)
+                add_dependencies(zynum_test_build zynum_native_complex_abi_cpp)
+            endif()
+        endif()
+    endif()
     # Formal Runtime tests are present only when the parent explicitly supplies
     # its Runtime target. Header-only Zynum never finds Cargo or builds Runtime.
     if(TARGET heteris_runtime)
@@ -149,4 +175,4 @@ if(ZYNUM_BUILD_STANDALONE)
 endif()
 install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h ../../include/zynum_native_spectral.h DESTINATION include)
 install(FILES "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h" DESTINATION include)
-install(FILES ../../LICENSE ../../COPYING UPSTREAM.md DESTINATION share/licenses/zynum)
+install(FILES ../../LICENSE ../../COPYING UPSTREAM.md ZIG-MIT DESTINATION share/licenses/zynum)

@@ -48,6 +48,25 @@ SysV aggregate lowering issue after six integer-register arguments. Independentl
 compiled C callers verify both nonzero scalar components and error behavior;
 the platform's `scripts/validate.py` also runs these consumers against debug and fast archives.
 
+On x86-64 GNU/Linux, link the native static archives with the usual GCC or Clang
+C/C++ driver and libm (`-lm`). The driver's compiler runtime supplies the scalar
+builtins used by the archives. This also lets the driver's own C complex calls
+reach the correct SysV helpers. Zig 0.17's bundled complex long-double helper
+returns a two-field struct through memory, whereas C returns a complex long
+double in x87 registers. The shared libraries retain Zig's hidden runtime inside
+the ELF image, where it cannot resolve a caller's complex symbols.
+
+The static archives preserve Zig stack probing with the x86-64
+`zig_probe_stack` routine from Zig 0.17.0's `lib/compiler_rt/stack_probe.zig`
+(SHA-256 `8d45e440647f649ef9f7afde40607ff0f57fb012a22e36ccf7381bf120e4345e`).
+The assembly source retains the upstream MIT license and copyright notice.
+Both build systems install the Zig 0.17.0 license as
+`share/licenses/zynum/ZIG-MIT` (SHA-256
+`5c537d6853e005298a285d508cff9ac7192cea23576c840d485b2b586a7ff177`).
+The CMake tests exercise native archive linkage and C complex arithmetic at
+float, double and long-double widths. A parent CMake build with C++ enabled
+also runs the corresponding `std::complex` consumer.
+
 The standalone CMake project also qualifies a plain C consumer:
 
 ```sh
