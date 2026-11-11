@@ -1288,3 +1288,145 @@ test "projected periodic solve reports produced nonfinite stencil arithmetic wit
     try std.testing.expectEqual(@as(usize, 2), allocations);
     try std.testing.expectEqualSlices(u8, std.mem.asBytes(&saved), std.mem.asBytes(&out));
 }
+
+const C128 = native.ComplexF64;
+fn complexArgs(a: []const C128, b: []const C128, output: []C128, m: i32, n: i32, k: i32, lda: i32, ldb: i32, ldc: i32, alpha: C128, beta: C128) native.MatrixProductC128 {
+    return .{
+        .left_matrix = .{ .values = a, .row_count = m, .column_count = k, .leading_dimension = lda },
+        .right_matrix = .{ .values = b, .row_count = n, .column_count = k, .leading_dimension = ldb, .operation = .adjoint },
+        .result_matrix = .{ .values = output, .row_count = m, .column_count = n, .leading_dimension = ldc },
+        .product_scale = alpha,
+        .result_scale = beta,
+    };
+}
+
+test "native complex NC portable leaf matches scalar oracle for padded non-square tasks" {
+    const alpha: C128 = .{ .re = 1.25, .im = -0.75 };
+    const beta: C128 = .{ .re = -0.5, .im = 0.25 };
+    for ([_]u32{ 1, 2 }) |limit| {
+        var fixture: Fixture = .{};
+        try fixture.init(limit);
+        defer fixture.deinit();
+        for ([_][3]usize{ .{ 3, 2, 4 }, .{ 1, 5, 3 }, .{ 5, 1, 2 } }) |shape| {
+            const m, const n, const k = shape;
+            const lda = m + 2;
+            const ldb = n + 3;
+            const ldc = m + 4;
+            var a: [64]C128 = undefined;
+            var b: [64]C128 = undefined;
+            var output: [64]C128 = undefined;
+            for (&a, 0..) |*v, i| v.* = .{ .re = @as(f64, @floatFromInt(i % 7)) - 2, .im = @as(f64, @floatFromInt(i % 3)) - 1 };
+            for (&b, 0..) |*v, i| v.* = .{ .re = @as(f64, @floatFromInt(i % 5)) - 1, .im = @as(f64, @floatFromInt(i % 4)) - 2 };
+            @memset(&output, .{ .re = 7, .im = -3 });
+            const saved_a = a;
+            const saved_b = b;
+            try native.matrixMultiplyC128NC(&fixture.context, complexArgs(&a, &b, &output, @intCast(m), @intCast(n), @intCast(k), @intCast(lda), @intCast(ldb), @intCast(ldc), alpha, beta), &fixture.report);
+            try std.testing.expectEqual(execution.OutputState.complete, fixture.report.output);
+            for (0..output.len) |index| {
+                const i = index % ldc;
+                const j = index / ldc;
+                var expected: C128 = .{ .re = 7, .im = -3 };
+                if (i < m and j < n) {
+                    var sr: f64 = 0;
+                    var si: f64 = 0;
+                    for (0..k) |q| {
+                        const av = a[i + q * lda];
+                        const bv = b[j + q * ldb];
+                        sr += av.re * bv.re + av.im * bv.im;
+                        si += av.im * bv.re - av.re * bv.im;
+                    }
+                    expected = .{ .re = alpha.re * sr - alpha.im * si + beta.re * 7 + beta.im * 3, .im = alpha.re * si + alpha.im * sr - beta.re * 3 + beta.im * 7 };
+                }
+                try std.testing.expectEqual(expected.re, output[index].re);
+                try std.testing.expectEqual(expected.im, output[index].im);
+            }
+            try std.testing.expectEqualSlices(C128, &saved_a, &a);
+            try std.testing.expectEqualSlices(C128, &saved_b, &b);
+        }
+        try std.testing.expectEqual(@as(usize, 3), submissions);
+        try std.testing.expectEqual(@as(usize, 6), allocations);
+        try std.testing.expectEqual(@as(usize, 0), live_scratch);
+    }
+}
+
+test "native complex zero semantics and empty output use one admission without fallback" {
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    const zero: C128 = .{ .re = 0, .im = 0 };
+    const one: C128 = .{ .re = 1, .im = 0 };
+    const nan: C128 = .{ .re = std.math.nan(f64), .im = std.math.nan(f64) };
+    const sentinel: [16]C128 = @splat(nan);
+    var output: [6]C128 = @splat(nan);
+    output[2] = .{ .re = 97, .im = 98 };
+    output[5] = output[2];
+    try native.matrixMultiplyC128NC(&fixture.context, complexArgs(&sentinel, &sentinel, &output, 2, 2, 2, 3, 4, 3, zero, zero), &fixture.report);
+    for ([_]usize{ 0, 1, 3, 4 }) |i| {
+        try std.testing.expectEqual(@as(f64, 0), output[i].re);
+        try std.testing.expectEqual(@as(f64, 0), output[i].im);
+    }
+    try std.testing.expectEqual(@as(f64, 97), output[2].re);
+    try native.matrixMultiplyC128NC(&fixture.context, complexArgs(&.{}, &.{}, &output, 2, 2, 0, 0, 0, 3, one, .{ .re = 2, .im = -1 }), &fixture.report);
+    try std.testing.expectEqual(@as(usize, 2), submissions);
+    try std.testing.expectEqual(@as(usize, 4), allocations);
+    try native.matrixMultiplyC128NC(&fixture.context, complexArgs(&.{}, &.{}, &.{}, 0, 2, 0, 0, 0, 0, one, zero), &fixture.report);
+    try std.testing.expectEqual(execution.OutputState.unchanged, fixture.report.output);
+    try std.testing.expectEqual(@as(usize, 2), submissions);
+    try std.testing.expectEqual(@as(usize, 4), allocations);
+    _ = fixture.context.requestClose();
+    try std.testing.expectError(error.ContextClosing, native.matrixMultiplyC128NC(&fixture.context, complexArgs(&.{}, &.{}, &.{}, 0, 2, 0, 0, 0, 0, one, zero), &fixture.report));
+}
+
+test "native complex scratch submit callback execution failures preserve diagnostics and owners" {
+    const input: [8]C128 = @splat(.{ .re = 2, .im = 1 });
+    const alpha: C128 = .{ .re = 1, .im = -0.5 };
+    const beta: C128 = .{ .re = 0, .im = 0 };
+    for ([_]Mode{ .budget, .oom_second, .reject, .callback_error }) |failure| {
+        var fixture: Fixture = .{};
+        try fixture.init(2);
+        defer fixture.deinit();
+        mode = failure;
+        var output: [8]C128 = @splat(.{ .re = 77, .im = -99 });
+        const saved = output;
+        const expected = switch (failure) {
+            .budget => error.ResourceBudgetExceeded,
+            .oom_second => error.OutOfMemory,
+            .reject => error.ProviderRejected,
+            .callback_error => error.ProviderCallbackFailed,
+            else => unreachable,
+        };
+        try std.testing.expectError(expected, native.matrixMultiplyC128NC(&fixture.context, complexArgs(&input, &input, &output, 2, 3, 2, 2, 3, 2, alpha, beta), &fixture.report));
+        if (failure == .callback_error) {
+            try std.testing.expectEqual(execution.OutputState.partial_or_invalid, fixture.report.output);
+            try std.testing.expectEqual(@as(i32, -1903), fixture.report.provider.callback_status);
+        } else {
+            try std.testing.expectEqualSlices(C128, &saved, &output);
+            try std.testing.expectEqual(execution.OutputState.unchanged, fixture.report.output);
+        }
+        try std.testing.expectEqual(@as(usize, 0), live_scratch);
+        try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+    }
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    fail_submission = 1;
+    bulk_failure = .execution;
+    var output: [8]C128 = @splat(.{ .re = 77, .im = -99 });
+    try std.testing.expectError(error.ProviderExecutionFailed, native.matrixMultiplyC128NC(&fixture.context, complexArgs(&input, &input, &output, 2, 3, 2, 2, 3, 2, alpha, beta), &fixture.report));
+    try std.testing.expectEqual(execution.OutputState.partial_or_invalid, fixture.report.output);
+    try std.testing.expectEqual(@as(i32, -1904), fixture.report.provider.execution_status);
+    try std.testing.expectEqual(@as(usize, 1), submissions);
+}
+
+test "native complex admitted close stays busy until provider callbacks and scratch complete" {
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    grid_close_during = &fixture.context;
+    const input: [8]C128 = @splat(.{ .re = 2, .im = 1 });
+    var output: [8]C128 = undefined;
+    try native.matrixMultiplyC128NC(&fixture.context, complexArgs(&input, &input, &output, 2, 3, 2, 2, 3, 2, .{ .re = 1, .im = 0 }, .{ .re = 0, .im = 0 }), &fixture.report);
+    try std.testing.expect(grid_close_during_busy.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 0), live_scratch);
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+}

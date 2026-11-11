@@ -72,6 +72,26 @@ zynum_native_status zynum_native_gemm_f64_tn_v1(void *storage,
  const double *a, uint64_t a_backing_elements, uint64_t lda,
  const double *b, uint64_t b_backing_elements, uint64_t ldb, double beta,
  double *c, uint64_t c_backing_elements, uint64_t ldc, zynum_native_report_v1 *report);
+/* Complex128 row-major CN: C = alpha*adjoint(A)*B + beta*C, with physical
+   A(k,m), B(k,n), C(m,n). Complex values use Heteris Data's interleaved
+   double(real,imag) representation (16 bytes, alignment 8). All capacities and
+   leading dimensions count complex elements, never doubles or bytes.
+   alpha/beta are finite primitive components. Complete declared spans must be
+   representable and C disjoint from A/B; A and B may overlap each other.
+   Context/report and complete declared spans must be disjoint. Every metadata
+   check precedes report writes and borrowing. Unprovable control/span metadata
+   returns INVALID_ARGUMENT with report untouched. A zero m/n validates and
+   admits without allocation/submission/writes. alpha=0 or k=0 does not read
+   A/B; beta=0 does not read C. Every nonempty output uses the explicit provider.
+   Rejected admission/allocation/submission preserves C; quiescent execution or
+   callback failure may leave C partial or invalid. Scratch-release/provider
+   contract violations retain the existing fail-stop ownership policy. */
+zynum_native_status zynum_native_gemm_c128_row_major_cn_v1(void *storage,
+ uint64_t m, uint64_t n, uint64_t k, double alpha_re, double alpha_im,
+ const double *a_ri, uint64_t a_capacity_complex, uint64_t lda_complex,
+ const double *b_ri, uint64_t b_capacity_complex, uint64_t ldb_complex,
+ double beta_re, double beta_im, double *c_ri, uint64_t c_capacity_complex,
+ uint64_t ldc_complex, zynum_native_report_v1 *report);
 /* Contiguous periodic 3D FP64 grid, axis 2 fastest. Positive finite inverse
    squared spacings. No in-place operation: full declared X/Y spans are disjoint.
    Control ranges are checked before any report write; an uncheckable declared

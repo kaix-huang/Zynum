@@ -20,3 +20,7 @@ pub const periodicLaplacianF64 = core.native_grid.periodicLaplacianF64;
 pub const periodic_neg_laplacian = core.native_grid_solve;
 pub const f64_sum_summary = core.native_f64_summary;
 pub const spectral = core.native_spectral;
+
+pub const ComplexF64 = core.native.ComplexF64;
+pub const MatrixProductC128 = core.native.MatrixProductC128;
+pub const matrixMultiplyC128NC = core.native.matrixMultiplyC128NC;

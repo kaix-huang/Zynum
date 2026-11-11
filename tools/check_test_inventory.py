@@ -848,7 +848,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '531444aaffec42140ecba01917937f3e2696017a70ea20a25983e2e60ac8baa5'
+CURRENT_TEST_INVENTORY_SHA256 = '9bf5510d25b53e3e94049597a3c5b9c5b1bf902c5a035504991116fc6ef00919'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = '9f1f4a649d301d0f75907f3af11a8d25cee038ceca25f92839d7aafb5df32204'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -4912,6 +4912,32 @@ def _reviewed_poisson_source_refresh(previous: dict[str, Any], current: dict[str
     return True
 
 
+# Exact native C128 source metadata migration; no compiler observation is created.
+# The build source contract binds all twelve reviewed facade/consumer/Core blobs.
+C128_PREVIOUS_SOURCE_SHA256 = "90499435640c177574c7a735afb31ba50c411eebf9e379076c16eff946eca3d9"
+C128_CURRENT_SOURCE_SHA256 = "faa4835baf1ea430ae205cb8c3bac86bdaac61591a696d91eeaee7241a313dfc"
+C128_CHANGED_CORRECTNESS_ROOT_IDS = frozenset(("correctness-root:native-provider-math_tests", "correctness-root:heteris-adapter-package", "correctness-root:native-provider-c_tests"))
+
+
+def _reviewed_c128_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    if (_fact_digest(_host_assembly_source_facts(previous)) != C128_PREVIOUS_SOURCE_SHA256 or
+            _fact_digest(_host_assembly_source_facts(current)) != C128_CURRENT_SOURCE_SHA256):
+        return False
+    for key, allowed in (("test_roots", frozenset()),
+                         ("correctness_only_roots", C128_CHANGED_CORRECTNESS_ROOT_IDS),
+                         ("zig_test_files", frozenset(("zig-file:src/native_provider_math_test.zig",)))):
+        old = {row["id"]: row for row in previous[key]}
+        new = {row["id"]: row for row in current[key]}
+        if old.keys() != new.keys() or {key for key in old if old[key] != new[key]} != allowed:
+            return False
+    old_declarations = next(row["declarations"] for row in previous["zig_test_files"]
+                            if row["id"] == "zig-file:src/native_provider_math_test.zig")
+    new_declarations = next(row["declarations"] for row in current["zig_test_files"]
+                            if row["id"] == "zig-file:src/native_provider_math_test.zig")
+    return (len(old_declarations) == 28 and len(new_declarations) == 32 and
+            new_declarations[:28] == old_declarations)
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -4925,6 +4951,7 @@ def _refresh_base_compatible_discovery(
     native_spectral_migration = _reviewed_native_spectral_source_refresh(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     poisson_migration = _reviewed_poisson_source_refresh(inventory, discovered)
+    c128_migration = _reviewed_c128_source_refresh(inventory, discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -5153,7 +5180,7 @@ def _refresh_base_compatible_discovery(
              for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
             key=lambda gap: gap["id"],
         )
-    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration or poisson_migration:
+    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration or poisson_migration or c128_migration:
         # Reconstruct the reviewed old source metadata for base validation only.
         # The candidate still comes from discover(); native-ledger immutability
         # and the original whole-file CURRENT/NEXT/publication gates remain.

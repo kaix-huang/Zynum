@@ -6762,7 +6762,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -6797,7 +6797,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7065,7 +7065,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7109,7 +7109,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7153,7 +7153,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7443,7 +7443,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7487,7 +7487,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7519,7 +7519,7 @@
           "module": "native",
           "attachment_owner": "main",
           "target": "requested-target",
-          "source_sha256": "47d711395098be0c95d21059ed00f3e75c74250cc058cfd3e5cd089efa8c8d19",
+          "source_sha256": "0aba8a9f9a1134d69b276b844ecacbc9854b9b33aedb0f785cbc74e5e615c833",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47"
         },
         {
@@ -7549,7 +7549,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "0f3d5ee677b3d36999480747c9c90a813baa63a3de873d2befb70ce7211c2d47",
           "input_sha256": {
-            "include/zynum_native.h": "26a8fb07bb2e360c777b8226c45a518aeabf6c40a03f89d3494021d20d073cba",
+            "include/zynum_native.h": "278b28c50b99d387e6326da7b8f87bbb28e00eb6384241db7a7baa1ec66ded03",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -10569,6 +10569,30 @@
           "id": "zig-decl:src/native_provider_math_test.zig:27",
           "name": "projected periodic solve reports produced nonfinite stencil arithmetic without publishing",
           "ordinal": 27,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:28",
+          "name": "native complex NC portable leaf matches scalar oracle for padded non-square tasks",
+          "ordinal": 28,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:29",
+          "name": "native complex zero semantics and empty output use one admission without fallback",
+          "ordinal": 29,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:30",
+          "name": "native complex scratch submit callback execution failures preserve diagnostics and owners",
+          "ordinal": 30,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:src/native_provider_math_test.zig:31",
+          "name": "native complex admitted close stays busy until provider callbacks and scratch complete",
+          "ordinal": 31,
           "kind": "named"
         }
       ],
@@ -60516,11 +60540,11 @@
     },
     "correctness_only_roots": {
       "count": 6,
-      "digest": "bd166966274606a70323425729640caf80aed27bafc907d1accac7113ab75c59"
+      "digest": "9fd1abc6de26299893aed0c90d3f30ab69929f71c1d5943dac0ba9778967527c"
     },
     "zig_test_files": {
       "count": 174,
-      "digest": "de781d5eb894739503c76b4ee24b3ad939767ad78574b262379f85e797c7a842"
+      "digest": "391af37fc5a0bf56ffe7aa386c5a29e9a447cf0fb38c7b6bdb04c88a085f7c6e"
     },
     "python_test_modules": {
       "count": 42,

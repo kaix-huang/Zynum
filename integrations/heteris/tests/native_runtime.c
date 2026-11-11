@@ -21,9 +21,9 @@ static pthread_t caller;
 static _Atomic unsigned bulk_calls, callback_calls, caller_callbacks;
 enum death_fault { DEATH_NONE, DEATH_MALFORMED, DEATH_NONQUIESCENT, DEATH_RELEASE };
 static enum death_fault death_fault;
-enum death_operation { DEATH_TN, DEATH_LAPLACIAN, DEATH_PERIODIC_SOLVE };
+enum death_operation { DEATH_TN, DEATH_LAPLACIAN, DEATH_PERIODIC_SOLVE, DEATH_C128 };
 static enum death_operation death_operation;
-static const char *const death_labels[] = { "TN", "LAPLACIAN", "PERIODIC_SOLVE" };
+static const char *const death_labels[] = { "TN", "LAPLACIAN", "PERIODIC_SOLVE", "C128_CN" };
 static unsigned death_phase, death_allocations, death_release_site;
 static heteris_rp_token death_leases[6];
 static heteris_status death_allocate(heteris_rp_token p,uint64_t bytes,uint64_t alignment,heteris_rp_scratch_v1 *out) {
@@ -76,6 +76,7 @@ static void tn_death_case(enum death_fault fault,unsigned phase,unsigned release
   zynum_native_periodic_neg_laplacian_report_v1 solve_report;
   (void)zynum_native_periodic_neg_laplacian_solve_f64_v1(context.data,&problem,rhs,4,output,4,work,48,&solve_report);
  }
+ else if(death_operation==DEATH_C128)(void)zynum_native_gemm_c128_row_major_cn_v1(context.data,1,2,1,1,0,a,1,1,a,2,2,0,0,output,2,2,&report);
  else if(death_operation==DEATH_LAPLACIAN)(void)zynum_native_laplacian_periodic_3d_f64_v1(context.data,1,2,2,a,4,output,4,2,3,4,&report);
  else (void)zynum_native_gemm_f64_tn_v1(context.data,2,2,2,1,a,4,2,a,4,2,1,output,4,2,&report);
  _exit(99); /* A returning API is never accepted as fail-stop evidence. */
@@ -128,11 +129,23 @@ static void periodic_solve_death_cases(void) {
  printf("native projected periodic solve fail-stop cases passed: 8 real-Runtime child processes\n");
 }
 
+static void complex_gemm_cases(void *context);
+static void complex_death_cases(void) {
+ death_operation=DEATH_C128;
+ for(uint32_t limit=1;limit<=2;++limit){
+  expect_tn_death(DEATH_MALFORMED,1,0,limit);
+  expect_tn_death(DEATH_NONQUIESCENT,1,0,limit);
+  for(unsigned site=1;site<=2;++site)expect_tn_death(DEATH_RELEASE,0,site,limit);
+ }
+ death_operation=DEATH_TN;
+ printf("native complex128 CN fail-stop cases passed: 8 real-Runtime child processes\n");
+}
 static void f64_summary_cases(void);
 static void periodic_solve_cases(void *context,double *rhs,double *solution,double *workspace);
 static void laplacian_runtime_cases(void);
 static void spectral_runtime_cases(void);
 int main(int argc,char **argv) {
+ complex_death_cases();
  tn_death_cases();
  laplacian_death_cases();
  periodic_solve_death_cases();
@@ -165,6 +178,7 @@ int main(int argc,char **argv) {
  memcpy(a,av,sizeof av);memcpy(b,bv,sizeof bv);for(int i=0;i<4;++i)c[i]=1;
  zynum_native_policy_v1 policy={1,sizeof policy,1,0,{0,0}};zynum_native_report_v1 report;
  for(int i=0;i<2;++i)assert(zynum_native_context_init_v1(contexts[i].data,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
+ complex_gemm_cases(contexts[1].data);
  assert(real_api.provider_release(provider.provider)==HETERIS_OK);memset(&provider,0,sizeof provider);memset(&traced,0,sizeof traced);
  assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_BUSY);
  assert(call_gemm(contexts[0].data,2,2,2,1,a,4,2,b,4,2,0.5,c,4,2,&report)==ZYNUM_NATIVE_OK);equals(c,expected,4);
@@ -225,7 +239,8 @@ int main(int argc,char **argv) {
  assert(zynum_native_gemm_f64_tn_v1(contexts[1].data,0,2,0,1,NULL,0,0,NULL,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_CONTEXT_CLOSING);
  assert(zynum_native_gemm_f64_tn_v1(contexts[1].data,2,2,3,1,a,7,5,b,7,4,0,c,6,3,&report)==ZYNUM_NATIVE_VIEW_INVALID);
  assert(zynum_native_context_progress_close_v1(contexts[1].data,&report)==ZYNUM_NATIVE_OK);
- assert(atomic_load(&bulk_calls)==6&&atomic_load(&callback_calls)>=6&&atomic_load(&caller_callbacks)==0);
+ /* Six original submissions plus four explicit complex calls above. */
+ assert(atomic_load(&bulk_calls)==10&&atomic_load(&callback_calls)>=10&&atomic_load(&caller_callbacks)==0);
  for(int i=0;i<3;++i)assert(real_api.scratch_release(matrices[i].lease)==HETERIS_OK);
  for(int i=0;i<2;++i)assert(real_api.scratch_release(contexts[i].lease)==HETERIS_OK);
  assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_OK);
@@ -710,4 +725,73 @@ static void spectral_runtime_cases(void) {
  for(unsigned i=0;i<8;++i)assert(api.scratch_release(memory[i].lease)==HETERIS_OK);
  assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_OK);
  printf("native spectral C controls, guard, reports, empty, worker and close cases passed\n");
+}
+
+
+static void complex_gemm_cases(void *context) {
+ /* Primitive interleaved C ABI, independent scalar oracle, non-square CN. */
+ double a[40],b[48],output[40],expected[40];
+ for(unsigned i=0;i<40;++i)a[i]=(double)(i%7)-2;
+ for(unsigned i=0;i<48;++i)b[i]=(double)(i%5)-1;
+ for(unsigned i=0;i<40;++i)output[i]=expected[i]=773;
+ const uint64_t m=2,n=3,k=4,lda=4,ldb=5,ldc=5;
+ for(uint64_t i=0;i<m;++i)for(uint64_t j=0;j<n;++j){
+  double sr=0,si=0;
+  for(uint64_t q=0;q<k;++q){
+   const double ar=a[2*(q*lda+i)],ai=a[2*(q*lda+i)+1];
+   const double br=b[2*(q*ldb+j)],bi=b[2*(q*ldb+j)+1];
+   sr+=ar*br+ai*bi;si+=ar*bi-ai*br;
+  }
+  expected[2*(i*ldc+j)]=1.25*sr+0.75*si-0.5*773-0.25*773;
+  expected[2*(i*ldc+j)+1]=1.25*si-0.75*sr-0.5*773+0.25*773;
+ }
+ zynum_native_report_v1 report;
+ assert(zynum_native_gemm_c128_row_major_cn_v1(context,m,n,k,1.25,-0.75,a,20,lda,b,24,ldb,-0.5,0.25,output,20,ldc,&report)==ZYNUM_NATIVE_OK);
+ equals(output,expected,40);assert(report.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE&&report.callbacks_completed>0);
+ const unsigned submitted=atomic_load(&bulk_calls);double saved[40],saved_a[40],saved_b[48];memcpy(saved,output,sizeof saved);memcpy(saved_a,a,sizeof a);memcpy(saved_b,b,sizeof b);
+ #define C128_REJECT(code,call) do { memset(&report,0xa5,sizeof report);zynum_native_report_v1 keep=report;assert((call)==(code));assert(memcmp(&report,&keep,sizeof report)==0); } while(0)
+ #define C128_CALL(ctx,aa,ac,al,bb,bc,bl,cc,cap,cl,rr) zynum_native_gemm_c128_row_major_cn_v1(ctx,m,n,k,1.25,-0.75,aa,ac,al,bb,bc,bl,-0.5,0.25,cc,cap,cl,rr)
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,C128_CALL(context,NULL,20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,C128_CALL(context,a,13,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,C128_CALL(context,a,20,1,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,C128_CALL(context,(const double*)((uintptr_t)a+1),20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,C128_CALL(context,a,20,lda,b,24,ldb,a+20,10,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,a,UINT64_MAX,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,(const double*)(UINTPTR_MAX-7),20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(NULL,a,20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL((void*)((uintptr_t)context+1),a,20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,(const double*)&report,20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,(const double*)context,20,lda,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,a,20,lda,b,24,ldb,output,20,ldc,(zynum_native_report_v1*)(output+2)));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,a,20,lda,b,24,ldb,output,20,ldc,(zynum_native_report_v1*)((uintptr_t)&report+1)));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,a,20,lda,b,24,ldb,output,20,ldc,NULL));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,C128_CALL(context,a,20,lda,b,24,ldb,output,20,ldc,(zynum_native_report_v1*)(a+30)));
+ /* Full declared A padding overlaps C although the active 1x1 views do not. */
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,zynum_native_gemm_c128_row_major_cn_v1(context,1,1,1,1,0,a,20,1,b,24,1,0,0,a+20,10,1,&report));
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,zynum_native_gemm_c128_row_major_cn_v1(context,m,n,k,0,0,a,13,lda,b,24,ldb,0,0,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_VIEW_INVALID,zynum_native_gemm_c128_row_major_cn_v1(context,0,n,k,1,0,NULL,0,0,NULL,0,0,0,0,NULL,0,0,&report));
+ C128_REJECT(ZYNUM_NATIVE_OVERFLOW,zynum_native_gemm_c128_row_major_cn_v1(context,UINT64_MAX,n,k,1,0,a,20,lda,b,24,ldb,0,0,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_OVERFLOW,C128_CALL(context,a,20,UINT64_MAX,b,24,ldb,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,zynum_native_gemm_c128_row_major_cn_v1(context,m,n,k,INFINITY,0,a,20,lda,b,24,ldb,0,0,output,20,ldc,&report));
+ C128_REJECT(ZYNUM_NATIVE_INVALID_ARGUMENT,zynum_native_gemm_c128_row_major_cn_v1(context,m,n,k,1,0,a,20,lda,b,24,ldb,0,NAN,output,20,ldc,&report));
+ equals(output,saved,40);equals(a,saved_a,40);equals(b,saved_b,48);assert(atomic_load(&bulk_calls)==submitted);
+ #undef C128_CALL
+ #undef C128_REJECT
+ for(unsigned i=0;i<40;++i)a[i]=NAN;
+ for(unsigned i=0;i<48;++i)b[i]=NAN;
+ for(unsigned i=0;i<40;++i)output[i]=NAN;
+ assert(zynum_native_gemm_c128_row_major_cn_v1(context,m,n,k,0,0,a,20,lda,b,24,ldb,0,0,output,20,ldc,&report)==ZYNUM_NATIVE_OK);
+ for(uint64_t i=0;i<m;++i)for(uint64_t j=0;j<n;++j){assert(output[2*(i*ldc+j)]==0);assert(output[2*(i*ldc+j)+1]==0);}
+ assert(isnan(output[6])&&isnan(output[7]));
+ output[0]=2;output[1]=-3;
+ assert(zynum_native_gemm_c128_row_major_cn_v1(context,1,1,0,1,2,NULL,0,0,NULL,0,0,2,-1,output,20,ldc,&report)==ZYNUM_NATIVE_OK);
+ assert(output[0]==1&&output[1]==-8);
+ /* A/B sharing is permitted; beta zero ignores NaN output. */
+ a[0]=2;a[1]=3;output[0]=output[1]=NAN;
+ assert(zynum_native_gemm_c128_row_major_cn_v1(context,1,1,1,1,0,a,1,1,a,1,1,0,0,output,20,ldc,&report)==ZYNUM_NATIVE_OK);
+ assert(output[0]==13&&output[1]==0);
+ unsigned before_zero=atomic_load(&bulk_calls);
+ assert(zynum_native_gemm_c128_row_major_cn_v1(context,0,3,0,1,0,NULL,0,0,NULL,0,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_OK);
+ assert(report.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED&&atomic_load(&bulk_calls)==before_zero);
+ printf("native complex128 CN primitive C ABI and metadata cases passed\n");
 }

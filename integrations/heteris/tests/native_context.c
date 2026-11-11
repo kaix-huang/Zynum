@@ -36,9 +36,13 @@ int main(void) {
  assert(zynum_native_context_init_v1(first,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  assert(zynum_native_context_init_v1(second,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  assert(retains==2 && owned==3 && report.abi_version==1 && report.struct_size==sizeof report);
+ /* Empty complex outputs still admit but never allocate/submit: mock calls abort. */
+ assert(zynum_native_gemm_c128_row_major_cn_v1(first,0,2,0,1,0,NULL,0,0,NULL,0,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_OK);
+ assert(report.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED&&report.submission_state==ZYNUM_NATIVE_SUBMISSION_NOT_SUBMITTED);
  /* Both contexts must own copied immutable descriptor/table prefixes. */
  memset(&provider,0,sizeof provider);memset(&api,0,sizeof api);
  assert(zynum_native_context_request_close_v1(first,&report)==ZYNUM_NATIVE_OK && report.close_state==ZYNUM_NATIVE_CLOSE_CLOSING);
+ assert(zynum_native_gemm_c128_row_major_cn_v1(first,0,2,0,1,0,NULL,0,0,NULL,0,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_CONTEXT_CLOSING);
  fail_release=1;
  assert(zynum_native_context_progress_close_v1(first,&report)==ZYNUM_NATIVE_RELEASE_FAILED);
  assert(report.close_state==ZYNUM_NATIVE_CLOSE_RELEASE_FAILED && report.provider_status==HETERIS_BUSY && report.cleanup_status==HETERIS_BUSY && owned==3);

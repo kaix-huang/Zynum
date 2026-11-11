@@ -322,6 +322,104 @@ export fn zynum_native_gemm_f64_tn_v1(storage: ?*anyopaque, m64: u64, n64: u64, 
     return c.ZYNUM_NATIVE_OK;
 }
 
+// Heteris Data COMPLEX128 is interleaved real/imaginary binary64, size 16,
+// alignment 8. Prove the one original Core scalar representation before casts.
+const C128 = native.ComplexF64;
+comptime {
+    if (@sizeOf(f64) != 8 or @alignOf(f64) != 8 or @sizeOf(C128) != 16 or @alignOf(C128) != 8 or
+        @offsetOf(C128, "re") != 0 or @offsetOf(C128, "im") != 8)
+        @compileError("Core ComplexF64 does not match Heteris Data COMPLEX128");
+    if (c.heteris_dtype_size(c.HETERIS_COMPLEX128) != @sizeOf(C128) or
+        c.heteris_dtype_alignment(c.HETERIS_COMPLEX128) != @alignOf(C128))
+        @compileError("Heteris Data COMPLEX128 layout differs from the Core");
+}
+fn complexDeclaredBytes(address: usize, capacity64: u64) ?usize {
+    const capacity = std.math.cast(usize, capacity64) orelse return null;
+    const bytes = std.math.mul(usize, capacity, @sizeOf(C128)) catch return null;
+    _ = std.math.add(usize, address, bytes) catch return null;
+    return bytes;
+}
+fn complexMatrixRange(address: usize, capacity64: u64, bytes: usize, rows: i32, columns: i32, leading: i32) BufferError!BufferRange {
+    const capacity = std.math.cast(usize, capacity64) orelse return error.Overflow;
+    var required: usize = 0;
+    if (rows != 0 and columns != 0) {
+        if (leading < rows) return error.InvalidView;
+        const offset = std.math.mul(usize, @intCast(columns - 1), @intCast(leading)) catch return error.Overflow;
+        required = std.math.add(usize, offset, @intCast(rows)) catch return error.Overflow;
+    }
+    const required_bytes = std.math.mul(usize, required, @sizeOf(C128)) catch return error.Overflow;
+    if (required > capacity) return error.InvalidView;
+    if (address == 0) {
+        if (capacity != 0 or required != 0) return error.InvalidView;
+    } else if (address % @alignOf(C128) != 0) return error.InvalidView;
+    return .{ .address = address, .backing = capacity, .backing_bytes = bytes, .required_bytes = required_bytes };
+}
+const empty_c128: [0]C128 = .{};
+fn constComplexSlice(range: BufferRange) []const C128 {
+    if (range.address == 0) return &empty_c128;
+    const values: [*]const C128 = @ptrFromInt(range.address);
+    return values[0..range.backing];
+}
+fn mutableComplexSlice(range: BufferRange) []C128 {
+    if (range.address == 0) return @constCast(&empty_c128);
+    const values: [*]C128 = @ptrFromInt(range.address);
+    return values[0..range.backing];
+}
+export fn zynum_native_gemm_c128_row_major_cn_v1(storage: ?*anyopaque, m64: u64, n64: u64, k64: u64, alpha_re: f64, alpha_im: f64, a_raw: ?*align(1) const f64, a_capacity: u64, lda64: u64, b_raw: ?*align(1) const f64, b_capacity: u64, ldb64: u64, beta_re: f64, beta_im: f64, c_raw: ?*align(1) f64, c_capacity: u64, ldc64: u64, report_raw: ?*align(1) Report) i32 {
+    // Prove every complete declared range and control separation before a
+    // report write, borrowed slice, Context access, allocation or submission.
+    const ctx = contextPointer(storage) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_pointer = report_raw orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_address = @intFromPtr(report_pointer);
+    const context_address = @intFromPtr(ctx);
+    if (!validAddress(report_address, @sizeOf(Report), @alignOf(Report)) or
+        overlaps(report_address, @sizeOf(Report), context_address, @sizeOf(Context))) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const addresses = [3]usize{
+        if (a_raw) |value| @intFromPtr(value) else 0,
+        if (b_raw) |value| @intFromPtr(value) else 0,
+        if (c_raw) |value| @intFromPtr(value) else 0,
+    };
+    const capacities = [3]u64{ a_capacity, b_capacity, c_capacity };
+    var bytes: [3]usize = undefined;
+    for (addresses, capacities, 0..) |address, capacity, index| {
+        bytes[index] = complexDeclaredBytes(address, capacity) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+        if (overlaps(report_address, @sizeOf(Report), address, bytes[index]) or
+            overlaps(context_address, @sizeOf(Context), address, bytes[index])) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    }
+    const m = dimension(m64) catch |err| return bufferStatus(err);
+    const n = dimension(n64) catch |err| return bufferStatus(err);
+    const k = dimension(k64) catch |err| return bufferStatus(err);
+    const lda = dimension(lda64) catch |err| return bufferStatus(err);
+    const ldb = dimension(ldb64) catch |err| return bufferStatus(err);
+    const ldc = dimension(ldc64) catch |err| return bufferStatus(err);
+    // Row-major physical A(k,m), B(k,n), C(m,n) are borrowed without
+    // copies as column-major A(m,k), B(n,k), C(n,m).
+    const a = complexMatrixRange(addresses[0], a_capacity, bytes[0], m, k, lda) catch |err| return bufferStatus(err);
+    const b = complexMatrixRange(addresses[1], b_capacity, bytes[1], n, k, ldb) catch |err| return bufferStatus(err);
+    const output = complexMatrixRange(addresses[2], c_capacity, bytes[2], n, m, ldc) catch |err| return bufferStatus(err);
+    if (!std.math.isFinite(alpha_re) or !std.math.isFinite(alpha_im) or
+        !std.math.isFinite(beta_re) or !std.math.isFinite(beta_im)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    if (overlaps(output.address, output.backing_bytes, a.address, a.backing_bytes) or
+        overlaps(output.address, output.backing_bytes, b.address, b.backing_bytes)) return c.ZYNUM_NATIVE_VIEW_INVALID;
+    const report = reportPointer(report_raw, storage, @sizeOf(Context)) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    // C^T = alpha * B^T * conjugate(A) + beta*C^T: NC with dimensions
+    // (n,m,k). Neither alpha nor beta is conjugated by this storage mapping.
+    const args: native.MatrixProductC128 = .{
+        .left_matrix = .{ .values = constComplexSlice(b), .row_count = n, .column_count = k, .leading_dimension = ldb },
+        .right_matrix = .{ .values = constComplexSlice(a), .row_count = m, .column_count = k, .leading_dimension = lda, .operation = .adjoint },
+        .result_matrix = .{ .values = mutableComplexSlice(output), .row_count = n, .column_count = m, .leading_dimension = ldc },
+        .product_scale = .{ .re = alpha_re, .im = alpha_im },
+        .result_scale = .{ .re = beta_re, .im = beta_im },
+    };
+    var result: execution.CallReport = .{};
+    native.matrixMultiplyC128NC(ctx, args, &result) catch |err| {
+        reportResult(report, result);
+        return mathematicalStatus(err);
+    };
+    reportResult(report, result);
+    return c.ZYNUM_NATIVE_OK;
+}
+
 // Full declared ranges, including empty-grid tails, must be computable before
 // any control bytes change. This intentionally does not alter GEMM precedence.
 fn gridDeclaredBytes(address: usize, backing: u64) ?usize {

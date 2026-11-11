@@ -1663,12 +1663,7 @@ pub fn gemmWithResources(comptime T: type, resources: CallResources, transa: Ord
     const n = toUsize(n_);
     const k = toUsize(k_);
     if (k == 0 or isZero(T, alpha)) {
-        for (0..n) |j| {
-            for (0..m) |i| {
-                const idxc = matIndex(ldc, i, j);
-                c[idxc] = if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]);
-            }
-        }
+        scaleMatrixColumns(T, m, n, beta, c, ldc);
         return;
     }
     if (T == ComplexF32 or T == ComplexF64) {
@@ -1691,4 +1686,77 @@ pub fn gemmWithResources(comptime T: type, resources: CallResources, transa: Ord
 /// the injected provider. It never enters the legacy GEMV/packed fallbacks.
 pub fn gemmF64NNExplicit(operation: *const @import("zynum-execution").Operation, args: @import("../checked/operands.zig").MatrixProduct(f64), report: *@import("zynum-execution").CallReport) @import("zynum-execution").ExecutionError!void {
     try planner.noTransF64Explicit(operation, args.output.row_count, args.output.column_count, args.left.column_count, args.product_scale, args.left.values, args.left.leading_dimension, args.right.values, args.right.leading_dimension, args.output_scale, args.output.values, args.output.leading_dimension, report);
+}
+
+/// Shared original Core scale semantics: beta zero never reads output.
+fn scaleMatrixColumns(comptime T: type, m: usize, n: usize, beta: T, c: [*]T, ldc: BlasInt) void {
+    for (0..n) |j| {
+        for (0..m) |i| {
+            const idxc = matIndex(ldc, i, j);
+            c[idxc] = if (isZero(T, beta)) zero(T) else mul(T, beta, c[idxc]);
+        }
+    }
+}
+
+const ExplicitC128NCTask = struct {
+    m: BlasInt,
+    n: BlasInt,
+    k: BlasInt,
+    alpha: ComplexF64,
+    a: [*]const ComplexF64,
+    lda: BlasInt,
+    b: [*]const ComplexF64,
+    ldb: BlasInt,
+    beta: ComplexF64,
+    c: [*]ComplexF64,
+    ldc: BlasInt,
+};
+fn runExplicitC128NCTask(raw: *const anyopaque, index: usize) void {
+    const tasks: [*]const ExplicitC128NCTask = @ptrCast(@alignCast(raw));
+    const task = tasks[index];
+    if (task.k == 0 or isZero(ComplexF64, task.alpha)) {
+        scaleMatrixColumns(ComplexF64, @intCast(task.m), @intCast(task.n), task.beta, task.c, task.ldc);
+    } else {
+        gemmComplexF64PortableMode(.no_trans, .conj_trans, task.m, task.n, task.k, task.alpha, task.a, task.lda, task.b, task.ldb, task.beta, task.c, task.ldc);
+    }
+}
+
+/// Integrated portable policy only. Each provider task owns disjoint output
+/// columns and invokes the existing portable leaf, without planner selection,
+/// implicit scratch allocators, serial replay, packing or fallback.
+pub fn gemmC128NCExplicit(operation: *const @import("zynum-execution").Operation, args: @import("../checked/operands.zig").MatrixProduct(ComplexF64), report: *@import("zynum-execution").CallReport) @import("zynum-execution").ExecutionError!void {
+    const execution = @import("zynum-execution");
+    const resources = execution.admittedResources(operation);
+    const limit = @min(resources.maxThreads(), execution.max_tasks);
+    if (limit == 0) return error.Unsupported;
+    const m = args.output.row_count;
+    const n = args.output.column_count;
+    const k = args.left.column_count;
+    if (m < 0 or n < 0 or k < 0) return error.ExtentOverflow;
+    if (m == 0 or n == 0) return;
+    const columns: usize = @intCast(n);
+    const task_count = @min(columns, limit);
+    var tasks = try resources.acquireScratch(ExplicitC128NCTask, task_count, report);
+    defer tasks.release(report);
+    var first: usize = 0;
+    for (tasks.values, 0..) |*task, index| {
+        const count = columns / task_count + @intFromBool(index < columns % task_count);
+        // Scale-only calls may carry empty inputs: derive no unused pointer.
+        const b = if (k == 0 or isZero(ComplexF64, args.product_scale)) args.right.values else args.right.values + first;
+        task.* = .{
+            .m = m,
+            .n = @intCast(count),
+            .k = k,
+            .alpha = args.product_scale,
+            .a = args.left.values,
+            .lda = args.left.leading_dimension,
+            .b = b,
+            .ldb = args.right.leading_dimension,
+            .beta = args.output_scale,
+            .c = args.output.values + first * @as(usize, @intCast(args.output.leading_dimension)),
+            .ldc = args.output.leading_dimension,
+        };
+        first += count;
+    }
+    try resources.runChecked(runExplicitC128NCTask, @ptrCast(tasks.values.ptr), tasks.values.len, report);
 }

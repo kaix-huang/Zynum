@@ -9,6 +9,7 @@
 #include <zynum_native_spectral.h>
 #include <zynum_native.h>
 #include <cassert>
+#include <complex>
 #include <cmath>
 #include <cstring>
 #include <type_traits>
@@ -18,6 +19,23 @@ static_assert(sizeof(zynum_native_report_v1)==72);
 using Gemm=zynum_native_status(*)(void*,uint64_t,uint64_t,uint64_t,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double*,uint64_t,uint64_t,zynum_native_report_v1*);
 static_assert(std::is_same_v<decltype(&zynum_native_gemm_f64_nn_v1),Gemm>);
 static_assert(std::is_same_v<decltype(&zynum_native_gemm_f64_tn_v1),Gemm>);
+using GemmCN=zynum_native_status(*)(void*,uint64_t,uint64_t,uint64_t,double,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double,double*,uint64_t,uint64_t,zynum_native_report_v1*);
+static_assert(std::is_same_v<decltype(&zynum_native_gemm_c128_row_major_cn_v1),GemmCN>);
+static void cpp_complex_cases(void *context) {
+ // C++ permits viewing complex<double> arrays as interleaved double arrays.
+ // No Zig struct is named or borrowed by this consumer.
+ const std::complex<double> a[6]={{1,2},{3,-1},{71,72},{-2,1},{4,3},{73,74}};
+ const std::complex<double> b[8]={{2,-1},{1,3},{-3,2},{81,82},{4,2},{-2,1},{3,-4},{83,84}};
+ std::complex<double> out[8];for(auto &value:out)value={91,92};
+ const std::complex<double> alpha{1.25,-0.75},beta{-0.5,0.25};
+ std::complex<double> expected[8];for(unsigned i=0;i<8;++i)expected[i]=out[i];
+ for(unsigned i=0;i<2;++i)for(unsigned j=0;j<3;++j){std::complex<double> sum{};for(unsigned q=0;q<2;++q)sum+=std::conj(a[q*3+i])*b[q*4+j];expected[i*4+j]=alpha*sum+beta*out[i*4+j];}
+ zynum_native_report_v1 report{};
+ assert(zynum_native_gemm_c128_row_major_cn_v1(context,2,3,2,alpha.real(),alpha.imag(),reinterpret_cast<const double*>(a),6,3,reinterpret_cast<const double*>(b),8,4,beta.real(),beta.imag(),reinterpret_cast<double*>(out),8,4,&report)==ZYNUM_NATIVE_OK);
+ for(unsigned i=0;i<8;++i)assert(std::abs(out[i]-expected[i])<1e-12);
+ assert(report.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE&&report.callbacks_completed>0);
+}
+
 using Laplacian=zynum_native_status(*)(void*,uint64_t,uint64_t,uint64_t,const double*,uint64_t,double*,uint64_t,double,double,double,zynum_native_report_v1*);
 static_assert(std::is_same_v<decltype(&zynum_native_laplacian_periodic_3d_f64_v1),Laplacian>);
 
@@ -99,6 +117,7 @@ int main(){
  auto *c=::new (data[2].data) double[16]{};*a=2;*b=3;*c=4;
  zynum_native_policy_v1 policy{1,sizeof policy,1,0,{0,0}};zynum_native_report_v1 report{};
  assert(zynum_native_context_init_v1(storage.data,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
+ cpp_complex_cases(storage.data);
  const auto spectral_provider=provider.provider;
  assert(api.provider_release(provider.provider)==HETERIS_OK);std::memset(&provider,0,sizeof provider);
  assert(zynum_native_gemm_f64_nn_v1(storage.data,1,1,1,2,a,1,1,b,1,1,0.5,c,1,1,&report)==ZYNUM_NATIVE_OK);assert(*c==14&&report.output_state==1&&report.submission_state==2);

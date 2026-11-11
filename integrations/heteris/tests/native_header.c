@@ -19,7 +19,8 @@ void zynum_native_header_type_check(void) {
  zynum_native_status (*init)(void*,uint64_t,const heteris_runtime_provider_v1*,const zynum_native_policy_v1*,zynum_native_report_v1*)=zynum_native_context_init_v1;
  zynum_native_status (*gemm)(void*,uint64_t,uint64_t,uint64_t,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double*,uint64_t,uint64_t,zynum_native_report_v1*)=zynum_native_gemm_f64_nn_v1;
  zynum_native_status (*gemm_tn)(void*,uint64_t,uint64_t,uint64_t,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double*,uint64_t,uint64_t,zynum_native_report_v1*)=zynum_native_gemm_f64_tn_v1;
- (void)query;(void)init;(void)gemm;(void)gemm_tn;
+ zynum_native_status (*gemm_cn)(void*,uint64_t,uint64_t,uint64_t,double,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double,double*,uint64_t,uint64_t,zynum_native_report_v1*)=zynum_native_gemm_c128_row_major_cn_v1;
+ (void)query;(void)init;(void)gemm;(void)gemm_tn;(void)gemm_cn;
 }
 
 _Static_assert(sizeof(zynum_native_spectral_status)==4,"spectral fixed i32 status");
