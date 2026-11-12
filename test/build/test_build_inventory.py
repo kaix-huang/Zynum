@@ -127,7 +127,8 @@ class NativeConfigureSeamSourceContractTests(unittest.TestCase):
         for helper, old, new in (
             ("configureIntegrated", 'core.addImport("zynum-execution", execution);', 'core.addImport("zynum-execution", b.createModule(.{}));'),
             ("configureIntegrated", 'execution.addImport("zynum-numerics-resources", resources);', 'execution.addImport("zynum-numerics-resources", b.createModule(.{}));'),
-            ("configureIntegrated", 'resources.addImport("heteris-provider-c", provider_c);', 'resources.addImport("heteris-provider-c", translateProvider(b, target, optimize, heteris_include));'),
+            ("addHeterisResourceAdapter", 'adapter.addImport("heteris-provider-c", provider_c);', 'adapter.addImport("heteris-provider-c", b.createModule(.{}));'),
+            ("configureResourcePortCore", 'execution.addImport("zynum-numerics-resources", resources);', 'execution.addImport("heteris-provider-c", resources);'),
             ("addNativeFacade", 'native.addImport("zynum-core", core);', 'native.addImport("zynum-core", b.createModule(.{}));'),
             ("addPlatformLibrary", 'main.addImport("zynum-core", graph.core);', 'main.addImport("zynum-core", b.createModule(.{}));'),
             ("addPlatformLibrary", 'upstream.addImport("zynum-core", graph.core);', 'upstream.addImport("zynum-core", b.createModule(.{}));'),
@@ -145,7 +146,16 @@ class NativeConfigureSeamSourceContractTests(unittest.TestCase):
             'main.addImport("zynum-core", graph.core); main.linkLibrary(b.addLibrary(.{ .name = "second-core", .root_module = graph.core }));'))
 
     def test_sdk_conflict_and_archive_gates_cannot_be_disabled(self) -> None:
-        self.rejects(self.helper_mutation("headerIncludePath", "normalized_option != null and normalized_inherited != null", "false"))
+        self.rejects(self.helper_mutation("headerContractInputs", "b.graph.poisonCache();", ""))
+        for path in ("build.zig", "integrations/heteris/build.zig"):
+            raw = (REPOSITORY_ROOT / path).read_text(encoding="utf-8")
+            CHECKER._sdk_environment_cache_contract(path, raw)
+            for replacement in ("", "if (false) b.graph.poisonCache();"):
+                with self.subTest(path=path, replacement=replacement):
+                    with self.assertRaisesRegex(CHECKER.InventoryError, "SDK environment cache"):
+                        CHECKER._sdk_environment_cache_contract(path, raw.replace("b.graph.poisonCache();", replacement, 1))
+        self.rejects(self.helper_mutation("headerIncludePath", "contract_headers.selectExplicit(normalized_option, normalized_inherited)", "contract_headers.selectExplicit(normalized_option, normalized_option)"))
+        self.rejects(self.helper_mutation("headerDataIncludePath", "contract_headers.selectExplicit(normalized_option, normalized_inherited)", "contract_headers.selectExplicit(normalized_option, normalized_option)"))
         self.rejects(self.helper_mutation("normalizeHeaderPath", "!std.fs.path.isAbsolute(path)", "false"))
         self.rejects(self.helper_mutation("configureIntegrated", 'if (!std.fs.path.isAbsolute(archive))', 'if (false)'))
 
@@ -476,8 +486,8 @@ class NumericsResourcesSourceContractTests(unittest.TestCase):
     def test_resources_bind_all_owners_host_and_canonical_roots(self) -> None:
         facts = CHECKER._numerics_resources_build_contract(self.source)
         self.assertEqual(11, len(facts["edges"]))
-        self.assertEqual(42, len(facts["core_edges"]))
-        self.assertEqual(129, len(facts["declarations"]))
+        self.assertEqual(50, len(facts["core_edges"]))
+        self.assertEqual(146, len(facts["declarations"]))
         self.assertEqual(28, len(facts["root_sources"]))
         self.assertEqual("src/blas/triangular_band_solve_test.zig", facts["root_sources"]["triangular_band_solve_tests"])
         host = next(edge for edge in facts["edges"] if edge["owner"] == "kernel_coverage_mod")
@@ -589,7 +599,7 @@ class NumericsResourcesSourceContractTests(unittest.TestCase):
         for edge in (
             'abplas_lp64_root.addImport("zynum-core", zynum_core_mod);',
             'abplas_lp64_root.addImport("lapacke-interface-owner", lapacke_binding_mod);',
-            'abplas_lp64_root.addImport("zynum-lapacke-exports", abplas_lp64_lapacke_controls_selected);',
+            'abplas_lp64_root.addImport("zynum-lapacke-exports", abplas_lp64_lapacke_gelss_selected);',
             'abplas_lp64_root.addImport("zynum-checked-sparse-exports", csp);',
             'abplas_lp64_lapacke.addImport("lapacke-interface-owner", lapacke_binding_mod);',
         ):
@@ -1169,7 +1179,7 @@ class ManagedLapackeSourceContractTests(unittest.TestCase):
             "src/lapack/core/svd.zig": "library-source",
             "test/lapack/bidiagonal_test.zig": "test-infrastructure",
             "test/lapack/interop/gelsd_policy_test.zig": "test-infrastructure",
-            "src/abplas_lp64.zig": "library-source",
+            "interfaces/production/profiles/abplas_lp64/abplas_lp64.zig": "library-source",
             "src/lapack/core/complex_svd.zig": "library-source",
             "src/lapack/core/complex_minimum_norm.zig": "library-source",
             "src/lapack/core/complex_rank_least_squares.zig": "library-source",
@@ -2354,7 +2364,7 @@ class BuildInventoryTests(unittest.TestCase):
         files.update(CHECKER.EXECUTION_OBJECT_SOURCE_SHA256)
         files.update({
             "src/abplas_operator_lp64.zig",
-            "src/abplas_sparse_lp64.zig",
+            "interfaces/production/profiles/abplas_lp64/abplas_sparse_lp64.zig",
             "src/interop/operator_binding.zig",
             "tools/fftw_profile.json",
             "tools/generate_operator_interface.py",
@@ -11390,7 +11400,7 @@ class BuildInventoryTests(unittest.TestCase):
         self._write_inventory(inventory)
         errors = "\n".join(CHECKER.validate(self.root, self.inventory_path))
         self.assertIn(
-            "build.zig option surfaces must contain exactly 43 standard/project surfaces",
+            "build.zig option surfaces must contain exactly 45 standard/project surfaces",
             errors,
         )
         self.assertIn("default does not match source", errors)
@@ -18162,8 +18172,8 @@ class NativeSpectralHeaderSourceContractTests(unittest.TestCase):
         changes = (
             ('.root_source_file = b.path("include/zynum_native.h"),',
              '.root_source_file = b.path("include/zynum_native_spectral.h"),'),
-            ('const provider_c = translateProvider(b, target, optimize, heteris_include);',
-             'const provider_c = translateProvider(b, target, optimize, heteris_include);\n    const duplicate_c = translateProvider(b, target, optimize, heteris_include);'),
+            ('const provider_c = translateProvider(b, target, optimize, heteris_headers);',
+             'const provider_c = translateProvider(b, target, optimize, heteris_headers);\n    const duplicate_c = translateProvider(b, target, optimize, heteris_headers);'),
         )
         for old, new in changes:
             self.assertIn(old, self.source)

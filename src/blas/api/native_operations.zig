@@ -75,6 +75,34 @@ pub fn matrixMultiplyF64TN(context: *execution.Context, args: MatrixProductF64, 
 }
 
 pub const ComplexF64 = views.ComplexF64;
+/// Column-major FP64 NT, physical A(m,k), B(n,k), C(m,n). One admission
+/// spans provider packing of B and the original explicit NN Core.
+pub fn matrixMultiplyF64NT(context: *execution.Context, args: MatrixProductF64, report: *execution.CallReport) NativeError!void {
+    report.* = .{};
+    const a = args.left_matrix;
+    const b = args.right_matrix;
+    const c = args.result_matrix;
+    try a.check();
+    try b.check();
+    try c.check();
+    if (a.operation != .normal or b.operation != .transposed) return error.Unsupported;
+    if (a.column_count != b.column_count or a.row_count != c.row_count or b.row_count != c.column_count) return error.DimensionMismatch;
+    try aliasing.ensureNoMatrixOverlap(f64, a, c);
+    try aliasing.ensureNoMatrixOverlap(f64, b, c);
+    var operation = context.begin() catch |err| return switch (err) {
+        error.Closing => error.ContextClosing,
+        error.CounterOverflow => error.CounterOverflow,
+    };
+    defer operation.end();
+    try core.multiplyF64NTExplicit(&operation, .{
+        .left = .{ .values = a.values.ptr, .row_count = a.row_count, .column_count = a.column_count, .leading_dimension = a.leading_dimension },
+        .right = .{ .values = b.values.ptr, .row_count = b.row_count, .column_count = b.column_count, .leading_dimension = b.leading_dimension, .transpose = .trans },
+        .output = .{ .values = c.values.ptr, .row_count = c.row_count, .column_count = c.column_count, .leading_dimension = c.leading_dimension },
+        .product_scale = args.product_scale,
+        .output_scale = args.result_scale,
+    }, report);
+}
+
 pub const MatrixProductC128 = struct {
     left_matrix: views.ConstMatrix(ComplexF64),
     right_matrix: views.ConstMatrix(ComplexF64),

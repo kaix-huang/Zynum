@@ -24,7 +24,7 @@ int main(void) {
  assert(zynum_native_context_query_v1(NULL)==ZYNUM_NATIVE_INVALID_ARGUMENT);
  assert(zynum_native_context_query_v1(&req)==ZYNUM_NATIVE_OK);
  assert(req.abi_version==1 && req.struct_size==sizeof req && req.bytes && req.alignment);
- size_t size=(size_t)((req.bytes+req.alignment-1)/req.alignment*req.alignment);
+ size_t size=(size_t)((req.bytes+sizeof(zynum_native_report_v1)+req.alignment-1)/req.alignment*req.alignment);
  void *first=aligned_alloc((size_t)req.alignment,size),*second=aligned_alloc((size_t)req.alignment,size);assert(first&&second);
  heteris_runtime_provider_api_v1 api={1,sizeof api,&authority,retain,release,query,same,alloc_scratch,scratch_ref,scratch_ref,bulk};
  heteris_runtime_provider_v1 provider={1,sizeof provider,&api,{&authority,55,1,HETERIS_RP_PROVIDER,0}};
@@ -32,10 +32,29 @@ int main(void) {
  zynum_native_report_v1 report;
  assert(zynum_native_context_init_v1(first,req.bytes-1,&provider,&policy,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
  policy.reserved[0]=1;assert(zynum_native_context_init_v1(first,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);policy.reserved[0]=0;
+ /* Initialization guards every byte of explicitly supplied extra storage. */
+ memset(first,0xA5,size);
+ zynum_native_report_v1 *extra=(zynum_native_report_v1 *)((unsigned char *)first+req.bytes);
+ assert(zynum_native_context_init_v1(first,req.bytes+sizeof *extra,&provider,&policy,extra)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ for(size_t i=0;i<size;i++)assert(((unsigned char *)first)[i]==0xA5);
  assert(retains==0 && owned==1);
  assert(zynum_native_context_init_v1(first,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  assert(zynum_native_context_init_v1(second,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  assert(retains==2 && owned==3 && report.abi_version==1 && report.struct_size==sizeof report);
+ /* The entire production envelope, including its adapter-owned tail, is
+    control storage. Rejection must precede every report write and retain. */
+ unsigned char *snapshot=malloc((size_t)req.bytes);assert(snapshot);
+ memcpy(snapshot,first,(size_t)req.bytes);
+ zynum_native_report_v1 *inside=(zynum_native_report_v1 *)((unsigned char *)first+req.bytes-sizeof report);
+ assert(zynum_native_context_request_close_v1(first,inside)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_gemm_c128_row_major_cn_v1(first,0,2,0,1,0,NULL,0,0,NULL,0,0,0,0,NULL,0,0,inside)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(memcmp(snapshot,first,(size_t)req.bytes)==0);
+ memset(&report,0x5C,sizeof report);zynum_native_report_v1 saved_report=report;
+ const double *tail=(const double *)((unsigned char *)first+req.bytes-2*sizeof(double));
+ assert(zynum_native_gemm_f64_row_major_tn_v1(first,0,2,0,1,tail,1,0,NULL,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(zynum_native_gemm_c128_row_major_cn_v1(first,0,2,0,1,0,tail,1,0,NULL,0,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(memcmp(&saved_report,&report,sizeof report)==0&&memcmp(snapshot,first,(size_t)req.bytes)==0);
+ free(snapshot);
  /* Empty complex outputs still admit but never allocate/submit: mock calls abort. */
  assert(zynum_native_gemm_c128_row_major_cn_v1(first,0,2,0,1,0,NULL,0,0,NULL,0,0,0,0,NULL,0,0,&report)==ZYNUM_NATIVE_OK);
  assert(report.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED&&report.submission_state==ZYNUM_NATIVE_SUBMISSION_NOT_SUBMITTED);

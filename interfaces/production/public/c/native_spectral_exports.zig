@@ -5,7 +5,7 @@ const std = @import("std");
 const execution = @import("zynum-execution");
 const native = @import("zynum-native").spectral;
 const c = @import("heteris-provider-c");
-const Context = execution.Context;
+const Context = @import("zynum-resource-heteris").IntegratedContext;
 const Report = c.zynum_native_spectral_report_v1;
 const Range = struct {
     begin: usize,
@@ -88,9 +88,11 @@ fn project(report: *Report, result: native.Report) void {
 const Callback = struct {
     apply: c.zynum_native_spectral_apply_f64_v1,
     user: ?*anyopaque,
-    fn invoke(raw: ?*anyopaque, context: *Context, input: native.ConstPanel, output: native.Panel) i32 {
+    context: ?*anyopaque,
+    fn invoke(raw: ?*anyopaque, context: *execution.Context, input: native.ConstPanel, output: native.Panel) i32 {
         const self: *const Callback = @ptrCast(@alignCast(raw.?));
-        return self.apply.?(self.user, context, input.rows, input.columns, if (input.data) |p| p else null, input.rows * input.columns, input.ld, if (output.data) |p| p else null, output.rows * output.columns, output.ld);
+        _ = context;
+        return self.apply.?(self.user, self.context, input.rows, input.columns, if (input.data) |p| p else null, input.rows * input.columns, input.ld, if (output.data) |p| p else null, output.rows * output.columns, output.ld);
     }
 };
 fn call(raw: RawControls, args: native.Args) i32 {
@@ -99,7 +101,7 @@ fn call(raw: RawControls, args: native.Args) i32 {
     if (!checked.guard.acquire()) return c.ZYNUM_NATIVE_SPECTRAL_BUSY;
     defer checked.guard.release();
     var result: native.Report = .{};
-    const status = native.invoke(checked.context, args, &result);
+    const status = native.invoke(checked.context.core(), args, &result);
     project(checked.report, result);
     return @backingInt(status);
 }
@@ -132,7 +134,7 @@ export fn zynum_native_spectral_workspace_elements_v1(kind: u32, rows: u64, colu
     return c.ZYNUM_NATIVE_SPECTRAL_OK;
 }
 export fn zynum_native_chebyshev_series_f64_v1(context: ?*anyopaque, apply: c.zynum_native_spectral_apply_f64_v1, user: ?*anyopaque, user_bytes: u64, rows: u64, columns: u64, x: ?*align(1) const f64, x_backing: u64, ldx: u64, coefficients: ?*align(1) const f64, coefficients_backing: u64, coefficient_count: u64, lower: f64, upper: f64, y: ?*align(1) f64, y_backing: u64, ldy: u64, work: ?*align(1) f64, work_backing: u64, guard: ?*anyopaque, guard_bytes: u64, report: ?*align(1) Report) i32 {
-    var callback: Callback = .{ .apply = apply, .user = user };
+    var callback: Callback = .{ .apply = apply, .user = user, .context = context };
     return call(.{ .context = context, .user = user, .user_bytes = user_bytes, .guard = guard, .guard_bytes = guard_bytes, .report = report }, .{
         .kind = .series,
         .rows = rows,
@@ -148,7 +150,7 @@ export fn zynum_native_chebyshev_series_f64_v1(context: ?*anyopaque, apply: c.zy
     });
 }
 export fn zynum_native_chebyshev_moments_f64_v1(context: ?*anyopaque, apply: c.zynum_native_spectral_apply_f64_v1, user: ?*anyopaque, user_bytes: u64, rows: u64, columns: u64, x: ?*align(1) const f64, x_backing: u64, ldx: u64, orders: u64, lower: f64, upper: f64, moments: ?*align(1) f64, moments_backing: u64, ldm: u64, work: ?*align(1) f64, work_backing: u64, guard: ?*anyopaque, guard_bytes: u64, report: ?*align(1) Report) i32 {
-    var callback: Callback = .{ .apply = apply, .user = user };
+    var callback: Callback = .{ .apply = apply, .user = user, .context = context };
     return call(.{ .context = context, .user = user, .user_bytes = user_bytes, .guard = guard, .guard_bytes = guard_bytes, .report = report }, .{
         .kind = .moments,
         .rows = rows,

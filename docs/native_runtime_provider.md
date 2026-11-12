@@ -12,6 +12,41 @@ legacy resource paths need further migration
 and qualification. No cluster, materials/SCF, GPU or performance qualification
 is established. Earlier checked-bounds evidence retains its own source identity.
 
+## FP64 row-major TN development entry
+
+`zynum_native_gemm_f64_row_major_tn_v1` is an additive development entry; its
+new qualification is recorded separately and is not implied by the earlier
+NN/TN or complex evidence. It computes `C = alpha*transpose(A)*B + beta*C`
+for physical row-major A(k,m), B(k,n), C(m,n). Capacities and strides count
+doubles. The minimum nonempty spans are `(k-1)*lda+m`, `(k-1)*ldb+n` and
+`(m-1)*ldc+n`, with leading dimensions at least m, n and n respectively.
+Shape/stride must fit the original Core BlasInt; capacities use checked usize
+byte/address ranges. Complete declared spans, including unused tails, must be
+disjoint from Context/report and C from A/B. A and B may overlap each other.
+All C metadata checks precede report initialization and borrowing; rejected
+metadata leaves report untouched. Finite alpha/beta is required by the C ABI;
+matrix values follow IEEE arithmetic, so success alone does not prove finite
+or scientifically valid output.
+
+The same storage is column-major NT(n,m,k), left=public B and right=public A.
+One admitted Operation obtains explicit provider scratch for `k*m` doubles,
+packs the internal right operand (public A) with the original pure-transpose
+helper, waits for quiescence, then submits the existing explicit NN Core.
+Provider task/control leases and accounting are additional to the packed value
+buffer; this is not a total Runtime/RSS bound. Neither phase constructs an
+allocator, pool, Context or fallback, and the worker does not submit nested NN.
+Zero output dimensions validate and admit without allocation or submission.
+Alpha zero or k zero skips packing/input reads but uses the original explicit
+provider scale branch for nonempty output; beta zero never reads old C.
+
+Packing failure leaves public C unchanged. Rejected NN allocation/submission
+also preserves C; quiescent NN execution/callback failure may leave C invalid.
+Requesting close stops new admissions, not the already admitted two-phase call.
+Keep caller buffers, Context, provider backing and implementation image live
+through synchronous return and explicit close. Malformed provider ownership or
+completion and failed scratch release retain the existing fail-stop policy in
+ReleaseFast. This primitive does not establish AB production SCF integration.
+
 ## Profiles and builds
 
 The root builder offers `reference` and `integrated_native` execution profiles.
@@ -434,3 +469,125 @@ source enrollment, independent review, focused three-mode execution, Core/host
 and root integration/installed ON/OFF/relocated/header-only checks are still
 required. No material/SCF, cluster/MPI/Slurm, GPU, performance or full C2-C4
 qualification is implied.
+
+
+## Resource-port source boundary (B04 first slice)
+
+The mathematical Core now borrows a private Zig `ResourcePort`, containing an
+explicit stable owner, resource callbacks and a parallel-task limit. It neither
+imports Heteris types nor interprets external status numbers. This is not a
+second public C RuntimeProvider ABI, allocator, resource ledger or scheduler.
+The original Heteris C ABI remains authoritative at
+`interfaces/production/adapters/resources/heteris/provider.zig`. That adapter
+alone validates descriptor/API/token/capability/scratch ownership and bulk
+completion, maps status values, and retains all existing raw report fields.
+
+`Context.initIntegrated` has intentionally been removed from the Core Zig API.
+Zig integration consumers use the production `IntegratedContext.initInPlace`
+at its final caller-owned address, then pass `context.core()` to mathematical
+operations. A live envelope must not be copied or moved. Its Binding owns the
+retained provider; the Core borrows its port. Internal callers that already own
+a stable Binding may explicitly construct `Context.initResources(binding.port())`.
+All repository integrated callers have migrated. Legacy reference construction
+continues to require the explicitly selected reference compatibility profile.
+
+C entry points, policy/report POD layouts, symbol names and matrix element
+capacities remain unchanged. C Context storage is opaque: query this library's
+actual bytes/alignment, allocate that storage, initialize it once and retain it
+through close and every returning call. The query may change after this source
+refactor; old hardcoded byte counts are unsupported. Every C control/alias check
+covers the complete production envelope, including adapter state. Spectral C
+callbacks receive the original C Context and userdata pointers, allowing checked
+nested calls through the same envelope.
+
+Scratch requests use bytes plus explicit alignment; typed element counts are
+converted with checked multiplication before allocation. A private bounded,
+aligned erasure stores the adapter's actual release obligation, never a recreated
+handle derived from a pointer. Oversized/overaligned obligations fail compilation.
+Release succeeds before the Context resource pin is dropped. Unprovable scratch
+release retains the existing fail-stop policy. Provider close still runs outside
+the gate only after all admitted operations and pins end, preserving the existing
+release-failed state and its explicit retry semantics without claiming a refund.
+
+The current execution port is synchronous only. Rejection guarantees no callback
+access; any admitted execution/callback error is reported only after quiescence
+and may leave output partial or invalid. Malformed/unknown completion or inability
+to prove quiescence remains fail-stop, with raw diagnostics preserved. There is no
+asynchronous ticket or cancellation implementation. Requesting close prevents new
+admission; it does not cancel in-flight operations. No error triggers replay,
+resource-provider substitution, CPU fallback or precision downgrade.
+
+`zig build test-resource-port-core -Dresource-port-core-only=true -Doptimize=debug
+-j2 --cache-dir <external-cache> --prefix <external-prefix>` selects a narrow
+verification graph before SDK discovery. It compiles the original Core and runs
+explicit pure Zig fixture resources without Heteris headers or Runtime. Repeat
+with `safe` and `fast`; this is not a distributable standalone provider. The
+reference build, C SDK, old explicit standalone provider, compatibility interfaces,
+full Core and installed/relocated consumer matrix retain their separate gates.
+The complete header-free standalone distribution and B05 migration remain open.
+`tools/check_resource_boundary.py --self-test` checks the conservative transitive
+literal Core source closure and explicit module edges, including negative probes;
+actual no-SDK compilation remains required evidence.
+
+
+## Direct Zig SDK installation: flat or explicit canonical contract inputs
+
+A direct `zig build ... install` now validates and installs the actual local
+header dependency closure. `-Dheteris-include=/absolute/flat-SDK/include` retains
+single-directory operation for a real installed SDK. A split H source contract
+requires both explicit canonical inputs:
+
+```sh
+zig build install test-platform -Dexecution-profile=integrated_native \
+  -Doptimize=debug -Dstandalone=true \
+  -Dheteris-include=/absolute/H/interfaces/production/public/contracts/resources/include \
+  -Dheteris-data-include=/absolute/H/interfaces/production/public/contracts/data/include \
+  --cache-dir /absolute/external/cache --prefix /absolute/external/install -j2
+```
+
+`ZYNUM_HETERIS_INCLUDE` and optional `ZYNUM_HETERIS_DATA_INCLUDE` must agree with
+any corresponding explicit CLI option after path normalization. The bridge in
+`integrations/heteris` forwards the same pair. No source root is inferred by
+walking upward from `abi/include`; those temporary forwarding headers cannot be
+installed as an SDK. The current canonical closure contains `heteris.h`,
+`heteris_runtime_provider.h` and `heteris_data.h`; the original bytes are copied,
+not reconstructed or rewritten. A monolithic true flat SDK follows its actual
+closure. Missing local includes, escaping/source-relative/absolute forwarders,
+malformed include directives and same-name headers from two distinct authorities
+are rejected, even if the duplicate files happen to have equal bytes. Ordinary
+C angle-bracket system headers stay with the C toolchain. This bounded packaging
+guard is neither a complete C preprocessor nor a malicious-source sandbox.
+
+CMake derives the two source directories only from H's build-only
+`HETERIS_CONTRACT_SOURCE_HEADERS` property. An installed imported H target need
+not export that property: its real flat SDK remains supported. H retains its own
+canonical header installation when it owns the CMake target. Neither mode
+constructs or builds the Rust Runtime for an ordinary standalone provider.
+
+The `resource-port-core-only` branch still returns before SDK discovery and
+header environment checks. This direct-install repair does not change a Core
+algorithm, Context admission/ownership rule, public H C ABI or historical native
+enumeration status. An earlier full-CPU attempt installed a 169-byte H source
+forwarder and failed its standalone C caller; that failure is retained and is not
+relabelled as successful integration.
+
+
+The integrated root, bridge and narrow Core-only configuration use Zig 0.17's
+`standardOptimizeOption` once. The previous manual `optimize` declaration followed
+by the same standard declaration failed when no `-Doptimize` was supplied. The
+standard enum is the same `std.lang.Optimize` type (`std.builtin` aliases `lang`):
+explicit `debug`/`safe`/`fast`/`small` values are unchanged, no-option configuration
+selects `debug`, and a specific `--release=<mode>` follows Zig's standard choice.
+The existing reference preferred-release policy remains unchanged. The original
+no-option panic is preserved as a failed attempt rather than hidden by always
+supplying an explicit optimization flag.
+
+
+SDK environment selection is revalidated on every integrated/root or bridge
+configuration, including when either environment variable is absent. Global Zig
+0.17 does not track arbitrary `Build.Graph.environ_map` reads in its configure
+cache, so these SDK entrances call the supported `b.graph.poisonCache()` before
+reading SDK inputs. This disables reuse of the configure result only; ordinary
+compilation caches remain enabled. The private Core-only branch returns before
+SDK selection and this cache invalidation. No caller must clear a cache to make
+a changed, removed or conflicting SDK environment take effect.

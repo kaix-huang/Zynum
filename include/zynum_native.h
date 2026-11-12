@@ -72,6 +72,23 @@ zynum_native_status zynum_native_gemm_f64_tn_v1(void *storage,
  const double *a, uint64_t a_backing_elements, uint64_t lda,
  const double *b, uint64_t b_backing_elements, uint64_t ldb, double beta,
  double *c, uint64_t c_backing_elements, uint64_t ldc, zynum_native_report_v1 *report);
+/* FP64 row-major TN: C = alpha*transpose(A)*B + beta*C, physical
+   A(k,m), B(k,n), C(m,n). Capacities/leading dimensions count doubles.
+   Finite alpha/beta and complete declared ranges are validated before report
+   writes or borrowing. C is disjoint from A/B; A and B may overlap. Context
+   and report are disjoint from each other and all complete declared ranges.
+   Invalid/unprovable control metadata returns INVALID_ARGUMENT with report
+   untouched. Zero m/n still validates/admit, without allocate/submit/write.
+   alpha=0 or k=0 does not read A/B; beta=0 does not read C. Every nonempty
+   output uses the explicit provider. Rejected admission/allocation/submission
+   preserves C; quiescent execution/callback failure can leave C partial/invalid.
+   Scratch-release/provider contract violations preserve fail-stop ownership. */
+zynum_native_status zynum_native_gemm_f64_row_major_tn_v1(void *storage,
+ uint64_t m, uint64_t n, uint64_t k, double alpha,
+ const double *a, uint64_t a_capacity_elements, uint64_t lda,
+ const double *b, uint64_t b_capacity_elements, uint64_t ldb, double beta,
+ double *c, uint64_t c_capacity_elements, uint64_t ldc,
+ zynum_native_report_v1 *report);
 /* Complex128 row-major CN: C = alpha*adjoint(A)*B + beta*C, with physical
    A(k,m), B(k,n), C(m,n). Complex values use Heteris Data's interleaved
    double(real,imag) representation (16 bytes, alignment 8). All capacities and

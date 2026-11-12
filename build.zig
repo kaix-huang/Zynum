@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 
 const std = @import("std");
+const contract_headers = @import("interfaces/production/build/heteris_contract_headers.zig");
 
 const DispatchMode = enum { auto, dynamic, specialized };
 
@@ -65,6 +66,7 @@ pub const ImplementationGraph = struct {
     resources: *std.Build.Module,
     options: *std.Build.Module,
     provider_c: *std.Build.Module,
+    resource_adapter: *std.Build.Module,
     native: *std.Build.Module,
     main_library: ?*std.Build.Step.Compile = null,
     lapacke_binding: ?*std.Build.Module = null,
@@ -72,6 +74,10 @@ pub const ImplementationGraph = struct {
 };
 
 pub fn build(b: *std.Build) void {
+    if (b.option(bool, "resource-port-core-only", "Run the private neutral Core resource seam without any external SDK") orelse false) {
+        configureResourcePortCore(b);
+        return;
+    }
     _ = configure(b);
 }
 
@@ -82,8 +88,8 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     const reference_compat = b.option(bool, "reference-compat", "Enable reference-only default owner and compatibility services") orelse (execution_profile == .reference);
     if (reference_compat != (execution_profile == .reference))
         @panic("reference-compat must be true only for execution-profile=reference");
-    const heteris_include = headerIncludePath(b);
-    if (execution_profile == .integrated_native) return configureIntegrated(b, heteris_include);
+    const heteris_headers = headerContractInputs(b);
+    if (execution_profile == .integrated_native) return configureIntegrated(b, heteris_headers);
     const blas_interface = b.option(BLASInterfaceProfile, "blas-interface", "Optional existing LP64 CBLAS and Fortran BLAS frontend for the unified package") orelse .none;
     const fft_interface = b.option(FFTInterfaceProfile, "fft-interface", "Optional FFT frontend for the unified LP64 package: none or FFTW3 f64 ABPLaS profile") orelse .none;
     const fft_f32 = b.option(bool, "fft-f32", "Include the optional FFTW single-precision companion over the same unified Core") orelse false;
@@ -362,7 +368,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     else
         &.{};
 
-    const provider_c = translateProvider(b, target, optimize, heteris_include);
+    const provider_c = translateProvider(b, target, optimize, heteris_headers);
 
     // One stateless scratch service module per compatible resolved target.
     // Leave optimize inherited so production and tests keep their own modes.
@@ -370,7 +376,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         .root_source_file = b.path("src/numerics/resources.zig"),
         .target = target,
     });
-    numerics_resources_mod.addImport("heteris-provider-c", provider_c);
+
     // The coverage generator executes on the build host even when the library
     // target is foreign. Reuse the main module only for identical targets.
     const resources_host_matches_target = std.Target.Query.eql(
@@ -386,9 +392,6 @@ pub fn configure(b: *std.Build) ImplementationGraph {
             .target = b.graph.host,
         });
 
-    if (!resources_host_matches_target)
-        host_numerics_resources_mod.addImport("heteris-provider-c", translateProvider(b, b.graph.host, optimize, heteris_include));
-
     // One execution/configuration owner per compatible compilation mode.
     // Never recreate the options module from the same generated source file.
     const execution_mod = b.addModule("zynum-execution", .{
@@ -397,7 +400,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         .optimize = optimize,
         .link_libc = true,
     });
-    execution_mod.addImport("heteris-provider-c", provider_c);
+
     execution_mod.addImport("zynum-build-options", zynum_build_options_mod);
     execution_mod.addImport("zynum-numerics-resources", numerics_resources_mod);
     const execution_test_mod = if (optimize == test_optimize) execution_mod else b.createModule(.{
@@ -406,7 +409,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         .optimize = test_optimize,
         .link_libc = true,
     });
-    execution_test_mod.addImport("heteris-provider-c", provider_c);
+
     execution_test_mod.addImport("zynum-build-options", zynum_build_options_mod);
     execution_test_mod.addImport("zynum-numerics-resources", numerics_resources_mod);
 
@@ -1283,7 +1286,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     });
     execution_contract_tests.root_module.addImport("zynum-numerics-resources", numerics_resources_mod);
     execution_contract_tests.root_module.addImport("zynum-build-options", zynum_build_options_mod);
-    execution_contract_tests.root_module.addImport("heteris-provider-c", provider_c);
+
     const run_execution_contract_tests = b.addRunArtifact(execution_contract_tests);
     const execution_contract_test_step = b.step("test-execution-contract", "Run shared execution owner contract tests");
     execution_contract_test_step.dependOn(&run_execution_contract_tests.step);
@@ -2118,12 +2121,6 @@ pub fn configure(b: *std.Build) ImplementationGraph {
             .root_source_file = b.path("src/numerics/resources.zig"),
             .target = runtime_lifecycle_target,
         });
-    const runtime_lifecycle_provider_c = runtime_lifecycle_resources_mod.import_table.get("heteris-provider-c") orelse blk: {
-        const binding = translateProvider(b, runtime_lifecycle_target, test_optimize, heteris_include);
-        runtime_lifecycle_resources_mod.addImport("heteris-provider-c", binding);
-        break :blk binding;
-    };
-    runtime_lifecycle_execution_mod.addImport("heteris-provider-c", runtime_lifecycle_provider_c);
     runtime_lifecycle_execution_mod.addImport("zynum-numerics-resources", runtime_lifecycle_resources_mod);
     const runtime_lifecycle_probe = b.addExecutable(.{
         .name = "zynum-runtime-lifecycle-probe",
@@ -2308,7 +2305,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
             abplas_lp64_lapacke_gelss_composed_root.addImport("zynum-lapacke-gelss-exports", abplas_lp64_lapacke_gelss_component);
             abplas_lp64_lapacke_gelss_selected = abplas_lp64_lapacke_gelss_composed_root;
         }
-        const abplas_lp64_root = b.createModule(.{ .root_source_file = b.path(if (fft_interface == .fftw3) "src/abplas_fftw_lp64.zig" else "src/abplas_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
+        const abplas_lp64_root = b.createModule(.{ .root_source_file = b.path(if (fft_interface == .fftw3) "interfaces/production/profiles/abplas_lp64/abplas_fftw_lp64.zig" else "interfaces/production/profiles/abplas_lp64/abplas_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
         abplas_lp64_root.addImport("zynum-core", zynum_core_mod);
         abplas_lp64_root.addImport("lapacke-interface-owner", lapacke_binding_mod);
         abplas_lp64_root.addImport("zynum-lapacke-exports", abplas_lp64_lapacke_gelss_selected);
@@ -2390,7 +2387,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         if (sparse_solves) {
             const abplas_standard_sparse_exports = b.createModule(.{ .root_source_file = b.path("interface_subset/mkl2026.lp64/sparse-csr-csc-mv-mm-trsv-trsm-ordinary-lp64-v1/exports.zig"), .target = target, .optimize = optimize, .link_libc = true });
             abplas_standard_sparse_exports.addImport("sparse-interface-owner", mkl_sparse_binding_mod);
-            const sparse_combined_mod = b.createModule(.{ .root_source_file = b.path("src/abplas_sparse_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
+            const sparse_combined_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/profiles/abplas_lp64/abplas_sparse_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
             sparse_combined_mod.addImport("zynum-core", zynum_core_mod);
             sparse_combined_mod.addImport("sparse-interface-owner", mkl_sparse_binding_mod);
             sparse_combined_mod.addImport("zynum-abplas-base-exports", abplas_lp64_selected_root);
@@ -2401,7 +2398,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         }
         const abplas_lp64_pre_blas_root = abplas_lp64_selected_root;
         if (blas_interface == .lp64) {
-            const blas_combined_mod = b.createModule(.{ .root_source_file = b.path("src/abplas_blas_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
+            const blas_combined_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/profiles/abplas_lp64/abplas_blas_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
             blas_combined_mod.addImport("zynum-core", zynum_core_mod);
             blas_combined_mod.addImport("zynum-blas-abi", blas_abi_mod);
             blas_combined_mod.addImport("zynum-abplas-base-exports", abplas_lp64_pre_blas_root);
@@ -2432,7 +2429,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
             feast_binding_mod.addImport("zynum-core", zynum_core_mod);
             const feast_exports_mod = b.createModule(.{ .root_source_file = feast_directory.path(b, "feast_exports.zig"), .target = target, .optimize = optimize, .link_libc = true });
             feast_exports_mod.addImport("feast-interface-owner", feast_binding_mod);
-            const feast_combined_mod = b.createModule(.{ .root_source_file = b.path("src/abplas_feast_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
+            const feast_combined_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/profiles/abplas_lp64/abplas_feast_lp64.zig"), .target = target, .optimize = optimize, .link_libc = true });
             feast_combined_mod.addImport("zynum-core", zynum_core_mod);
             feast_combined_mod.addImport("feast-interface-owner", feast_binding_mod);
             feast_combined_mod.addImport("zynum-abplas-base-exports", abplas_lp64_pre_feast_root);
@@ -3235,11 +3232,13 @@ pub fn configure(b: *std.Build) ImplementationGraph {
         }),
     });
     b.installArtifact(dcopy_probe);
-    const native = addNativeFacade(b, target, optimize, zynum_core_mod, execution_mod, numerics_resources_mod);
+    const resource_adapter = addHeterisResourceAdapter(b, target, optimize, execution_mod, provider_c);
+    const native = addNativeFacade(b, target, optimize, zynum_core_mod, execution_mod, numerics_resources_mod, resource_adapter);
     b.modules.put(b.allocator, "heteris-provider-c", provider_c) catch @panic("out of memory");
     b.modules.put(b.allocator, "zynum-build-options", zynum_build_options_mod) catch @panic("out of memory");
     return .{
         .provider_c = provider_c,
+        .resource_adapter = resource_adapter,
         .native = native,
         .core = zynum_core_mod,
         .execution = execution_mod,
@@ -3317,33 +3316,70 @@ fn buildKernelTiers(
     return libraries;
 }
 
-fn translateProvider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, heteris_include: []const u8) *std.Build.Module {
+fn translateProvider(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, heteris_headers: contract_headers.Headers) *std.Build.Module {
     const translated = b.addTranslateC(.{
         .root_source_file = b.path("include/zynum_native.h"),
         .target = target,
         .optimize = optimize,
     });
-    translated.addIncludePath(.{ .cwd_relative = heteris_include });
+    heteris_headers.addIncludePaths(translated);
     return translated.createModule();
 }
 
-fn addNativeFacade(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, core: *std.Build.Module, execution: *std.Build.Module, resources: *std.Build.Module) *std.Build.Module {
+fn addHeterisResourceAdapter(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, execution: *std.Build.Module, provider_c: *std.Build.Module) *std.Build.Module {
+    const adapter = b.createModule(.{ .root_source_file = b.path("interfaces/production/adapters/resources/heteris/provider.zig"), .target = target, .optimize = optimize });
+    adapter.addImport("zynum-execution", execution);
+    adapter.addImport("heteris-provider-c", provider_c);
+    return adapter;
+}
+
+/// This narrow verification graph intentionally performs no H SDK discovery,
+/// translation, adapter import or library installation. Full standalone release
+/// selection remains a separate joint gate.
+fn configureResourcePortCore(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{ .default_target = .{ .cpu_model = .baseline } });
+    const optimize = b.standardOptimizeOption(.{});
+    const options = b.addOptions();
+    options.addOption(bool, "reference_compat", false);
+    options.addOption(bool, "poison_reference", false);
+    options.addOption(bool, "native_identity_tests", false);
+    options.addOption(bool, "dynamic_dispatch", false);
+    options.addOption(bool, "apple_amx", false);
+    options.addOption(usize, "thread_limit", 0);
+    const options_mod = options.createModule();
+    const resources = b.createModule(.{ .root_source_file = b.path("src/numerics/resources.zig"), .target = target, .optimize = optimize });
+    const execution = b.createModule(.{ .root_source_file = b.path("src/numerics/execution/root.zig"), .target = target, .optimize = optimize });
+    execution.addImport("zynum-build-options", options_mod);
+    execution.addImport("zynum-numerics-resources", resources);
+    const core = b.createModule(.{ .root_source_file = b.path("src/zynum.zig"), .target = target, .optimize = optimize });
+    core.addImport("zynum-build-options", options_mod);
+    core.addImport("zynum-execution", execution);
+    core.addImport("zynum-numerics-resources", resources);
+    const tests = b.createModule(.{ .root_source_file = b.path("test/resource_port_core.zig"), .target = target, .optimize = optimize });
+    tests.addImport("zynum-core", core);
+    tests.addImport("zynum-execution", execution);
+    const artifact = b.addTest(.{ .name = "zynum-neutral-resource-core", .root_module = tests, .use_llvm = true, .use_lld = true });
+    b.step("test-resource-port-core", "Execute the single Core with an explicit pure Zig resource fixture and no external SDK").dependOn(&b.addRunArtifact(artifact).step);
+}
+
+fn addNativeFacade(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, core: *std.Build.Module, execution: *std.Build.Module, resources: *std.Build.Module, resource_adapter: *std.Build.Module) *std.Build.Module {
     const native = b.addModule("zynum-native", .{
-        .root_source_file = b.path("src/facades/native.zig"),
+        .root_source_file = b.path("interfaces/production/public/zig/native.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
         .pic = true,
     });
+    native.addImport("zynum-resource-heteris", resource_adapter);
     native.addImport("zynum-core", core);
     native.addImport("zynum-execution", execution);
     native.addImport("zynum-numerics-resources", resources);
     return native;
 }
 
-fn configureIntegrated(b: *std.Build, heteris_include: []const u8) ImplementationGraph {
+fn configureIntegrated(b: *std.Build, heteris_headers: contract_headers.Headers) ImplementationGraph {
     const target = b.standardTargetOptions(.{ .default_target = .{ .cpu_model = .baseline } });
-    const optimize = b.option(std.lang.Optimize, "optimize", "Explicit optimization mode") orelse b.standardOptimizeOption(.{});
+    const optimize = b.standardOptimizeOption(.{});
     const test_optimize = b.option(std.lang.Optimize, "test-optimize", "Native tests use the same original module graph") orelse optimize;
     if (test_optimize != optimize) @panic("integrated_native requires matching optimize and test-optimize");
     if ((b.option(DispatchMode, "dispatch", "Integrated first slice uses portable specialized code") orelse .specialized) != .specialized)
@@ -3369,14 +3405,14 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
     options.addOption(usize, "thread_limit", 0);
     const options_mod = options.createModule();
     b.modules.put(b.allocator, "zynum-build-options", options_mod) catch @panic("out of memory");
-    const provider_c = translateProvider(b, target, optimize, heteris_include);
+    const provider_c = translateProvider(b, target, optimize, heteris_headers);
     b.modules.put(b.allocator, "heteris-provider-c", provider_c) catch @panic("out of memory");
     const resources = b.addModule("zynum-numerics-resources", .{
         .root_source_file = b.path("src/numerics/resources.zig"),
         .target = target,
         .optimize = optimize,
     });
-    resources.addImport("heteris-provider-c", provider_c);
+
     const execution = b.addModule("zynum-execution", .{
         .root_source_file = b.path("src/numerics/execution/root.zig"),
         .target = target,
@@ -3384,7 +3420,7 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
         .link_libc = true,
     });
     execution.addImport("zynum-build-options", options_mod);
-    execution.addImport("heteris-provider-c", provider_c);
+
     execution.addImport("zynum-numerics-resources", resources);
     const core = b.addModule("zynum-core", .{
         .root_source_file = b.path("src/zynum.zig"),
@@ -3396,17 +3432,19 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
     core.addImport("zynum-build-options", options_mod);
     core.addImport("zynum-execution", execution);
     core.addImport("zynum-numerics-resources", resources);
-    const native = addNativeFacade(b, target, optimize, core, execution, resources);
-    const graph: ImplementationGraph = .{ .core = core, .execution = execution, .resources = resources, .options = options_mod, .provider_c = provider_c, .native = native };
+    const resource_adapter = addHeterisResourceAdapter(b, target, optimize, execution, provider_c);
+    const native = addNativeFacade(b, target, optimize, core, execution, resources, resource_adapter);
+    const graph: ImplementationGraph = .{ .core = core, .execution = execution, .resources = resources, .options = options_mod, .provider_c = provider_c, .resource_adapter = resource_adapter, .native = native };
     if (native.import_table.get("zynum-core") != core or native.import_table.get("zynum-execution") != execution or
         native.import_table.get("zynum-numerics-resources") != resources or core.import_table.get("zynum-execution") != execution or
         core.import_table.get("zynum-numerics-resources") != resources or execution.import_table.get("zynum-numerics-resources") != resources or
-        resources.import_table.get("heteris-provider-c") != provider_c or execution.import_table.get("heteris-provider-c") != provider_c)
+        resources.import_table.contains("heteris-provider-c") or execution.import_table.contains("heteris-provider-c") or
+        resource_adapter.import_table.get("zynum-execution") != execution or resource_adapter.import_table.get("heteris-provider-c") != provider_c)
         @panic("original native module graph identity split");
     const graph_file = b.addWriteFiles().add("native-graph.json", "{\"profile\":\"integrated_native\",\"single_core_execution_resources\":true,\"reference_compat\":false}\n");
     const graph_install = b.addInstallFileWithDir(graph_file, .prefix, "share/zynum/native-graph.json");
     b.step("native-graph", "Validate exact original module identities without compiling mathematical functions").dependOn(&graph_install.step);
-    const library = addPlatformLibrary(b, target, optimize, heteris_include, graph, shared, standalone);
+    const library = addPlatformLibrary(b, target, optimize, heteris_headers, graph, shared, standalone);
     var complete = graph;
     complete.main_library = library;
     if (b.option([]const u8, "heteris-runtime-archive", "Explicit absolute prebuilt formal Runtime archive; only enables requested provider test targets")) |archive| {
@@ -3416,6 +3454,7 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
         math_module.addImport("zynum-execution", execution);
         math_module.addImport("zynum-numerics-resources", resources);
         math_module.addImport("heteris-provider-c", provider_c);
+        math_module.addImport("zynum-resource-heteris", resource_adapter);
         const gemm_test_reference = b.createModule(.{ .root_source_file = b.path("test/abi/gemm_reference.zig"), .target = target, .optimize = optimize });
         math_module.addImport("gemm-test-reference", gemm_test_reference);
         const periodic_test_reference = b.createModule(.{ .root_source_file = b.path("integrations/heteris/src/periodic_reference.zig"), .target = target, .optimize = optimize });
@@ -3426,7 +3465,7 @@ fn configureIntegrated(b: *std.Build, heteris_include: []const u8) Implementatio
         b.step("test-native-provider-math", "Run original-Core explicit math tests against an explicitly supplied prebuilt Runtime").dependOn(&b.addRunArtifact(math_tests).step);
         const c_module = b.createModule(.{ .target = target, .optimize = optimize, .link_libc = true });
         c_module.addIncludePath(b.path("include"));
-        c_module.addIncludePath(.{ .cwd_relative = heteris_include });
+        heteris_headers.addIncludePaths(c_module);
         c_module.addCSourceFile(.{ .file = b.path("integrations/heteris/tests/native_runtime.c"), .flags = &.{ "-std=c11", "-Wall", "-Wextra", "-Werror", "-UNDEBUG" } });
         c_module.linkLibrary(library);
         c_module.addObjectFile(.{ .cwd_relative = archive });
@@ -3454,24 +3493,25 @@ fn configurePlatformCompilerRuntime(b: *std.Build, target: std.Build.ResolvedTar
     }
 }
 
-fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, heteris_include: []const u8, graph: ImplementationGraph, shared: bool, standalone: bool) *std.Build.Step.Compile {
+fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, heteris_headers: contract_headers.Headers, graph: ImplementationGraph, shared: bool, standalone: bool) *std.Build.Step.Compile {
     const upstream = b.createModule(.{ .root_source_file = b.path("src/facades/scientific_sources.zig"), .target = target, .optimize = optimize });
     upstream.addImport("zynum-core", graph.core);
     const translated = b.addTranslateC(.{ .root_source_file = b.path("integrations/heteris/include/zynum.h"), .target = target, .optimize = optimize });
-    translated.addIncludePath(.{ .cwd_relative = heteris_include });
+    heteris_headers.addIncludePaths(translated);
     const adapter_c = translated.createModule();
     const adapter = b.createModule(.{ .root_source_file = b.path("integrations/heteris/src/root.zig"), .target = target, .optimize = optimize, .link_libc = true, .pic = true });
     adapter.addIncludePath(b.path("integrations/heteris/include"));
-    adapter.addIncludePath(.{ .cwd_relative = heteris_include });
+    heteris_headers.addIncludePaths(adapter);
     adapter.addImport("scientific_sources", upstream);
     adapter.addImport("zynum_c", adapter_c);
     adapter.addCSourceFile(.{ .file = b.path("integrations/heteris/src/descriptor.c"), .flags = &.{"-std=c11"} });
-    const main = b.createModule(.{ .root_source_file = b.path("integrations/heteris/src/native_exports.zig"), .target = target, .optimize = optimize, .link_libc = true, .pic = true });
+    const main = b.createModule(.{ .root_source_file = b.path("interfaces/production/public/c/native_exports.zig"), .target = target, .optimize = optimize, .link_libc = true, .pic = true });
     main.addImport("adapter-root", adapter);
     main.addImport("zynum-native", graph.native);
     main.addImport("zynum-core", graph.core);
     main.addImport("zynum-execution", graph.execution);
     main.addImport("heteris-provider-c", graph.provider_c);
+    main.addImport("zynum-resource-heteris", graph.resource_adapter);
     main.addImport("zynum-build-options", graph.options);
     const library = b.addLibrary(.{ .name = "zynum", .root_module = main, .linkage = if (shared) .dynamic else .static, .use_llvm = true, .use_lld = true });
     configurePlatformCompilerRuntime(b, target, library);
@@ -3483,8 +3523,8 @@ fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
     b.installFile("include/zynum_native.h", "include/zynum_native.h");
     b.installFile("include/zynum_native_spectral.h", "include/zynum_native_spectral.h");
     b.installFile("integrations/heteris/ZIG-MIT", "share/licenses/zynum/ZIG-MIT");
-    for ([_][]const u8{ "heteris.h", "heteris_runtime_provider.h" }) |name|
-        b.getInstallStep().dependOn(&b.addInstallFileWithDir(.{ .cwd_relative = b.pathJoin(&.{ heteris_include, name }) }, .header, name).step);
+    // Install the validated real local include closure, never source forwarders.
+    heteris_headers.install(b);
     if (standalone) {
         const module = b.createModule(.{ .root_source_file = b.path("integrations/heteris/src/standalone.zig"), .target = target, .optimize = optimize, .link_libc = true, .pic = true });
         module.addImport("zynum_c", adapter_c);
@@ -3500,17 +3540,32 @@ fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize:
 }
 
 fn headerIncludePath(b: *std.Build) []const u8 {
-    const option = b.option([]const u8, "heteris-include", "Explicit absolute header-only Heteris Data SDK include directory");
+    const option = b.option([]const u8, "heteris-include", "Explicit absolute flat Heteris SDK or canonical resource-contract include directory");
     const inherited = b.graph.environ_map.get("ZYNUM_HETERIS_INCLUDE");
     if (option == null and inherited == null)
         @panic("Supply -Dheteris-include=/absolute/SDK/include or explicit ZYNUM_HETERIS_INCLUDE (headers only; no Runtime build)");
     const normalized_option = if (option) |path| normalizeHeaderPath(b, path) else null;
     const normalized_inherited = if (inherited) |path| normalizeHeaderPath(b, path) else null;
-    if (normalized_option != null and normalized_inherited != null and !std.mem.eql(u8, normalized_option.?, normalized_inherited.?))
-        @panic("heteris-include conflicts with ZYNUM_HETERIS_INCLUDE; nested builds must consume the same explicit SDK");
-    return normalized_option orelse normalized_inherited.?;
+    return (contract_headers.selectExplicit(normalized_option, normalized_inherited) catch
+        @panic("heteris-include conflicts with ZYNUM_HETERIS_INCLUDE; nested builds must consume the same explicit SDK")).?;
 }
 fn normalizeHeaderPath(b: *std.Build, path: []const u8) []const u8 {
     if (!std.fs.path.isAbsolute(path)) @panic("Heteris SDK include input must be an explicit absolute path");
     return std.fs.path.resolve(b.allocator, &.{path}) catch @panic("unable to normalize Heteris SDK include path");
+}
+
+fn headerDataIncludePath(b: *std.Build) ?[]const u8 {
+    const option = b.option([]const u8, "heteris-data-include", "Explicit absolute canonical Heteris Data include directory when separate from resource headers");
+    const inherited = b.graph.environ_map.get("ZYNUM_HETERIS_DATA_INCLUDE");
+    const normalized_option = if (option) |path| normalizeHeaderPath(b, path) else null;
+    const normalized_inherited = if (inherited) |path| normalizeHeaderPath(b, path) else null;
+    return contract_headers.selectExplicit(normalized_option, normalized_inherited) catch
+        @panic("heteris-data-include conflicts with ZYNUM_HETERIS_DATA_INCLUDE; nested builds must consume the same explicit Data contract");
+}
+fn headerContractInputs(b: *std.Build) contract_headers.Headers {
+    // SDK environment and external header checks are configure-time inputs that
+    // Zig does not track; never reuse a configuration after they change.
+    b.graph.poisonCache();
+    return contract_headers.resolve(b.graph.io, b.allocator, headerIncludePath(b), headerDataIncludePath(b)) catch |err|
+        std.debug.panic("Invalid Heteris header contract: {s}. Supply a real flat -Dheteris-include SDK, or explicit canonical resource -Dheteris-include and Data -Dheteris-data-include directories; source forwarding headers are not installable.", .{@errorName(err)});
 }

@@ -1,14 +1,19 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 const std = @import("std");
 pub fn build(b: *std.Build) void {
+    // This entrypoint reads SDK environment before configuring its dependency.
+    // Recheck it on every invocation, including absent-to-present transitions.
+    b.graph.poisonCache();
     const target = b.standardTargetOptions(.{ .default_target = .{ .cpu_model = .baseline } });
-    const optimize = b.option(std.lang.Optimize, "optimize", "Explicit optimization mode") orelse b.standardOptimizeOption(.{});
-    const include = b.option([]const u8, "heteris-include", "Explicit absolute header-only Heteris SDK include directory") orelse @panic("Supply -Dheteris-include");
+    const optimize = b.standardOptimizeOption(.{});
+    const include = b.option([]const u8, "heteris-include", "Explicit absolute flat Heteris SDK or canonical resource-contract include directory") orelse @panic("Supply -Dheteris-include");
+    const data_include = b.option([]const u8, "heteris-data-include", "Explicit separate canonical Heteris Data include directory") orelse b.graph.environ_map.get("ZYNUM_HETERIS_DATA_INCLUDE");
     const dependency = b.dependency("original_zynum", .{
         .target = target,
         .optimize = optimize,
         .@"execution-profile" = .integrated_native,
         .@"heteris-include" = include,
+        .@"heteris-data-include" = data_include,
         .standalone = b.option(bool, "standalone", "Separate explicit standalone adapter provider") orelse false,
         .shared = b.option(bool, "shared", "One shared main libzynum") orelse false,
     });

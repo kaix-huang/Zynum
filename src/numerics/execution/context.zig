@@ -4,7 +4,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const options = @import("zynum-build-options");
-const provider = @import("heteris_provider.zig");
+const ports = @import("resource_port.zig");
 const legacy = @import("legacy_services.zig");
 const results = @import("results.zig");
 const resources = @import("zynum-numerics-resources");
@@ -15,7 +15,7 @@ pub const RequestResult = enum { immortal, pending, closed };
 pub const Snapshot = struct { phase: Phase, active_operations: usize, resource_pins: usize };
 pub const TestEvent = enum { admitted, finishing };
 const TestState = if (builtin.is_test) struct { limit: usize = std.math.maxInt(usize), observer: ?*const fn (*Context, TestEvent) void = null } else void;
-const Binding = union(enum) { integrated: provider.Binding, legacy: legacy.LegacyServices };
+const Binding = union(enum) { external: ports.ResourcePort, legacy: legacy.LegacyServices };
 pub const Context = struct {
     binding: Binding,
     gate: std.atomic.Value(bool) = .init(false),
@@ -24,22 +24,25 @@ pub const Context = struct {
     resource_pins: usize = 0,
     test_state: TestState = if (builtin.is_test) .{} else {},
 
-    pub fn initIntegrated(source: *const provider.c.heteris_runtime_provider_v1, desc: results.ContextDesc, report: *results.CallReport) results.InitError!Context {
-        return .{ .binding = .{ .integrated = try provider.Binding.init(source, desc, report) } };
+    /// Borrows an explicitly selected capability. Owner/code stay stable through
+    /// close; production adapters perform their own external ABI validation.
+    pub fn initResources(port: ports.ResourcePort) Context {
+        if (port.parallel_limit == 0 or port.parallel_limit > @import("contracts.zig").max_tasks) @panic("invalid private resource port parallel limit");
+        return .{ .binding = .{ .external = port } };
     }
     pub fn initLegacyBorrowed(services: legacy.LegacyServices) Context {
         if (comptime !options.reference_compat) @compileError("legacy Context construction requires reference_compat");
         return .{ .binding = .{ .legacy = services } };
     }
-    pub fn integratedBinding(self: *const Context) ?*const provider.Binding {
+    pub fn resourcePort(self: *const Context) ?ports.ResourcePort {
         return switch (self.binding) {
-            .integrated => &self.binding.integrated,
+            .external => |port| port,
             .legacy => null,
         };
     }
     fn immortal(self: *const Context) bool {
         return switch (self.binding) {
-            .integrated => false,
+            .external => false,
             .legacy => |s| s.lifetime == .immortal_default,
         };
     }
@@ -111,21 +114,18 @@ pub const Context = struct {
                         self.lock();
                         self.phase = .drained;
                     },
-                    .integrated => |*binding| {
+                    .external => |port| {
                         if (self.resource_pins != 0) {
                             self.unlock();
                             return .waiting_resources;
                         }
                         self.phase = .releasing;
                         self.unlock();
-                        const code = binding.release();
-                        report.provider.stage = .provider_release;
-                        report.provider.returned_status = code;
-                        report.provider.cleanup_status = if (code == provider.c.HETERIS_OK) 0 else code;
+                        const released = port.releaseProvider(report);
                         self.lock();
-                        self.phase = if (code == provider.c.HETERIS_OK) .closed else .release_failed;
+                        self.phase = if (released) .closed else .release_failed;
                         self.unlock();
-                        return if (code == provider.c.HETERIS_OK) .closed else .release_failed;
+                        return if (released) .closed else .release_failed;
                     },
                 }
             },
@@ -154,7 +154,7 @@ pub const Operation = struct {
         if (comptime !options.reference_compat) @compileError("legacy resources require reference_compat");
         return switch (self.borrowedContext().binding) {
             .legacy => |s| s,
-            .integrated => @panic("integrated operation used as reference resources"),
+            .external => @panic("integrated operation used as reference resources"),
         };
     }
     pub fn legacyAllocator(self: *const Operation) std.mem.Allocator {
@@ -198,27 +198,30 @@ pub const ResourcePin = struct {
 };
 pub fn OperationScratch(comptime T: type) type {
     return struct {
-        lease: resources.ProviderScratchLease(T),
+        lease: ports.ByteLease,
         pin: ResourcePin,
         values: []T,
         pub fn release(self: *@This(), report: *results.CallReport) void {
-            const code = self.lease.releaseRaw();
-            if (code != provider.c.HETERIS_OK) {
-                report.provider.stage = .scratch_release;
-                report.provider.cleanup_status = code;
-                provider.failStop(report, "valid scratch release failed");
-            }
+            self.lease.release(report);
             self.pin.releaseAfterResourceFree();
             self.* = undefined;
         }
     };
 }
 pub fn acquireOperationScratch(operation: *const Operation, comptime T: type, count: usize, report: *results.CallReport) results.ExecutionError!OperationScratch(T) {
-    const binding = operation.borrowedContext().integratedBinding() orelse return error.Unsupported;
+    const port = operation.borrowedContext().resourcePort() orelse return error.Unsupported;
     var pin = try operation.pinResource();
     errdefer pin.releaseAfterResourceFree();
-    const lease = try binding.acquire(T, count, report);
-    return .{ .lease = lease, .pin = pin, .values = lease.values };
+    if (@sizeOf(T) == 0) @compileError("resource scratch requires nonzero-sized elements");
+    const bytes = std.math.mul(usize, count, @sizeOf(T)) catch return error.ExtentOverflow;
+    _ = std.math.add(usize, bytes, @alignOf(T) - 1) catch return error.ExtentOverflow;
+    const lease = try port.acquireBytes(bytes, @alignOf(T), report);
+    // An adapter guarantees exact extent/alignment and a nonnull even empty
+    // backing; never infer ownership from this borrowed data pointer.
+    if (lease.values.len != bytes or lease.alignment != @alignOf(T) or @intFromPtr(lease.values.ptr) % @alignOf(T) != 0) @panic("invalid private scratch capability");
+    _ = std.math.add(usize, @intFromPtr(lease.values.ptr), bytes) catch @panic("private scratch extent overflow");
+    const pointer: [*]T = @ptrCast(@alignCast(lease.values.ptr));
+    return .{ .lease = lease, .pin = pin, .values = pointer[0..count] };
 }
 /// Explicit reference-only scratch. Integrated calls cannot use an allocator.
 pub fn ContextScratch(comptime T: type) type {

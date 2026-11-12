@@ -508,3 +508,52 @@ pub fn transposedAF64Explicit(operation: *const execution_api.Operation, m_: Bla
     };
     report.* = output_report;
 }
+
+const ExplicitTransposedBF64Task = struct {
+    n: usize,
+    k: usize,
+    b: [*]const f64,
+    ldb: BlasInt,
+    packed_b: []f64,
+
+    fn run(task: @This()) void {
+        // Physical B(n,k) -> packed B^T(k,n), using the original pure transpose.
+        packing.packTransposedA(f64, task.k, task.n, task.b, task.ldb, task.packed_b);
+    }
+};
+
+/// Explicit NT owns one admission and provider leases across both synchronous
+/// phases. In the row-TN C mapping, this packs public A, not public B.
+pub fn transposedBF64Explicit(operation: *const execution_api.Operation, m_: BlasInt, n_: BlasInt, k_: BlasInt, alpha: f64, a: [*]const f64, lda: BlasInt, b: [*]const f64, ldb: BlasInt, beta: f64, c: [*]f64, ldc: BlasInt, report: *execution_api.CallReport) execution_api.ExecutionError!void {
+    report.* = .{};
+    if (m_ < 0 or n_ < 0 or k_ < 0) return error.ExtentOverflow;
+    if (m_ == 0 or n_ == 0 or k_ == 0 or alpha == 0)
+        return noTransF64Explicit(operation, m_, n_, k_, alpha, a, lda, b, ldb, beta, c, ldc, report);
+    const resources = execution_api.admittedResources(operation);
+    if (resources.maxThreads() == 0) return error.Unsupported;
+    const n: usize = @intCast(n_);
+    const k: usize = @intCast(k_);
+    const packed_len = std.math.mul(usize, k, n) catch return error.ExtentOverflow;
+    var allocation_report: execution_api.CallReport = .{};
+    var packed_b = resources.acquireScratch(f64, packed_len, &allocation_report) catch |err| {
+        report.* = allocation_report;
+        return err;
+    };
+    defer packed_b.release(report);
+
+    const task = [_]ExplicitTransposedBF64Task{.{ .n = n, .k = k, .b = b, .ldb = ldb, .packed_b = packed_b.values }};
+    var packing_report: execution_api.CallReport = .{};
+    resources.runTypedChecked(ExplicitTransposedBF64Task, ExplicitTransposedBF64Task.run, &task, &packing_report) catch |err| {
+        report.* = packing_report;
+        report.output = .unchanged;
+        return err;
+    };
+    // Packing has quiesced. NN is submitted by the synchronous owner, never
+    // from its callback, and reuses this same Operation and Context binding.
+    var output_report: execution_api.CallReport = .{};
+    noTransF64Explicit(operation, m_, n_, k_, alpha, a, lda, packed_b.values.ptr, k_, beta, c, ldc, &output_report) catch |err| {
+        report.* = output_report;
+        return err;
+    };
+    report.* = output_report;
+}

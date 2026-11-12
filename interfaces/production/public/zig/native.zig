@@ -13,6 +13,7 @@ pub const MatrixProductF64 = core.native.MatrixProductF64;
 pub const NativeError = core.native.NativeError;
 pub const matrixMultiplyF64NN = core.native.matrixMultiplyF64NN;
 pub const matrixMultiplyF64TN = core.native.matrixMultiplyF64TN;
+pub const matrixMultiplyF64NT = core.native.matrixMultiplyF64NT;
 pub const coreIdentity = core.internal.nativeCoreIdentity;
 pub const PeriodicLaplacianF64 = core.native_grid.PeriodicLaplacianF64;
 pub const PeriodicLaplacianError = core.native_grid.Error;
@@ -24,3 +25,6 @@ pub const spectral = core.native_spectral;
 pub const ComplexF64 = core.native.ComplexF64;
 pub const MatrixProductC128 = core.native.MatrixProductC128;
 pub const matrixMultiplyC128NC = core.native.matrixMultiplyC128NC;
+
+/// Heteris construction is explicit and requires stable caller-owned storage.
+pub const IntegratedContext = @import("zynum-resource-heteris").IntegratedContext;

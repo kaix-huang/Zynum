@@ -6,7 +6,7 @@ const execution = @import("root.zig");
 pub fn main() void {
     const mode = @import("zynum-build-options").negative_mode;
     if (comptime std.mem.eql(u8, mode, "integrated")) {
-        std.mem.doNotOptimizeAway(execution.Context.initIntegrated);
+        std.mem.doNotOptimizeAway(execution.Context.initResources);
     }
     if (comptime std.mem.eql(u8, mode, "factory")) {
         _ = execution.Context.initLegacyBorrowed(undefined);

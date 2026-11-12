@@ -4,6 +4,7 @@
 const options = @import("zynum-build-options");
 pub const contracts = @import("contracts.zig");
 pub const results = @import("results.zig");
+pub const resource_port = @import("resource_port.zig");
 pub const context = @import("context.zig");
 pub const Context = context.Context;
 pub const Operation = context.Operation;

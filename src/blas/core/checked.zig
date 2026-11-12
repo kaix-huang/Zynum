@@ -44,6 +44,7 @@ pub const multiplyMatrices = operations.multiplyMatrices;
 pub const multiplyRealMatricesAdmitted = operations.multiplyRealMatricesAdmitted;
 pub const multiplyF64NNExplicit = operations.multiplyF64NNExplicit;
 pub const multiplyF64TNExplicit = operations.multiplyF64TNExplicit;
+pub const multiplyF64NTExplicit = operations.multiplyF64NTExplicit;
 pub const multiplyComplexMatricesAdmitted = operations.multiplyComplexMatricesAdmitted;
 
 pub const multiplyC128NCExplicit = operations.multiplyC128NCExplicit;

@@ -1,10 +1,15 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
 const std = @import("std");
-const common = @import("context.zig");
-const resources = @import("call_resources.zig");
-const results = @import("results.zig");
+const common = @import("zynum-execution");
+const provider = @import("provider.zig");
+const resources = common;
+const results = common.results;
 const c = @import("heteris-provider-c");
+fn initContext(binding: *provider.Binding, source: *const c.heteris_runtime_provider_v1, desc: results.ContextDesc, report: *results.CallReport) results.ExecutionError!common.Context {
+    binding.* = try provider.Binding.init(source, desc, report);
+    return common.Context.initResources(binding.port());
+}
 const Fake = struct {
     allocator: std.mem.Allocator,
     references: usize = 1,
@@ -158,7 +163,8 @@ test "integrated copies descriptor and API, closes only its retained provider ou
     var api = fake.api();
     var desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    var ctx = try common.Context.initIntegrated(&desc, .{}, &report);
+    var binding: provider.Binding = undefined;
+    var ctx = try initContext(&binding, &desc, .{}, &report);
     fake.context = &ctx;
     api.provider_release = null;
     desc.provider.serial = 999;
@@ -179,12 +185,13 @@ test "query and caps rejection retain rollback preserves raw original error" {
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    try std.testing.expectError(error.ProviderRejected, common.Context.initIntegrated(&desc, .{}, &report));
+    var binding: provider.Binding = undefined;
+    try std.testing.expectError(error.ProviderRejected, initContext(&binding, &desc, .{}, &report));
     try std.testing.expectEqual(@as(i32, -997), report.provider.returned_status);
     try std.testing.expectEqual(@as(usize, 1), fake.references);
     fake.query_status = 0;
     fake.flags = 0;
-    try std.testing.expectError(error.Unsupported, common.Context.initIntegrated(&desc, .{}, &report));
+    try std.testing.expectError(error.Unsupported, initContext(&binding, &desc, .{}, &report));
     try std.testing.expectEqual(@as(usize, 2), fake.releases);
 }
 test "normal provider release failure retains exact token and allows explicit retry" {
@@ -192,7 +199,8 @@ test "normal provider release failure retains exact token and allows explicit re
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    var ctx = try common.Context.initIntegrated(&desc, .{}, &report);
+    var binding: provider.Binding = undefined;
+    var ctx = try initContext(&binding, &desc, .{}, &report);
     fake.context = &ctx;
     _ = ctx.requestClose();
     try std.testing.expectEqual(common.CloseResult.release_failed, ctx.tryProgressClose(&report));
@@ -213,17 +221,18 @@ test "local descriptor and retain failures never acquire provider ownership" {
     var api = fake.api();
     var desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
+    var binding: provider.Binding = undefined;
     api.struct_size = 0;
-    try std.testing.expectError(error.InvalidProvider, common.Context.initIntegrated(&desc, .{}, &report));
+    try std.testing.expectError(error.InvalidProvider, initContext(&binding, &desc, .{}, &report));
     try std.testing.expectEqual(@as(usize, 0), fake.retains);
     api = fake.api();
-    try std.testing.expectError(error.ProviderRejected, common.Context.initIntegrated(&desc, .{}, &report));
+    try std.testing.expectError(error.ProviderRejected, initContext(&binding, &desc, .{}, &report));
     try std.testing.expectEqual(results.ResourceStage.retain, report.provider.stage);
     try std.testing.expectEqual(@as(i32, -651), report.provider.returned_status);
     try std.testing.expectEqual(@as(usize, 1), fake.references);
     try std.testing.expectEqual(@as(usize, 0), fake.releases);
     fake.retain_status = 0;
-    try std.testing.expectError(error.Unsupported, common.Context.initIntegrated(&desc, .{ .max_parallel_tasks = 3 }, &report));
+    try std.testing.expectError(error.Unsupported, initContext(&binding, &desc, .{ .max_parallel_tasks = 3 }, &report));
     try std.testing.expectEqual(@as(usize, 1), fake.references);
 }
 test "scratch extent and actual OOM preserve status and rollback their pin" {
@@ -232,7 +241,8 @@ test "scratch extent and actual OOM preserve status and rollback their pin" {
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    var ctx = try common.Context.initIntegrated(&desc, .{}, &report);
+    var binding: provider.Binding = undefined;
+    var ctx = try initContext(&binding, &desc, .{}, &report);
     fake.context = &ctx;
     var operation = try ctx.begin();
     const call = resources.admittedResources(&operation);
@@ -251,7 +261,8 @@ test "zero-length aligned provider scratch retains pin after admitted operation 
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    var ctx = try common.Context.initIntegrated(&desc, .{}, &report);
+    var binding: provider.Binding = undefined;
+    var ctx = try initContext(&binding, &desc, .{}, &report);
     fake.context = &ctx;
     var operation = try ctx.begin();
     _ = ctx.requestClose();
@@ -270,7 +281,8 @@ test "concurrent finalizers observe busy while sole release runs outside gate" {
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    var ctx = try common.Context.initIntegrated(&desc, .{}, &report);
+    var binding: provider.Binding = undefined;
+    var ctx = try initContext(&binding, &desc, .{}, &report);
     fake.context = &ctx;
     _ = ctx.requestClose();
     const Finalizer = struct {
@@ -292,7 +304,7 @@ test "concurrent finalizers observe busy while sole release runs outside gate" {
     while (!fake.release_entered.load(.acquire) and started.durationTo(std.Io.Clock.awake.now(std.testing.io)).nanoseconds < 5 * std.time.ns_per_s) std.Thread.yield() catch {};
     try std.testing.expect(fake.release_entered.load(.acquire));
     try std.testing.expectEqual(common.CloseResult.busy, ctx.tryProgressClose(&report));
-    try std.testing.expectEqual(common.Phase.releasing, ctx.snapshot().phase);
+    try std.testing.expectEqual(common.context.Phase.releasing, ctx.snapshot().phase);
     fake.allow_release.store(true, .release);
     thread.join();
     joined = true;
@@ -304,7 +316,8 @@ test "typed dispatch provider scratch, unknown reject and partial errors never r
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
-    var ctx = try common.Context.initIntegrated(&desc, .{}, &report);
+    var binding: provider.Binding = undefined;
+    var ctx = try initContext(&binding, &desc, .{}, &report);
     fake.context = &ctx;
     var operation = try ctx.begin();
     const call = resources.admittedResources(&operation);
@@ -342,13 +355,14 @@ pub fn failStopFixture(mode: []const u8) void {
     const api = fake.api();
     const desc = fake.descriptor(&api);
     var report: results.CallReport = .{};
+    var binding: provider.Binding = undefined;
     if (std.mem.eql(u8, mode, "rollback")) {
         fake.query_status = -997;
         fake.release_status = -663;
-        _ = common.Context.initIntegrated(&desc, .{}, &report) catch @panic("rollback incorrectly returned");
+        _ = initContext(&binding, &desc, .{}, &report) catch @panic("rollback incorrectly returned");
         @panic("rollback incorrectly succeeded");
     }
-    var ctx = common.Context.initIntegrated(&desc, .{}, &report) catch @panic("fixture init");
+    var ctx = initContext(&binding, &desc, .{}, &report) catch @panic("fixture init");
     var operation = ctx.begin() catch @panic("fixture begin");
     if (std.mem.eql(u8, mode, "scratch")) {
         var scratch = resources.admittedResources(&operation).acquireScratch(u8, 1, &report) catch @panic("fixture scratch");

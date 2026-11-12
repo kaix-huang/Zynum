@@ -11,9 +11,92 @@ execute_process(COMMAND "${ZYNUM_ZIG}" version OUTPUT_VARIABLE ZYNUM_ZIG_VERSION
 if(NOT ZYNUM_ZIG_VERSION STREQUAL "0.17.0")
     message(FATAL_ERROR "The qualified toolchain is global Zig 0.17.0; found ${ZYNUM_ZIG_VERSION}.")
 endif()
-if(NOT TARGET heteris_data)
+if(TARGET heteris_data)
+    set(ZYNUM_HETERIS_DATA_TARGET heteris_data)
+elseif(TARGET heteris::data)
+    set(ZYNUM_HETERIS_DATA_TARGET heteris::data)
+else()
     add_library(heteris_data INTERFACE)
     target_include_directories(heteris_data INTERFACE "${HETERIS_ABI_INCLUDE_DIR}")
+    set(ZYNUM_HETERIS_DATA_TARGET heteris_data)
+endif()
+# Native and standalone APIs use the explicit header-only resource contract.
+# Reuse Heteris ownership when embedded; an explicit flat SDK remains usable alone.
+set(ZYNUM_INSTALL_HETERIS_CONTRACT OFF)
+if(TARGET heteris_resource_contract)
+    set(ZYNUM_HETERIS_RESOURCE_TARGET heteris_resource_contract)
+elseif(TARGET heteris::resource_contract)
+    set(ZYNUM_HETERIS_RESOURCE_TARGET heteris::resource_contract)
+else()
+    set(ZYNUM_INSTALL_HETERIS_CONTRACT ON)
+    add_library(heteris_resource_contract INTERFACE)
+    target_link_libraries(heteris_resource_contract INTERFACE ${ZYNUM_HETERIS_DATA_TARGET})
+    target_include_directories(heteris_resource_contract INTERFACE "${HETERIS_ABI_INCLUDE_DIR}")
+    set(ZYNUM_HETERIS_RESOURCE_TARGET heteris_resource_contract)
+endif()
+# Zig translates these C contracts. Canonical source inputs must invalidate the
+# archive even when the selected compatibility forwarders themselves are unchanged.
+set(ZYNUM_HETERIS_HEADER_INPUTS
+    "${HETERIS_ABI_INCLUDE_DIR}/heteris.h"
+    "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h")
+if(EXISTS "${HETERIS_ABI_INCLUDE_DIR}/heteris_data.h")
+    list(APPEND ZYNUM_HETERIS_HEADER_INPUTS "${HETERIS_ABI_INCLUDE_DIR}/heteris_data.h")
+endif()
+get_target_property(ZYNUM_HETERIS_CANONICAL_HEADERS ${ZYNUM_HETERIS_RESOURCE_TARGET}
+    HETERIS_CONTRACT_SOURCE_HEADERS)
+set(ZYNUM_ZIG_HETERIS_RESOURCE_INCLUDE "${HETERIS_ABI_INCLUDE_DIR}")
+set(ZYNUM_ZIG_HETERIS_DATA_INCLUDE "")
+if(ZYNUM_HETERIS_CANONICAL_HEADERS)
+    foreach(header IN LISTS ZYNUM_HETERIS_CANONICAL_HEADERS)
+        if(NOT IS_ABSOLUTE "${header}" OR NOT EXISTS "${header}")
+            message(FATAL_ERROR "Heteris canonical contract source must be an existing absolute header: ${header}")
+        endif()
+    endforeach()
+    # The owning H target supplies exact canonical inputs. Never derive source
+    # directories by walking upward from an abi/include compatibility forwarder.
+    unset(ZYNUM_CANONICAL_RESOURCE_DIR)
+    unset(ZYNUM_CANONICAL_PROVIDER_DIR)
+    unset(ZYNUM_CANONICAL_DATA_DIR)
+    foreach(header IN LISTS ZYNUM_HETERIS_CANONICAL_HEADERS)
+        get_filename_component(header_name "${header}" NAME)
+        get_filename_component(header_directory "${header}" DIRECTORY)
+        if(header_name STREQUAL "heteris.h")
+            if(DEFINED ZYNUM_CANONICAL_RESOURCE_DIR AND NOT ZYNUM_CANONICAL_RESOURCE_DIR STREQUAL header_directory)
+                message(FATAL_ERROR "Heteris source contract has duplicate heteris.h authorities")
+            endif()
+            set(ZYNUM_CANONICAL_RESOURCE_DIR "${header_directory}")
+        elseif(header_name STREQUAL "heteris_runtime_provider.h")
+            if(DEFINED ZYNUM_CANONICAL_PROVIDER_DIR AND NOT ZYNUM_CANONICAL_PROVIDER_DIR STREQUAL header_directory)
+                message(FATAL_ERROR "Heteris source contract has duplicate heteris_runtime_provider.h authorities")
+            endif()
+            set(ZYNUM_CANONICAL_PROVIDER_DIR "${header_directory}")
+        elseif(header_name STREQUAL "heteris_data.h")
+            if(DEFINED ZYNUM_CANONICAL_DATA_DIR AND NOT ZYNUM_CANONICAL_DATA_DIR STREQUAL header_directory)
+                message(FATAL_ERROR "Heteris source contract has duplicate heteris_data.h authorities")
+            endif()
+            set(ZYNUM_CANONICAL_DATA_DIR "${header_directory}")
+        endif()
+    endforeach()
+    if(NOT ZYNUM_CANONICAL_RESOURCE_DIR OR NOT ZYNUM_CANONICAL_PROVIDER_DIR OR
+       NOT ZYNUM_CANONICAL_RESOURCE_DIR STREQUAL ZYNUM_CANONICAL_PROVIDER_DIR OR
+       NOT ZYNUM_CANONICAL_DATA_DIR)
+        message(FATAL_ERROR "Heteris source contract property must identify canonical resource/provider and Data headers")
+    endif()
+    set(ZYNUM_ZIG_HETERIS_RESOURCE_INCLUDE "${ZYNUM_CANONICAL_RESOURCE_DIR}")
+    set(ZYNUM_ZIG_HETERIS_DATA_INCLUDE "${ZYNUM_CANONICAL_DATA_DIR}")
+    list(APPEND ZYNUM_HETERIS_HEADER_INPUTS ${ZYNUM_HETERIS_CANONICAL_HEADERS})
+else()
+    foreach(header IN LISTS ZYNUM_HETERIS_HEADER_INPUTS)
+        file(READ "${header}" header_contents)
+        if(header_contents MATCHES [=[#[ 	]*include[ 	]*[<"][^>"]*[.][.]/]=])
+            message(FATAL_ERROR "Source-relative Heteris headers require HETERIS_CONTRACT_SOURCE_HEADERS; select the owning Heteris component or an explicit flat SDK")
+        endif()
+    endforeach()
+endif()
+list(REMOVE_DUPLICATES ZYNUM_HETERIS_HEADER_INPUTS)
+set(ZYNUM_ZIG_HETERIS_INCLUDE_ARGS "-Dheteris-include=${ZYNUM_ZIG_HETERIS_RESOURCE_INCLUDE}")
+if(ZYNUM_ZIG_HETERIS_DATA_INCLUDE)
+    list(APPEND ZYNUM_ZIG_HETERIS_INCLUDE_ARGS "-Dheteris-data-include=${ZYNUM_ZIG_HETERIS_DATA_INCLUDE}")
 endif()
 # Per-configuration prefixes and caches keep concurrent Debug/Release builds isolated.
 set(ZYNUM_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/zig/$<CONFIG>")
@@ -37,7 +120,8 @@ else()
     endforeach()
 endif()
 set(ZYNUM_OPTIMIZE "$<IF:$<CONFIG:Debug>,debug,safe>")
-file(GLOB_RECURSE ZYNUM_ZIG_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.zig" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.S" "${CMAKE_CURRENT_SOURCE_DIR}/../../src/*.zig")
+file(GLOB_RECURSE ZYNUM_ZIG_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.zig" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/src/*.S" "${CMAKE_CURRENT_SOURCE_DIR}/../../src/*.zig"
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../interfaces/production/*.zig")
 list(APPEND ZYNUM_ZIG_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../src/scientific_platform_sources.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/blas/types.zig"
     "${CMAKE_CURRENT_SOURCE_DIR}/../../src/blas/core/shared/scalar.zig"
@@ -46,7 +130,7 @@ add_custom_command(OUTPUT ${ZYNUM_ARTIFACTS}
     COMMAND "${CMAKE_COMMAND}" -E env "ZIG_GLOBAL_CACHE_DIR=${CMAKE_CURRENT_BINARY_DIR}/zig-global-cache/$<CONFIG>"
             "${ZYNUM_ZIG}" build platform -Dexecution-profile=integrated_native -Doptimize=${ZYNUM_OPTIMIZE}
             -Dstandalone=${ZYNUM_STANDALONE_FLAG}
-            "-Dheteris-include=${HETERIS_ABI_INCLUDE_DIR}"
+            ${ZYNUM_ZIG_HETERIS_INCLUDE_ARGS}
             --prefix "${ZYNUM_PREFIX}"
             --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-cache/$<CONFIG>"
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.."
@@ -54,7 +138,7 @@ add_custom_command(OUTPUT ${ZYNUM_ARTIFACTS}
             "${CMAKE_CURRENT_SOURCE_DIR}/../../include/zynum_native.h"
             "${CMAKE_CURRENT_SOURCE_DIR}/../../include/zynum_native_spectral.h"
             include/zynum.h include/zynum_spectral.h include/zynum_standalone.h
-            "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h"
+            ${ZYNUM_HETERIS_HEADER_INPUTS}
     VERBATIM)
 add_custom_target(zynum_build ALL DEPENDS ${ZYNUM_ARTIFACTS})
 add_library(zynum STATIC IMPORTED GLOBAL)
@@ -71,7 +155,7 @@ if(NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 add_dependencies(zynum zynum_build)
 target_include_directories(zynum INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/../../include")
-target_link_libraries(zynum INTERFACE heteris_data)
+target_link_libraries(zynum INTERFACE ${ZYNUM_HETERIS_RESOURCE_TARGET})
 if(UNIX)
     target_link_libraries(zynum INTERFACE m)
 endif()
@@ -165,7 +249,7 @@ if(BUILD_TESTING)
     add_test(NAME zynum_zig_tests
         COMMAND "${CMAKE_COMMAND}" -E env "ZIG_GLOBAL_CACHE_DIR=${CMAKE_CURRENT_BINARY_DIR}/zig-global-cache/$<CONFIG>"
             "${ZYNUM_ZIG}" build test-platform -Dexecution-profile=integrated_native -Doptimize=${ZYNUM_OPTIMIZE}
-            "-Dheteris-include=${HETERIS_ABI_INCLUDE_DIR}"
+            ${ZYNUM_ZIG_HETERIS_INCLUDE_ARGS}
             --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-test-cache/$<CONFIG>")
     set_tests_properties(zynum_zig_tests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.." TIMEOUT 180)
 endif()
@@ -174,5 +258,33 @@ if(ZYNUM_BUILD_STANDALONE)
     install(FILES include/zynum_standalone.h DESTINATION include)
 endif()
 install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h ../../include/zynum_native_spectral.h DESTINATION include)
-install(FILES "${HETERIS_ABI_INCLUDE_DIR}/heteris.h" "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h" DESTINATION include)
+# Embedded Heteris owns its canonical public-header installation. Standalone
+# integration accepts only a real flat SDK, never source-relative forwarders.
+if(ZYNUM_INSTALL_HETERIS_CONTRACT)
+    set(ZYNUM_HETERIS_CONTRACT_HEADERS
+        "${HETERIS_ABI_INCLUDE_DIR}/heteris.h"
+        "${HETERIS_ABI_INCLUDE_DIR}/heteris_runtime_provider.h")
+    set(ZYNUM_HETERIS_NEEDS_DATA_HEADER OFF)
+    foreach(header IN LISTS ZYNUM_HETERIS_CONTRACT_HEADERS)
+        file(READ "${header}" header_contents)
+        if(header_contents MATCHES [=[#[ 	]*include[ 	]*[<"][^>"]*[.][.]/]=])
+            message(FATAL_ERROR "Standalone Zynum installation requires a flat Heteris SDK; source-relative forwarding header: ${header}")
+        endif()
+        if(header_contents MATCHES [=[#[ 	]*include[ 	]*[<"]heteris_data[.]h[>"]]=])
+            set(ZYNUM_HETERIS_NEEDS_DATA_HEADER ON)
+        endif()
+    endforeach()
+    if(ZYNUM_HETERIS_NEEDS_DATA_HEADER)
+        set(ZYNUM_HETERIS_DATA_HEADER "${HETERIS_ABI_INCLUDE_DIR}/heteris_data.h")
+        if(NOT EXISTS "${ZYNUM_HETERIS_DATA_HEADER}")
+            message(FATAL_ERROR "The selected flat Heteris SDK requires heteris_data.h")
+        endif()
+        file(READ "${ZYNUM_HETERIS_DATA_HEADER}" header_contents)
+        if(header_contents MATCHES [=[#[ 	]*include[ 	]*[<"][^>"]*[.][.]/]=])
+            message(FATAL_ERROR "Standalone Zynum installation requires a flat Heteris Data header")
+        endif()
+        list(APPEND ZYNUM_HETERIS_CONTRACT_HEADERS "${ZYNUM_HETERIS_DATA_HEADER}")
+    endif()
+    install(FILES ${ZYNUM_HETERIS_CONTRACT_HEADERS} DESTINATION include)
+endif()
 install(FILES ../../LICENSE ../../COPYING UPSTREAM.md ZIG-MIT DESTINATION share/licenses/zynum)

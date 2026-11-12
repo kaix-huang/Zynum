@@ -7,7 +7,7 @@ const execution = @import("zynum-execution");
 const native = @import("zynum-native");
 const c = @import("heteris-provider-c");
 const options = @import("zynum-build-options");
-const Context = execution.Context;
+const Context = @import("zynum-resource-heteris").IntegratedContext;
 const Report = c.zynum_native_report_v1;
 const Policy = c.zynum_native_policy_v1;
 const Requirements = c.zynum_native_context_requirements_v1;
@@ -107,11 +107,10 @@ export fn zynum_native_context_init_v1(storage: ?*anyopaque, bytes: u64, provide
     if (policy.algorithm != 1) return c.ZYNUM_NATIVE_UNSUPPORTED;
     const provider: *const c.heteris_runtime_provider_v1 = @ptrCast(@alignCast(provider_raw));
     var result: execution.CallReport = .{};
-    const initialized = Context.initIntegrated(provider, .{ .algorithm = .portable_generic, .max_parallel_tasks = policy.max_parallel_tasks }, &result) catch |err| {
+    ctx.initInPlace(provider, .{ .algorithm = .portable_generic, .max_parallel_tasks = policy.max_parallel_tasks }, &result) catch |err| {
         reportResult(report, result);
         return errorStatus(err);
     };
-    ctx.* = initialized;
     reportResult(report, result);
     report.close_state = c.ZYNUM_NATIVE_CLOSE_OPEN;
     return c.ZYNUM_NATIVE_OK;
@@ -271,7 +270,7 @@ export fn zynum_native_gemm_f64_nn_v1(storage: ?*anyopaque, m64: u64, n64: u64, 
         .result_scale = beta,
     };
     var result: execution.CallReport = .{};
-    native.matrixMultiplyF64NN(ctx, args, &result) catch |err| {
+    native.matrixMultiplyF64NN(ctx.core(), args, &result) catch |err| {
         reportResult(report, result);
         return mathematicalStatus(err);
     };
@@ -314,7 +313,74 @@ export fn zynum_native_gemm_f64_tn_v1(storage: ?*anyopaque, m64: u64, n64: u64, 
         .result_scale = beta,
     };
     var result: execution.CallReport = .{};
-    native.matrixMultiplyF64TN(ctx, args, &result) catch |err| {
+    native.matrixMultiplyF64TN(ctx.core(), args, &result) catch |err| {
+        reportResult(report, result);
+        return mathematicalStatus(err);
+    };
+    reportResult(report, result);
+    return c.ZYNUM_NATIVE_OK;
+}
+
+// New row-major F64 uses full usize capacities; the older NN/TN entry points
+// intentionally retain their original LP64 backing and diagnostic precedence.
+fn declaredF64MatrixRange(address: usize, capacity64: u64, bytes: usize, rows: i32, columns: i32, leading: i32) BufferError!BufferRange {
+    const capacity = std.math.cast(usize, capacity64) orelse return error.Overflow;
+    var required: usize = 0;
+    if (rows != 0 and columns != 0) {
+        if (leading < rows) return error.InvalidView;
+        const offset = std.math.mul(usize, @intCast(columns - 1), @intCast(leading)) catch return error.Overflow;
+        required = std.math.add(usize, offset, @intCast(rows)) catch return error.Overflow;
+    }
+    const required_bytes = std.math.mul(usize, required, @sizeOf(f64)) catch return error.Overflow;
+    if (required > capacity) return error.InvalidView;
+    if (address == 0) {
+        if (capacity != 0 or required != 0) return error.InvalidView;
+    } else if (address % @alignOf(f64) != 0) return error.InvalidView;
+    return .{ .address = address, .backing = capacity, .backing_bytes = bytes, .required_bytes = required_bytes };
+}
+export fn zynum_native_gemm_f64_row_major_tn_v1(storage: ?*anyopaque, m64: u64, n64: u64, k64: u64, alpha: f64, a_raw: ?*align(1) const f64, a_capacity: u64, lda64: u64, b_raw: ?*align(1) const f64, b_capacity: u64, ldb64: u64, beta: f64, c_raw: ?*align(1) f64, c_capacity: u64, ldc64: u64, report_raw: ?*align(1) Report) i32 {
+    const ctx = contextPointer(storage) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_pointer = report_raw orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_address = @intFromPtr(report_pointer);
+    const context_address = @intFromPtr(ctx);
+    if (!validAddress(report_address, @sizeOf(Report), @alignOf(Report)) or
+        overlaps(report_address, @sizeOf(Report), context_address, @sizeOf(Context))) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const addresses = [3]usize{
+        if (a_raw) |value| @intFromPtr(value) else 0,
+        if (b_raw) |value| @intFromPtr(value) else 0,
+        if (c_raw) |value| @intFromPtr(value) else 0,
+    };
+    const capacities = [3]u64{ a_capacity, b_capacity, c_capacity };
+    var bytes: [3]usize = undefined;
+    for (addresses, capacities, 0..) |address, capacity, index| {
+        bytes[index] = gridDeclaredBytes(address, capacity) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+        if (overlaps(report_address, @sizeOf(Report), address, bytes[index]) or
+            overlaps(context_address, @sizeOf(Context), address, bytes[index])) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    }
+    const m = dimension(m64) catch |err| return bufferStatus(err);
+    const n = dimension(n64) catch |err| return bufferStatus(err);
+    const k = dimension(k64) catch |err| return bufferStatus(err);
+    const lda = dimension(lda64) catch |err| return bufferStatus(err);
+    const ldb = dimension(ldb64) catch |err| return bufferStatus(err);
+    const ldc = dimension(ldc64) catch |err| return bufferStatus(err);
+    const a = declaredF64MatrixRange(addresses[0], a_capacity, bytes[0], m, k, lda) catch |err| return bufferStatus(err);
+    const b = declaredF64MatrixRange(addresses[1], b_capacity, bytes[1], n, k, ldb) catch |err| return bufferStatus(err);
+    const output = declaredF64MatrixRange(addresses[2], c_capacity, bytes[2], n, m, ldc) catch |err| return bufferStatus(err);
+    if (!std.math.isFinite(alpha) or !std.math.isFinite(beta)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    if (overlaps(output.address, output.backing_bytes, a.address, a.backing_bytes) or
+        overlaps(output.address, output.backing_bytes, b.address, b.backing_bytes)) return c.ZYNUM_NATIVE_VIEW_INVALID;
+    const report = reportPointer(report_raw, storage, @sizeOf(Context)) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    // C_row^T = alpha * B_row^T * A_row + beta*C_row^T: column NT(n,m,k).
+    // The original Core packs its internal right operand, which is public A.
+    const args: native.MatrixProductF64 = .{
+        .left_matrix = .{ .values = constSlice(b), .row_count = n, .column_count = k, .leading_dimension = ldb },
+        .right_matrix = .{ .values = constSlice(a), .row_count = m, .column_count = k, .leading_dimension = lda, .operation = .transposed },
+        .result_matrix = .{ .values = mutableSlice(output), .row_count = n, .column_count = m, .leading_dimension = ldc },
+        .product_scale = alpha,
+        .result_scale = beta,
+    };
+    var result: execution.CallReport = .{};
+    native.matrixMultiplyF64NT(ctx.core(), args, &result) catch |err| {
         reportResult(report, result);
         return mathematicalStatus(err);
     };
@@ -412,7 +478,7 @@ export fn zynum_native_gemm_c128_row_major_cn_v1(storage: ?*anyopaque, m64: u64,
         .result_scale = .{ .re = beta_re, .im = beta_im },
     };
     var result: execution.CallReport = .{};
-    native.matrixMultiplyC128NC(ctx, args, &result) catch |err| {
+    native.matrixMultiplyC128NC(ctx.core(), args, &result) catch |err| {
         reportResult(report, result);
         return mathematicalStatus(err);
     };
@@ -477,7 +543,7 @@ export fn zynum_native_laplacian_periodic_3d_f64_v1(storage: ?*anyopaque, n0: u6
     const y: BufferRange = .{ .address = y_address, .backing = @intCast(y_backing), .backing_bytes = y_bytes, .required_bytes = required_bytes };
     const ctx: *Context = @ptrCast(@alignCast(storage.?));
     var result: execution.CallReport = .{};
-    native.periodicLaplacianF64(ctx, .{ .shape = shape, .input = constSlice(x), .output = mutableSlice(y), .inv_h2 = h }, &result) catch |err| {
+    native.periodicLaplacianF64(ctx.core(), .{ .shape = shape, .input = constSlice(x), .output = mutableSlice(y), .inv_h2 = h }, &result) catch |err| {
         reportResult(report, result);
         return gridErrorStatus(err);
     };
@@ -632,7 +698,7 @@ export fn zynum_native_periodic_neg_laplacian_solve_f64_v1(
     const x: [*]f64 = @ptrFromInt(solution.address);
     const w: [*]f64 = @ptrFromInt(workspace.address);
     const ctx: *Context = @alignCast(ctx_raw);
-    solve.solve(ctx, problem, b[0..@intCast(rhs_count)], x[0..@intCast(solution_count)], w[0..@intCast(workspace_count)], &result) catch |err| return solveErrorStatus(err);
+    solve.solve(ctx.core(), problem, b[0..@intCast(rhs_count)], x[0..@intCast(solution_count)], w[0..@intCast(workspace_count)], &result) catch |err| return solveErrorStatus(err);
     return c.ZYNUM_NATIVE_OK;
 }
 

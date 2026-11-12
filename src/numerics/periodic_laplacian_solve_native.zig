@@ -221,7 +221,7 @@ pub fn solve(context: *execution.Context, problem: Problem, rhs: []const f64, so
         error.CounterOverflow => error.CounterOverflow,
     };
     defer operation.end();
-    if (operation.borrowedContext().integratedBinding() == null) return error.Unsupported;
+    if (operation.borrowedContext().resourcePort() == null) return error.Unsupported;
     // The last stencil diagnostics survive all exits; the output state always
     // describes the caller's solution, never any staged stencil destination.
     defer report.native.output = if (report.phase == .published) .complete else .unchanged;

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: LGPL-3.0-or-later
 //! Explicitly selected local Heteris integration evidence, not math qualification.
 const std = @import("std");
-const common = @import("context.zig");
-const resources = @import("call_resources.zig");
-const results = @import("results.zig");
+const common = @import("zynum-execution");
+const provider = @import("provider.zig");
+const resources = common;
+const results = common.results;
 const c = @import("heteris-provider-c");
 test "actual original Runtime owns task writes and shared Context close isolation" {
     const desc: c.heteris_rp_cpu_create_desc_v1 = .{ .abi_version = 1, .struct_size = @sizeOf(c.heteris_rp_cpu_create_desc_v1), .compute_workers = 1, .managed_thread_limit = 2, .max_tasks = 8, .max_dependencies = 8, .host_bytes_limit = 8192, .task_scratch_bytes_limit = 0, .reserved = .{ 0, 0 } };
@@ -13,8 +14,10 @@ test "actual original Runtime owns task writes and shared Context close isolatio
     var source: c.heteris_runtime_provider_v1 = undefined;
     try std.testing.expectEqual(@as(i32, 0), c.heteris_cpu_runtime_export_provider_v1(root, &source));
     var report: results.CallReport = .{};
-    var first = try common.Context.initIntegrated(&source, .{}, &report);
-    var second = try common.Context.initIntegrated(&source, .{}, &report);
+    var first_binding = try provider.Binding.init(&source, .{}, &report);
+    var first = common.Context.initResources(first_binding.port());
+    var second_binding = try provider.Binding.init(&source, .{}, &report);
+    var second = common.Context.initResources(second_binding.port());
     const Task = struct {
         value: *u32,
         caller: std.Thread.Id,

@@ -19,6 +19,25 @@ static_assert(sizeof(zynum_native_report_v1)==72);
 using Gemm=zynum_native_status(*)(void*,uint64_t,uint64_t,uint64_t,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double*,uint64_t,uint64_t,zynum_native_report_v1*);
 static_assert(std::is_same_v<decltype(&zynum_native_gemm_f64_nn_v1),Gemm>);
 static_assert(std::is_same_v<decltype(&zynum_native_gemm_f64_tn_v1),Gemm>);
+static_assert(std::is_same_v<decltype(&zynum_native_gemm_f64_row_major_tn_v1),Gemm>);
+static void cpp_row_tn_cases(void *context) {
+ const double a[12]={1,2,91,3,-1,92,2,4,93,-2,5,94};
+ const double b[20]={2,-3,1,81,82,4,2,-2,83,84,-1,5,3,85,86,3,-4,2,87,88};
+ double output[8]={7,7,7,123,7,7,7,123};
+ long double expected[6]{};
+ for(unsigned i=0;i<2;++i)for(unsigned j=0;j<3;++j){
+  long double sum=0;for(unsigned q=0;q<4;++q)sum+=static_cast<long double>(a[q*3+i])*b[q*5+j];
+  expected[i*3+j]=1.25L*sum-0.5L*output[i*4+j];
+ }
+ zynum_native_report_v1 report{};
+ assert(zynum_native_gemm_f64_row_major_tn_v1(context,2,3,4,1.25,a,12,3,b,20,5,-0.5,output,8,4,&report)==ZYNUM_NATIVE_OK);
+ for(unsigned i=0;i<2;++i)for(unsigned j=0;j<3;++j)assert(std::fabs(static_cast<long double>(output[i*4+j])-expected[i*3+j])<1e-12L);
+ assert(output[3]==123&&output[7]==123&&report.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE);
+ // Padded subpanel: pack only the public A columns selected by this pointer.
+ double panel[4]={0,0,0,0};
+ assert(zynum_native_gemm_f64_row_major_tn_v1(context,1,3,4,1,a+1,11,3,b,20,5,0,panel,4,4,&report)==ZYNUM_NATIVE_OK);
+ for(unsigned j=0;j<3;++j){long double sum=0;for(unsigned q=0;q<4;++q)sum+=static_cast<long double>(a[q*3+1])*b[q*5+j];assert(std::fabs(static_cast<long double>(panel[j])-sum)<1e-12L);}
+}
 using GemmCN=zynum_native_status(*)(void*,uint64_t,uint64_t,uint64_t,double,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double,double*,uint64_t,uint64_t,zynum_native_report_v1*);
 static_assert(std::is_same_v<decltype(&zynum_native_gemm_c128_row_major_cn_v1),GemmCN>);
 static void cpp_complex_cases(void *context) {
@@ -53,11 +72,11 @@ static_assert(std::is_same_v<decltype(&zynum_native_chebyshev_moments_f64_v1),Sp
 static_assert(std::is_same_v<decltype(&zynum_native_spectral_guard_query_v1),zynum_native_spectral_status(*)(uint64_t*,uint64_t*)>);
 static_assert(std::is_same_v<decltype(&zynum_native_spectral_guard_init_v1),zynum_native_spectral_status(*)(void*,uint64_t)>);
 static_assert(std::is_same_v<decltype(&zynum_native_spectral_workspace_elements_v1),zynum_native_spectral_status(*)(uint32_t,uint64_t,uint64_t,uint64_t,uint64_t*)>);
-struct CppSpectralState { double factor=2; unsigned calls=0; zynum_native_report_v1 child{}; };
+struct CppSpectralState { void *expected_context=nullptr; double factor=2; unsigned calls=0; zynum_native_report_v1 child{}; };
 extern "C" {
 static int32_t cpp_spectral_apply(void *raw,void *context,uint64_t n,uint64_t w,const double *x,uint64_t xb,uint64_t ldx,double *y,uint64_t yb,uint64_t ldy) {
  try {
-  auto &state=*static_cast<CppSpectralState*>(raw);++state.calls;
+  auto &state=*static_cast<CppSpectralState*>(raw);++state.calls;assert(context==state.expected_context);
   assert(ldx==n&&ldy==n&&xb==n*w&&yb==n*w);
   if(n==0||w==0){assert(x==nullptr&&y==nullptr&&xb==0&&yb==0);return 0;}
   // One scalar scaling GEMM per compact column, through the same real Context.
@@ -90,7 +109,7 @@ static void cpp_spectral_cases(void *context,const heteris_runtime_provider_api_
  x[0]=1;x[1]=2;x[2]=x[3]=NAN;x[4]=3;x[5]=4;
  coefficients[0]=1;coefficients[1]=2;coefficients[2]=3;
  for(unsigned i=0;i<16;++i)y[i]=773;
- CppSpectralState state;zynum_native_spectral_report_v1 report{};
+ CppSpectralState state;state.expected_context=context;zynum_native_spectral_report_v1 report{};
  assert(zynum_native_chebyshev_series_f64_v1(context,cpp_spectral_apply,&state,sizeof state,2,2,x,6,4,coefficients,3,3,0,4,y,6,4,work,elements+2,guard.data,bytes+16,&report)==ZYNUM_NATIVE_SPECTRAL_OK);
  assert(y[0]==-2&&y[1]==-4&&y[4]==-6&&y[5]==-8&&y[2]==773&&y[3]==773&&y[6]==773);
  assert(state.calls==2&&report.callbacks_returned==2&&report.phase==ZYNUM_NATIVE_SPECTRAL_COMPLETE&&report.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE);
@@ -118,6 +137,7 @@ int main(){
  zynum_native_policy_v1 policy{1,sizeof policy,1,0,{0,0}};zynum_native_report_v1 report{};
  assert(zynum_native_context_init_v1(storage.data,req.bytes,&provider,&policy,&report)==ZYNUM_NATIVE_OK);
  cpp_complex_cases(storage.data);
+ cpp_row_tn_cases(storage.data);
  const auto spectral_provider=provider.provider;
  assert(api.provider_release(provider.provider)==HETERIS_OK);std::memset(&provider,0,sizeof provider);
  assert(zynum_native_gemm_f64_nn_v1(storage.data,1,1,1,2,a,1,1,b,1,1,0.5,c,1,1,&report)==ZYNUM_NATIVE_OK);assert(*c==14&&report.output_state==1&&report.submission_state==2);

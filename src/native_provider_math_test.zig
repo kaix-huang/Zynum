@@ -6,6 +6,7 @@ const native = @import("zynum-core").native;
 const grid_solve = @import("zynum-core").native_grid_solve;
 const execution = @import("zynum-execution");
 const c = @import("heteris-provider-c");
+const resource_adapter = @import("zynum-resource-heteris");
 const tn_reference = @import("gemm-test-reference").referenceGemmTransposedA;
 const Mode = enum { normal, budget, oom_second, reject, callback_error };
 var mode: Mode = .normal;
@@ -96,6 +97,7 @@ const Fixture = struct {
     source: c.heteris_runtime_provider_v1 = undefined,
     api: c.heteris_runtime_provider_api_v1 = undefined,
     context: execution.Context = undefined,
+    binding: resource_adapter.Binding = undefined,
     report: execution.CallReport = .{},
     fn init(self: *@This(), limit: u32) !void {
         mode = .normal;
@@ -122,7 +124,8 @@ const Fixture = struct {
         self.api.scratch_release = releaseScratch;
         self.api.cpu_bulk_sync = submit;
         self.source.api = &self.api;
-        self.context = try execution.Context.initIntegrated(&self.source, .{ .max_parallel_tasks = limit }, &self.report);
+        self.binding = try resource_adapter.Binding.init(&self.source, .{ .max_parallel_tasks = limit }, &self.report);
+        self.context = execution.Context.initResources(self.binding.port());
     }
     fn deinit(self: *@This()) void {
         if (live_scratch != 0) @panic("native math scratch leak");
@@ -459,7 +462,8 @@ test "native TN close after quiescent packing keeps one admission and packed lea
     try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
     try std.testing.expectError(error.ContextClosing, native.matrixMultiplyF64TN(&fixture.context, tnArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 1), &fixture.report));
     // Closing one mathematical Context must leave the shared Runtime usable.
-    var other = try execution.Context.initIntegrated(&fixture.source, .{}, &fixture.report);
+    var other_binding = try resource_adapter.Binding.init(&fixture.source, .{}, &fixture.report);
+    var other = execution.Context.initResources(other_binding.port());
     try native.matrixMultiplyF64TN(&other, tnArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 0), &fixture.report);
     _ = other.requestClose();
     try std.testing.expect(other.tryProgressClose(&fixture.report) == .closed);
@@ -697,7 +701,8 @@ test "native periodic Laplacian admitted close and managed worker paths preserve
         try std.testing.expectEqual(@as(usize, 0), live_scratch);
         try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
         try std.testing.expectError(error.ContextClosing, grid.periodicLaplacianF64(&fixture.context, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report));
-        var other = try execution.Context.initIntegrated(&fixture.source, .{}, &fixture.report);
+        var other_binding = try resource_adapter.Binding.init(&fixture.source, .{}, &fixture.report);
+        var other = execution.Context.initResources(other_binding.port());
         grid_close_during = null;
         try grid.periodicLaplacianF64(&other, gridArgs(.{ 1, 2, 2 }, &x, &y), &fixture.report);
         _ = other.requestClose();
@@ -1429,4 +1434,206 @@ test "native complex admitted close stays busy until provider callbacks and scra
     try std.testing.expect(grid_close_during_busy.load(.acquire));
     try std.testing.expectEqual(@as(usize, 0), live_scratch);
     try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+}
+
+fn ntArgs(a: []const f64, b: []const f64, output: []f64, m: i32, n: i32, k: i32, lda: i32, ldb: i32, ldc: i32, alpha: f64, beta: f64) native.MatrixProductF64 {
+    var result = args(a, b, output, m, n, k, lda, ldb, ldc, alpha, beta);
+    result.right_matrix.row_count = n;
+    result.right_matrix.column_count = k;
+    result.right_matrix.operation = .transposed;
+    return result;
+}
+
+test "native NT rectangular padded independent widened oracle exercises original transpose packing" {
+    const shapes = [_][3]usize{ .{ 1, 9, 19 }, .{ 9, 1, 19 }, .{ 3, 5, 7 }, .{ 33, 17, 67 }, .{ 5, 3, 2049 }, .{ 3, 1025, 65 } };
+    for ([_]u32{ 1, 2 }) |limit| {
+        var fixture: Fixture = .{};
+        try fixture.init(limit);
+        defer fixture.deinit();
+        for (shapes) |shape| {
+            const m, const n, const k = shape;
+            const lda = m + 2;
+            const ldb = n + 3;
+            const ldc = m + 4;
+            const a = try std.testing.allocator.alloc(f64, lda * k);
+            defer std.testing.allocator.free(a);
+            const b = try std.testing.allocator.alloc(f64, ldb * k);
+            defer std.testing.allocator.free(b);
+            const output = try std.testing.allocator.alloc(f64, ldc * n);
+            defer std.testing.allocator.free(output);
+            @memset(a, -991);
+            @memset(b, -997);
+            @memset(output, 17);
+            for (0..k) |q| {
+                for (0..m) |i| a[i + q * lda] = sampleTN(i, q, 7);
+                for (0..n) |j| b[j + q * ldb] = sampleTN(q, j, 13);
+            }
+            const before = submissions;
+            const before_allocations = allocations;
+            try native.matrixMultiplyF64NT(&fixture.context, ntArgs(a, b, output, @intCast(m), @intCast(n), @intCast(k), @intCast(lda), @intCast(ldb), @intCast(ldc), 0.75, -0.25), &fixture.report);
+            for (0..n) |j| for (0..ldc) |i| {
+                if (i >= m) {
+                    try std.testing.expectEqual(@as(f64, 17), output[i + j * ldc]);
+                } else {
+                    // Independent physical NT indexing, widened accumulation;
+                    // neither the pack helper nor the NN/TN implementation is an oracle.
+                    var sum: f128 = 0;
+                    for (0..k) |q| sum += @as(f128, a[i + q * lda]) * @as(f128, b[j + q * ldb]);
+                    const expected: f64 = @floatCast(0.75 * sum - 0.25 * 17);
+                    try std.testing.expectApproxEqAbs(expected, output[i + j * ldc], 1e-10);
+                }
+            };
+            try std.testing.expectEqual(@as(usize, 2), submissions - before);
+            try std.testing.expectEqual(@as(usize, 5), allocations - before_allocations);
+            try std.testing.expectEqual(execution.OutputState.complete, fixture.report.output);
+            try std.testing.expectEqual(@as(usize, 0), live_scratch);
+        }
+    }
+}
+
+test "native NT zero scaling empty output and IEEE data retain explicit provider semantics" {
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    var output = [_]f64{ std.math.nan(f64), std.math.nan(f64), 99, std.math.nan(f64), std.math.nan(f64), 99 };
+    try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&.{}, &.{}, &output, 2, 2, 0, 0, 0, 3, 1, 0), &fixture.report);
+    try std.testing.expectEqualSlices(f64, &.{ 0, 0, 99, 0, 0, 99 }, &output);
+    const nan: [4]f64 = @splat(std.math.nan(f64));
+    output = .{ 2, 3, 99, 4, 5, 99 };
+    try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&nan, &nan, &output, 2, 2, 2, 2, 2, 3, -0.0, 2), &fixture.report);
+    try std.testing.expectEqualSlices(f64, &.{ 4, 6, 99, 8, 10, 99 }, &output);
+    try std.testing.expectEqual(@as(usize, 2), submissions);
+    try std.testing.expectEqual(@as(usize, 4), allocations);
+    output = .{ std.math.nan(f64), std.math.nan(f64), 99, std.math.nan(f64), std.math.nan(f64), 99 };
+    const finite = [_]f64{ 1, 2, 3, 4 };
+    try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&finite, &finite, &output, 2, 2, 2, 2, 2, 3, 1, 0), &fixture.report);
+    try std.testing.expectEqualSlices(f64, &.{ 10, 14, 99, 14, 20, 99 }, &output);
+    try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&nan, &finite, &output, 2, 2, 2, 2, 2, 3, 1, 0), &fixture.report);
+    try std.testing.expect(std.math.isNan(output[0]));
+    const before = allocations;
+    const before_submit = submissions;
+    try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&.{}, &.{}, &.{}, 0, 2, 0, 0, 0, 0, 1, 0), &fixture.report);
+    try std.testing.expectEqual(execution.OutputState.unchanged, fixture.report.output);
+    try std.testing.expectEqual(before, allocations);
+    try std.testing.expectEqual(before_submit, submissions);
+}
+
+test "native NT physical validation aliases transforms and closing precede resources" {
+    var fixture: Fixture = .{};
+    try fixture.init(1);
+    defer fixture.deinit();
+    const input = [_]f64{ 1, 2, 3, 4, 5, 6 };
+    var output = [_]f64{ 7, 7, 7, 7 };
+    const request = ntArgs(&input, &input, &output, 2, 2, 3, 2, 2, 2, 1, 0);
+    var invalid = request;
+    invalid.right_matrix.values = input[0..5];
+    try std.testing.expectError(error.BufferTooSmall, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    invalid = request;
+    invalid.right_matrix.leading_dimension = 1;
+    try std.testing.expectError(error.InvalidLeadingDimension, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    for ([_]@TypeOf(request.right_matrix.operation){ .normal, .adjoint }) |transform| {
+        invalid = request;
+        invalid.right_matrix.operation = transform;
+        try std.testing.expectError(error.Unsupported, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    }
+    invalid = request;
+    invalid.left_matrix.operation = .transposed;
+    try std.testing.expectError(error.Unsupported, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    invalid = request;
+    invalid.right_matrix.row_count = 1;
+    try std.testing.expectError(error.DimensionMismatch, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    invalid = ntArgs(&output, &input, &output, 2, 2, 2, 2, 2, 2, 0, 0);
+    try std.testing.expectError(error.AliasingNotAllowed, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    invalid = ntArgs(&input, &output, &output, 2, 2, 2, 2, 2, 2, 0, 0);
+    try std.testing.expectError(error.AliasingNotAllowed, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    try std.testing.expectEqual(@as(usize, 0), allocations);
+    try std.testing.expectEqual(@as(usize, 0), submissions);
+    _ = fixture.context.requestClose();
+    try std.testing.expectError(error.AliasingNotAllowed, native.matrixMultiplyF64NT(&fixture.context, invalid, &fixture.report));
+    try std.testing.expectError(error.ContextClosing, native.matrixMultiplyF64NT(&fixture.context, request, &fixture.report));
+    try std.testing.expectError(error.ContextClosing, native.matrixMultiplyF64NT(&fixture.context, ntArgs(&.{}, &.{}, &.{}, 0, 0, 0, 0, 0, 0, 1, 0), &fixture.report));
+}
+
+test "native NT each provider allocation failure preserves C and terminal allocation diagnostics" {
+    for ([_]u32{ 1, 2 }) |limit| for ([_]i32{ c.HETERIS_BUDGET_EXCEEDED, c.HETERIS_OUT_OF_MEMORY }) |status| {
+        for (1..6) |site| {
+            var fixture: Fixture = .{};
+            try fixture.init(limit);
+            defer fixture.deinit();
+            fail_allocation = site;
+            allocation_status = status;
+            var output = [_]f64{ 7, 7, 7, 7 };
+            const input = [_]f64{ 1, 2, 3, 4 };
+            const expected: native.NativeError = if (status == c.HETERIS_BUDGET_EXCEEDED) error.ResourceBudgetExceeded else error.OutOfMemory;
+            try std.testing.expectError(expected, native.matrixMultiplyF64NT(&fixture.context, ntArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 1), &fixture.report));
+            try std.testing.expectEqualSlices(f64, &.{ 7, 7, 7, 7 }, &output);
+            try std.testing.expectEqualDeep(execution.CallReport{ .provider = .{ .stage = .scratch_allocate, .returned_status = status } }, fixture.report);
+            try std.testing.expectEqual(site, allocations);
+            try std.testing.expectEqual(@as(usize, if (site <= 3) 0 else 1), submissions);
+            try std.testing.expectEqual(@as(usize, 0), live_scratch);
+            try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+            try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().resource_pins);
+            fail_allocation = 0;
+            // An explicit subsequent request proves cleanup; no implicit replay.
+            try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 1), &fixture.report);
+            try std.testing.expectEqualSlices(f64, &.{ 17, 21, 21, 27 }, &output);
+        }
+    };
+}
+
+test "native NT both bulks preserve exact rejection execution and callback diagnostics without replay" {
+    for ([_]u32{ 1, 2 }) |limit| for ([_]BulkFailure{ .reject, .execution, .callback }) |failure| {
+        for (1..3) |phase| {
+            var fixture: Fixture = .{};
+            try fixture.init(limit);
+            defer fixture.deinit();
+            fail_submission = phase;
+            bulk_failure = failure;
+            var output = [_]f64{ 7, 7, 7, 7 };
+            const input = [_]f64{ 1, 2, 3, 4 };
+            const expected: native.NativeError = switch (failure) {
+                .reject => error.ProviderRejected,
+                .execution => error.ProviderExecutionFailed,
+                .callback => error.ProviderCallbackFailed,
+                .none => unreachable,
+            };
+            try std.testing.expectError(expected, native.matrixMultiplyF64NT(&fixture.context, ntArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 1), &fixture.report));
+            try std.testing.expectEqual(phase, submissions);
+            try expectBulkDiagnostic(fixture.report, phase);
+            if (phase == 1 or failure == .reject) {
+                try std.testing.expectEqual(execution.OutputState.unchanged, fixture.report.output);
+                try std.testing.expectEqualSlices(f64, &.{ 7, 7, 7, 7 }, &output);
+            } else {
+                try std.testing.expectEqual(execution.OutputState.partial_or_invalid, fixture.report.output);
+                const full = [_]f64{ 17, 21, 21, 27 };
+                for (output, full) |value, complete| try std.testing.expect(value == 7 or value == complete);
+            }
+            try std.testing.expectEqual(@as(usize, 0), live_scratch);
+            try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().resource_pins);
+        }
+    };
+}
+
+test "native NT close after quiescent packing keeps one admission and packed lease through C" {
+    var fixture: Fixture = .{};
+    try fixture.init(2);
+    defer fixture.deinit();
+    close_after_packing = &fixture.context;
+    var output = [_]f64{ 7, 7, 7, 7 };
+    const input = [_]f64{ 1, 2, 3, 4 };
+    try native.matrixMultiplyF64NT(&fixture.context, ntArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 1), &fixture.report);
+    try std.testing.expect(close_was_busy);
+    try std.testing.expect(second_phase_admitted);
+    try std.testing.expectEqualSlices(f64, &.{ 17, 21, 21, 27 }, &output);
+    try std.testing.expectEqual(@as(usize, 2), submissions);
+    try expectBulkDiagnostic(fixture.report, 2);
+    try std.testing.expectEqual(@as(usize, 0), live_scratch);
+    try std.testing.expectEqual(@as(usize, 0), fixture.context.snapshot().active_operations);
+    try std.testing.expectError(error.ContextClosing, native.matrixMultiplyF64NT(&fixture.context, ntArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 1), &fixture.report));
+    // Closing one mathematical Context must leave the shared Runtime usable.
+    var other_binding = try resource_adapter.Binding.init(&fixture.source, .{}, &fixture.report);
+    var other = execution.Context.initResources(other_binding.port());
+    try native.matrixMultiplyF64NT(&other, ntArgs(&input, &input, &output, 2, 2, 2, 2, 2, 2, 1, 0), &fixture.report);
+    _ = other.requestClose();
+    try std.testing.expect(other.tryProgressClose(&fixture.report) == .closed);
 }

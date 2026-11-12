@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import ast
 import contextlib
 import ctypes
@@ -848,9 +849,9 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '9bf5510d25b53e3e94049597a3c5b9c5b1bf902c5a035504991116fc6ef00919'
+CURRENT_TEST_INVENTORY_SHA256 = '6c703dd544707a2402df445e27575570c848d0c3b193f904ceaf7bc9835655a0'
 NEXT_TEST_INVENTORY_SHA256 = None
-CURRENT_NATIVE_PROJECTION_SHA256 = '9f1f4a649d301d0f75907f3af11a8d25cee038ceca25f92839d7aafb5df32204'
+CURRENT_NATIVE_PROJECTION_SHA256 = 'bb2627cfe862388f54aab267c8c515e65f4187f541a45a501fee3aebf4b5f858'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
 RETIRED_NATIVE_SECTION = "retired_native_observations"
 TOP_LEVEL_KEYS = {
@@ -2435,7 +2436,7 @@ def _native_source_closure(
     masked = BUILD_CHECKER._code_mask(text)
     modules: dict[str, str] = {}
     imports: dict[str, dict[str, str]] = {}
-    for helper in ("configureIntegrated", "addNativeFacade", "addPlatformLibrary"):
+    for helper in ("configureIntegrated", "addNativeFacade", "addPlatformLibrary", "addHeterisResourceAdapter", "configureResourcePortCore"):
         match = re.search(r"\bfn\s+" + helper + r"\s*\(", masked)
         if match is None:
             raise InventoryError("native source helper is absent: " + helper)
@@ -2451,20 +2452,34 @@ def _native_source_closure(
             source = re.search(r'\.root_source_file\s*=\s*b\.path\("([^"]+)"\)', call)
             if source is not None:
                 owner = declaration.group(1)
+                # Whole-body-bound helper return values have explicit composition
+                # identities; local variable spellings are not global owners.
+                if helper == "addHeterisResourceAdapter" and owner == "adapter":
+                    owner = "resource_adapter"
+                elif helper == "configureResourcePortCore" and owner == "tests":
+                    owner = "core_port_tests"
                 if owner in modules and modules[owner] != source.group(1):
                     raise InventoryError("native source module owner collision: " + owner)
                 modules[owner] = source.group(1)
         for receiver, alias, provider in re.findall(r'(\w+)\.addImport\("([^"]+)",\s*(?:graph\.)?(\w+)\)', body):
+            if helper == "addHeterisResourceAdapter" and receiver == "adapter":
+                receiver = "resource_adapter"
+            elif helper == "configureResourcePortCore" and receiver == "tests":
+                receiver = "core_port_tests"
             previous = imports.setdefault(receiver, {}).setdefault(alias, provider)
             if previous != provider:
                 raise InventoryError("native source alias changes owner: " + alias)
     expected = {"core": "src/zynum.zig", "execution": "src/numerics/execution/root.zig",
                 "resources": "src/numerics/resources.zig", "adapter": "integrations/heteris/src/root.zig",
-                "math_module": "src/native_provider_math_test.zig"}
+                "math_module": "src/native_provider_math_test.zig",
+                "resource_adapter": "interfaces/production/adapters/resources/heteris/provider.zig",
+                "core_port_tests": "test/resource_port_core.zig"}
     if any(modules.get(owner) != path for owner, path in expected.items()):
         raise InventoryError("native original-Core source owner binding changed")
     if root_owner not in modules:
         raise InventoryError("unknown native source traversal owner: " + root_owner)
+    selected_contract = BUILD_CHECKER.INJECTION_HELPER_CONTRACT_SHA256[
+        "configureResourcePortCore" if root_owner == "core_port_tests" else "configureIntegrated"]
     pending = [(root_owner, modules[root_owner])]
     visited: set[tuple[str, str]] = set()
     receipts: list[dict[str, Any]] = []
@@ -2487,7 +2502,7 @@ def _native_source_closure(
                     receipts.append({"alias": alias, "path": candidate, "module": provider,
                                      "attachment_owner": owner, "target": "requested-target",
                                      "source_sha256": hashlib.sha256(zig_text[candidate].encode()).hexdigest(),
-                                     "build_contract_sha256": BUILD_CHECKER.INJECTION_HELPER_CONTRACT_SHA256["configureIntegrated"]})
+                                     "build_contract_sha256": selected_contract})
             elif provider in {"options_mod", "options", "provider_c", "adapter_c"}:
                 key = (owner, alias)
                 if key not in receipt_keys:
@@ -2498,8 +2513,8 @@ def _native_source_closure(
                                                                   else "compile:build.zig:addPlatformLibrary:translated" if provider == "adapter_c"
                                                                   else "reviewed original-Core shared Options module"),
                                      "external_input": ("explicit Heteris Data SDK authoritative headers" if provider in {"provider_c", "adapter_c"}
-                                                        else "execution-profile=integrated_native; reference_compat=false"),
-                                     "build_contract_sha256": BUILD_CHECKER.INJECTION_HELPER_CONTRACT_SHA256["configureIntegrated"]}
+                                                        else "resource-port-core-only=true; reference_compat=false" if root_owner == "core_port_tests" else "execution-profile=integrated_native; reference_compat=false"),
+                                     "build_contract_sha256": selected_contract}
                     if provider == "provider_c":
                         receipt["input_sha256"] = {
                             header: hashlib.sha256(BUILD_CHECKER._frozen_regular_bytes(
@@ -2564,6 +2579,7 @@ def discover(
             and item.get("id") != POSV_COMPILE_ID
             and item.get("id") != HETERIS_ADAPTER_COMPILE_ID
             and item.get("id") != "compile:build.zig:configureIntegrated:math_tests"
+            and item.get("id") != "compile:build.zig:configureResourcePortCore:artifact"
         ),
         key=lambda item: item["id"],
     )
@@ -2935,10 +2951,33 @@ def discover(
             "source_reachability": sorted(reached), "named_dependency_sources": receipts,
         })
 
+    # The no-SDK probe is a real explicit correctness target, with conservative
+    # source reachability only. It creates no historical compiler matrix rows.
+    core_prefix = "build.zig:configureResourcePortCore:"
+    core_ids = ("compile:" + core_prefix + "artifact", "launch:" + core_prefix + "anonymous",
+                "step:" + core_prefix + "test-resource-port-core")
+    for identifier in core_ids:
+        actual = by_id.get(identifier, {})
+        reviewed = BUILD_CHECKER.INJECTION_OBSERVATION_TEMPLATES[identifier]
+        if any(actual.get(key) != value for key, value in reviewed.items()):
+            raise InventoryError("neutral Core source-only test graph changed: " + identifier)
+    reached, receipts = _native_source_closure(zig_text, public_paths, context, "core_port_tests")
+    if any(receipt.get("alias") in {"heteris-provider-c", "zynum-resource-heteris", "zynum_c"} for receipt in receipts):
+        raise InventoryError("neutral Core source-only graph depends on an external resource adapter")
+    correctness_only_roots.append({
+        "id": "correctness-root:neutral-resource-core", "language": "zig",
+        "physical_path": "test/resource_port_core.zig", "compile_observation_id": core_ids[0],
+        "launch_observation_ids": [core_ids[1]], "selector_step_observation_id": core_ids[2],
+        "guard": "resource-port-core-only=true; explicit named test step; no external SDK",
+        "executor_guard_dependency": None, "process_environments": [{}],
+        "enumeration_source": "static-source-reachability-only", "native_inventory_evidence": False,
+        "source_reachability": sorted(reached), "named_dependency_sources": receipts,
+    })
+
     # Track source declarations of the correctness-only root without adding native
     # protocol rows or manufacturing compiler-enumerated test names.
     for correctness_root in correctness_only_roots:
-        if correctness_root["id"] == HETERIS_ADAPTER_ROOT_ID or correctness_root["id"].startswith("correctness-root:native-provider-"):
+        if correctness_root["id"] in {HETERIS_ADAPTER_ROOT_ID, "correctness-root:neutral-resource-core"} or correctness_root["id"].startswith("correctness-root:native-provider-"):
             for path in correctness_root["source_reachability"]:
                 if path in zig_declarations:
                     root_reach[path].append(correctness_root["id"])
@@ -3588,6 +3627,14 @@ def _prepare_inventory_refresh(
             "existing inventory is invalid: " + "; ".join(existing_errors)
         )
     refreshed = discover(root, inventory_path)
+    if _reviewed_resource_port_source_refresh(existing, refreshed):
+        required = {row["id"] for row in existing["test_mode_rows"]
+                    if row["root_id"].startswith("zig-root:")
+                    and row["expectation_state"] == FROZEN_STATE}
+        if len(required) != 147 or set(reopen_native_rows) != required:
+            raise InventoryError("private resource-port source cut requires exact retirement of all 147 affected historical Zig rows; source-only retention is forbidden")
+    if _reviewed_header_install_source_refresh(existing, refreshed) and (not source_only or bindings or reopen_native_rows):
+        raise InventoryError("header installation source cut permits only source-derived refresh with unchanged native projection")
     refreshed["python_skip_contracts"] = existing["python_skip_contracts"]
     if RETIRED_NATIVE_SECTION in existing:
         refreshed[RETIRED_NATIVE_SECTION] = existing[RETIRED_NATIVE_SECTION]
@@ -4938,6 +4985,92 @@ def _reviewed_c128_source_refresh(previous: dict[str, Any], current: dict[str, A
             new_declarations[:28] == old_declarations)
 
 
+# Exact F64 NT source-only transition. No compiler observation is created.
+F64_NT_PREVIOUS_SOURCE_SHA256 = "faa4835baf1ea430ae205cb8c3bac86bdaac61591a696d91eeaee7241a313dfc"
+F64_NT_CURRENT_SOURCE_SHA256 = "ac393c40a25229496eee4ab048819270474ffcdeb04b16b9fe7d4053172f6905"
+F64_NT_CHANGED_CORRECTNESS_ROOT_IDS = frozenset(("correctness-root:native-provider-math_tests", "correctness-root:heteris-adapter-package", "correctness-root:native-provider-c_tests"))
+
+
+def _reviewed_f64_nt_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    if (_fact_digest(_host_assembly_source_facts(previous)) != F64_NT_PREVIOUS_SOURCE_SHA256 or
+            _fact_digest(_host_assembly_source_facts(current)) != F64_NT_CURRENT_SOURCE_SHA256):
+        return False
+    for field, allowed in (("test_roots", frozenset()),
+                           ("correctness_only_roots", F64_NT_CHANGED_CORRECTNESS_ROOT_IDS),
+                           ("zig_test_files", frozenset(("zig-file:src/native_provider_math_test.zig",)))):
+        old = {row["id"]: row for row in previous[field]}
+        new = {row["id"]: row for row in current[field]}
+        if old.keys() != new.keys() or {key for key in old if old[key] != new[key]} != allowed:
+            return False
+    old_declarations = next(row["declarations"] for row in previous["zig_test_files"]
+                            if row["id"] == "zig-file:src/native_provider_math_test.zig")
+    new_declarations = next(row["declarations"] for row in current["zig_test_files"]
+                            if row["id"] == "zig-file:src/native_provider_math_test.zig")
+    return (len(old_declarations) == 32 and len(new_declarations) == 38 and
+            new_declarations[:32] == old_declarations and
+            all(row["name"].startswith("native NT ") for row in new_declarations[32:]))
+
+
+PRODUCTION_PROFILE_PREVIOUS_SOURCE_SHA256 = "ac393c40a25229496eee4ab048819270474ffcdeb04b16b9fe7d4053172f6905"
+PRODUCTION_PROFILE_CURRENT_SOURCE_SHA256 = "8b93fddbec0809cefa047250fe1b5540caa78d843a5592895a0312d53e9e5616"
+
+
+def _reviewed_production_profile_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    """Admit only the exact reviewed export-path graph metadata transition."""
+    if (_fact_digest(_host_assembly_source_facts(previous)) != PRODUCTION_PROFILE_PREVIOUS_SOURCE_SHA256 or
+            _fact_digest(_host_assembly_source_facts(current)) != PRODUCTION_PROFILE_CURRENT_SOURCE_SHA256):
+        return False
+    normalized = copy.deepcopy(_host_assembly_source_facts(current))
+    changed = 0
+    for section in ("test_roots", "correctness_only_roots"):
+        for root in normalized[section]:
+            for dependency in root.get("named_dependency_sources", []):
+                if dependency.get("build_contract_sha256") == "0977a0c4d09735b3047c18b850e9596c33fedca5e70fe714c7a8411bb75ebcbc":
+                    dependency["build_contract_sha256"] = "cdd2c5ac095f0d98c93e0db4c9221f53cd199b64b41925bb6f5816f3f63c7703"
+                    changed += 1
+    return changed == 130 and normalized == _host_assembly_source_facts(previous)
+
+
+RESOURCE_PORT_PREVIOUS_SOURCE_SHA256 = "8b93fddbec0809cefa047250fe1b5540caa78d843a5592895a0312d53e9e5616"
+RESOURCE_PORT_CURRENT_SOURCE_SHA256 = "f74b52f515f60f648ebed375df7dad3ff50c4154721414d543c918d15f59f749"
+RESOURCE_PORT_PREVIOUS_INVENTORY_SHA256 = "999aaabb660afce98b7f0fea41aa875f2104dbb4e1e8eb108db21a86da6f41a8"
+
+def _reviewed_resource_port_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    """One exact private-port/adapter source cut, never a generic graph waiver.
+
+    Canonical matrix roots/row identities stay fixed. The real no-SDK probe is
+    source-only; all 147 affected historical executable Zig rows are explicitly
+    reopened by the original retirement mechanism, with their prior data kept.
+    """
+    return (
+        _fact_digest(_host_assembly_source_facts(previous)) == RESOURCE_PORT_PREVIOUS_SOURCE_SHA256
+        and _fact_digest(_host_assembly_source_facts(current)) == RESOURCE_PORT_CURRENT_SOURCE_SHA256
+        and [row["id"] for row in previous["test_roots"]] == [row["id"] for row in current["test_roots"]]
+        and {row["id"] for row in current["correctness_only_roots"]}
+            == {row["id"] for row in previous["correctness_only_roots"]} | {"correctness-root:neutral-resource-core"}
+    )
+
+
+HEADER_INSTALL_PREVIOUS_SOURCE_SHA256 = "f74b52f515f60f648ebed375df7dad3ff50c4154721414d543c918d15f59f749"
+HEADER_INSTALL_CURRENT_SOURCE_SHA256 = "ff77ec95d28016f7f692273b61f266013b4b14bafeb6342d03c8020e468db481"
+HEADER_INSTALL_PREVIOUS_INVENTORY_SHA256 = "08f9ad7714f73ac4053ddc8f5304fce40e355752d99904a459b79815da41f51f"
+
+def _reviewed_header_install_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    """One exact flat/canonical packaging/default-option source cut.
+
+    Matrix roots, correctness roots, mode policy and historical native data stay
+    fixed. New build-only helper declarations are explicit source gaps; no new
+    compiler names or execution observations are manufactured here.
+    """
+    return (
+        _fact_digest(_host_assembly_source_facts(previous)) == HEADER_INSTALL_PREVIOUS_SOURCE_SHA256
+        and _fact_digest(_host_assembly_source_facts(current)) == HEADER_INSTALL_CURRENT_SOURCE_SHA256
+        and [row["id"] for row in previous["test_roots"]] == [row["id"] for row in current["test_roots"]]
+        and [row["id"] for row in previous["correctness_only_roots"]] == [row["id"] for row in current["correctness_only_roots"]]
+        and not previous["native_observation_bindings"]
+    )
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -4952,6 +5085,10 @@ def _refresh_base_compatible_discovery(
         _fact_digest(_host_assembly_source_facts(inventory)), discovered)
     poisson_migration = _reviewed_poisson_source_refresh(inventory, discovered)
     c128_migration = _reviewed_c128_source_refresh(inventory, discovered)
+    f64_nt_migration = _reviewed_f64_nt_source_refresh(inventory, discovered)
+    production_profile_migration = _reviewed_production_profile_source_refresh(inventory, discovered)
+    resource_port_migration = _reviewed_resource_port_source_refresh(inventory, discovered)
+    header_install_migration = _reviewed_header_install_source_refresh(inventory, discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -4965,8 +5102,10 @@ def _refresh_base_compatible_discovery(
     for recorded, current in zip(recorded_roots, current_roots, strict=True):
         if recorded == current:
             continue
-        if host_assembly_migration:
-            continue  # The complete old/new source facts were checked above.
+        if host_assembly_migration or resource_port_migration or header_install_migration:
+            continue  # The complete exact old/new source facts were checked above.
+        if production_profile_migration and current.get("id", "").startswith("zig-root:"):
+            continue  # Only the exact reviewed named-dependency graph hashes changed.
         if tn_oracle_migration and recorded.get("id") == "zig-root:fortran-tests":
             continue  # Only this exact root gains the pure helper dependency.
         if periodic_laplacian_migration and recorded.get("id") in PERIODIC_LAPLACIAN_CHANGED_ROOT_IDS:
@@ -5165,10 +5304,13 @@ def _refresh_base_compatible_discovery(
 
     compatible = dict(discovered)
     compatible["test_roots"] = recorded_roots
-    if host_assembly_migration:
+    if host_assembly_migration or resource_port_migration or header_install_migration:
         compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
         compatible["zig_test_files"] = inventory["zig_test_files"]
-        if hashlib.sha256(_canonical_inventory_bytes(inventory)).hexdigest() != HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256:
+        expected_base = (HEADER_INSTALL_PREVIOUS_INVENTORY_SHA256 if header_install_migration else
+                         RESOURCE_PORT_PREVIOUS_INVENTORY_SHA256 if resource_port_migration else
+                         HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256)
+        if hashlib.sha256(_canonical_inventory_bytes(inventory)).hexdigest() != expected_base:
             raise InventoryError("source-gap refresh compatibility requires the exact historical whole-file inventory")
         # Derive historical source gaps from the exact reviewed old source facts,
         # never from arbitrary old known_gaps. Current non-source gaps remain
@@ -5180,12 +5322,14 @@ def _refresh_base_compatible_discovery(
              for row in inventory["zig_test_files"] if row["classification"] == "current-gap"],
             key=lambda gap: gap["id"],
         )
-    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration or poisson_migration or c128_migration:
+    if tn_oracle_migration or periodic_laplacian_migration or native_spectral_migration or poisson_migration or c128_migration or f64_nt_migration:
         # Reconstruct the reviewed old source metadata for base validation only.
         # The candidate still comes from discover(); native-ledger immutability
         # and the original whole-file CURRENT/NEXT/publication gates remain.
         compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
         compatible["zig_test_files"] = inventory["zig_test_files"]
+    if production_profile_migration:
+        compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
     compatible["python_test_modules"] = recorded_modules
     compatible["expected_test_sets"] = derived_sets
     compatible["test_mode_rows"] = inventory["test_mode_rows"]
