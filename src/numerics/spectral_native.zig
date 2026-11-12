@@ -5,7 +5,7 @@
 //! preconditions; this module owns logical validation and numerical invocation.
 const std = @import("std");
 const execution = @import("zynum-execution");
-pub const Engine = @import("checked_spectral.zig");
+pub const Engine = @import("spectral/interval_recurrence.zig");
 const A = @import("recurrence_arithmetic.zig");
 
 pub const Kind = enum(u32) { series = 1, moments = 2 };

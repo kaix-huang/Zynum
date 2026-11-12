@@ -631,7 +631,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -668,6 +667,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -723,7 +723,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "blas_module_tests",
@@ -922,7 +922,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -959,6 +958,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -1005,7 +1005,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
@@ -1207,7 +1207,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -1244,6 +1243,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -1270,7 +1270,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "cblas_tests",
@@ -1557,7 +1557,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -1594,6 +1593,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -1621,7 +1621,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "fortran_tests",
@@ -1681,7 +1681,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "fortran_tests",
@@ -2196,7 +2196,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -2233,6 +2232,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -2330,7 +2330,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2368,7 +2368,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2418,7 +2418,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2448,7 +2448,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2478,7 +2478,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -3056,7 +3056,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -3093,6 +3092,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -3168,7 +3168,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3198,7 +3198,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3208,7 +3208,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3218,7 +3218,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3768,7 +3768,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -3805,6 +3804,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -3846,7 +3846,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3876,7 +3876,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3906,7 +3906,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3966,7 +3966,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -5505,7 +5505,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -5542,6 +5541,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -5608,7 +5608,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
@@ -5796,7 +5796,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -5833,6 +5832,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -5857,7 +5857,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "dynamic_tests",
@@ -5877,7 +5877,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "dynamic_tests",
@@ -6073,7 +6073,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -6110,6 +6109,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -6134,7 +6134,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
@@ -6373,7 +6373,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -6410,6 +6409,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -6447,7 +6447,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
@@ -6514,6 +6514,7 @@
         "integrations/heteris/src/test_api.zig",
         "integrations/heteris/src/tests.zig",
         "integrations/heteris/src/views.zig",
+        "interfaces/production/public/zig/scientific_sources.zig",
         "src/blas.zig",
         "src/blas/api.zig",
         "src/blas/api/aliasing.zig",
@@ -6607,7 +6608,6 @@
         "src/blas/reference_cache_hook.zig",
         "src/blas/runtime.zig",
         "src/blas/types.zig",
-        "src/facades/scientific_sources.zig",
         "src/fft/core.zig",
         "src/fft/managed.zig",
         "src/lapack.zig",
@@ -6650,7 +6650,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -6687,6 +6686,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -6710,11 +6710,11 @@
       "named_dependency_sources": [
         {
           "alias": "scientific_sources",
-          "path": "src/facades/scientific_sources.zig",
+          "path": "interfaces/production/public/zig/scientific_sources.zig",
           "module": "upstream",
           "attachment_owner": "adapter",
           "target": "requested-target",
-          "source_sha256": "eb6d47bd54eb2676cdef0e748c6ca20cc3ea87eedd760cbf784b90c2611bdaa7",
+          "source_sha256": "398e372953fe0df4e14da8af7be72934241a470674f551532c9e8d629133eada",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -6777,7 +6777,7 @@
           "module": "core",
           "attachment_owner": "upstream",
           "target": "requested-target",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         }
       ]
@@ -6937,7 +6937,6 @@
         "src/native_provider_math_test.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -6974,6 +6973,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -7082,7 +7082,7 @@
           "module": "core",
           "attachment_owner": "math_module",
           "target": "requested-target",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -7164,6 +7164,7 @@
         "interfaces/production/public/c/native_exports.zig",
         "interfaces/production/public/c/native_spectral_exports.zig",
         "interfaces/production/public/zig/native.zig",
+        "interfaces/production/public/zig/scientific_sources.zig",
         "src/blas.zig",
         "src/blas/api.zig",
         "src/blas/api/aliasing.zig",
@@ -7257,7 +7258,6 @@
         "src/blas/reference_cache_hook.zig",
         "src/blas/runtime.zig",
         "src/blas/types.zig",
-        "src/facades/scientific_sources.zig",
         "src/fft/core.zig",
         "src/fft/managed.zig",
         "src/lapack.zig",
@@ -7300,7 +7300,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -7337,6 +7336,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -7360,11 +7360,11 @@
       "named_dependency_sources": [
         {
           "alias": "scientific_sources",
-          "path": "src/facades/scientific_sources.zig",
+          "path": "interfaces/production/public/zig/scientific_sources.zig",
           "module": "upstream",
           "attachment_owner": "adapter",
           "target": "requested-target",
-          "source_sha256": "eb6d47bd54eb2676cdef0e748c6ca20cc3ea87eedd760cbf784b90c2611bdaa7",
+          "source_sha256": "398e372953fe0df4e14da8af7be72934241a470674f551532c9e8d629133eada",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -7489,7 +7489,7 @@
           "module": "core",
           "attachment_owner": "native",
           "target": "requested-target",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -7542,7 +7542,7 @@
           "module": "core",
           "attachment_owner": "upstream",
           "target": "requested-target",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         }
       ]
@@ -7699,7 +7699,6 @@
         "src/lapack/validation.zig",
         "src/numerics/bicgstab.zig",
         "src/numerics/chebyshev.zig",
-        "src/numerics/checked_spectral.zig",
         "src/numerics/cholesky_inverse.zig",
         "src/numerics/complex.zig",
         "src/numerics/contour_eigensolver.zig",
@@ -7736,6 +7735,7 @@
         "src/numerics/recurrence_arithmetic.zig",
         "src/numerics/reductions.zig",
         "src/numerics/resources.zig",
+        "src/numerics/spectral/interval_recurrence.zig",
         "src/numerics/spectral_native.zig",
         "src/numerics/storage.zig",
         "src/numerics/subspace_projection.zig",
@@ -7791,7 +7791,7 @@
           "module": "core",
           "attachment_owner": "core_port_tests",
           "target": "requested-target",
-          "source_sha256": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
           "build_contract_sha256": "c4a6b67643a731020e6ca31f2da88e19dc387280945dfd2898ddd175ab193c06"
         },
         {
@@ -26810,23 +26810,43 @@
         },
         {
           "id": "python-decl:test/build/test_build_inventory.py:486",
-          "name": "NativeSpectralHeaderSourceContractTests.test_exact_two_header_inputs_single_root_and_install_edge",
+          "name": "IntervalRecurrenceBoundaryTests.test_std_only_engine_and_same_configured_core_aliases",
           "ordinal": 486
         },
         {
           "id": "python-decl:test/build/test_build_inventory.py:487",
-          "name": "NativeSpectralHeaderSourceContractTests.test_missing_mutated_nested_header_rejects_original_frozen_source_guard",
+          "name": "IntervalRecurrenceBoundaryTests.test_dependency_and_allocation_regressions_are_rejected",
           "ordinal": 487
         },
         {
           "id": "python-decl:test/build/test_build_inventory.py:488",
-          "name": "NativeSpectralHeaderSourceContractTests.test_wrong_root_and_duplicate_translation_reject_original_helper_guard",
+          "name": "IntervalRecurrenceBoundaryTests.test_parallel_core_and_obsolete_alias_are_rejected",
           "ordinal": 488
         },
         {
           "id": "python-decl:test/build/test_build_inventory.py:489",
-          "name": "NativeSpectralHeaderSourceContractTests.test_false_header_install_source_destination_and_missing_edge_reject",
+          "name": "NativeSpectralHeaderSourceContractTests.test_exact_two_header_inputs_single_root_and_install_edge",
           "ordinal": 489
+        },
+        {
+          "id": "python-decl:test/build/test_build_inventory.py:490",
+          "name": "NativeSpectralHeaderSourceContractTests.test_algorithm_body_drift_rejects_original_frozen_source_guard",
+          "ordinal": 490
+        },
+        {
+          "id": "python-decl:test/build/test_build_inventory.py:491",
+          "name": "NativeSpectralHeaderSourceContractTests.test_missing_mutated_nested_header_rejects_original_frozen_source_guard",
+          "ordinal": 491
+        },
+        {
+          "id": "python-decl:test/build/test_build_inventory.py:492",
+          "name": "NativeSpectralHeaderSourceContractTests.test_wrong_root_and_duplicate_translation_reject_original_helper_guard",
+          "ordinal": 492
+        },
+        {
+          "id": "python-decl:test/build/test_build_inventory.py:493",
+          "name": "NativeSpectralHeaderSourceContractTests.test_false_header_install_source_destination_and_missing_edge_reject",
+          "ordinal": 493
         }
       ],
       "root_ids": [
@@ -28095,43 +28115,58 @@
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:107",
-          "name": "NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
+          "name": "IntervalRecurrenceSourceRefreshTests.test_exact_reviewed_pair_preserves_native_source_only_ledger",
           "ordinal": 107
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:108",
-          "name": "NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
+          "name": "IntervalRecurrenceSourceRefreshTests.test_unreviewed_reachability_hash_and_declaration_drift_reject",
           "ordinal": 108
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:109",
-          "name": "NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
+          "name": "IntervalRecurrenceSourceRefreshTests.test_nonpython_mode_row_drift_is_rejected_by_original_native_guard",
           "ordinal": 109
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:110",
-          "name": "NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
+          "name": "NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
           "ordinal": 110
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:111",
-          "name": "NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
+          "name": "NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
           "ordinal": 111
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:112",
-          "name": "NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "name": "NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
           "ordinal": 112
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:113",
-          "name": "NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "name": "NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
           "ordinal": 113
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:114",
-          "name": "NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "name": "NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
           "ordinal": 114
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:115",
+          "name": "NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "ordinal": 115
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:116",
+          "name": "NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "ordinal": 116
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:117",
+          "name": "NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "ordinal": 117
         }
       ],
       "root_ids": [
@@ -32697,7 +32732,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "root_id": "python-root:build-inventory-direct",
       "tests": [
         {
@@ -35132,27 +35167,47 @@
         },
         {
           "id": "test:python-root-build-inventory-direct:486",
-          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_exact_two_header_inputs_single_root_and_install_edge",
+          "name": "test/build/test_build_inventory.py::IntervalRecurrenceBoundaryTests.test_std_only_engine_and_same_configured_core_aliases",
           "ordinal": 486
         },
         {
           "id": "test:python-root-build-inventory-direct:487",
-          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_missing_mutated_nested_header_rejects_original_frozen_source_guard",
+          "name": "test/build/test_build_inventory.py::IntervalRecurrenceBoundaryTests.test_dependency_and_allocation_regressions_are_rejected",
           "ordinal": 487
         },
         {
           "id": "test:python-root-build-inventory-direct:488",
-          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_wrong_root_and_duplicate_translation_reject_original_helper_guard",
+          "name": "test/build/test_build_inventory.py::IntervalRecurrenceBoundaryTests.test_parallel_core_and_obsolete_alias_are_rejected",
           "ordinal": 488
         },
         {
           "id": "test:python-root-build-inventory-direct:489",
-          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_false_header_install_source_destination_and_missing_edge_reject",
+          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_exact_two_header_inputs_single_root_and_install_edge",
           "ordinal": 489
+        },
+        {
+          "id": "test:python-root-build-inventory-direct:490",
+          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_algorithm_body_drift_rejects_original_frozen_source_guard",
+          "ordinal": 490
+        },
+        {
+          "id": "test:python-root-build-inventory-direct:491",
+          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_missing_mutated_nested_header_rejects_original_frozen_source_guard",
+          "ordinal": 491
+        },
+        {
+          "id": "test:python-root-build-inventory-direct:492",
+          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_wrong_root_and_duplicate_translation_reject_original_helper_guard",
+          "ordinal": 492
+        },
+        {
+          "id": "test:python-root-build-inventory-direct:493",
+          "name": "test/build/test_build_inventory.py::NativeSpectralHeaderSourceContractTests.test_false_header_install_source_destination_and_missing_edge_reject",
+          "ordinal": 493
         }
       ],
-      "count": 490,
-      "digest": "314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "count": 494,
+      "digest": "c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "enumeration_source": "static"
     },
     {
@@ -35803,7 +35858,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "root_id": "python-root:test-inventory-direct",
       "tests": [
         {
@@ -36343,47 +36398,62 @@
         },
         {
           "id": "test:python-root-test-inventory-direct:107",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
+          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_exact_reviewed_pair_preserves_native_source_only_ledger",
           "ordinal": 107
         },
         {
           "id": "test:python-root-test-inventory-direct:108",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
+          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_unreviewed_reachability_hash_and_declaration_drift_reject",
           "ordinal": 108
         },
         {
           "id": "test:python-root-test-inventory-direct:109",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
+          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_nonpython_mode_row_drift_is_rejected_by_original_native_guard",
           "ordinal": 109
         },
         {
           "id": "test:python-root-test-inventory-direct:110",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
           "ordinal": 110
         },
         {
           "id": "test:python-root-test-inventory-direct:111",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
           "ordinal": 111
         },
         {
           "id": "test:python-root-test-inventory-direct:112",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
           "ordinal": 112
         },
         {
           "id": "test:python-root-test-inventory-direct:113",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
           "ordinal": 113
         },
         {
           "id": "test:python-root-test-inventory-direct:114",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
           "ordinal": 114
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:115",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "ordinal": 115
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:116",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "ordinal": 116
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:117",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "ordinal": 117
         }
       ],
-      "count": 115,
-      "digest": "72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "count": 118,
+      "digest": "ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "enumeration_source": "static"
     },
     {
@@ -36555,7 +36625,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36570,7 +36640,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36585,7 +36655,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -37410,7 +37480,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -37425,7 +37495,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -37440,7 +37510,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38760,7 +38830,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38775,7 +38845,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38790,7 +38860,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -39615,7 +39685,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -39630,7 +39700,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -39645,7 +39715,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -40965,7 +41035,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -40980,7 +41050,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -40995,7 +41065,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:314b1179fc58827604abb3eb1fb415de0277c55ab443eb4e9b5e70f0f15aef31",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41820,7 +41890,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41835,7 +41905,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41850,7 +41920,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -44025,7 +44095,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -44040,7 +44110,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -44055,7 +44125,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:72344f8eb68741468837caa8487ad34d582a05b49e3325530be9f91c9a407501",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -46247,11 +46317,11 @@
     },
     "test_roots": {
       "count": 49,
-      "digest": "22139677420bf7fcd72b290bb44583588116a2b5e25071215f7b90ea3549203c"
+      "digest": "1d7a6bf1e3abb2f423901244536f2629c61b3fe0405912424d13693e686e0138"
     },
     "correctness_only_roots": {
       "count": 7,
-      "digest": "a6757280b8812fc14b4fdd95dccd12ac1e164f63971ce3760ccde832db27136f"
+      "digest": "17563001197bf7af603bc2e10fabd097e7b14fb7211257de1e835965e5684414"
     },
     "zig_test_files": {
       "count": 177,
@@ -46259,11 +46329,11 @@
     },
     "python_test_modules": {
       "count": 42,
-      "digest": "b7e9549bacb6edfad302411cf4c380e656413160add1dc055dd6e0907a3d619c"
+      "digest": "e4dc99dde25acfd944a10dbf6c3fcae2a8fd6ec0eb444f68108b6d52c1954303"
     },
     "expected_test_sets": {
       "count": 24,
-      "digest": "780875ee2bb92fc7fd55b49b6c3d2d860faec496777d139da581909c67d8f6ef"
+      "digest": "4aa8c5925e177ae77132f11a50436a4475473899ca7a853ff5f86b367d8e9a06"
     },
     "native_observation_bindings": {
       "count": 0,
@@ -46271,7 +46341,7 @@
     },
     "test_mode_rows": {
       "count": 588,
-      "digest": "7024cb044c3c834d81039e07075e698e6f0a90e5c9440ee9afd381d9f3b30d6c"
+      "digest": "ca6375b86ca8da35cd3510c511e60f2877f17c04d64abee80996ada775488722"
     },
     "workflow_mode_bindings": {
       "count": 4,

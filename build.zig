@@ -3494,7 +3494,7 @@ fn configurePlatformCompilerRuntime(b: *std.Build, target: std.Build.ResolvedTar
 }
 
 fn addPlatformLibrary(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize, heteris_headers: contract_headers.Headers, graph: ImplementationGraph, shared: bool, standalone: bool) *std.Build.Step.Compile {
-    const upstream = b.createModule(.{ .root_source_file = b.path("src/facades/scientific_sources.zig"), .target = target, .optimize = optimize });
+    const upstream = b.createModule(.{ .root_source_file = b.path("interfaces/production/public/zig/scientific_sources.zig"), .target = target, .optimize = optimize });
     upstream.addImport("zynum-core", graph.core);
     const translated = b.addTranslateC(.{ .root_source_file = b.path("integrations/heteris/include/zynum.h"), .target = target, .optimize = optimize });
     heteris_headers.addIncludePaths(translated);

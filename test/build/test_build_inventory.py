@@ -18109,6 +18109,42 @@ class PotriComponentInventoryContractTests(unittest.TestCase):
 
 
 
+class IntervalRecurrenceBoundaryTests(unittest.TestCase):
+    """Reject dependency and alias regressions without copying the mathematics."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.sources = [(REPOSITORY_ROOT / path).read_text() for path in (
+            "src/numerics/spectral/interval_recurrence.zig", "src/zynum.zig",
+            "interfaces/production/public/zig/scientific_sources.zig",
+            "src/numerics/spectral_native.zig", "integrations/heteris/src/spectral.zig")]
+
+    def test_std_only_engine_and_same_configured_core_aliases(self) -> None:
+        CHECKER._interval_recurrence_source_boundary(*self.sources)
+        for obsolete in ("src/numerics/checked_spectral.zig", "src/facades/scientific_sources.zig"):
+            self.assertFalse((REPOSITORY_ROOT / obsolete).exists())
+
+    def test_dependency_and_allocation_regressions_are_rejected(self) -> None:
+        for addition in ('const external = @import("heteris-provider-c");',
+                         'const external = @import("../execution/context.zig");',
+                         'const external = @cImport({});', 'const storage = Allocator;',
+                         'const storage = provider;', 'fn alloc() void {}'):
+            sources = list(self.sources)
+            sources[0] += "\n" + addition
+            with self.subTest(addition=addition), self.assertRaisesRegex(CHECKER.InventoryError, "std-only"):
+                CHECKER._interval_recurrence_source_boundary(*sources)
+
+    def test_parallel_core_and_obsolete_alias_are_rejected(self) -> None:
+        for index, original, changed in (
+            (2, '@import("zynum-core")', '@import("../../../../src/zynum.zig")'),
+            (2, 'core.internal.numerics.interval_recurrence', 'core.internal.numerics.CheckedSpectral'),
+            (3, 'spectral/interval_recurrence.zig', 'checked_spectral.zig'),
+            (4, ').interval_recurrence;', ').checked_spectral;')):
+            sources = list(self.sources)
+            sources[index] = sources[index].replace(original, changed)
+            with self.subTest(index=index), self.assertRaises(CHECKER.InventoryError):
+                CHECKER._interval_recurrence_source_boundary(*sources)
+
+
 class NativeSpectralHeaderSourceContractTests(unittest.TestCase):
     """Nested public header inputs cannot disappear behind the umbrella root."""
     @classmethod
@@ -18130,12 +18166,23 @@ class NativeSpectralHeaderSourceContractTests(unittest.TestCase):
         step = CHECKER.INJECTION_OBSERVATION_TEMPLATES["step:build.zig:addPlatformLibrary:platform"]
         self.assertEqual(1, sum(r["id"] == identifier for r in step["direct_dependencies"]))
         classifications = {r["path"]: r for r in CHECKER.INJECTION_SOURCE_CLASSIFICATIONS}
-        for path in (headers[1], "integrations/heteris/src/native_spectral_exports.zig",
-                     "src/numerics/checked_spectral.zig", "src/numerics/spectral_native.zig"):
+        for path in (headers[1], "interfaces/production/public/c/native_spectral_exports.zig",
+                     "src/numerics/spectral/interval_recurrence.zig", "src/numerics/spectral_native.zig"):
             self.assertEqual(hashlib.sha256((REPOSITORY_ROOT / path).read_bytes()).hexdigest(),
                              CHECKER.INJECTION_SOURCE_SHA256[path])
             self.assertEqual("public-api" if path.endswith(".h") else "library-source", classifications[path]["owner"])
             self.assertEqual("non-generated-source", classifications[path]["class"])
+
+    def test_algorithm_body_drift_rejects_original_frozen_source_guard(self) -> None:
+        engine = "src/numerics/spectral/interval_recurrence.zig"
+        context = CHECKER._make_discovery_context(REPOSITORY_ROOT)
+        original = CHECKER._frozen_regular_bytes
+        def mutated(active, path, label):
+            data = original(active, path, label)
+            return data.replace(b"const center =", b"const drifted_center =", 1) if path == engine else data
+        with mock.patch.object(CHECKER, "_frozen_regular_bytes", side_effect=mutated):
+            with self.assertRaisesRegex(CHECKER.InventoryError, "native injection source-only bytes drifted: " + engine):
+                CHECKER._numerics_resources_source_contract(context)
 
     def test_missing_mutated_nested_header_rejects_original_frozen_source_guard(self) -> None:
         tables = (CHECKER.GELSS_SOURCE_SHA256, CHECKER.GELS_SOURCE_SHA256, CHECKER.GVD_SOURCE_SHA256,

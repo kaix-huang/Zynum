@@ -849,7 +849,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '6c703dd544707a2402df445e27575570c848d0c3b193f904ceaf7bc9835655a0'
+CURRENT_TEST_INVENTORY_SHA256 = '8ee02aee5d7b3ed0d5f65d5bcff689f697cd1fe8f8f00a7e911458420889e60c'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = 'bb2627cfe862388f54aab267c8c515e65f4187f541a45a501fee3aebf4b5f858'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -5071,6 +5071,24 @@ def _reviewed_header_install_source_refresh(previous: dict[str, Any], current: d
     )
 
 
+INTERVAL_RECURRENCE_PREVIOUS_SOURCE_SHA256 = "ff77ec95d28016f7f692273b61f266013b4b14bafeb6342d03c8020e468db481"
+INTERVAL_RECURRENCE_CURRENT_SOURCE_SHA256 = "feabde171e158096fc74ae114881595cc74dd9c4a87e5204173d0b2079bfeacc"
+INTERVAL_RECURRENCE_PREVIOUS_INVENTORY_SHA256 = "6c703dd544707a2402df445e27575570c848d0c3b193f904ceaf7bc9835655a0"
+
+
+def _reviewed_interval_recurrence_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    """Exact two-path/alias source move; recurrence bodies and native ledger stay fixed.
+
+    The complete pair admits only the reviewed source reachability and named
+    dependency path/hash changes. Original source-only native immutability,
+    whole-file CURRENT/NEXT and atomic publication checks remain mandatory.
+    """
+    return (
+        _fact_digest(_host_assembly_source_facts(previous)) == INTERVAL_RECURRENCE_PREVIOUS_SOURCE_SHA256
+        and _fact_digest(_host_assembly_source_facts(current)) == INTERVAL_RECURRENCE_CURRENT_SOURCE_SHA256
+    )
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -5089,6 +5107,7 @@ def _refresh_base_compatible_discovery(
     production_profile_migration = _reviewed_production_profile_source_refresh(inventory, discovered)
     resource_port_migration = _reviewed_resource_port_source_refresh(inventory, discovered)
     header_install_migration = _reviewed_header_install_source_refresh(inventory, discovered)
+    interval_recurrence_migration = _reviewed_interval_recurrence_source_refresh(inventory, discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -5102,7 +5121,7 @@ def _refresh_base_compatible_discovery(
     for recorded, current in zip(recorded_roots, current_roots, strict=True):
         if recorded == current:
             continue
-        if host_assembly_migration or resource_port_migration or header_install_migration:
+        if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration:
             continue  # The complete exact old/new source facts were checked above.
         if production_profile_migration and current.get("id", "").startswith("zig-root:"):
             continue  # Only the exact reviewed named-dependency graph hashes changed.
@@ -5304,10 +5323,11 @@ def _refresh_base_compatible_discovery(
 
     compatible = dict(discovered)
     compatible["test_roots"] = recorded_roots
-    if host_assembly_migration or resource_port_migration or header_install_migration:
+    if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration:
         compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
         compatible["zig_test_files"] = inventory["zig_test_files"]
-        expected_base = (HEADER_INSTALL_PREVIOUS_INVENTORY_SHA256 if header_install_migration else
+        expected_base = (INTERVAL_RECURRENCE_PREVIOUS_INVENTORY_SHA256 if interval_recurrence_migration else
+                         HEADER_INSTALL_PREVIOUS_INVENTORY_SHA256 if header_install_migration else
                          RESOURCE_PORT_PREVIOUS_INVENTORY_SHA256 if resource_port_migration else
                          HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256)
         if hashlib.sha256(_canonical_inventory_bytes(inventory)).hexdigest() != expected_base:

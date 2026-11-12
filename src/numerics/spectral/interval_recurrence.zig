@@ -1,6 +1,6 @@
 // Copyright (C) 2026 Scientific Platform contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
-//! Ownerless checked interval-scaled FP64 series and raw moments.
+//! Ownerless interval-scaled FP64 series and raw moments recurrence.
 //! Extracted from integrations/heteris/src/spectral.zig at Zynum
 //! 98b3a671ceea1c5c9c5d282d16c0dd98bb2e73b0. Its series was adapted from
 //! c5cb123e55eaae683de09b0c8030837f5600f140 src/numerics/chebyshev.zig;

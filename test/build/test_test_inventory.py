@@ -48,17 +48,36 @@ class SourceOnlyRefreshTests(unittest.TestCase):
     def test_unchanged_historical_native_ledger_is_accepted(self) -> None:
         CHECKER._assert_source_only_native_unchanged(self.inventory, copy.deepcopy(self.inventory))
 
+    def _controlled_native_ledger(self) -> dict[str, Any]:
+        """Test-only one-row active history from archived observations; no live refresh."""
+        fixture = copy.deepcopy(self.inventory)
+        if fixture["native_observation_bindings"]:
+            return fixture
+        history = fixture[CHECKER.RETIRED_NATIVE_SECTION].pop()
+        archived = history["test_mode_rows"][0]
+        fixture["test_mode_rows"] = [archived if row["id"] == archived["id"] else row
+                                     for row in fixture["test_mode_rows"]]
+        fixture["expected_test_sets"].append(next(row for row in history["expected_test_sets"]
+                                                 if row["id"] == archived["expected_test_set_id"]))
+        fixture["expected_test_sets"].sort(key=lambda row: row["id"])
+        fixture["native_observation_bindings"] = [next(row for row in history["native_observation_bindings"]
+                                                       if row["row_id"] == archived["id"])]
+        CHECKER._refresh_native_gaps(fixture)
+        fixture["strict_summary"] = CHECKER._section_summary(fixture)
+        return fixture
+
     def test_native_profiles_classes_bindings_and_namesets_are_immutable(self) -> None:
+        inventory = self._controlled_native_ledger()
         for field in ("environment_profiles", "test_enumeration_classes", "native_observation_bindings"):
-            changed = copy.deepcopy(self.inventory)
+            changed = copy.deepcopy(inventory)
             changed[field][0]["unreviewed"] = True
             with self.subTest(field=field), self.assertRaises(CHECKER.InventoryError):
-                CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
-        changed = copy.deepcopy(self.inventory)
+                CHECKER._assert_source_only_native_unchanged(inventory, changed)
+        changed = copy.deepcopy(inventory)
         row = next(row for row in changed["expected_test_sets"] if row["root_id"].startswith("zig-root:"))
         row["tests"] = row["tests"][1:]
         with self.assertRaises(CHECKER.InventoryError):
-            CHECKER._assert_source_only_native_unchanged(self.inventory, changed)
+            CHECKER._assert_source_only_native_unchanged(inventory, changed)
 
     def test_all_zig_rows_and_exact_pending_id_order_are_immutable(self) -> None:
         changed = copy.deepcopy(self.inventory)
@@ -107,8 +126,16 @@ class SourceOnlyRefreshTests(unittest.TestCase):
         fixture = TestInventoryTests()
         fixture.setUp()
         self.addCleanup(fixture.tearDown)
-        # New regression methods legitimately change the source-derived Python
-        # sets; prepare their reviewed fixture generation, never on-disk pins.
+        # This local policy test requires one explicit controlled frozen row.
+        # Restore only an archived test observation in the temporary fixture;
+        # the shared factory and the real inventory keep their existing behavior.
+        fixture.inventory = self._controlled_native_ledger()
+        data = CHECKER._canonical_inventory_bytes(fixture.inventory)
+        fixture.inventory_path.write_bytes(data)
+        self.enterContext(fixture._reviewed_digest_slots(
+            inventory_current=hashlib.sha256(data).hexdigest(),
+            native_current=CHECKER._native_projection_digest(fixture.inventory)))
+        # New regression methods legitimately change source-derived Python sets.
         current = fixture._source_current_fixture_inventory()
         discovered = CHECKER.discover(fixture.root, fixture.inventory_path)
         historical = copy.deepcopy(current)
@@ -11867,7 +11894,7 @@ class TNOracleSourceRefreshTests(unittest.TestCase):
 
 _NATIVE_SPECTRAL_FACT_PAIR: tuple[dict[str, Any], dict[str, Any]] | None = None
 _NATIVE_SPECTRAL_CORE_PATHS = (
-    "src/numerics/checked_spectral.zig", "src/numerics/spectral_native.zig",
+    "src/numerics/spectral/interval_recurrence.zig", "src/numerics/spectral_native.zig",
 )
 _NATIVE_SPECTRAL_ROOT_IDS = (
     "zig-root:blas-module-tests", "zig-root:blas-public-surface-contract-tests",
@@ -11952,6 +11979,51 @@ def _native_spectral_source_fact_pair() -> tuple[dict[str, Any], dict[str, Any]]
         raise AssertionError("reversing only reviewed spectral delta changed historical Laplacian facts")
     _NATIVE_SPECTRAL_FACT_PAIR = previous, current
     return copy.deepcopy(_NATIVE_SPECTRAL_FACT_PAIR)
+
+
+class IntervalRecurrenceSourceRefreshTests(unittest.TestCase):
+    """Only the exact source move can retain historical native expectations."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.current = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        cls.previous = copy.deepcopy(cls.current)
+        inverse = {
+            "src/numerics/spectral/interval_recurrence.zig": "src/numerics/checked_spectral.zig",
+            "interfaces/production/public/zig/scientific_sources.zig": "src/facades/scientific_sources.zig",
+            "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f": "47ce533f055beb3890046dcc064a97ffcd0892eeefc532a6d82c71186149c9d6",
+            "398e372953fe0df4e14da8af7be72934241a470674f551532c9e8d629133eada": "eb6d47bd54eb2676cdef0e748c6ca20cc3ea87eedd760cbf784b90c2611bdaa7",
+        }
+        def reverse(value: Any, key: str = "") -> Any:
+            if isinstance(value, str):
+                return inverse.get(value, value)
+            if isinstance(value, list):
+                rows = [reverse(row) for row in value]
+                return sorted(rows) if key == "source_reachability" else rows
+            if isinstance(value, dict):
+                return {name: reverse(item, name) for name, item in value.items()}
+            return value
+        for section in ("test_roots", "correctness_only_roots", "zig_test_files"):
+            cls.previous[section] = reverse(cls.current[section])
+
+    def test_exact_reviewed_pair_preserves_native_source_only_ledger(self) -> None:
+        self.assertTrue(CHECKER._reviewed_interval_recurrence_source_refresh(self.previous, self.current))
+        CHECKER._assert_source_only_native_unchanged(self.previous, self.current)
+
+    def test_unreviewed_reachability_hash_and_declaration_drift_reject(self) -> None:
+        for section in ("test_roots", "correctness_only_roots", "zig_test_files"):
+            for side in ("previous", "current"):
+                previous, current = copy.deepcopy(self.previous), copy.deepcopy(self.current)
+                changed = previous if side == "previous" else current
+                changed[section][0]["unreviewed"] = True
+                with self.subTest(section=section, side=side):
+                    self.assertFalse(CHECKER._reviewed_interval_recurrence_source_refresh(previous, current))
+
+    def test_nonpython_mode_row_drift_is_rejected_by_original_native_guard(self) -> None:
+        changed = copy.deepcopy(self.current)
+        row = next(row for row in changed["test_mode_rows"] if row["root_id"].startswith("zig-root:"))
+        row["command_template"] += " unreviewed"
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._assert_source_only_native_unchanged(self.previous, changed)
 
 
 class NativeSpectralSourceRefreshTests(unittest.TestCase):

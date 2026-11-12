@@ -4,13 +4,13 @@
 // src/numerics/chebyshev.zig: panelAdmitted/seriesArithmetic. Execution admission
 // is replaced by the explicit synchronous Heteris resources/callback ABI. Four
 // vectors, recurrence order, no endpoint halving, and final commit are preserved.
-// The checked loops now live in the ownerless checked_spectral Core engine,
+// The recurrence loops now live in the ownerless interval_recurrence Core engine,
 // using the exact upstream recurrence_arithmetic.zig unchanged.
 // The moments entry point below is new bridge code using that same checked
 // recurrence; the pinned upstream revision has no Chebyshev moments API.
 const std = @import("std");
 const V = @import("views.zig");
-const Engine = @import("scientific_sources").checked_spectral;
+const Engine = @import("scientific_sources").interval_recurrence;
 const A = @import("scientific_sources").recurrence_arithmetic;
 const c = V.c;
 pub const Apply = *const fn (?*anyopaque, ?*const V.Resources, ?*const V.View, ?*const V.View) callconv(.c) V.Status;
