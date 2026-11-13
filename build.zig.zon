@@ -13,6 +13,7 @@
         "src",
         "interfaces/production/profiles/abplas_lp64",
         "interfaces/production/adapters/resources/heteris",
+        "interfaces/production/adapters/c/cholesky",
         "interfaces/production/public",
         "interfaces/production/build",
         "include",

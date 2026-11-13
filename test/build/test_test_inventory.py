@@ -611,7 +611,7 @@ class CheckedCholeskyLedgerTests(unittest.TestCase):
     def test_lifecycle_root_is_explicit_without_native_enumeration_claim(self) -> None:
         inventory = json.loads((REPOSITORY_ROOT/"tools/test_inventory.json").read_text())
         root = next(row for row in inventory["correctness_only_roots"] if row["id"] == "correctness-root:checked-cholesky-lifecycle")
-        self.assertEqual("src/checked/cholesky_adapter_test.zig", root["physical_path"])
+        self.assertEqual("interfaces/production/adapters/c/cholesky/adapter_test.zig", root["physical_path"])
         self.assertEqual(CHECKER.CHECKED_CHOLESKY_COMPILE_ID, root["compile_observation_id"])
         self.assertEqual([CHECKER.CHECKED_CHOLESKY_LAUNCH_ID], root["launch_observation_ids"])
         self.assertEqual(CHECKER.CHECKED_CHOLESKY_STEP_ID, root["selector_step_observation_id"])
@@ -629,7 +629,7 @@ class CheckedCholeskyLedgerTests(unittest.TestCase):
         self.assertEqual(["launch:build.zig:build:checked_cholesky_profile_tests"], root["launch_observation_ids"])
         self.assertIsNone(root["aggregate_step_observation_id"])
         expected = next(row for row in inventory["expected_test_sets"] if row["root_id"] == root["id"])
-        self.assertEqual(3, expected["count"])
+        self.assertEqual(4, expected["count"])
         self.assertEqual("static", expected["enumeration_source"])
 
 
@@ -11979,6 +11979,79 @@ def _native_spectral_source_fact_pair() -> tuple[dict[str, Any], dict[str, Any]]
         raise AssertionError("reversing only reviewed spectral delta changed historical Laplacian facts")
     _NATIVE_SPECTRAL_FACT_PAIR = previous, current
     return copy.deepcopy(_NATIVE_SPECTRAL_FACT_PAIR)
+
+
+class CholeskyCSourceRefreshTests(unittest.TestCase):
+    """Reverse only this source cut; never supply history, logs or digest mocks."""
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.current = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        cls.previous = copy.deepcopy(cls.current)
+        old_paths = {"src/checked/cholesky_adapter_test.zig", "src/checked/cholesky_exports.zig", "src/checked/cholesky_status.zig"}
+        new_paths = {
+            "interfaces/production/adapters/c/cholesky/adapter_test.zig",
+            "interfaces/production/adapters/c/cholesky/decode.zig",
+            "interfaces/production/adapters/c/cholesky/factor_solve.zig",
+            "interfaces/production/public/c/cholesky/exports.zig",
+            "interfaces/production/public/c/cholesky/real_exports.zig",
+            "interfaces/production/public/c/cholesky/complex_exports.zig",
+            "interfaces/production/public/c/cholesky/status.zig",
+        }
+        for section in ("test_roots", "correctness_only_roots"):
+            for row in cls.previous[section]:
+                for receipt in row.get("named_dependency_sources", []):
+                    if receipt.get("build_contract_sha256") == "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52":
+                        receipt["build_contract_sha256"] = "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+                if row["id"] in {"zig-root:lapack-tests", "zig-root:sparse-tests"}:
+                    row["source_reachability"] = sorted([*row["source_reachability"], "src/checked/cholesky_status.zig"])
+                if row["id"] != "correctness-root:checked-cholesky-lifecycle":
+                    continue
+                row["physical_path"] = "src/checked/cholesky_adapter_test.zig"
+                row["source_reachability"] = sorted(set(row["source_reachability"]) - new_paths | old_paths)
+                selected = []
+                for alias, module, owner in (
+                    ("zynum-core", "zynum_core_test_mod", "checked_cholesky_tests.root_module"),
+                    ("zynum-execution", "execution_test_mod", "checked_cholesky_tests.root_module"),
+                    ("zynum-numerics-resources", "numerics_resources_mod", "execution_test_mod"),
+                    ("zynum-execution", "execution_test_mod", "zynum_core_test_mod"),
+                    ("zynum-numerics-resources", "numerics_resources_mod", "zynum_core_test_mod"),
+                ):
+                    matches = [receipt for receipt in row["named_dependency_sources"]
+                               if (receipt["alias"], receipt["module"], receipt["attachment_owner"]) == (alias, module, owner)]
+                    if len(matches) != 1:
+                        raise AssertionError("Cholesky fixture must borrow each original exact module identity once")
+                    selected.append(matches[0])
+                row["named_dependency_sources"] = selected
+        for row in cls.previous["zig_test_files"]:
+            if row["path"] != "interfaces/production/adapters/c/cholesky/adapter_test.zig":
+                continue
+            row["path"] = "src/checked/cholesky_adapter_test.zig"
+            row["id"] = "zig-file:" + row["path"]
+            row["declarations"] = row["declarations"][:2]
+            for declaration in row["declarations"]:
+                declaration["id"] = "zig-decl:" + row["path"] + ":" + str(declaration["ordinal"])
+        cls.previous["zig_test_files"].sort(key=lambda row: row["id"])
+        if CHECKER._fact_digest(CHECKER._host_assembly_source_facts(cls.previous)) != CHECKER.CHOLESKY_C_PREVIOUS_SOURCE_SHA256:
+            raise AssertionError("reversing only Cholesky delta changed historical source facts")
+
+    def test_exact_source_pair_retains_native_ledger_without_new_qualification(self) -> None:
+        self.assertTrue(CHECKER._reviewed_cholesky_c_source_refresh(self.previous, self.current))
+        CHECKER._assert_source_only_native_unchanged(self.previous, self.current)
+
+    def test_any_other_source_delta_is_rejected(self) -> None:
+        for section in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:
+            for side in ("previous", "current"):
+                previous, current = copy.deepcopy(self.previous), copy.deepcopy(self.current)
+                (previous if side == "previous" else current)[section][0]["unreviewed"] = True
+                with self.subTest(section=section, side=side):
+                    self.assertFalse(CHECKER._reviewed_cholesky_c_source_refresh(previous, current))
+
+    def test_source_migration_cannot_change_native_state(self) -> None:
+        current = copy.deepcopy(self.current)
+        row = next(row for row in current["test_mode_rows"] if row["expectation_state"] == CHECKER.PENDING_STATE)
+        row["expectation_state"] = CHECKER.FROZEN_STATE
+        with self.assertRaises(CHECKER.InventoryError):
+            CHECKER._assert_source_only_native_unchanged(self.previous, current)
 
 
 class IntervalRecurrenceSourceRefreshTests(unittest.TestCase):

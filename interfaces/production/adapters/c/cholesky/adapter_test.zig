@@ -3,15 +3,17 @@
 const std = @import("std");
 const core = @import("zynum-core");
 const execution = @import("zynum-execution");
-const wire = @import("abi_types.zig");
-const api = @import("cholesky_exports.zig");
+const bridge = @import("zynum-checked-wire");
+const wire = bridge.Wire;
+const api = @import("zynum-cholesky-c").Complex(bridge);
+const real_api = @import("zynum-cholesky-c").Real(bridge);
 const C = execution.context;
 
 fn factor(comptime T: type, a: wire.dense, uplo: i32) wire.result {
-    return if (T == core.lapack.ComplexF32) api.zynum_checked_cholesky_factor_complex_f32(a, uplo) else api.zynum_checked_cholesky_factor_complex_f64(a, uplo);
+    return if (T == f32) real_api.zynum_checked_cholesky_factor_f32(a, uplo) else if (T == f64) real_api.zynum_checked_cholesky_factor_f64(a, uplo) else if (T == core.lapack.ComplexF32) api.zynum_checked_cholesky_factor_complex_f32(a, uplo) else api.zynum_checked_cholesky_factor_complex_f64(a, uplo);
 }
 fn solve(comptime T: type, a: wire.const_dense, b: wire.dense, uplo: i32) wire.result {
-    return if (T == core.lapack.ComplexF32) api.zynum_checked_cholesky_solve_complex_f32(a, b, uplo) else api.zynum_checked_cholesky_solve_complex_f64(a, b, uplo);
+    return if (T == f32) real_api.zynum_checked_cholesky_solve_f32(a, b, uplo) else if (T == f64) real_api.zynum_checked_cholesky_solve_f64(a, b, uplo) else if (T == core.lapack.ComplexF32) api.zynum_checked_cholesky_solve_complex_f32(a, b, uplo) else api.zynum_checked_cholesky_solve_complex_f64(a, b, uplo);
 }
 
 test "generated checked Cholesky enters one default admission and ends after writes on success and error" {
@@ -93,4 +95,31 @@ const FixtureReferenceContext = @import("zynum-execution").reference.ReferenceCo
 fn fixtureProgressClose(ctx: *@import("zynum-execution").Context) @import("zynum-execution").CloseResult {
     var report: @import("zynum-execution").CallReport = .{};
     return ctx.tryProgressClose(&report);
+}
+
+// Invalid descriptors never reach mathematical memory reads. These competing
+// failures pin the original flag -> dense span -> pointer -> A-before-B order.
+test "Cholesky C decode preserves failure precedence and validated zero dimension no-ops" {
+    inline for (.{ f32, f64, core.lapack.ComplexF32, core.lapack.ComplexF64 }) |T| {
+        var a: wire.dense = .{ .storage = .{ .data = null, .length = 1 }, .rows = -1, .cols = 1, .ld = 1 };
+        try std.testing.expectEqual(wire.INVALID_FLAG, factor(T, a, -1).status);
+        try std.testing.expectEqual(wire.INVALID_DIMENSION, factor(T, a, wire.LOWER).status);
+        a.rows = 1;
+        a.storage.length = 0;
+        try std.testing.expectEqual(wire.BUFFER_TOO_SMALL, factor(T, a, wire.LOWER).status);
+        a.storage.length = 1;
+        try std.testing.expectEqual(wire.NULL_POINTER, factor(T, a, wire.LOWER).status);
+        a.storage.data = @ptrFromInt(1);
+        try std.testing.expectEqual(wire.MISALIGNED_POINTER, factor(T, a, wire.LOWER).status);
+        a.storage.data = @ptrFromInt(std.math.maxInt(usize) - (@alignOf(T) - 1));
+        try std.testing.expectEqual(wire.SIZE_OVERFLOW, factor(T, a, wire.LOWER).status);
+        // A pointer failure is reported before B descriptor failure, and neither
+        // operand is touched while both descriptor ranges are being decoded.
+        const fa: wire.const_dense = .{ .storage = .{ .data = null, .length = 1 }, .rows = 1, .cols = 1, .ld = 1 };
+        a.rows = -1;
+        try std.testing.expectEqual(wire.NULL_POINTER, solve(T, fa, a, wire.UPPER).status);
+        const empty: wire.dense = .{ .storage = .{ .data = null, .length = 0 }, .rows = 0, .cols = 0, .ld = 0 };
+        try std.testing.expectEqual(wire.OK, factor(T, empty, wire.LOWER).status);
+        try std.testing.expectEqual(wire.OK, solve(T, .{ .storage = .{ .data = null, .length = 0 }, .rows = 0, .cols = 0, .ld = 0 }, empty, wire.UPPER).status);
+    }
 }

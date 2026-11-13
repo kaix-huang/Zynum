@@ -5,9 +5,10 @@
 // Select this combined artifact instead of loading two independent runtimes.
 comptime {
     _ = @import("checked/exports.zig");
+    _ = @import("zynum-cholesky-c").Real(implementation);
     _ = @import("checked/sparse_exports.zig");
     if (@import("zynum-checked-options").checked_complex_cholesky)
-        _ = @import("checked/cholesky_exports.zig");
+        _ = @import("zynum-cholesky-c").Complex(implementation);
 }
 
 // Shared declaration/conversion owner for optional generated callback frontends.

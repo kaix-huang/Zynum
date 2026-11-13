@@ -279,7 +279,7 @@ class PolicyTests(unittest.TestCase):
 
 class SourceTests(unittest.TestCase):
     def test_real_repository_counts_and_cross_map(self) -> None:
-        declarations = observer.scan_zig_exports(ROOT / "src", ROOT)
+        declarations = observer.scan_repository_exports(ROOT)
         self.assertEqual(476, len(declarations))
         self.assertEqual(
             161,
@@ -1783,6 +1783,28 @@ class DeterminismTests(unittest.TestCase):
             if item["path"] == "tools/abi_baseline_observation.json"
         )
         self.assertEqual(observer.sha256_file(policy_path), policy_input["sha256"])
+
+
+class CholeskyProductionDeclarationTests(unittest.TestCase):
+    def test_relocated_decoder_admission_and_tests_retain_source_commitments(self):
+        source_files = {row["path"]: row["sha256"] for row in observer.repository_source_commitment(ROOT)}
+        for name in ("decode.zig", "factor_solve.zig", "adapter_test.zig"):
+            path = "interfaces/production/adapters/c/cholesky/" + name
+            self.assertEqual(observer.sha256_file(ROOT/path), source_files[path])
+        self.assertEqual(("src", "interfaces/production/public/c/cholesky"), observer.EXPORT_SOURCE_ROOTS)
+
+    def test_relocated_eight_cholesky_exports_remain_observed_outside_blas_set(self):
+        declarations = observer.scan_repository_exports(ROOT)
+        cholesky = [row for row in declarations if row["exported_name"].startswith("zynum_checked_cholesky_")]
+        expected = {"zynum_checked_cholesky_" + operation + "_" + scalar
+                    for operation in ("factor", "solve")
+                    for scalar in ("f32", "f64", "complex_f32", "complex_f64")}
+        self.assertEqual(expected, {row["exported_name"] for row in cholesky})
+        self.assertEqual(8, len(cholesky))
+        self.assertTrue(all(row["source_path"].startswith("interfaces/production/public/c/cholesky/") for row in cholesky))
+        self.assertTrue(all(row["category"] == "separate_checked_interface" for row in cholesky))
+        public, hidden = observer.artifact_source_symbol_sets(declarations)
+        self.assertTrue(expected.isdisjoint(public | hidden))
 
 
 if __name__ == "__main__":

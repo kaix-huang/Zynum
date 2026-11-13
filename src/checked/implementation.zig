@@ -1,6 +1,8 @@
 // Copyright (C) 2026 Zynum contributors
 // SPDX-License-Identifier: LGPL-3.0-or-later
-// Checked ABI adapters. Declarations come from tools/checked_abi_schema.py.
+// Shared checked-v1 wire decoding and Sparse adapters.
+// Cholesky C decoding/admission lives in interfaces/production/adapters/c/cholesky.
+// Common wire helpers remain here until the separately scoped shared-wire migration.
 const std = @import("std");
 const execution = @import("zynum-execution");
 const abi = @import("abi_types.zig");
@@ -11,7 +13,6 @@ pub const writeBuffer = mutableSlice;
 pub const countElements = count;
 pub const statusCode = status;
 const lapack = @import("zynum-core").lapack;
-const lapack_checked = @import("zynum-core").internal.lapack_checked;
 const sparse = @import("zynum-core").sparse;
 
 fn status(err: anyerror) i32 {
@@ -27,9 +28,6 @@ fn status(err: anyerror) i32 {
         error.AliasingNotAllowed => abi.ALIASING_NOT_ALLOWED,
         error.InvalidRowOffsets, error.InvalidColumnIndex => abi.INVALID_SPARSE_STRUCTURE,
         error.NonFiniteInput => abi.NONFINITE_INPUT,
-        // Additive Cholesky profile owns this status. Existing real/Sparse
-        // checked-v1 operations cannot produce a Hermitian diagonal error.
-        error.InvalidHermitianDiagonal => @import("cholesky_status.zig").INVALID_HERMITIAN_DIAGONAL,
         error.InvalidLength => abi.INVALID_LENGTH,
         else => abi.INTERNAL_ERROR,
     };
@@ -38,14 +36,6 @@ fn status(err: anyerror) i32 {
 fn result(value: anyerror!usize) abi.result {
     const info = value catch |err| return .{ .status = status(err), .reserved = 0, .info = 0 };
     return .{ .status = if (info == 0) abi.OK else abi.NUMERICAL_FAILURE, .reserved = 0, .info = @intCast(info) };
-}
-
-fn triangle(flag: i32) !lapack.Triangle {
-    return switch (flag) {
-        abi.LOWER => .lower,
-        abi.UPPER => .upper,
-        else => error.InvalidFlag,
-    };
 }
 
 fn transform(flag: i32) !sparse.MatrixTransform {
@@ -94,7 +84,7 @@ fn mutableSlice(comptime T: type, b: abi.buffer) ![]T {
     return p[0..len];
 }
 
-fn densePreflight(a: anytype) !void {
+pub fn densePreflight(a: anytype) !void {
     const rows = try dimension(a.rows);
     const cols = try dimension(a.cols);
     if (rows > std.math.maxInt(lapack.PivotInt) or cols > std.math.maxInt(lapack.PivotInt)) return error.InvalidDimension;
@@ -106,41 +96,6 @@ fn densePreflight(a: anytype) !void {
     const preceding = std.math.mul(usize, cols - 1, ld) catch return error.SizeOverflow;
     const span = std.math.add(usize, preceding, rows) catch return error.SizeOverflow;
     if (len < span) return error.BufferTooSmall;
-}
-
-fn matrix(comptime T: type, a: abi.dense) !lapack.Matrix(T) {
-    try densePreflight(a);
-    return .{ .values = try mutableSlice(T, a.storage), .row_count = @intCast(a.rows), .column_count = @intCast(a.cols), .leading_dimension = @intCast(a.ld) };
-}
-
-fn constMatrix(comptime T: type, a: abi.const_dense) !lapack.ConstMatrix(T) {
-    try densePreflight(a);
-    return .{ .values = try constSlice(T, a.storage), .row_count = @intCast(a.rows), .column_count = @intCast(a.cols), .leading_dimension = @intCast(a.ld) };
-}
-
-fn factorInner(comptime T: type, operation: *const execution.context.Operation, a: abi.dense, flag: i32) !usize {
-    const uplo = try triangle(flag);
-    return lapack_checked.choleskyFactorizeAdmitted(operation, T, try matrix(T, a), uplo);
-}
-
-pub fn factor(comptime T: type, a: abi.dense, flag: i32) abi.result {
-    var operation = execution.beginDefault();
-    defer operation.end();
-    return result(factorInner(T, &operation, a, flag));
-}
-
-fn solveInner(comptime T: type, operation: *const execution.context.Operation, a: abi.const_dense, b: abi.dense, flag: i32) !usize {
-    const uplo = try triangle(flag);
-    // Both descriptor ranges are checked before public operations may read memory.
-    const factor_matrix = try constMatrix(T, a);
-    const rhs = try matrix(T, b);
-    return lapack_checked.choleskySolveAdmitted(operation, T, factor_matrix, rhs, uplo);
-}
-
-pub fn solve(comptime T: type, a: abi.const_dense, b: abi.dense, flag: i32) abi.result {
-    var operation = execution.beginDefault();
-    defer operation.end();
-    return result(solveInner(T, &operation, a, b, flag));
 }
 
 fn spmvInner(operation: *const execution.context.Operation, comptime T: type, comptime O: type, comptime I: type, comptime extended_transform: bool, a: abi.csr, flag: i32, alpha: T, x: abi.const_buffer, beta: T, y: abi.buffer) !usize {

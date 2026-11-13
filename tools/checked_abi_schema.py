@@ -50,11 +50,17 @@ def select_profile(profile_id=DEFAULT_PROFILE):
     exact_keys(profile['adapter_source'], ('path', 'sha256'), 'adapter source')
     require(profile['adapter_source'] == {
         'path': 'src/checked/implementation.zig',
-        'sha256': 'bf05e8adfac3a678ab2db7a2b5fa8588a8ebba105ce358d7e8c27e6d238090c5',
+        'sha256': 'd2311082d31bcbda0165ceec8f31b99dec6cf8fc08c5cb7e1b6569ecf66a72d5',
     }, 'Unreviewed checked adapter source binding')
     source = Path(__file__).resolve().parents[1] / profile['adapter_source']['path']
     require(source.is_file() and hashlib.sha256(source.read_bytes()).hexdigest() == profile['adapter_source']['sha256'],
             'Checked adapter entry source drift; this pin is not full numerical/ABI evidence')
+    # Shared wire remains the checked-v1 profile owner; Cholesky is a separate
+    # production adapter whose exact sources must also be reviewed before render.
+    for path, digest in {'interfaces/production/adapters/c/cholesky/decode.zig': '31ac03cb65f9490ffba3a72ee6f2e2a196a7dc75153341f8a2c21525cbd5557d', 'interfaces/production/adapters/c/cholesky/factor_solve.zig': '134f0eb794838d97dd2cdf86be28bdfc7b091cab1cda8a30cb01a50c7e158376'}.items():
+        cholesky_source = Path(__file__).resolve().parents[1] / path
+        require(cholesky_source.is_file() and hashlib.sha256(cholesky_source.read_bytes()).hexdigest() == digest,
+                'Cholesky adapter entry source drift; this pin is not full numerical/ABI evidence')
     require(set(profile['adapters']) == {'factor', 'solve', 'spmv'}, 'Unreviewed checked adapter set')
     require(isinstance(profile['bindings'], list) and len(profile['bindings']) == 8, 'Checked-v1 requires eight exact bindings')
     functions = []

@@ -883,12 +883,14 @@ def _routine_family(name: str) -> str:
 
 CHECKED_SOURCE_EXPORTS = {
     "src/checked/exports.zig": frozenset({
-        "zynum_checked_cholesky_factor_f32", "zynum_checked_cholesky_solve_f32",
-        "zynum_checked_cholesky_factor_f64", "zynum_checked_cholesky_solve_f64",
         "zynum_checked_csr_spmv_f32_u32", "zynum_checked_csr_spmv_f32_u64",
         "zynum_checked_csr_spmv_f64_u32", "zynum_checked_csr_spmv_f64_u64",
     }),
-    "src/checked/cholesky_exports.zig": frozenset(
+    "interfaces/production/public/c/cholesky/real_exports.zig": frozenset({
+        "zynum_checked_cholesky_factor_f32", "zynum_checked_cholesky_solve_f32",
+        "zynum_checked_cholesky_factor_f64", "zynum_checked_cholesky_solve_f64",
+    }),
+    "interfaces/production/public/c/cholesky/complex_exports.zig": frozenset(
         f"zynum_checked_cholesky_{operation}_complex_{precision}"
         for operation in ("factor", "solve") for precision in ("f32", "f64")
     ),
@@ -940,6 +942,23 @@ def artifact_source_symbol_sets(
     hidden = {entry["exported_name"] for entry in scoped
               if entry["exported_name"] != "not_observed" and entry["visibility"] == "hidden"}
     return public, hidden
+
+
+# Explicit production declaration ownership; do not scan arbitrary interface/test
+# trees or silently lose declarations relocated out of the mathematical src tree.
+EXPORT_SOURCE_ROOTS = ("src", "interfaces/production/public/c/cholesky")
+SOURCE_COMMITMENT_ROOTS = (*EXPORT_SOURCE_ROOTS, "interfaces/production/adapters/c/cholesky")
+
+
+def scan_repository_exports(root: Path) -> list[dict[str, Any]]:
+    return [entry for source in EXPORT_SOURCE_ROOTS
+            for entry in scan_zig_exports(root/source, root)]
+
+
+def repository_source_commitment(root: Path) -> list[dict[str, str]]:
+    return [{"path": path.relative_to(root).as_posix(), "sha256": sha256_file(path)}
+            for source in SOURCE_COMMITMENT_ROOTS
+            for path in sorted((root / source).rglob("*.zig"))]
 
 
 def scan_zig_exports(source_root: Path, repository_root: Path) -> list[dict[str, Any]]:
@@ -2867,7 +2886,7 @@ def build_observation(args: argparse.Namespace) -> dict[str, Any]:
         raise ObservationError(
             "artifact target does not match the canonical artifact build configuration"
         )
-    source_declarations = scan_zig_exports(root / "src", root)
+    source_declarations = scan_repository_exports(root)
     projection, projection_inputs, projection_counts = observe_projections(root)
     public_source_names, hidden_source_names = artifact_source_symbol_sets(source_declarations)
     generator_declarations = [
@@ -2963,10 +2982,7 @@ def build_observation(args: argparse.Namespace) -> dict[str, Any]:
         ],
         key=lambda item: item["path"],
     )
-    source_commitment = [
-        {"path": path.relative_to(root).as_posix(), "sha256": sha256_file(path)}
-        for path in sorted((root / "src").rglob("*.zig"))
-    ]
+    source_commitment = repository_source_commitment(root)
     consumer_input_commitment = []
     if args.source_archive and args.source_archive.is_file():
         consumer_input_commitment.append(

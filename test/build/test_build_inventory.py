@@ -435,10 +435,10 @@ class TrtrsInventoryContractTests(unittest.TestCase):
 
 
 class CheckedCholeskyInventoryContractTests(unittest.TestCase):
-    def test_only_thirteen_explicit_frontend_files_are_added(self) -> None:
+    def test_only_sixteen_explicit_frontend_files_are_added(self) -> None:
         inventory = json.loads((REPOSITORY_ROOT / "tools/build_inventory.json").read_text())
         paths = {row["path"] for row in CHECKER.CHECKED_CHOLESKY_CLASSIFICATIONS}
-        self.assertEqual(13, len(paths))
+        self.assertEqual(16, len(paths))
         inventory["repository_file_classifications"] = [row for row in inventory["repository_file_classifications"] if row["path"] not in paths]
         before = {row["path"]: row for row in inventory["repository_file_classifications"]}
         CHECKER._apply_reviewed_build_inventory_migrations(_with_source_reviewed_execution_compile(inventory))
@@ -2160,7 +2160,7 @@ class CheckedAbiProfileGenerationTests(unittest.TestCase):
             explicit = self.generator.outputs("formatter-must-not-run", "checked-v1")
             self.assertEqual(default, explicit)
             self.assertEqual(set(CHECKER.CHECKED_ABI_OUTPUTS), set(default))
-            self.assertEqual(4, formatter.call_count)  # Two Zig files per selection.
+            self.assertEqual(6, formatter.call_count)  # Three Zig files per selection.
             for call in formatter.call_args_list:
                 self.assertEqual((["formatter-must-not-run", "fmt", "--stdin"],), call.args)
                 self.assertEqual({"input", "text", "capture_output", "check"}, set(call.kwargs))
@@ -17795,7 +17795,8 @@ class FiniteStandardBindingGenerationTests(unittest.TestCase):
             'include/zynum/checked/checked.f90': '3c5dd455a1f748556c31c7cc380ee0d43f2af6bd4b7fa80977a0055b4734c7c5',
             'include/zynum/checked/abi_manifest.json': '96355c7acf43925023771e33c20af42838a6d9b7662556f8dd1b333a69104755',
             'src/checked/abi_types.zig': 'd80b207134bc498e83f8bafa35b3024d810a81c07e46897a1218fa6e2b7adec7',
-            'src/checked/exports.zig': '4e3ec3065541011d925088cd86be0ba9e1448756eba407aec361fd5e765d48b3',
+            'src/checked/exports.zig': '4eb9dd159f6c5cd5860120a2f4c3900003db3633fa507a440e9a51e52c98a1ca',
+            'interfaces/production/public/c/cholesky/real_exports.zig': '3b40c0cae800d37c752f7ebffe7aacf12617674811fccafcc71518a2e7987e4f',
             'src/checked/exports.def': '90a5a4f2d7fb60c4999fc5e259698b754aaece465040152f1c17e934d68fb1a3',
         }
         self.assertEqual(set(CHECKER.CHECKED_ABI_OUTPUTS), set(expected))

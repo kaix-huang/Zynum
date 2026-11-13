@@ -31,7 +31,7 @@ STRUCTS = {
 # Reviewed bridge to the existing adapter file, not a numerical dependency or
 # native ABI proof. Roles refer to numerical_operation_schema, while argument
 # names, layouts, flags/statuses and call spelling belong to this profile.
-ADAPTER_SOURCE = {'path': 'src/checked/implementation.zig', 'sha256': 'bf05e8adfac3a678ab2db7a2b5fa8588a8ebba105ce358d7e8c27e6d238090c5'}
+ADAPTER_SOURCE = {'path': 'src/checked/implementation.zig', 'sha256': 'd2311082d31bcbda0165ceec8f31b99dec6cf8fc08c5cb7e1b6569ecf66a72d5'}
 ADAPTERS = {
     'factor': {
         'operation': 'cholesky.factor', 'symbol_stem': 'cholesky_factor',

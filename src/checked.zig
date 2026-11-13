@@ -5,4 +5,5 @@
 // This is not an additional public Zig facade.
 comptime {
     _ = @import("checked/exports.zig");
+    _ = @import("zynum-cholesky-c").Real(@import("checked/implementation.zig"));
 }

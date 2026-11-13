@@ -849,7 +849,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '8ee02aee5d7b3ed0d5f65d5bcff689f697cd1fe8f8f00a7e911458420889e60c'
+CURRENT_TEST_INVENTORY_SHA256 = '1f4ecbc0000aa7c4e4cf7527fa3dc3a17d85dc8c7a021c780f311cb0fafefd6f'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = 'bb2627cfe862388f54aab267c8c515e65f4187f541a45a501fee3aebf4b5f858'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -2618,7 +2618,7 @@ def discover(
     cholesky_launch = by_id.get(CHECKED_CHOLESKY_LAUNCH_ID, {})
     cholesky_step = by_id.get(CHECKED_CHOLESKY_STEP_ID, {})
     if (cholesky_compile.get("call") != "b.addTest"
-        or cholesky_compile.get("root_source") != ["src/checked/cholesky_adapter_test.zig"]
+        or cholesky_compile.get("root_source") != ["interfaces/production/adapters/c/cholesky/adapter_test.zig"]
         or cholesky_compile.get("artifact_role") != "checked-cholesky-correctness-only"
         or cholesky_launch.get("call") != "b.addRunArtifact"
         or cholesky_launch.get("source_artifact") != CHECKED_CHOLESKY_COMPILE_ID
@@ -2629,7 +2629,7 @@ def discover(
         raise InventoryError("checked Cholesky correctness-only root/launch/step contract changed")
     correctness_only_roots.append({
         "id": "correctness-root:checked-cholesky-lifecycle", "language": "zig",
-        "physical_path": "src/checked/cholesky_adapter_test.zig",
+        "physical_path": "interfaces/production/adapters/c/cholesky/adapter_test.zig",
         "compile_observation_id": CHECKED_CHOLESKY_COMPILE_ID,
         "launch_observation_ids": [CHECKED_CHOLESKY_LAUNCH_ID],
         "selector_step_observation_id": CHECKED_CHOLESKY_STEP_ID,
@@ -5089,6 +5089,35 @@ def _reviewed_interval_recurrence_source_refresh(previous: dict[str, Any], curre
     )
 
 
+# Exact B05 Cholesky C source cut. The pair includes every named dependency
+# receipt, relocated correctness-only root and Zig file declaration. No native
+# row, nameset, execution state or historical observation is admitted by it.
+CHOLESKY_C_PREVIOUS_INVENTORY_SHA256 = "8ee02aee5d7b3ed0d5f65d5bcff689f697cd1fe8f8f00a7e911458420889e60c"
+CHOLESKY_C_PREVIOUS_SOURCE_SHA256 = "feabde171e158096fc74ae114881595cc74dd9c4a87e5204173d0b2079bfeacc"
+CHOLESKY_C_CURRENT_SOURCE_SHA256 = "089479a08428d10668492d0a1acc14e19ec41004a6a342a73315564f25e8707c"
+
+
+def _reviewed_cholesky_c_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    if (_fact_digest(_host_assembly_source_facts(previous)) != CHOLESKY_C_PREVIOUS_SOURCE_SHA256
+        or _fact_digest(_host_assembly_source_facts(current)) != CHOLESKY_C_CURRENT_SOURCE_SHA256):
+        return False
+    # All ordinary test identities and source closures stay fixed. Their only
+    # delta is the exact reviewed global same-Core build-contract receipt.
+    for old, new in zip(previous["test_roots"], current["test_roots"], strict=True):
+        comparable = copy.deepcopy(old)
+        if old["id"] in {"zig-root:lapack-tests", "zig-root:sparse-tests"}:
+            comparable["source_reachability"] = [path for path in comparable["source_reachability"] if path != "src/checked/cholesky_status.zig"]
+        if {k: v for k, v in comparable.items() if k != "named_dependency_sources"} != {k: v for k, v in new.items() if k != "named_dependency_sources"}:
+            return False
+        receipts = copy.deepcopy(old.get("named_dependency_sources", []))
+        for receipt in receipts:
+            if receipt.get("build_contract_sha256") == "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed":
+                receipt["build_contract_sha256"] = "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        if receipts != new.get("named_dependency_sources", []):
+            return False
+    return True
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -5108,6 +5137,7 @@ def _refresh_base_compatible_discovery(
     resource_port_migration = _reviewed_resource_port_source_refresh(inventory, discovered)
     header_install_migration = _reviewed_header_install_source_refresh(inventory, discovered)
     interval_recurrence_migration = _reviewed_interval_recurrence_source_refresh(inventory, discovered)
+    cholesky_c_migration = _reviewed_cholesky_c_source_refresh(inventory, discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -5121,7 +5151,7 @@ def _refresh_base_compatible_discovery(
     for recorded, current in zip(recorded_roots, current_roots, strict=True):
         if recorded == current:
             continue
-        if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration:
+        if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration or cholesky_c_migration:
             continue  # The complete exact old/new source facts were checked above.
         if production_profile_migration and current.get("id", "").startswith("zig-root:"):
             continue  # Only the exact reviewed named-dependency graph hashes changed.
@@ -5323,10 +5353,11 @@ def _refresh_base_compatible_discovery(
 
     compatible = dict(discovered)
     compatible["test_roots"] = recorded_roots
-    if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration:
+    if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration or cholesky_c_migration:
         compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
         compatible["zig_test_files"] = inventory["zig_test_files"]
-        expected_base = (INTERVAL_RECURRENCE_PREVIOUS_INVENTORY_SHA256 if interval_recurrence_migration else
+        expected_base = (CHOLESKY_C_PREVIOUS_INVENTORY_SHA256 if cholesky_c_migration else
+                         INTERVAL_RECURRENCE_PREVIOUS_INVENTORY_SHA256 if interval_recurrence_migration else
                          HEADER_INSTALL_PREVIOUS_INVENTORY_SHA256 if header_install_migration else
                          RESOURCE_PORT_PREVIOUS_INVENTORY_SHA256 if resource_port_migration else
                          HOST_ASSEMBLY_PREVIOUS_INVENTORY_SHA256)

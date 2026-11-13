@@ -13,7 +13,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT/'tools'))
 from checked_cholesky_profile import candidate, validate, PROFILE, TARGET
-from generate_checked_cholesky import render
+from generate_checked_cholesky import render, BRIDGE_SOURCES
 
 
 class CholeskyProfileTests(unittest.TestCase):
@@ -51,13 +51,26 @@ class CholeskyProfileTests(unittest.TestCase):
                 self.assertFalse(output.exists())
 
     def test_bridge_drift_rejects_before_formatter(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root=Path(directory); bridge=root/'src/checked/implementation.zig'
-            bridge.parent.mkdir(parents=True); bridge.write_text('// unreviewed bridge\n')
-            with patch('generate_checked_cholesky.ROOT', root), patch('generate_checked_cholesky.subprocess.run') as formatter:
-                with self.assertRaisesRegex(ValueError, 'admission source drift'):
-                    render(candidate(), '/never-invoke')
-                formatter.assert_not_called()
+        for changed in BRIDGE_SOURCES:
+            with self.subTest(path=changed), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                for source in BRIDGE_SOURCES:
+                    bridge = root/source
+                    bridge.parent.mkdir(parents=True, exist_ok=True)
+                    bridge.write_bytes((ROOT/source).read_bytes())
+                (root/changed).write_text('// unreviewed bridge\n')
+                with patch('generate_checked_cholesky.ROOT', root), patch('generate_checked_cholesky.subprocess.run') as formatter:
+                    with self.assertRaisesRegex(ValueError, 'admission source drift'):
+                        render(candidate(), '/never-invoke')
+                    formatter.assert_not_called()
+
+    def test_generated_sources_use_single_wire_owner_and_production_adapter(self):
+        outputs = render(candidate(), 'zig')
+        source = outputs['interfaces/production/public/c/cholesky/complex_exports.zig']
+        self.assertIn('const abi = WireBridge.Wire;', source)
+        self.assertIn('@import("zynum-cholesky-c-adapter").Adapter(WireBridge)', source)
+        self.assertNotIn('src/checked/', source)
+        self.assertNotIn('src/checked/cholesky_exports.zig', outputs)
 
 
 if __name__ == '__main__':

@@ -698,7 +698,7 @@
           "target": "target",
           "compile_symbol": "blas_module_tests",
           "attachment_owner": "blas_module_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -708,7 +708,7 @@
           "target": "target",
           "compile_symbol": "blas_module_tests",
           "attachment_owner": "blas_module_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -718,7 +718,7 @@
           "target": "target",
           "compile_symbol": "blas_module_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -728,7 +728,7 @@
           "target": "target",
           "compile_symbol": "blas_module_tests",
           "attachment_owner": "zynum_blas_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -738,7 +738,7 @@
           "target": "target",
           "compile_symbol": "blas_module_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -748,7 +748,7 @@
           "target": "target",
           "compile_symbol": "blas_module_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -990,7 +990,7 @@
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
           "attachment_owner": "blas_public_surface_contract_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1000,7 +1000,7 @@
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -1010,7 +1010,7 @@
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
           "attachment_owner": "zynum_blas_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1020,7 +1020,7 @@
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1030,7 +1030,7 @@
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -1275,7 +1275,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "blas_abi_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-blas-abi",
@@ -1285,7 +1285,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "cblas_compat_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1295,7 +1295,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "cblas_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum_blas_cblas_compat",
@@ -1305,7 +1305,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "cblas_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1315,7 +1315,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1325,7 +1325,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1335,7 +1335,7 @@
           "target": "target",
           "compile_symbol": "cblas_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -1394,7 +1394,7 @@
           "target": "target",
           "compile_symbol": "execution_contract_tests",
           "attachment_owner": "execution_contract_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": []
@@ -1626,7 +1626,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "blas_abi_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1636,7 +1636,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-blas-abi",
@@ -1646,7 +1646,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "fortran_compat_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-blas",
@@ -1656,7 +1656,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "fortran_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1666,7 +1666,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "fortran_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum_blas_fortran_compat",
@@ -1676,7 +1676,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "fortran_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -1686,7 +1686,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "zynum_blas_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1696,7 +1696,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1706,7 +1706,7 @@
           "target": "target",
           "compile_symbol": "fortran_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -1842,7 +1842,7 @@
           "target": "target",
           "compile_symbol": "gemm_registry_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1852,7 +1852,7 @@
           "target": "target",
           "compile_symbol": "gemm_registry_tests",
           "attachment_owner": "gemm_registry_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -1862,7 +1862,7 @@
           "target": "target",
           "compile_symbol": "gemm_registry_tests",
           "attachment_owner": "gemm_registry_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -1959,7 +1959,7 @@
           "target": "target",
           "compile_symbol": "header_smoke_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -1969,7 +1969,7 @@
           "target": "target",
           "compile_symbol": "header_smoke_tests",
           "attachment_owner": "task_runtime_host_test_library.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -2106,7 +2106,6 @@
         "src/blas/runtime.zig",
         "src/blas/types.zig",
         "src/checked/abi_types.zig",
-        "src/checked/cholesky_status.zig",
         "src/checked/implementation.zig",
         "src/checked/mixed_adapter_test.zig",
         "src/contour_binding_candidate_test.zig",
@@ -2325,7 +2324,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -2335,7 +2334,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "fftw_binding_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "numerical-owner",
@@ -2345,7 +2344,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "general_operator_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-contour-wire",
@@ -2363,7 +2362,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "general_operator_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -2373,7 +2372,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "general_operator_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -2383,7 +2382,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "general_operator_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "fftw-interface-owner",
@@ -2393,7 +2392,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapack_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "general-operator-tests",
@@ -2403,7 +2402,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapack_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "numerical-owner",
@@ -2413,7 +2412,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapack_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -2423,7 +2422,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapack_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -2433,7 +2432,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapack_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-lapack",
@@ -2443,7 +2442,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapack_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -2453,7 +2452,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "lapacke_binding_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -2463,7 +2462,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -2473,7 +2472,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -2483,7 +2482,7 @@
           "target": "target",
           "compile_symbol": "lapack_tests",
           "attachment_owner": "zynum_lapack_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -2597,7 +2596,7 @@
           "target": "target",
           "compile_symbol": "level1_registry_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -2607,7 +2606,7 @@
           "target": "target",
           "compile_symbol": "level1_registry_tests",
           "attachment_owner": "level1_registry_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -2731,7 +2730,7 @@
           "target": "target",
           "compile_symbol": "level2_compact_registry_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -2741,7 +2740,7 @@
           "target": "target",
           "compile_symbol": "level2_compact_registry_tests",
           "attachment_owner": "level2_compact_registry_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -2868,7 +2867,7 @@
           "target": "target",
           "compile_symbol": "level2_fused_registry_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -2878,7 +2877,7 @@
           "target": "target",
           "compile_symbol": "level2_fused_registry_tests",
           "attachment_owner": "level2_fused_registry_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -3123,7 +3122,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum",
@@ -3133,7 +3132,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "modern_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-blas",
@@ -3143,7 +3142,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "modern_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-lapack",
@@ -3153,7 +3152,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "modern_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-sparse",
@@ -3163,7 +3162,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "modern_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3173,7 +3172,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "zynum_blas_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -3183,7 +3182,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -3193,7 +3192,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3203,7 +3202,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "zynum_lapack_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3213,7 +3212,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "zynum_sparse_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3223,7 +3222,7 @@
           "target": "target",
           "compile_symbol": "modern_tests",
           "attachment_owner": "zynum_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -3442,7 +3441,7 @@
           "target": "target",
           "compile_symbol": "numerics_contract_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -3452,7 +3451,7 @@
           "target": "target",
           "compile_symbol": "numerics_contract_tests",
           "attachment_owner": "numerics_contract_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -3462,7 +3461,7 @@
           "target": "target",
           "compile_symbol": "numerics_contract_tests",
           "attachment_owner": "numerics_contract_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": []
@@ -3569,7 +3568,7 @@
           "target": "target",
           "compile_symbol": "packed_parallel_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -3579,7 +3578,7 @@
           "target": "target",
           "compile_symbol": "packed_parallel_tests",
           "attachment_owner": "packed_parallel_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -3715,7 +3714,6 @@
         "src/blas/runtime.zig",
         "src/blas/types.zig",
         "src/checked/abi_types.zig",
-        "src/checked/cholesky_status.zig",
         "src/checked/implementation.zig",
         "src/checked/mixed_adapter_test.zig",
         "src/facades/sparse.zig",
@@ -3851,7 +3849,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "checked_sparse_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -3861,7 +3859,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "checked_sparse_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -3871,7 +3869,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3881,7 +3879,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "mkl_sparse_binding_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "checked-sparse-tests",
@@ -3891,7 +3889,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "sparse_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "sparse-interface-owner",
@@ -3901,7 +3899,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "sparse_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3911,7 +3909,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "sparse_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -3921,7 +3919,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "sparse_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -3931,7 +3929,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "sparse_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-sparse",
@@ -3941,7 +3939,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "sparse_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -3951,7 +3949,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -3961,7 +3959,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -3971,7 +3969,7 @@
           "target": "target",
           "compile_symbol": "sparse_tests",
           "attachment_owner": "zynum_sparse_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -4115,7 +4113,7 @@
           "target": "target",
           "compile_symbol": "structured_blocked_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4125,7 +4123,7 @@
           "target": "target",
           "compile_symbol": "structured_blocked_tests",
           "attachment_owner": "structured_blocked_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -4135,7 +4133,7 @@
           "target": "target",
           "compile_symbol": "structured_blocked_tests",
           "attachment_owner": "structured_blocked_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -4279,7 +4277,7 @@
           "target": "target",
           "compile_symbol": "structured_object_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4289,7 +4287,7 @@
           "target": "target",
           "compile_symbol": "structured_object_tests",
           "attachment_owner": "structured_object_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -4299,7 +4297,7 @@
           "target": "target",
           "compile_symbol": "structured_object_tests",
           "attachment_owner": "structured_object_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -4446,7 +4444,7 @@
           "target": "target",
           "compile_symbol": "symm_dense_gemm_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4456,7 +4454,7 @@
           "target": "target",
           "compile_symbol": "symm_dense_gemm_tests",
           "attachment_owner": "symm_dense_gemm_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -4466,7 +4464,7 @@
           "target": "target",
           "compile_symbol": "symm_dense_gemm_tests",
           "attachment_owner": "symm_dense_gemm_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -4598,7 +4596,7 @@
           "target": "target",
           "compile_symbol": "triangular_band_solve_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4608,7 +4606,7 @@
           "target": "target",
           "compile_symbol": "triangular_band_solve_tests",
           "attachment_owner": "triangular_band_solve_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -4618,7 +4616,7 @@
           "target": "target",
           "compile_symbol": "triangular_band_solve_tests",
           "attachment_owner": "triangular_band_solve_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -4742,7 +4740,7 @@
           "target": "target",
           "compile_symbol": "triangular_band_window_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4752,7 +4750,7 @@
           "target": "target",
           "compile_symbol": "triangular_band_window_tests",
           "attachment_owner": "task_runtime_host_test_library.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4762,7 +4760,7 @@
           "target": "target",
           "compile_symbol": "triangular_band_window_tests",
           "attachment_owner": "triangular_band_window_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -4882,7 +4880,7 @@
           "target": "target",
           "compile_symbol": "triangular_dense_unit_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -4892,7 +4890,7 @@
           "target": "target",
           "compile_symbol": "triangular_dense_unit_tests",
           "attachment_owner": "triangular_dense_unit_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -5024,7 +5022,7 @@
           "target": "target",
           "compile_symbol": "triangular_packed_unit_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -5034,7 +5032,7 @@
           "target": "target",
           "compile_symbol": "triangular_packed_unit_tests",
           "attachment_owner": "triangular_packed_unit_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -5044,7 +5042,7 @@
           "target": "target",
           "compile_symbol": "triangular_packed_unit_tests",
           "attachment_owner": "triangular_packed_unit_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -5186,7 +5184,7 @@
           "target": "target",
           "compile_symbol": "triangular_parallel_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -5196,7 +5194,7 @@
           "target": "target",
           "compile_symbol": "triangular_parallel_tests",
           "attachment_owner": "triangular_parallel_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -5206,7 +5204,7 @@
           "target": "target",
           "compile_symbol": "triangular_parallel_tests",
           "attachment_owner": "triangular_parallel_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -5321,7 +5319,7 @@
           "target": "target",
           "compile_symbol": "vector_stride2_parallel_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -5331,7 +5329,7 @@
           "target": "target",
           "compile_symbol": "vector_stride2_parallel_tests",
           "attachment_owner": "vector_stride2_parallel_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -5573,7 +5571,7 @@
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -5583,7 +5581,7 @@
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -5593,7 +5591,7 @@
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "public-surface",
@@ -5603,7 +5601,7 @@
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
           "attachment_owner": "zynum_public_surface_contract_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -5613,7 +5611,7 @@
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
           "attachment_owner": "zynum_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ],
       "required_isolated_objects": [
@@ -5862,7 +5860,7 @@
           "target": "target",
           "compile_symbol": "dynamic_tests",
           "attachment_owner": "blas_abi_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-blas-abi",
@@ -5872,7 +5870,7 @@
           "target": "target",
           "compile_symbol": "dynamic_tests",
           "attachment_owner": "dynamic_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -5882,7 +5880,7 @@
           "target": "target",
           "compile_symbol": "dynamic_tests",
           "attachment_owner": "dynamic_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -5892,7 +5890,7 @@
           "target": "target",
           "compile_symbol": "dynamic_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -5902,7 +5900,7 @@
           "target": "target",
           "compile_symbol": "dynamic_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -5912,14 +5910,14 @@
           "target": "target",
           "compile_symbol": "dynamic_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ]
     },
     {
       "id": "correctness-root:checked-cholesky-lifecycle",
       "language": "zig",
-      "physical_path": "src/checked/cholesky_adapter_test.zig",
+      "physical_path": "interfaces/production/adapters/c/cholesky/adapter_test.zig",
       "compile_observation_id": "compile:build.zig:build:checked_cholesky_tests",
       "launch_observation_ids": [
         "launch:build.zig:build:anonymous-2"
@@ -5933,6 +5931,13 @@
       "enumeration_source": "static-source-reachability-only",
       "native_inventory_evidence": false,
       "source_reachability": [
+        "interfaces/production/adapters/c/cholesky/adapter_test.zig",
+        "interfaces/production/adapters/c/cholesky/decode.zig",
+        "interfaces/production/adapters/c/cholesky/factor_solve.zig",
+        "interfaces/production/public/c/cholesky/complex_exports.zig",
+        "interfaces/production/public/c/cholesky/exports.zig",
+        "interfaces/production/public/c/cholesky/real_exports.zig",
+        "interfaces/production/public/c/cholesky/status.zig",
         "src/blas.zig",
         "src/blas/api.zig",
         "src/blas/api/aliasing.zig",
@@ -6027,9 +6032,6 @@
         "src/blas/runtime.zig",
         "src/blas/types.zig",
         "src/checked/abi_types.zig",
-        "src/checked/cholesky_adapter_test.zig",
-        "src/checked/cholesky_exports.zig",
-        "src/checked/cholesky_status.zig",
         "src/checked/implementation.zig",
         "src/fft/core.zig",
         "src/fft/managed.zig",
@@ -6132,6 +6134,26 @@
       ],
       "named_dependency_sources": [
         {
+          "alias": "zynum-checked-wire",
+          "path": "src/checked/implementation.zig",
+          "source_sha256": "d2311082d31bcbda0165ceec8f31b99dec6cf8fc08c5cb7e1b6569ecf66a72d5",
+          "module": "cholesky_wire_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "checked_cholesky_tests.root_module",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-cholesky-c",
+          "path": "interfaces/production/public/c/cholesky/exports.zig",
+          "source_sha256": "c929216814d448c4d2504fb1cc89a79a77f1528f073a58f85bb28acd49c9bc0c",
+          "module": "cholesky_c_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "checked_cholesky_tests.root_module",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
           "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
@@ -6139,7 +6161,7 @@
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
           "attachment_owner": "checked_cholesky_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -6149,7 +6171,77 @@
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
           "attachment_owner": "checked_cholesky_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-cholesky-c-status",
+          "path": "interfaces/production/public/c/cholesky/status.zig",
+          "source_sha256": "f82db7735062cb2c1c99d461f0e0f12cfa12f2e3bb2fbded6f9a86531eeafc52",
+          "module": "cholesky_status_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_adapter_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-core",
+          "path": "src/zynum.zig",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "module": "zynum_core_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_adapter_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-execution",
+          "path": "src/numerics/execution/root.zig",
+          "source_sha256": "f1678b312cf6c1344a2b9440253cad3ed580a8a794a9bdf0dad3c9fcb1431d62",
+          "module": "execution_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_adapter_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-cholesky-c-adapter",
+          "path": "interfaces/production/adapters/c/cholesky/factor_solve.zig",
+          "source_sha256": "134f0eb794838d97dd2cdf86be28bdfc7b091cab1cda8a30cb01a50c7e158376",
+          "module": "cholesky_adapter_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_c_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-core",
+          "path": "src/zynum.zig",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "module": "zynum_core_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_c_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-core",
+          "path": "src/zynum.zig",
+          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "module": "zynum_core_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_wire_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
+        },
+        {
+          "alias": "zynum-execution",
+          "path": "src/numerics/execution/root.zig",
+          "source_sha256": "f1678b312cf6c1344a2b9440253cad3ed580a8a794a9bdf0dad3c9fcb1431d62",
+          "module": "execution_test_mod",
+          "target": "target",
+          "compile_symbol": "checked_cholesky_tests",
+          "attachment_owner": "cholesky_wire_test_mod",
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -6159,7 +6251,7 @@
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -6169,7 +6261,7 @@
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -6179,7 +6271,7 @@
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ]
     },
@@ -6442,7 +6534,7 @@
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
           "attachment_owner": "execution_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-core",
@@ -6452,7 +6544,7 @@
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
           "attachment_owner": "lapacke_binding_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "numerical-owner",
@@ -6462,7 +6554,7 @@
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
           "attachment_owner": "lapacke_posv_tests.root_module",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-execution",
@@ -6472,7 +6564,7 @@
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         },
         {
           "alias": "zynum-numerics-resources",
@@ -6482,7 +6574,7 @@
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
           "attachment_owner": "zynum_core_test_mod",
-          "build_contract_sha256": "71c473e14d041387cc23f096dcd9dcae360142cfe21e5ed3f36b6c3caeb058ed"
+          "build_contract_sha256": "40b827c7b1da6674e46fbb134925b17619e8efc61f4405a410bfb54ee8635e52"
         }
       ]
     },
@@ -8095,6 +8187,35 @@
       "reaching_root_ids": [
         "correctness-root:heteris-adapter-package",
         "correctness-root:native-provider-c_tests"
+      ],
+      "gap_id": null
+    },
+    {
+      "id": "zig-file:interfaces/production/adapters/c/cholesky/adapter_test.zig",
+      "path": "interfaces/production/adapters/c/cholesky/adapter_test.zig",
+      "classification": "logical-root",
+      "declarations": [
+        {
+          "id": "zig-decl:interfaces/production/adapters/c/cholesky/adapter_test.zig:0",
+          "name": "generated checked Cholesky enters one default admission and ends after writes on success and error",
+          "ordinal": 0,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:interfaces/production/adapters/c/cholesky/adapter_test.zig:1",
+          "name": "checked factor storage survives its admitted Context close and is reused by another Context without allocations",
+          "ordinal": 1,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:interfaces/production/adapters/c/cholesky/adapter_test.zig:2",
+          "name": "Cholesky C decode preserves failure precedence and validated zero dimension no-ops",
+          "ordinal": 2,
+          "kind": "named"
+        }
+      ],
+      "reaching_root_ids": [
+        "correctness-root:checked-cholesky-lifecycle"
       ],
       "gap_id": null
     },
@@ -10474,29 +10595,6 @@
       ],
       "reaching_root_ids": [
         "zig-root:vector-stride2-parallel-tests"
-      ],
-      "gap_id": null
-    },
-    {
-      "id": "zig-file:src/checked/cholesky_adapter_test.zig",
-      "path": "src/checked/cholesky_adapter_test.zig",
-      "classification": "logical-root",
-      "declarations": [
-        {
-          "id": "zig-decl:src/checked/cholesky_adapter_test.zig:0",
-          "name": "generated checked Cholesky enters one default admission and ends after writes on success and error",
-          "ordinal": 0,
-          "kind": "named"
-        },
-        {
-          "id": "zig-decl:src/checked/cholesky_adapter_test.zig:1",
-          "name": "checked factor storage survives its admitted Context close and is reused by another Context without allocations",
-          "ordinal": 1,
-          "kind": "named"
-        }
-      ],
-      "reaching_root_ids": [
-        "correctness-root:checked-cholesky-lifecycle"
       ],
       "gap_id": null
     },
@@ -23931,6 +24029,16 @@
           "id": "python-decl:test/abi/baseline/test_observe_abi_baseline.py:58",
           "name": "DeterminismTests.test_policy_hash_remains_in_the_subject",
           "ordinal": 58
+        },
+        {
+          "id": "python-decl:test/abi/baseline/test_observe_abi_baseline.py:59",
+          "name": "CholeskyProductionDeclarationTests.test_relocated_decoder_admission_and_tests_retain_source_commitments",
+          "ordinal": 59
+        },
+        {
+          "id": "python-decl:test/abi/baseline/test_observe_abi_baseline.py:60",
+          "name": "CholeskyProductionDeclarationTests.test_relocated_eight_cholesky_exports_remain_observed_outside_blas_set",
+          "ordinal": 60
         }
       ],
       "root_ids": [
@@ -24475,7 +24583,7 @@
         },
         {
           "id": "python-decl:test/build/test_build_inventory.py:19",
-          "name": "CheckedCholeskyInventoryContractTests.test_only_thirteen_explicit_frontend_files_are_added",
+          "name": "CheckedCholeskyInventoryContractTests.test_only_sixteen_explicit_frontend_files_are_added",
           "ordinal": 19
         },
         {
@@ -26908,6 +27016,11 @@
           "id": "python-decl:test/build/test_checked_cholesky_profile.py:2",
           "name": "CholeskyProfileTests.test_bridge_drift_rejects_before_formatter",
           "ordinal": 2
+        },
+        {
+          "id": "python-decl:test/build/test_checked_cholesky_profile.py:3",
+          "name": "CholeskyProfileTests.test_generated_sources_use_single_wire_owner_and_production_adapter",
+          "ordinal": 3
         }
       ],
       "root_ids": [
@@ -28115,58 +28228,73 @@
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:107",
-          "name": "IntervalRecurrenceSourceRefreshTests.test_exact_reviewed_pair_preserves_native_source_only_ledger",
+          "name": "CholeskyCSourceRefreshTests.test_exact_source_pair_retains_native_ledger_without_new_qualification",
           "ordinal": 107
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:108",
-          "name": "IntervalRecurrenceSourceRefreshTests.test_unreviewed_reachability_hash_and_declaration_drift_reject",
+          "name": "CholeskyCSourceRefreshTests.test_any_other_source_delta_is_rejected",
           "ordinal": 108
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:109",
-          "name": "IntervalRecurrenceSourceRefreshTests.test_nonpython_mode_row_drift_is_rejected_by_original_native_guard",
+          "name": "CholeskyCSourceRefreshTests.test_source_migration_cannot_change_native_state",
           "ordinal": 109
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:110",
-          "name": "NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
+          "name": "IntervalRecurrenceSourceRefreshTests.test_exact_reviewed_pair_preserves_native_source_only_ledger",
           "ordinal": 110
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:111",
-          "name": "NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
+          "name": "IntervalRecurrenceSourceRefreshTests.test_unreviewed_reachability_hash_and_declaration_drift_reject",
           "ordinal": 111
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:112",
-          "name": "NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
+          "name": "IntervalRecurrenceSourceRefreshTests.test_nonpython_mode_row_drift_is_rejected_by_original_native_guard",
           "ordinal": 112
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:113",
-          "name": "NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
+          "name": "NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
           "ordinal": 113
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:114",
-          "name": "NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
+          "name": "NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
           "ordinal": 114
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:115",
-          "name": "NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "name": "NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
           "ordinal": 115
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:116",
-          "name": "NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "name": "NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
           "ordinal": 116
         },
         {
           "id": "python-decl:test/build/test_test_inventory.py:117",
-          "name": "NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "name": "NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
           "ordinal": 117
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:118",
+          "name": "NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "ordinal": 118
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:119",
+          "name": "NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "ordinal": 119
+        },
+        {
+          "id": "python-decl:test/build/test_test_inventory.py:120",
+          "name": "NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "ordinal": 120
         }
       ],
       "root_ids": [
@@ -29284,7 +29412,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "root_id": "python-root:abi-baseline-discovery",
       "tests": [
         {
@@ -29839,427 +29967,437 @@
         },
         {
           "id": "test:python-root-abi-baseline-discovery:110",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_path_forbidden_names_are_matched_by_component",
+          "name": "test/abi/baseline/test_observe_abi_baseline.py::CholeskyProductionDeclarationTests.test_relocated_decoder_admission_and_tests_retain_source_commitments",
           "ordinal": 110
         },
         {
           "id": "test:python-root-abi-baseline-discovery:111",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_excludes_ignored_files",
+          "name": "test/abi/baseline/test_observe_abi_baseline.py::CholeskyProductionDeclarationTests.test_relocated_eight_cholesky_exports_remain_observed_outside_blas_set",
           "ordinal": 111
         },
         {
           "id": "test:python-root-abi-baseline-discovery:112",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_omits_tracked_files_deleted_from_worktree",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_path_forbidden_names_are_matched_by_component",
           "ordinal": 112
         },
         {
           "id": "test:python-root-abi-baseline-discovery:113",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_rejects_deleted_file_reappearing_after_boundary",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_excludes_ignored_files",
           "ordinal": 113
         },
         {
           "id": "test:python-root-abi-baseline-discovery:114",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_rejects_disappearance_after_presence_boundary",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_omits_tracked_files_deleted_from_worktree",
           "ordinal": 114
         },
         {
           "id": "test:python-root-abi-baseline-discovery:115",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_rejects_real_disappearance_after_listing",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_rejects_deleted_file_reappearing_after_boundary",
           "ordinal": 115
         },
         {
           "id": "test:python-root-abi-baseline-discovery:116",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_malformed_duplicate_and_overlapping_paths",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_rejects_disappearance_after_presence_boundary",
           "ordinal": 116
         },
         {
           "id": "test:python-root-abi-baseline-discovery:117",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_symlinks_and_nonregular_files",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_allowlist_rejects_real_disappearance_after_listing",
           "ordinal": 117
         },
         {
           "id": "test:python-root-abi-baseline-discovery:118",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_forbidden_local_metadata",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_malformed_duplicate_and_overlapping_paths",
           "ordinal": 118
         },
         {
           "id": "test:python-root-abi-baseline-discovery:119",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_mode_fails_closed_on_invalid_git_marker",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_symlinks_and_nonregular_files",
           "ordinal": 119
         },
         {
           "id": "test:python-root-abi-baseline-discovery:120",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_mode_rejects_git_top_level_mismatch",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_forbidden_local_metadata",
           "ordinal": 120
         },
         {
           "id": "test:python-root-abi-baseline-discovery:121",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_marker_is_bound_before_executable_resolution",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_mode_fails_closed_on_invalid_git_marker",
           "ordinal": 121
         },
         {
           "id": "test:python-root-abi-baseline-discovery:122",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_output_and_path_counts_are_bounded",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_mode_rejects_git_top_level_mismatch",
           "ordinal": 122
         },
         {
           "id": "test:python-root-abi-baseline-discovery:123",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_strictly_decodes_one_top_level_path_line",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_marker_is_bound_before_executable_resolution",
           "ordinal": 123
         },
         {
           "id": "test:python-root-abi-baseline-discovery:124",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_accepts_windows_separator_and_case_spellings",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_output_and_path_counts_are_bounded",
           "ordinal": 124
         },
         {
           "id": "test:python-root-abi-baseline-discovery:125",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_mode_rejects_every_ambient_git_name",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_strictly_decodes_one_top_level_path_line",
           "ordinal": 125
         },
         {
           "id": "test:python-root-abi-baseline-discovery:126",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_ignores_ambient_git_names_without_invoking_git",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_accepts_windows_separator_and_case_spellings",
           "ordinal": 126
         },
         {
           "id": "test:python-root-abi-baseline-discovery:127",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_ignores_parent_home_and_global_configuration",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_mode_rejects_every_ambient_git_name",
           "ordinal": 127
         },
         {
           "id": "test:python-root-abi-baseline-discovery:128",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_pins_worktree_excludes_and_fsmonitor_policy",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_ignores_ambient_git_names_without_invoking_git",
           "ordinal": 128
         },
         {
           "id": "test:python-root-abi-baseline-discovery:129",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_supports_an_exact_linked_worktree",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_ignores_parent_home_and_global_configuration",
           "ordinal": 129
         },
         {
           "id": "test:python-root-abi-baseline-discovery:130",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_accepts_full_static_zon_syntax",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_pins_worktree_excludes_and_fsmonitor_policy",
           "ordinal": 130
         },
         {
           "id": "test:python-root-abi-baseline-discovery:131",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_manifest_leaf_and_parent_symlinks",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_repository_git_supports_an_exact_linked_worktree",
           "ordinal": 131
         },
         {
           "id": "test:python-root-abi-baseline-discovery:132",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_special_manifest_file",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_accepts_full_static_zon_syntax",
           "ordinal": 132
         },
         {
           "id": "test:python-root-abi-baseline-discovery:133",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_nested_manifest_before_read",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_manifest_leaf_and_parent_symlinks",
           "ordinal": 133
         },
         {
           "id": "test:python-root-abi-baseline-discovery:134",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_manifest_leaf_replaced_during_parsing",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_special_manifest_file",
           "ordinal": 134
         },
         {
           "id": "test:python-root-abi-baseline-discovery:135",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_same_inode_change_during_manifest_read",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_nested_manifest_before_read",
           "ordinal": 135
         },
         {
           "id": "test:python-root-abi-baseline-discovery:136",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_manifest_snapshot_rejects_change_between_parse_and_enumeration",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_manifest_leaf_replaced_during_parsing",
           "ordinal": 136
         },
         {
           "id": "test:python-root-abi-baseline-discovery:137",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_are_immutable",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_same_inode_change_during_manifest_read",
           "ordinal": 137
         },
         {
           "id": "test:python-root-abi-baseline-discovery:138",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_declares_and_returns_immutable_type_state",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_manifest_snapshot_rejects_change_between_parse_and_enumeration",
           "ordinal": 138
         },
         {
           "id": "test:python-root-abi-baseline-discovery:139",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_manifest_snapshot_rejects_change_between_enumeration_and_archive",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_are_immutable",
           "ordinal": 139
         },
         {
           "id": "test:python-root-abi-baseline-discovery:140",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_nonstatic_or_malformed_zon",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_declares_and_returns_immutable_type_state",
           "ordinal": 140
         },
         {
           "id": "test:python-root-abi-baseline-discovery:141",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_oversized_input_before_execution",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_manifest_snapshot_rejects_change_between_enumeration_and_archive",
           "ordinal": 141
         },
         {
           "id": "test:python-root-abi-baseline-discovery:142",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_path_decoder_accepts_compatible_zig_patch_releases",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_nonstatic_or_malformed_zon",
           "ordinal": 142
         },
         {
           "id": "test:python-root-abi-baseline-discovery:143",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_path_decoder_rejects_incompatible_or_malformed_zig_versions",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_oversized_input_before_execution",
           "ordinal": 143
         },
         {
           "id": "test:python-root-abi-baseline-discovery:144",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_untrusted_helper_output",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_path_decoder_accepts_compatible_zig_patch_releases",
           "ordinal": 144
         },
         {
           "id": "test:python-root-abi-baseline-discovery:145",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_cannot_create_a_release_archive",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_path_decoder_rejects_incompatible_or_malformed_zig_versions",
           "ordinal": 145
         },
         {
           "id": "test:python-root-abi-baseline-discovery:146",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_inspection_snapshots_cannot_cross_publication_boundary",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_paths_rejects_untrusted_helper_output",
           "ordinal": 146
         },
         {
           "id": "test:python-root-abi-baseline-discovery:147",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publishable_factory_rejects_plain_rewritten_and_wrong_root_paths",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_cannot_create_a_release_archive",
           "ordinal": 147
         },
         {
           "id": "test:python-root-abi-baseline-discovery:148",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publishable_factory_requires_parsed_manifest_in_membership",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_inspection_snapshots_cannot_cross_publication_boundary",
           "ordinal": 148
         },
         {
           "id": "test:python-root-abi-baseline-discovery:149",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publication_proof_rejects_forgery_rebinding_and_transplant",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publishable_factory_rejects_plain_rewritten_and_wrong_root_paths",
           "ordinal": 149
         },
         {
           "id": "test:python-root-abi-baseline-discovery:150",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publication_proof_rejects_git_membership_drift_before_side_effects",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publishable_factory_requires_parsed_manifest_in_membership",
           "ordinal": 150
         },
         {
           "id": "test:python-root-abi-baseline-discovery:151",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_cli_rejects_dirty_publication_subject_before_side_effects",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publication_proof_rejects_forgery_rebinding_and_transplant",
           "ordinal": 151
         },
         {
           "id": "test:python-root-abi-baseline-discovery:152",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_clean_archive_cli_matches_committed_tree_and_summary",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publication_proof_rejects_git_membership_drift_before_side_effects",
           "ordinal": 152
         },
         {
           "id": "test:python-root-abi-baseline-discovery:153",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_cli_rejects_tracked_bytes_hidden_from_status",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_cli_rejects_dirty_publication_subject_before_side_effects",
           "ordinal": 153
         },
         {
           "id": "test:python-root-abi-baseline-discovery:154",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_bytes_and_metadata_are_normalized",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_clean_archive_cli_matches_committed_tree_and_summary",
           "ordinal": 154
         },
         {
           "id": "test:python-root-abi-baseline-discovery:155",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publishable_factory_archive_is_deterministic",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_cli_rejects_tracked_bytes_hidden_from_status",
           "ordinal": 155
         },
         {
           "id": "test:python-root-abi-baseline-discovery:156",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_publication_rolls_back_source_mutation_at_replace",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_bytes_and_metadata_are_normalized",
           "ordinal": 156
         },
         {
           "id": "test:python-root-abi-baseline-discovery:157",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_prepared_artifact_content_mutation",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_publishable_factory_archive_is_deterministic",
           "ordinal": 157
         },
         {
           "id": "test:python-root-abi-baseline-discovery:158",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_temporary_path_swap_without_deleting_foreign_path",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_publication_rolls_back_source_mutation_at_replace",
           "ordinal": 158
         },
         {
           "id": "test:python-root-abi-baseline-discovery:159",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_symlink_and_special_destination",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_prepared_artifact_content_mutation",
           "ordinal": 159
         },
         {
           "id": "test:python-root-abi-baseline-discovery:160",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_replace_failure_preserves_existing_destination",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_temporary_path_swap_without_deleting_foreign_path",
           "ordinal": 160
         },
         {
           "id": "test:python-root-abi-baseline-discovery:161",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rollback_races_and_quarantine_cleanup_fail_closed",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_symlink_and_special_destination",
           "ordinal": 161
         },
         {
           "id": "test:python-root-abi-baseline-discovery:162",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_external_destination_replacement_is_not_overwritten",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_replace_failure_preserves_existing_destination",
           "ordinal": 162
         },
         {
           "id": "test:python-root-abi-baseline-discovery:163",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_published_digest_mismatch_is_quarantined",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rollback_races_and_quarantine_cleanup_fail_closed",
           "ordinal": 163
         },
         {
           "id": "test:python-root-abi-baseline-discovery:164",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_absent_rollback_preserves_concurrent_replacement",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_external_destination_replacement_is_not_overwritten",
           "ordinal": 164
         },
         {
           "id": "test:python-root-abi-baseline-discovery:165",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_success_removes_transaction_sidecars",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_published_digest_mismatch_is_quarantined",
           "ordinal": 165
         },
         {
           "id": "test:python-root-abi-baseline-discovery:166",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_parent_swap_fails_closed_at_every_publication_boundary",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_absent_rollback_preserves_concurrent_replacement",
           "ordinal": 166
         },
         {
           "id": "test:python-root-abi-baseline-discovery:167",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_existing_destination_durability_failure_rolls_back",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_success_removes_transaction_sidecars",
           "ordinal": 167
         },
         {
           "id": "test:python-root-abi-baseline-discovery:168",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_backup_cleanup_failure_keeps_new_archive_and_recovery",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_parent_swap_fails_closed_at_every_publication_boundary",
           "ordinal": 168
         },
         {
           "id": "test:python-root-abi-baseline-discovery:169",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_sidecar_operations_use_anchored_directories",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_existing_destination_durability_failure_rolls_back",
           "ordinal": 169
         },
         {
           "id": "test:python-root-abi-baseline-discovery:170",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_destination_hardlink_replacement_fails_closed",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_backup_cleanup_failure_keeps_new_archive_and_recovery",
           "ordinal": 170
         },
         {
           "id": "test:python-root-abi-baseline-discovery:171",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_member_replaced_after_enumeration",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_sidecar_operations_use_anchored_directories",
           "ordinal": 171
         },
         {
           "id": "test:python-root-abi-baseline-discovery:172",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_member_replaced_during_addfile",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_destination_hardlink_replacement_fails_closed",
           "ordinal": 172
         },
         {
           "id": "test:python-root-abi-baseline-discovery:173",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_enumeration_rejects_parent_replaced_after_git_listing",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_member_replaced_after_enumeration",
           "ordinal": 173
         },
         {
           "id": "test:python-root-abi-baseline-discovery:174",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_enumeration_rejects_nested_directory_mixed_snapshot",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_member_replaced_during_addfile",
           "ordinal": 174
         },
         {
           "id": "test:python-root-abi-baseline-discovery:175",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_validation_fails_closed_without_openat_support",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_enumeration_rejects_parent_replaced_after_git_listing",
           "ordinal": 175
         },
         {
           "id": "test:python-root-abi-baseline-discovery:176",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_parent_directory_replaced_after_enumeration",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_enumeration_rejects_nested_directory_mixed_snapshot",
           "ordinal": 176
         },
         {
           "id": "test:python-root-abi-baseline-discovery:177",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_regular_file_identity_change",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_validation_fails_closed_without_openat_support",
           "ordinal": 177
         },
         {
           "id": "test:python-root-abi-baseline-discovery:178",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_same_inode_content_change_with_restored_metadata",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_parent_directory_replaced_after_enumeration",
           "ordinal": 178
         },
         {
           "id": "test:python-root-abi-baseline-discovery:179",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_content_change_during_read",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_regular_file_identity_change",
           "ordinal": 179
         },
         {
           "id": "test:python-root-abi-baseline-discovery:180",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_addition_between_pre_and_post_snapshots_is_rejected",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_same_inode_content_change_with_restored_metadata",
           "ordinal": 180
         },
         {
           "id": "test:python-root-abi-baseline-discovery:181",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_untracked_and_newly_staged_additions",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_content_change_during_read",
           "ordinal": 181
         },
         {
           "id": "test:python-root-abi-baseline-discovery:182",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_disappearance_restore_and_content_replacement",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_git_addition_between_pre_and_post_snapshots_is_rejected",
           "ordinal": 182
         },
         {
           "id": "test:python-root-abi-baseline-discovery:183",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_directory_swap_to_external_symlink",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_untracked_and_newly_staged_additions",
           "ordinal": 183
         },
         {
           "id": "test:python-root-abi-baseline-discovery:184",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_late_file_in_walked_directory",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_rejects_disappearance_restore_and_content_replacement",
           "ordinal": 184
         },
         {
           "id": "test:python-root-abi-baseline-discovery:185",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_snapshot_is_immutable_and_sequence_compatible",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_directory_swap_to_external_symlink",
           "ordinal": 185
         },
         {
           "id": "test:python-root-abi-baseline-discovery:186",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_shared_snapshot_preserves_raw_symlink_target_without_following",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_late_file_in_walked_directory",
           "ordinal": 186
         },
         {
           "id": "test:python-root-abi-baseline-discovery:187",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_package_admits_selected_root_before_content_read",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_package_snapshot_is_immutable_and_sequence_compatible",
           "ordinal": 187
         },
         {
           "id": "test:python-root-abi-baseline-discovery:188",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_root_snapshot_rejects_root_and_nested_entry_changes",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_shared_snapshot_preserves_raw_symlink_target_without_following",
           "ordinal": 188
         },
         {
           "id": "test:python-root-abi-baseline-discovery:189",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_root_snapshot_ignores_nested_excluded_component_churn",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_package_admits_selected_root_before_content_read",
           "ordinal": 189
         },
         {
           "id": "test:python-root-abi-baseline-discovery:190",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_root_snapshot_rejects_top_level_directory_symlink_swap",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_root_snapshot_rejects_root_and_nested_entry_changes",
           "ordinal": 190
         },
         {
           "id": "test:python-root-abi-baseline-discovery:191",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_non_utf8_directory_entry",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_root_snapshot_ignores_nested_excluded_component_churn",
           "ordinal": 191
         },
         {
           "id": "test:python-root-abi-baseline-discovery:192",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_real_repository_archive_has_no_ignored_or_private_metadata",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_root_snapshot_rejects_top_level_directory_symlink_swap",
           "ordinal": 192
         },
         {
           "id": "test:python-root-abi-baseline-discovery:193",
-          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_distribution_license_documents_are_complete_and_archivable",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_archive_mode_rejects_non_utf8_directory_entry",
           "ordinal": 193
+        },
+        {
+          "id": "test:python-root-abi-baseline-discovery:194",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_real_repository_archive_has_no_ignored_or_private_metadata",
+          "ordinal": 194
+        },
+        {
+          "id": "test:python-root-abi-baseline-discovery:195",
+          "name": "test/abi/baseline/test_package_archive.py::PackageArchiveTests.test_distribution_license_documents_are_complete_and_archivable",
+          "ordinal": 195
         }
       ],
-      "count": 194,
-      "digest": "68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "count": 196,
+      "digest": "00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "enumeration_source": "static"
     },
     {
@@ -32732,7 +32870,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "root_id": "python-root:build-inventory-direct",
       "tests": [
         {
@@ -32832,7 +32970,7 @@
         },
         {
           "id": "test:python-root-build-inventory-direct:19",
-          "name": "test/build/test_build_inventory.py::CheckedCholeskyInventoryContractTests.test_only_thirteen_explicit_frontend_files_are_added",
+          "name": "test/build/test_build_inventory.py::CheckedCholeskyInventoryContractTests.test_only_sixteen_explicit_frontend_files_are_added",
           "ordinal": 19
         },
         {
@@ -35207,7 +35345,7 @@
         }
       ],
       "count": 494,
-      "digest": "c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "digest": "aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "enumeration_source": "static"
     },
     {
@@ -35240,7 +35378,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "root_id": "python-root:checked-cholesky-profile-direct",
       "tests": [
         {
@@ -35257,10 +35395,15 @@
           "id": "test:python-root-checked-cholesky-profile-direct:2",
           "name": "test/build/test_checked_cholesky_profile.py::CholeskyProfileTests.test_bridge_drift_rejects_before_formatter",
           "ordinal": 2
+        },
+        {
+          "id": "test:python-root-checked-cholesky-profile-direct:3",
+          "name": "test/build/test_checked_cholesky_profile.py::CholeskyProfileTests.test_generated_sources_use_single_wire_owner_and_production_adapter",
+          "ordinal": 3
         }
       ],
-      "count": 3,
-      "digest": "e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "count": 4,
+      "digest": "bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "enumeration_source": "static"
     },
     {
@@ -35858,7 +36001,7 @@
       "enumeration_source": "static"
     },
     {
-      "id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "root_id": "python-root:test-inventory-direct",
       "tests": [
         {
@@ -36398,62 +36541,77 @@
         },
         {
           "id": "test:python-root-test-inventory-direct:107",
-          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_exact_reviewed_pair_preserves_native_source_only_ledger",
+          "name": "test/build/test_test_inventory.py::CholeskyCSourceRefreshTests.test_exact_source_pair_retains_native_ledger_without_new_qualification",
           "ordinal": 107
         },
         {
           "id": "test:python-root-test-inventory-direct:108",
-          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_unreviewed_reachability_hash_and_declaration_drift_reject",
+          "name": "test/build/test_test_inventory.py::CholeskyCSourceRefreshTests.test_any_other_source_delta_is_rejected",
           "ordinal": 108
         },
         {
           "id": "test:python-root-test-inventory-direct:109",
-          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_nonpython_mode_row_drift_is_rejected_by_original_native_guard",
+          "name": "test/build/test_test_inventory.py::CholeskyCSourceRefreshTests.test_source_migration_cannot_change_native_state",
           "ordinal": 109
         },
         {
           "id": "test:python-root-test-inventory-direct:110",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
+          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_exact_reviewed_pair_preserves_native_source_only_ledger",
           "ordinal": 110
         },
         {
           "id": "test:python-root-test-inventory-direct:111",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
+          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_unreviewed_reachability_hash_and_declaration_drift_reject",
           "ordinal": 111
         },
         {
           "id": "test:python-root-test-inventory-direct:112",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
+          "name": "test/build/test_test_inventory.py::IntervalRecurrenceSourceRefreshTests.test_nonpython_mode_row_drift_is_rejected_by_original_native_guard",
           "ordinal": 112
         },
         {
           "id": "test:python-root-test-inventory-direct:113",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_exact_pair_and_only_reviewed_roots_receipts_and_declarations_change",
           "ordinal": 113
         },
         {
           "id": "test:python-root-test-inventory-direct:114",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_refresh_base_only_preserves_native_and_final_candidate_policy_stays_strict",
           "ordinal": 114
         },
         {
           "id": "test:python-root-test-inventory-direct:115",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_single_translation_root_and_two_actual_header_input_receipts",
           "ordinal": 115
         },
         {
           "id": "test:python-root-test-inventory-direct:116",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_wrong_pair_unlisted_root_reachability_and_root_order_are_rejected",
           "ordinal": 116
         },
         {
           "id": "test:python-root-test-inventory-direct:117",
-          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_missing_mutated_header_receipt_and_generator_ownership_are_rejected",
           "ordinal": 117
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:118",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_unreviewed_declaration_identity_kind_order_and_other_file_delta_reject",
+          "ordinal": 118
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:119",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_native_projection_rows_sets_bindings_pending_and_environments_remain_exact",
+          "ordinal": 119
+        },
+        {
+          "id": "test:python-root-test-inventory-direct:120",
+          "name": "test/build/test_test_inventory.py::NativeSpectralSourceRefreshTests.test_historical_host_tn_laplacian_pairs_remain_distinct",
+          "ordinal": 120
         }
       ],
-      "count": 118,
-      "digest": "ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "count": 121,
+      "digest": "b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "enumeration_source": "static"
     },
     {
@@ -36535,7 +36693,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-abi-baseline-discovery:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36550,7 +36708,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-abi-baseline-discovery:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36565,7 +36723,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-abi-baseline-discovery:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36625,7 +36783,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36640,7 +36798,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36655,7 +36813,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-build-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36715,7 +36873,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-checked-cholesky-profile-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36730,7 +36888,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-checked-cholesky-profile-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -36745,7 +36903,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-checked-cholesky-profile-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -37480,7 +37638,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -37495,7 +37653,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -37510,7 +37668,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-linux-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38740,7 +38898,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-abi-baseline-discovery:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38755,7 +38913,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-abi-baseline-discovery:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38770,7 +38928,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-abi-baseline-discovery:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38830,7 +38988,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38845,7 +39003,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38860,7 +39018,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-build-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38920,7 +39078,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-checked-cholesky-profile-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38935,7 +39093,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-checked-cholesky-profile-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -38950,7 +39108,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-checked-cholesky-profile-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -39685,7 +39843,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -39700,7 +39858,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -39715,7 +39873,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-aarch64-macos-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -40945,7 +41103,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-abi-baseline-discovery:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -40960,7 +41118,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-abi-baseline-discovery:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -40975,7 +41133,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-abi-baseline-discovery:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:abi-baseline-discovery:68219230be445274d6a1b6021a5fa59142b17d1e31aa582f6ccf174d219640e0",
+      "expected_test_set_id": "set:python-root:abi-baseline-discovery:00b4fac9006dc396b7b56dab761fdc0495c956db8e2b7aa0d06e86d7b1a6d3c4",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41035,7 +41193,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41050,7 +41208,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41065,7 +41223,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-build-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:build-inventory-direct:c23f7a8fe69787f90d05e25d44a8429a96aa599c316c03c45adb0fcb77cbfd32",
+      "expected_test_set_id": "set:python-root:build-inventory-direct:aa8fcb58e709e58622b897263c6b6205ac6fd27afdb36e9c8ddae419f22aec12",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41125,7 +41283,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-checked-cholesky-profile-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41140,7 +41298,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-checked-cholesky-profile-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41155,7 +41313,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-checked-cholesky-profile-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:e6126f10272c0a85b5f9113688f2d73f645302afe13fc2d3320990c87e30da30",
+      "expected_test_set_id": "set:python-root:checked-cholesky-profile-direct:bc4cc3e6e59698eb9f97ba666f41917bf891e1c2661a9c22031c345906488dc9",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41890,7 +42048,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41905,7 +42063,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -41920,7 +42078,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-linux-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -44095,7 +44253,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:debug",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -44110,7 +44268,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:fast",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -44125,7 +44283,7 @@
       "expected_actual_module_optimize": null,
       "evidence_slot_id": "evidence-slot:env-x86-64-windows-gnu-baseline:python-root-test-inventory-direct:safe",
       "enumeration_class_id": "enumeration-class:python-static",
-      "expected_test_set_id": "set:python-root:test-inventory-direct:ca55983c2ae64adc856ddd83d88730755aa446df84a7385b06aca714a7b6abd3",
+      "expected_test_set_id": "set:python-root:test-inventory-direct:b3b65343af733b8144b23b1bde5955e81b60cfb03fb38d74c728a0b27f6ec415",
       "expectation_state": "frozen-compiler-enumeration"
     },
     {
@@ -46317,23 +46475,23 @@
     },
     "test_roots": {
       "count": 49,
-      "digest": "1d7a6bf1e3abb2f423901244536f2629c61b3fe0405912424d13693e686e0138"
+      "digest": "40a97f6a409c9c35166b56446f05601185bccaa4ec35f839d1c195671d9448a8"
     },
     "correctness_only_roots": {
       "count": 7,
-      "digest": "17563001197bf7af603bc2e10fabd097e7b14fb7211257de1e835965e5684414"
+      "digest": "613dd83412067fea281a24597058a6b076781c8bffe518163eb9b11712802695"
     },
     "zig_test_files": {
       "count": 177,
-      "digest": "217dc9d4ded53392b98b1903285fee8c0ac3894ce60a12cc717dd9264713d0a7"
+      "digest": "d77202a5b9ae66782c58715b17252d255f4061336bf48fbacd291df180b4cafc"
     },
     "python_test_modules": {
       "count": 42,
-      "digest": "e4dc99dde25acfd944a10dbf6c3fcae2a8fd6ec0eb444f68108b6d52c1954303"
+      "digest": "e94bd49b00e69ef7e7beaedd72dc43ca2518d8fa59159f50c44f19a7416bd596"
     },
     "expected_test_sets": {
       "count": 24,
-      "digest": "4aa8c5925e177ae77132f11a50436a4475473899ca7a853ff5f86b367d8e9a06"
+      "digest": "583d0aca76aaa04e49c3349ec0621c2f82fb47f28e3b848df663d06f93a5e186"
     },
     "native_observation_bindings": {
       "count": 0,
@@ -46341,7 +46499,7 @@
     },
     "test_mode_rows": {
       "count": 588,
-      "digest": "ca6375b86ca8da35cd3510c511e60f2877f17c04d64abee80996ada775488722"
+      "digest": "9deed1b504979e4977379737c09b346f30ba203e091dc089a06555a1256a31d2"
     },
     "workflow_mode_bindings": {
       "count": 4,

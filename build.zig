@@ -1347,6 +1347,25 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     lapack_test_step.dependOn(numerics_contract_test_step);
     lapack_test_step.dependOn(execution_contract_test_step);
 
+    // Borrow the caller's existing sole Core/Context and wire type identity.
+    const cholesky_status_test_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/public/c/cholesky/status.zig"), .target = target, .optimize = test_optimize });
+    const cholesky_adapter_test_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/adapters/c/cholesky/factor_solve.zig"), .target = target, .optimize = test_optimize });
+    cholesky_adapter_test_mod.addImport("zynum-core", zynum_core_test_mod);
+    cholesky_adapter_test_mod.addImport("zynum-execution", execution_test_mod);
+    cholesky_adapter_test_mod.addImport("zynum-cholesky-c-status", cholesky_status_test_mod);
+    const cholesky_c_test_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/public/c/cholesky/exports.zig"), .target = target, .optimize = test_optimize });
+    cholesky_c_test_mod.addImport("zynum-core", zynum_core_test_mod);
+    cholesky_c_test_mod.addImport("zynum-cholesky-c-adapter", cholesky_adapter_test_mod);
+    // Borrow the caller's existing sole Core/Context and wire type identity.
+    const cholesky_status_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/public/c/cholesky/status.zig"), .target = target, .optimize = optimize });
+    const cholesky_adapter_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/adapters/c/cholesky/factor_solve.zig"), .target = target, .optimize = optimize });
+    cholesky_adapter_mod.addImport("zynum-core", zynum_core_mod);
+    cholesky_adapter_mod.addImport("zynum-execution", execution_mod);
+    cholesky_adapter_mod.addImport("zynum-cholesky-c-status", cholesky_status_mod);
+    const cholesky_c_mod = b.createModule(.{ .root_source_file = b.path("interfaces/production/public/c/cholesky/exports.zig"), .target = target, .optimize = optimize });
+    cholesky_c_mod.addImport("zynum-core", zynum_core_mod);
+    cholesky_c_mod.addImport("zynum-cholesky-c-adapter", cholesky_adapter_mod);
+
     // Checked adapter tests borrow the same test core and execution owner.
     const checked_sparse_test_mod = b.createModule(.{
         .root_source_file = b.path("src/checked/mixed_adapter_test.zig"),
@@ -1848,17 +1867,29 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     const feast_profile_tests = b.addSystemCommand(&.{ "python3", "-B", "test/build/test_feast_profile.py" });
     const feast_profile_step = b.step("test-feast-profile", "Run finite FEAST profile and shared Core build contract tests");
     feast_profile_step.dependOn(&feast_profile_tests.step);
+    const cholesky_wire_test_mod = b.createModule(.{
+        .root_source_file = b.path("src/checked/implementation.zig"),
+        .target = target,
+        .optimize = test_optimize,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "zynum-core", .module = zynum_core_test_mod },
+            .{ .name = "zynum-execution", .module = execution_test_mod },
+        },
+    });
     const contour_profile_tests = b.addSystemCommand(&.{ "python3", "-B", "test/build/test_contour_profile.py" });
     const contour_profile_step = b.step("test-operator-contour-profile", "Validate optional neutral Contour generation, wire and shared-owner contracts");
     contour_profile_step.dependOn(&contour_profile_tests.step);
     const checked_cholesky_tests = b.addTest(.{
         .name = "zynum-checked-cholesky-tests",
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/checked/cholesky_adapter_test.zig"),
+            .root_source_file = b.path("interfaces/production/adapters/c/cholesky/adapter_test.zig"),
             .target = target,
             .optimize = test_optimize,
             .link_libc = true,
             .imports = &.{
+                .{ .name = "zynum-checked-wire", .module = cholesky_wire_test_mod },
+                .{ .name = "zynum-cholesky-c", .module = cholesky_c_test_mod },
                 .{ .name = "zynum-core", .module = zynum_core_test_mod },
                 .{ .name = "zynum-execution", .module = execution_test_mod },
             },
@@ -2163,6 +2194,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     if (target.result.os.tag == .macos and target.result.cpu.arch == .aarch64) {
         const csp = b.createModule(.{ .root_source_file = b.path("src/checked_sparse.zig"), .target = target, .optimize = optimize, .link_libc = true });
         csp.addImport("zynum-core", zynum_core_mod);
+        csp.addImport("zynum-cholesky-c", cholesky_c_mod);
         csp.addImport("zynum-execution", execution_mod);
         csp.addImport("zynum-numerics-resources", numerics_resources_mod);
         csp.addImport("zynum-build-options", zynum_build_options_mod);
@@ -2651,6 +2683,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     });
     checked_abi_mod.addImport("zynum-numerics-resources", numerics_resources_mod);
     checked_abi_mod.addImport("zynum-core", zynum_core_mod);
+    checked_abi_mod.addImport("zynum-cholesky-c", cholesky_c_mod);
     checked_abi_mod.addImport("zynum-execution", execution_mod);
     checked_abi_mod.addImport("zynum-build-options", zynum_build_options_mod);
     const checked_dynamic_lib = b.addLibrary(.{
@@ -2731,6 +2764,7 @@ pub fn configure(b: *std.Build) ImplementationGraph {
     });
     checked_abi_test_mod.addImport("zynum-numerics-resources", numerics_resources_mod);
     checked_abi_test_mod.addImport("zynum-core", zynum_core_test_mod);
+    checked_abi_test_mod.addImport("zynum-cholesky-c", cholesky_c_test_mod);
     checked_abi_test_mod.addImport("zynum-execution", execution_test_mod);
     checked_abi_test_mod.addImport("zynum-build-options", zynum_build_options_mod);
     const checked_test_lib = b.addLibrary(.{
