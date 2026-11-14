@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.24)
-project(zynum VERSION 0.1.0 LANGUAGES C)
+# build.zig.zon is the source version authority, including its prerelease suffix.
+file(READ "${CMAKE_CURRENT_LIST_DIR}/../../build.zig.zon" ZYNUM_PACKAGE_METADATA)
+string(REGEX MATCH "[.]version = \"([^\"]+)\"" _zynum_version_match "${ZYNUM_PACKAGE_METADATA}")
+set(ZYNUM_PACKAGE_VERSION "${CMAKE_MATCH_1}")
+if(NOT ZYNUM_PACKAGE_VERSION MATCHES "^([0-9]+)[.]([0-9]+)[.]([0-9]+)")
+    message(FATAL_ERROR "Cannot read the Zynum source version from build.zig.zon")
+endif()
+set(ZYNUM_PACKAGE_NUMERIC_VERSION "${CMAKE_MATCH_1}.${CMAKE_MATCH_2}.${CMAKE_MATCH_3}")
+project(zynum VERSION ${ZYNUM_PACKAGE_NUMERIC_VERSION} LANGUAGES C)
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
 include(CTest)
 option(ZYNUM_BUILD_STANDALONE "Build the explicit standalone resource provider" OFF)
 if(NOT HETERIS_ABI_INCLUDE_DIR)
@@ -253,11 +263,11 @@ if(BUILD_TESTING)
             --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-test-cache/$<CONFIG>")
     set_tests_properties(zynum_zig_tests PROPERTIES WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../.." TIMEOUT 180)
 endif()
-install(FILES ${ZYNUM_ARTIFACTS} DESTINATION lib)
+install(FILES ${ZYNUM_ARTIFACTS} DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 if(ZYNUM_BUILD_STANDALONE)
-    install(FILES include/zynum_standalone.h DESTINATION include)
+    install(FILES include/zynum_standalone.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
-install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h ../../include/zynum_native_spectral.h DESTINATION include)
+install(FILES include/zynum.h include/zynum_spectral.h ../../include/zynum_native.h ../../include/zynum_native_spectral.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 # Embedded Heteris owns its canonical public-header installation. Standalone
 # integration accepts only a real flat SDK, never source-relative forwarders.
 if(ZYNUM_INSTALL_HETERIS_CONTRACT)
@@ -285,6 +295,45 @@ if(ZYNUM_INSTALL_HETERIS_CONTRACT)
         endif()
         list(APPEND ZYNUM_HETERIS_CONTRACT_HEADERS "${ZYNUM_HETERIS_DATA_HEADER}")
     endif()
-    install(FILES ${ZYNUM_HETERIS_CONTRACT_HEADERS} DESTINATION include)
+    install(FILES ${ZYNUM_HETERIS_CONTRACT_HEADERS} DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
-install(FILES ../../LICENSE ../../COPYING UPSTREAM.md ZIG-MIT DESTINATION share/licenses/zynum)
+install(FILES ../../LICENSE ../../COPYING UPSTREAM.md ZIG-MIT DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/zynum")
+
+# Export a relocatable, Runtime-free package independently of the superproject.
+# Source targets are imported Zig artifacts, so their installed counterparts are
+# declared in the config rather than exporting a source/build-tree target graph.
+set(ZYNUM_PACKAGE_SYSTEM_LIBRARIES "")
+if(UNIX)
+    set(ZYNUM_PACKAGE_SYSTEM_LIBRARIES m)
+endif()
+set(ZYNUM_PACKAGE_CMAKE_DIR "${CMAKE_INSTALL_DATADIR}/cmake/Zynum")
+set(ZYNUM_PACKAGE_TEMPLATE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../interfaces/production/build/cmake")
+configure_package_config_file(
+    "${ZYNUM_PACKAGE_TEMPLATE_DIR}/ZynumConfig.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ZynumConfig.cmake"
+    INSTALL_DESTINATION "${ZYNUM_PACKAGE_CMAKE_DIR}"
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR CMAKE_INSTALL_LIBDIR)
+configure_file(
+    "${ZYNUM_PACKAGE_TEMPLATE_DIR}/ZynumConfigVersion.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/ZynumConfigVersion.cmake" @ONLY)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ZynumConfig.cmake"
+              "${CMAKE_CURRENT_BINARY_DIR}/ZynumConfigVersion.cmake"
+        DESTINATION "${ZYNUM_PACKAGE_CMAKE_DIR}")
+
+# Preserve the exact producer-selected contract identity without exporting
+# machine-specific source paths or inventing a separate ABI authority.
+set(ZYNUM_PACKAGE_CONTRACT_INPUTS ${ZYNUM_HETERIS_CANONICAL_HEADERS})
+if(NOT ZYNUM_PACKAGE_CONTRACT_INPUTS)
+    set(ZYNUM_PACKAGE_CONTRACT_INPUTS ${ZYNUM_HETERIS_CONTRACT_HEADERS})
+endif()
+set(ZYNUM_PACKAGE_CONTRACT_MANIFEST "${CMAKE_CURRENT_BINARY_DIR}/HeterisContractHeaders.sha256")
+file(WRITE "${ZYNUM_PACKAGE_CONTRACT_MANIFEST}" "")
+foreach(header IN LISTS ZYNUM_PACKAGE_CONTRACT_INPUTS)
+    get_filename_component(header_name "${header}" NAME)
+    file(SHA256 "${header}" header_sha256)
+    file(APPEND "${ZYNUM_PACKAGE_CONTRACT_MANIFEST}" "${header_sha256}  ${header_name}\n")
+endforeach()
+install(FILES "${ZYNUM_PACKAGE_CONTRACT_MANIFEST}"
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/licenses/zynum")
+install(FILES ../../docs/cmake-package.md
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/doc/zynum")

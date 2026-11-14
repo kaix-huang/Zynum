@@ -1,0 +1,130 @@
+# SPDX-License-Identifier: LGPL-3.0-or-later
+@PACKAGE_INIT@
+
+# The canonical Heteris Data/resource headers are bundled at installation.
+# They are contracts only: this package never discovers or starts a Runtime.
+set(Zynum_VERSION "@ZYNUM_PACKAGE_VERSION@")
+set_and_check(Zynum_INCLUDE_DIR "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@")
+set_and_check(Zynum_CORE_LIBRARY "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@CMAKE_STATIC_LIBRARY_PREFIX@zynum@CMAKE_STATIC_LIBRARY_SUFFIX@")
+foreach(_zynum_header zynum.h zynum_spectral.h zynum_native.h zynum_native_spectral.h
+        heteris.h heteris_data.h heteris_runtime_provider.h)
+    set_and_check(_zynum_header_path "${Zynum_INCLUDE_DIR}/${_zynum_header}")
+endforeach()
+unset(_zynum_header)
+unset(_zynum_header_path)
+
+set(Zynum_core_FOUND TRUE)
+set(Zynum_STANDALONE_LIBRARY "@PACKAGE_CMAKE_INSTALL_LIBDIR@/@CMAKE_STATIC_LIBRARY_PREFIX@zynum-standalone@CMAKE_STATIC_LIBRARY_SUFFIX@")
+set(Zynum_standalone_FOUND FALSE)
+# Optional artifacts do not gate core discovery, even in an ON installation.
+# A requested missing component is handled by check_required_components below.
+if(@ZYNUM_BUILD_STANDALONE@ AND EXISTS "${Zynum_STANDALONE_LIBRARY}" AND
+   EXISTS "${Zynum_INCLUDE_DIR}/zynum_standalone.h")
+    set(Zynum_standalone_FOUND TRUE)
+endif()
+if(NOT Zynum_FIND_COMPONENTS)
+    set(Zynum_FIND_COMPONENTS core)
+endif()
+foreach(_zynum_component IN LISTS Zynum_FIND_COMPONENTS)
+    if(NOT _zynum_component STREQUAL "core" AND NOT _zynum_component STREQUAL "standalone")
+        set(Zynum_${_zynum_component}_FOUND FALSE)
+        set(Zynum_NOT_FOUND_MESSAGE "Unknown Zynum component: ${_zynum_component}. Supported components: core, standalone.")
+    elseif(_zynum_component STREQUAL "standalone" AND NOT Zynum_standalone_FOUND)
+        set(Zynum_NOT_FOUND_MESSAGE "Zynum standalone is unavailable: it must be built with ZYNUM_BUILD_STANDALONE=ON and its archive/header must be installed.")
+    endif()
+endforeach()
+check_required_components(Zynum)
+if(DEFINED Zynum_FOUND AND NOT Zynum_FOUND)
+    return()
+endif()
+
+# Repeated discovery may add standalone to the same installation. Existing
+# targets must still describe this selected package, rather than another prefix
+# or a caller-created target silently overriding the selected archive/includes.
+# This is the package's declared discovery-time contract, not a sandbox against
+# later consumer mutation or a check of every CMake target property.
+function(_zynum_require_matching_target target library links)
+    if(NOT TARGET ${target})
+        return()
+    endif()
+    get_target_property(_type ${target} TYPE)
+    get_target_property(_imported ${target} IMPORTED)
+    if(NOT _type STREQUAL "STATIC_LIBRARY" OR NOT _imported)
+        message(FATAL_ERROR "Zynum target origin conflict: ${target} must be a STATIC IMPORTED target from the selected package.")
+    endif()
+    file(REAL_PATH "${library}" _expected_library)
+    get_target_property(_configs ${target} IMPORTED_CONFIGURATIONS)
+    set(_locations IMPORTED_LOCATION IMPORTED_LOCATION_NOCONFIG)
+    foreach(_config IN ITEMS Debug Release RelWithDebInfo MinSizeRel ${CMAKE_CONFIGURATION_TYPES} ${CMAKE_BUILD_TYPE} ${_configs})
+        if(_config AND NOT _config MATCHES "-NOTFOUND$")
+            string(TOUPPER "${_config}" _config_upper)
+            list(APPEND _locations "IMPORTED_LOCATION_${_config_upper}")
+        endif()
+    endforeach()
+    list(REMOVE_DUPLICATES _locations)
+    foreach(_property IN LISTS _locations)
+        get_target_property(_actual ${target} ${_property})
+        if(_property STREQUAL "IMPORTED_LOCATION" OR (_actual AND NOT _actual MATCHES "-NOTFOUND$"))
+            if(NOT IS_ABSOLUTE "${_actual}")
+                message(FATAL_ERROR "Zynum target origin conflict: ${target} ${_property} must be absolute.")
+            endif()
+            file(REAL_PATH "${_actual}" _actual_library)
+            if(NOT _actual_library STREQUAL _expected_library)
+                message(FATAL_ERROR "Zynum target origin conflict: ${target} ${_property} differs from the selected package archive.")
+            endif()
+        endif()
+    endforeach()
+    get_target_property(_includes ${target} INTERFACE_INCLUDE_DIRECTORIES)
+    list(LENGTH _includes _include_count)
+    if(NOT _include_count EQUAL 1)
+        message(FATAL_ERROR "Zynum target origin conflict: ${target} includes differ from the selected package.")
+    endif()
+    if(NOT IS_ABSOLUTE "${_includes}")
+        message(FATAL_ERROR "Zynum target origin conflict: ${target} includes must be absolute.")
+    endif()
+    file(REAL_PATH "${_includes}" _actual_include)
+    file(REAL_PATH "${Zynum_INCLUDE_DIR}" _expected_include)
+    if(NOT _actual_include STREQUAL _expected_include)
+        message(FATAL_ERROR "Zynum target origin conflict: ${target} includes differ from the selected package.")
+    endif()
+    foreach(_property IN ITEMS INTERFACE_LINK_LIBRARIES INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+            INTERFACE_LINK_LIBRARIES_DIRECT INTERFACE_LINK_LIBRARIES_DIRECT_EXCLUDE
+            INTERFACE_LINK_OPTIONS INTERFACE_LINK_DIRECTORIES INTERFACE_COMPILE_OPTIONS
+            INTERFACE_COMPILE_DEFINITIONS INTERFACE_SOURCES)
+        get_property(_actual TARGET ${target} PROPERTY ${_property})
+        if(NOT DEFINED _actual)
+            set(_actual "")
+        endif()
+        set(_expected "")
+        if(_property STREQUAL "INTERFACE_LINK_LIBRARIES")
+            set(_expected "${links}")
+        endif()
+        if(NOT _actual STREQUAL _expected)
+            message(FATAL_ERROR "Zynum target origin conflict: ${target} ${_property} differs from the selected package.")
+        endif()
+    endforeach()
+endfunction()
+_zynum_require_matching_target(Zynum::core "${Zynum_CORE_LIBRARY}" "@ZYNUM_PACKAGE_SYSTEM_LIBRARIES@")
+if(TARGET Zynum::standalone)
+    if(NOT @ZYNUM_BUILD_STANDALONE@)
+        message(FATAL_ERROR "Zynum target origin conflict: the selected package was built without standalone.")
+    endif()
+    _zynum_require_matching_target(Zynum::standalone "${Zynum_STANDALONE_LIBRARY}" "Zynum::core")
+endif()
+
+if(NOT TARGET Zynum::core)
+    add_library(Zynum::core STATIC IMPORTED)
+    set_target_properties(Zynum::core PROPERTIES
+        IMPORTED_LOCATION "${Zynum_CORE_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${Zynum_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "@ZYNUM_PACKAGE_SYSTEM_LIBRARIES@")
+endif()
+# An installed optional archive is never selected by a default/core-only request.
+if("standalone" IN_LIST Zynum_FIND_COMPONENTS AND Zynum_standalone_FOUND AND NOT TARGET Zynum::standalone)
+    add_library(Zynum::standalone STATIC IMPORTED)
+    set_target_properties(Zynum::standalone PROPERTIES
+        IMPORTED_LOCATION "${Zynum_STANDALONE_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${Zynum_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES Zynum::core)
+endif()
+unset(_zynum_component)
