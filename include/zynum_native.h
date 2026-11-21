@@ -120,6 +120,48 @@ zynum_native_status zynum_native_laplacian_periodic_3d_f64_v1(void *storage,
  uint64_t n0, uint64_t n1, uint64_t n2,
  const double *x, uint64_t x_backing_elements, double *y, uint64_t y_backing_elements,
  double inv_h2_0, double inv_h2_1, double inv_h2_2, zynum_native_report_v1 *report);
+enum {
+ ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NONE=0,
+ ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_CONVERGED=1,
+ ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NOT_POSITIVE_DEFINITE=2,
+ ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_ITERATION_LIMIT=3,
+ ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NONFINITE_ARITHMETIC=4,
+ ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_ACCURACY_NOT_MET=5
+};
+typedef struct zynum_native_generalized_symmetric_eigen_report_v1 {
+ uint32_t abi_version, struct_size, outcome, reserved0;
+ uint64_t failing_pivot, sweeps;
+ zynum_native_report_v1 native;
+ uint64_t reserved[2];
+} zynum_native_generalized_symmetric_eigen_report_v1;
+/* Full real F64 type-1 solve H*C = S*C*diag(eigenvalues), with n > 0 and
+   finite bit-symmetric H/S (both triangles supplied, including matching signs
+   on mirrored zeros). All matrices are n-by-n column-major, all leading
+   dimensions at least n, and backing lengths count doubles. The full H and S
+   backing ranges may overlap. Every other pair of declared backing or control
+   ranges must be disjoint. The required output-only report is untouched on
+   an uncheckable range or alias.
+   One admitted operation uses synchronous caller-lane computation and one
+   scratch lease from the explicit native Context. No tasks are submitted.
+   OK means a completed numerical attempt. Consume outputs only on OK,
+   CONVERGED, and native.output_state COMPLETE. In that case eigenvalues are
+   ascending and the corresponding columns of C are S-orthonormal. Both
+   outputs are written only on that success. Padding and unused backing are
+   preserved. ACCURACY_NOT_MET means a finite staged solution failed the
+   original-coordinate residual or S-orthogonality check.
+   failing_pivot is one-based for NOT_POSITIVE_DEFINITE, zero
+   otherwise. sweeps counts complete symmetric eigensolver sweeps. Invalid
+   input values return INVALID_ARGUMENT with outcome NONE. Provider scratch
+   overlapping a declared backing or control range returns
+   PROVIDER_CONTRACT_FAILURE after releasing the lease. Resource failures
+   retain native diagnostics and the existing fail-stop ownership policy. */
+zynum_native_status zynum_native_generalized_symmetric_eigen_f64_v1(void *context_storage,
+ uint64_t n,
+ const double *h, uint64_t h_backing_elements, uint64_t ldh,
+ const double *s, uint64_t s_backing_elements, uint64_t lds,
+ double *eigenvalues, uint64_t eigenvalues_backing_elements,
+ double *coefficients, uint64_t coefficients_backing_elements, uint64_t ldc,
+ zynum_native_generalized_symmetric_eigen_report_v1 *report);
 /* Single-grid negative periodic Laplacian solve, axis 2 fastest. All axes
    are positive; singleton axes and repeated neighbors retain stencil semantics.
    Query writes an output-only v1 requirements struct on success. The input

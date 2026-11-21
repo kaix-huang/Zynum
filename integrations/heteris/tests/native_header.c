@@ -14,6 +14,9 @@ _Static_assert(sizeof(zynum_native_report_v1)==72, "report v1 layout");
 _Static_assert(offsetof(zynum_native_report_v1, callbacks_started)==40, "report count offset");
 _Static_assert(sizeof(zynum_native_policy_v1)==32, "policy v1 layout");
 _Static_assert(sizeof(zynum_native_context_requirements_v1)==40, "requirements v1 layout");
+_Static_assert(sizeof(zynum_native_generalized_symmetric_eigen_report_v1)==120, "generalized eigen report v1 layout");
+_Static_assert(offsetof(zynum_native_generalized_symmetric_eigen_report_v1,failing_pivot)==16, "generalized eigen pivot offset");
+_Static_assert(offsetof(zynum_native_generalized_symmetric_eigen_report_v1,native)==32, "generalized eigen native diagnostics offset");
 void zynum_native_header_type_check(void) {
  zynum_native_status (*query)(zynum_native_context_requirements_v1*)=zynum_native_context_query_v1;
  zynum_native_status (*init)(void*,uint64_t,const heteris_runtime_provider_v1*,const zynum_native_policy_v1*,zynum_native_report_v1*)=zynum_native_context_init_v1;
@@ -21,7 +24,8 @@ void zynum_native_header_type_check(void) {
  zynum_native_status (*gemm_tn)(void*,uint64_t,uint64_t,uint64_t,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double*,uint64_t,uint64_t,zynum_native_report_v1*)=zynum_native_gemm_f64_tn_v1;
  zynum_native_status (*gemm_cn)(void*,uint64_t,uint64_t,uint64_t,double,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double,double*,uint64_t,uint64_t,zynum_native_report_v1*)=zynum_native_gemm_c128_row_major_cn_v1;
  zynum_native_status (*gemm_row_tn)(void*,uint64_t,uint64_t,uint64_t,double,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double,double*,uint64_t,uint64_t,zynum_native_report_v1*)=zynum_native_gemm_f64_row_major_tn_v1;
- (void)query;(void)init;(void)gemm;(void)gemm_tn;(void)gemm_cn;(void)gemm_row_tn;
+ zynum_native_status (*generalized_eigen)(void*,uint64_t,const double*,uint64_t,uint64_t,const double*,uint64_t,uint64_t,double*,uint64_t,double*,uint64_t,uint64_t,zynum_native_generalized_symmetric_eigen_report_v1*)=zynum_native_generalized_symmetric_eigen_f64_v1;
+ (void)query;(void)init;(void)gemm;(void)gemm_tn;(void)gemm_cn;(void)gemm_row_tn;(void)generalized_eigen;
 }
 
 _Static_assert(sizeof(zynum_native_spectral_status)==4,"spectral fixed i32 status");

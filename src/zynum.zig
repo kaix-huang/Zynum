@@ -143,6 +143,7 @@ pub const internal = struct {
     };
     /// Checked frontends borrowing an existing operation, outside the math layer.
     pub const lapack_checked = struct {
+        pub const generalized_symmetric_eigen = @import("lapack/generalized_symmetric_eigen.zig");
         pub const symmetricEigenDecomposeAdmitted = @import("lapack/symmetric_eigen.zig").decomposeAdmitted;
         pub const qrGenerateQWithContractAdmitted = @import("lapack/qr.zig").generateQWithContractAdmitted;
         pub const qrFactorizeWithContractAdmitted = @import("lapack/qr.zig").factorizeWithContractAdmitted;

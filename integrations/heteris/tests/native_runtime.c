@@ -19,11 +19,34 @@
 static heteris_runtime_provider_api_v1 real_api;
 static pthread_t caller;
 static _Atomic unsigned bulk_calls, callback_calls, caller_callbacks;
+static struct {
+ void *address;
+ uint64_t capacity;
+ heteris_rp_token lease;
+ unsigned allocations, releases;
+} aliased_scratch;
+static heteris_status alias_scratch_allocate(heteris_rp_token p,uint64_t bytes,uint64_t alignment,heteris_rp_scratch_v1 *out) {
+ const heteris_status status=real_api.scratch_allocate(p,bytes,alignment,out);
+ if(status==HETERIS_OK&&aliased_scratch.address){
+  assert(bytes<=aliased_scratch.capacity);
+  assert((uintptr_t)aliased_scratch.address%alignment==0);
+  aliased_scratch.lease=out->lease;
+  aliased_scratch.allocations++;
+  out->data=aliased_scratch.address;
+ }
+ return status;
+}
+static heteris_status alias_scratch_release(heteris_rp_token lease) {
+ const heteris_status status=real_api.scratch_release(lease);
+ if(status==HETERIS_OK&&aliased_scratch.address&&lease.serial==aliased_scratch.lease.serial)
+  aliased_scratch.releases++;
+ return status;
+}
 enum death_fault { DEATH_NONE, DEATH_MALFORMED, DEATH_NONQUIESCENT, DEATH_RELEASE };
 static enum death_fault death_fault;
-enum death_operation { DEATH_TN, DEATH_LAPLACIAN, DEATH_PERIODIC_SOLVE, DEATH_C128, DEATH_ROW_TN };
+enum death_operation { DEATH_TN, DEATH_LAPLACIAN, DEATH_PERIODIC_SOLVE, DEATH_C128, DEATH_ROW_TN, DEATH_GENERALIZED_EIGEN };
 static enum death_operation death_operation;
-static const char *const death_labels[] = { "TN", "LAPLACIAN", "PERIODIC_SOLVE", "C128_CN", "F64_ROW_TN" };
+static const char *const death_labels[] = { "TN", "LAPLACIAN", "PERIODIC_SOLVE", "C128_CN", "F64_ROW_TN", "GENERALIZED_EIGEN" };
 static unsigned death_phase, death_allocations, death_release_site;
 static heteris_rp_token death_leases[6];
 static heteris_status death_allocate(heteris_rp_token p,uint64_t bytes,uint64_t alignment,heteris_rp_scratch_v1 *out) {
@@ -31,7 +54,11 @@ static heteris_status death_allocate(heteris_rp_token p,uint64_t bytes,uint64_t 
  if(status==HETERIS_OK){assert(death_allocations<6);death_leases[death_allocations++]=out->lease;}return status;
 }
 static heteris_status death_release(heteris_rp_token lease) {
- if(death_fault==DEATH_RELEASE&&death_allocations>=death_release_site&&lease.serial==death_leases[death_release_site-1].serial){fprintf(stderr,"%s_DEATH release_site=%u\n",death_labels[death_operation],death_release_site);return -1942;}
+ if(death_fault==DEATH_RELEASE&&death_allocations>=death_release_site&&lease.serial==death_leases[death_release_site-1].serial){
+  if(death_operation==DEATH_GENERALIZED_EIGEN)assert(death_allocations==1);
+  fprintf(stderr,"%s_DEATH release_site=%u\n",death_labels[death_operation],death_release_site);
+  return -1942;
+ }
  return real_api.scratch_release(lease);
 }
 struct invocation { heteris_rp_cpu_range_fn callback; void *data; };
@@ -75,6 +102,12 @@ static void tn_death_case(enum death_fault fault,unsigned phase,unsigned release
   const double rhs[4]={12,12,-12,-12};double work[48];
   zynum_native_periodic_neg_laplacian_report_v1 solve_report;
   (void)zynum_native_periodic_neg_laplacian_solve_f64_v1(context.data,&problem,rhs,4,output,4,work,48,&solve_report);
+ }
+ else if(death_operation==DEATH_GENERALIZED_EIGEN){
+  const double h[4]={4,0,0,8},s[4]={2,0,0,2};
+  double eigenvalues[2]={7,7};
+  zynum_native_generalized_symmetric_eigen_report_v1 solve_report;
+  (void)zynum_native_generalized_symmetric_eigen_f64_v1(context.data,2,h,4,2,s,4,2,eigenvalues,2,output,4,2,&solve_report);
  }
  else if(death_operation==DEATH_ROW_TN)(void)zynum_native_gemm_f64_row_major_tn_v1(context.data,2,2,2,1,a,4,2,a,4,2,1,output,4,2,&report);
  else if(death_operation==DEATH_C128)(void)zynum_native_gemm_c128_row_major_cn_v1(context.data,1,2,1,1,0,a,1,1,a,2,2,0,0,output,2,2,&report);
@@ -152,6 +185,85 @@ static void row_tn_death_cases(void) {
  death_operation=DEATH_TN;
  printf("native F64 row TN fail-stop cases passed: 18 real-Runtime child processes\n");
 }
+static void generalized_eigen_death_cases(void) {
+ death_operation=DEATH_GENERALIZED_EIGEN;
+ expect_tn_death(DEATH_RELEASE,0,1,1);
+ death_operation=DEATH_TN;
+ printf("native generalized eigen scratch release fail-stop passed\n");
+}
+
+static void generalized_eigen_cases(void *context) {
+ const double h[6]={8,0,NAN,0,6,NAN},s[6]={2,0,NAN,0,3,NAN};
+ const double indefinite[4]={2,0,0,-3},asymmetric[4]={2,0,-0.0,3};
+ const double overflow_during_factorization[4]={1e-308,1e308,1e308,1};
+ const double identity[4]={1,0,0,1},singular[4]={2,2,2,2};
+ double eigenvalues[3]={92,92,92},coefficients[6]={93,93,93,93,93,93};
+ zynum_native_generalized_symmetric_eigen_report_v1 report;
+ const unsigned before=atomic_load(&bulk_calls);
+ assert(zynum_native_generalized_symmetric_eigen_f64_v1(context,2,h,6,3,s,6,3,eigenvalues,3,coefficients,6,3,&report)==ZYNUM_NATIVE_OK);
+ assert(report.abi_version==1&&report.struct_size==sizeof report);
+ assert(report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_CONVERGED&&report.failing_pivot==0);
+ assert(report.native.output_state==ZYNUM_NATIVE_OUTPUT_COMPLETE);
+ assert(report.native.submission_state==ZYNUM_NATIVE_SUBMISSION_NOT_SUBMITTED);
+ const double expected_values[3]={2,4,92};
+ const double expected_magnitudes[6]={0,1/sqrt(3),93,1/sqrt(2),0,93};
+ double actual_magnitudes[6];
+ for(size_t i=0;i<6;++i)actual_magnitudes[i]=fabs(coefficients[i]);
+ equals(eigenvalues,expected_values,3);
+ equals(actual_magnitudes,expected_magnitudes,6);
+
+ double saved_values[3],saved_coefficients[6];
+ memcpy(saved_values,eigenvalues,sizeof eigenvalues);
+ memcpy(saved_coefficients,coefficients,sizeof coefficients);
+ assert(zynum_native_generalized_symmetric_eigen_f64_v1(context,2,h,6,3,indefinite,4,2,eigenvalues,3,coefficients,6,3,&report)==ZYNUM_NATIVE_OK);
+ assert(report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NOT_POSITIVE_DEFINITE&&report.failing_pivot==2);
+ assert(report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
+ assert(zynum_native_generalized_symmetric_eigen_f64_v1(context,2,h,6,3,overflow_during_factorization,4,2,eigenvalues,3,coefficients,6,3,&report)==ZYNUM_NATIVE_OK);
+ assert(report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NONFINITE_ARITHMETIC&&report.failing_pivot==0);
+ assert(report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
+ assert(zynum_native_generalized_symmetric_eigen_f64_v1(context,2,identity,4,2,singular,4,2,eigenvalues,3,coefficients,6,3,&report)==ZYNUM_NATIVE_OK);
+ assert((report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_ACCURACY_NOT_MET&&report.failing_pivot==0)||
+        (report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NOT_POSITIVE_DEFINITE&&report.failing_pivot==2));
+ assert(report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
+ assert(zynum_native_generalized_symmetric_eigen_f64_v1(context,2,h,6,3,asymmetric,4,2,eigenvalues,3,coefficients,6,3,&report)==ZYNUM_NATIVE_INVALID_ARGUMENT);
+ assert(report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NONE);
+ assert(report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
+ assert(memcmp(saved_values,eigenvalues,sizeof eigenvalues)==0);
+ assert(memcmp(saved_coefficients,coefficients,sizeof coefficients)==0);
+ assert(atomic_load(&bulk_calls)==before);
+ printf("native generalized eigen spectrum, padding, numerical diagnostics, and no submission passed\n");
+}
+
+static void generalized_eigen_scratch_alias_cases(void *context,uint64_t context_bytes) {
+ const double h[4]={4,0,0,8},s[4]={2,0,0,2};
+ double eigenvalues[2]={7,7},saved_coefficients[64];
+ _Alignas(16) double coefficients[64];
+ for(size_t i=0;i<64;++i)coefficients[i]=13;
+ memcpy(saved_coefficients,coefficients,sizeof coefficients);
+ _Alignas(16) struct {
+  zynum_native_generalized_symmetric_eigen_report_v1 report;
+  unsigned char tail[256];
+ } control;
+ memset(control.tail,0x5a,sizeof control.tail);
+ const struct { void *address; uint64_t capacity; } fixtures[]={
+  {context,context_bytes},{&control.report,sizeof control},{&coefficients[8],sizeof coefficients-8*sizeof(double)},
+ };
+ for(size_t i=0;i<sizeof fixtures/sizeof fixtures[0];++i){
+  aliased_scratch.address=fixtures[i].address;
+  aliased_scratch.capacity=fixtures[i].capacity;
+  assert(zynum_native_generalized_symmetric_eigen_f64_v1(context,2,h,4,2,s,4,2,eigenvalues,2,coefficients,64,2,&control.report)==ZYNUM_NATIVE_PROVIDER_CONTRACT_FAILURE);
+  aliased_scratch.address=NULL;
+  assert(control.report.outcome==ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NONE);
+  assert(control.report.native.output_state==ZYNUM_NATIVE_OUTPUT_UNCHANGED);
+  assert(control.report.native.resource_stage==ZYNUM_NATIVE_RESOURCE_STAGE_SCRATCH_ALLOCATE);
+  assert(aliased_scratch.allocations==i+1&&aliased_scratch.releases==i+1);
+  assert(eigenvalues[0]==7&&eigenvalues[1]==7);
+  assert(memcmp(saved_coefficients,coefficients,sizeof coefficients)==0);
+  for(size_t j=0;j<sizeof control.tail;++j)assert(control.tail[j]==0x5a);
+ }
+ printf("native generalized eigen rejected aliased scratch and released each lease\n");
+}
+
 static void periodic_solve_cases(void *context,double *rhs,double *solution,double *workspace);
 static void laplacian_runtime_cases(void);
 static void spectral_runtime_cases(void);
@@ -161,6 +273,7 @@ int main(int argc,char **argv) {
  tn_death_cases();
  laplacian_death_cases();
  periodic_solve_death_cases();
+ generalized_eigen_death_cases();
  f64_summary_cases();
  gemm_fn call_gemm=zynum_native_gemm_f64_nn_v1;
 #ifdef ZYNUM_NATIVE_DSO_CLIENT_TESTS
@@ -180,10 +293,11 @@ int main(int argc,char **argv) {
  desc.host_bytes_limit=1u<<20;desc.task_scratch_bytes_limit=1u<<16;
  heteris_rp_token runtime;assert(heteris_cpu_runtime_create_v1(&desc,&runtime)==HETERIS_OK);
  heteris_runtime_provider_v1 provider;assert(heteris_cpu_runtime_export_provider_v1(runtime,&provider)==HETERIS_OK);
- real_api=*provider.api;heteris_runtime_provider_api_v1 traced=real_api;traced.cpu_bulk_sync=traced_bulk;provider.api=&traced;
+ real_api=*provider.api;heteris_runtime_provider_api_v1 traced=real_api;traced.cpu_bulk_sync=traced_bulk;
+ traced.scratch_allocate=alias_scratch_allocate;traced.scratch_release=alias_scratch_release;provider.api=&traced;
  zynum_native_context_requirements_v1 req;assert(zynum_native_context_query_v1(&req)==ZYNUM_NATIVE_OK);
  heteris_rp_scratch_v1 contexts[2],matrices[3];
- for(int i=0;i<2;++i)allocate(provider.provider,req.bytes,req.alignment,&contexts[i]);
+ for(int i=0;i<2;++i)allocate(provider.provider,req.bytes,req.alignment<16?16:req.alignment,&contexts[i]);
  for(int i=0;i<3;++i)allocate(provider.provider,128,8,&matrices[i]);
  double *a=matrices[0].data,*b=matrices[1].data,*c=matrices[2].data;
  const double av[4]={1,2,3,4},bv[4]={5,6,7,8},expected[4]={23.5,34.5,31.5,46.5};
@@ -195,6 +309,8 @@ int main(int argc,char **argv) {
  row_tn_cases(contexts[1].data);
  const unsigned row_tn_submissions=atomic_load(&bulk_calls)-row_tn_before;
  assert(row_tn_submissions==6);
+ generalized_eigen_scratch_alias_cases(contexts[1].data,req.bytes);
+ generalized_eigen_cases(contexts[1].data);
  assert(real_api.provider_release(provider.provider)==HETERIS_OK);memset(&provider,0,sizeof provider);memset(&traced,0,sizeof traced);
  assert(heteris_cpu_runtime_destroy_v1(runtime)==HETERIS_BUSY);
  assert(call_gemm(contexts[0].data,2,2,2,1,a,4,2,b,4,2,0.5,c,4,2,&report)==ZYNUM_NATIVE_OK);equals(c,expected,4);

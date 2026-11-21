@@ -14,6 +14,11 @@ const core = @import("core/cholesky.zig");
 /// and may modify part of the failing column/row; no usable full factor is
 /// promised. Invalid arguments and nonfinite input leave the matrix unchanged.
 pub fn factorize(comptime T: type, a: views.Matrix(T), triangle: v.Triangle) v.Error!usize {
+    return (try factorizeDetailed(T, a, triangle)).failing_pivot;
+}
+
+pub const Factorization = core.Factorization;
+pub fn factorizeDetailed(comptime T: type, a: views.Matrix(T), triangle: v.Triangle) v.Error!Factorization {
     _ = try v.matrixSpan(T, a);
     if (a.row_count != a.column_count) return error.DimensionMismatch;
     try v.finiteTriangle(T, a, triangle);
@@ -24,8 +29,8 @@ pub fn factorize(comptime T: type, a: views.Matrix(T), triangle: v.Triangle) v.E
         .leading_dimension = @intCast(a.leading_dimension),
     };
     return switch (triangle) {
-        .lower => core.factorize(T, operand, .lower),
-        .upper => core.factorize(T, operand, .upper),
+        .lower => core.factorizeDetailed(T, operand, .lower),
+        .upper => core.factorizeDetailed(T, operand, .upper),
     };
 }
 

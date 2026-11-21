@@ -12,6 +12,44 @@ legacy resource paths need further migration
 and qualification. No cluster, materials/SCF, GPU or performance qualification
 is established. Earlier checked-bounds evidence retains its own source identity.
 
+## Real symmetric-definite generalized eigenproblem
+
+`zynum_native_generalized_symmetric_eigen_f64_v1` solves
+`H C = S C diag(eigenvalues)` for all eigenpairs of a real, full-rank
+type-1 problem on the local CPU. Pass a live explicit-provider context, the
+positive order and the complete column-major H and S matrices. Both triangles
+must be finite and bit-symmetric. Leading dimensions and backing lengths
+count doubles. The two read-only inputs may share storage. The eigenvalue
+array, coefficient matrix, report and context each require disjoint storage,
+including the declared padding and tails.
+
+One admitted operation obtains a provider scratch lease, factors S, reduces H
+to a real symmetric problem, solves it, and transforms the eigenvectors back
+to the original basis. For order `n`, the single lease requires
+`8 * (4*n*n + n + (n % 2))` payload bytes, aligned to 16 bytes on the
+qualified Linux x86-64 target. This excludes the separately supplied context.
+Before committing results, widened real accumulators check the original
+matrix residual and a conservative per-column residual bound against 1e-12,
+and the Frobenius norm of the S-orthogonality defect against 1e-10. The consumer can use the ascending
+eigenvalues and corresponding columns of C after checking the following expression.
+
+```c
+status == ZYNUM_NATIVE_OK &&
+report.outcome == ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_CONVERGED &&
+report.native.output_state == ZYNUM_NATIVE_OUTPUT_COMPLETE
+```
+
+Check the returned status before reading the report. Invalid control or
+backing metadata can prevent a report from being written. A completed
+numerical attempt can report a nonpositive Cholesky pivot (one-based),
+an iteration limit, nonfinite arithmetic, or insufficient accuracy in the
+original coordinates. These outcomes preserve the caller's output arrays.
+A resource rejection is returned as a native status. The report records
+the attempted resource stage when available. The operation runs synchronously
+on the admitted caller and reports zero submitted callbacks. After all calls
+return, close the context and release its backing and the provider according
+to the existing lifecycle contract.
+
 ## FP64 row-major TN development entry
 
 `zynum_native_gemm_f64_row_major_tn_v1` is an additive development entry; its

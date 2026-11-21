@@ -702,6 +702,108 @@ export fn zynum_native_periodic_neg_laplacian_solve_f64_v1(
     return c.ZYNUM_NATIVE_OK;
 }
 
+const gep = native.generalized_symmetric_eigen;
+const GepReport = c.zynum_native_generalized_symmetric_eigen_report_v1;
+
+fn gepErrorStatus(err: gep.Error) i32 {
+    return switch (err) {
+        error.NonFiniteInput, error.NonSymmetricInput => c.ZYNUM_NATIVE_INVALID_ARGUMENT,
+        error.InvalidLength, error.InvalidLeadingDimension, error.BufferTooSmall, error.DimensionMismatch, error.InvalidView, error.AliasingNotAllowed => c.ZYNUM_NATIVE_VIEW_INVALID,
+        error.InvalidMatrixOperation, error.InvalidPivot, error.InvalidReflector, error.InvalidTolerance, error.InvalidHermitianDiagonal => c.ZYNUM_NATIVE_INVALID_ARGUMENT,
+        else => |resource_error| errorStatus(resource_error),
+    };
+}
+
+export fn zynum_native_generalized_symmetric_eigen_f64_v1(
+    storage: ?*anyopaque,
+    n64: u64,
+    h_arg: ?*align(1) const f64,
+    h_count: u64,
+    ldh64: u64,
+    s_arg: ?*align(1) const f64,
+    s_count: u64,
+    lds64: u64,
+    eigenvalues_arg: ?*align(1) f64,
+    eigenvalues_count: u64,
+    coefficients_arg: ?*align(1) f64,
+    coefficients_count: u64,
+    ldc64: u64,
+    report_arg: ?*align(1) GepReport,
+) i32 {
+    // Establish full control and backing disjointness before report writes,
+    // forming slices, or accessing the Context. Only H and S may overlap.
+    const ctx_raw: *align(1) Context = @ptrCast(storage orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT);
+    const report_raw = report_arg orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const ctx_range = CheckedRange.control(ctx_raw) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const report_range = CheckedRange.control(report_raw) orelse return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    if (ctx_range.intersects(report_range)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const h = CheckedRange.backing(h_arg, h_count) catch |err| return bufferStatus(err);
+    const s = CheckedRange.backing(s_arg, s_count) catch |err| return bufferStatus(err);
+    const eigenvalues = CheckedRange.backing(eigenvalues_arg, eigenvalues_count) catch |err| return bufferStatus(err);
+    const coefficients = CheckedRange.backing(coefficients_arg, coefficients_count) catch |err| return bufferStatus(err);
+    for ([_]CheckedRange{ h, s, eigenvalues, coefficients }) |buffer| {
+        if (ctx_range.intersects(buffer) or report_range.intersects(buffer)) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    }
+    if (eigenvalues.intersects(h) or eigenvalues.intersects(s) or eigenvalues.intersects(coefficients) or
+        coefficients.intersects(h) or coefficients.intersects(s)) return c.ZYNUM_NATIVE_VIEW_INVALID;
+
+    const report: *GepReport = @alignCast(report_raw);
+    report.* = std.mem.zeroes(GepReport);
+    report.abi_version = c.ZYNUM_NATIVE_ABI_VERSION;
+    report.struct_size = @sizeOf(GepReport);
+    report.native.abi_version = c.ZYNUM_NATIVE_ABI_VERSION;
+    report.native.struct_size = @sizeOf(Report);
+    var result: execution.CallReport = .{};
+    defer reportResult(&report.native, result);
+
+    if (n64 == 0) return c.ZYNUM_NATIVE_INVALID_ARGUMENT;
+    const n: usize = @intCast(dimension(n64) catch |err| return bufferStatus(err));
+    const ldh = std.math.cast(usize, ldh64) orelse return c.ZYNUM_NATIVE_OVERFLOW;
+    const lds = std.math.cast(usize, lds64) orelse return c.ZYNUM_NATIVE_OVERFLOW;
+    const ldc = std.math.cast(usize, ldc64) orelse return c.ZYNUM_NATIVE_OVERFLOW;
+    if (!h.fits(n) or !s.fits(n) or !eigenvalues.fits(n) or !coefficients.fits(n)) return c.ZYNUM_NATIVE_VIEW_INVALID;
+
+    const h_data: [*]const f64 = @ptrFromInt(h.address);
+    const s_data: [*]const f64 = @ptrFromInt(s.address);
+    const values_data: [*]f64 = @ptrFromInt(eigenvalues.address);
+    const coefficients_data: [*]f64 = @ptrFromInt(coefficients.address);
+    const exclusions = [_]gep.ScratchExclusion{
+        gep.scratchExclusion(ctx_range.address, ctx_range.bytes) catch return c.ZYNUM_NATIVE_OVERFLOW,
+        gep.scratchExclusion(report_range.address, report_range.bytes) catch return c.ZYNUM_NATIVE_OVERFLOW,
+    };
+    const args: gep.Arguments = .{
+        .h = .{ .values = h_data[0..@intCast(h_count)], .row_count = n, .column_count = n, .leading_dimension = ldh },
+        .s = .{ .values = s_data[0..@intCast(s_count)], .row_count = n, .column_count = n, .leading_dimension = lds },
+        .eigenvalues = values_data[0..@intCast(eigenvalues_count)],
+        .coefficients = .{ .values = coefficients_data[0..@intCast(coefficients_count)], .row_count = n, .column_count = n, .leading_dimension = ldc },
+        .excluded_scratch = &exclusions,
+    };
+    for ([_]@TypeOf(args.h){ args.h, args.s, args.coefficients.asConst() }) |matrix| {
+        _ = matrix.check() catch |err| return switch (err) {
+            error.SizeOverflow => c.ZYNUM_NATIVE_OVERFLOW,
+            error.InvalidLeadingDimension, error.BufferTooSmall => c.ZYNUM_NATIVE_VIEW_INVALID,
+        };
+    }
+
+    const ctx: *Context = @alignCast(ctx_raw);
+    var operation = ctx.core().begin() catch |err| return switch (err) {
+        error.Closing => c.ZYNUM_NATIVE_CONTEXT_CLOSING,
+        error.CounterOverflow => c.ZYNUM_NATIVE_COUNTER_OVERFLOW,
+    };
+    defer operation.end();
+    const attempt = gep.solveAdmitted(&operation, args, &result) catch |err| return gepErrorStatus(err);
+    report.outcome = switch (attempt.status) {
+        .converged => c.ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_CONVERGED,
+        .not_positive_definite => c.ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NOT_POSITIVE_DEFINITE,
+        .iteration_limit => c.ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_ITERATION_LIMIT,
+        .nonfinite_arithmetic => c.ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_NONFINITE_ARITHMETIC,
+        .accuracy_not_met => c.ZYNUM_NATIVE_GENERALIZED_SYMMETRIC_EIGEN_ACCURACY_NOT_MET,
+    };
+    report.failing_pivot = attempt.failing_pivot;
+    report.sweeps = attempt.sweeps;
+    return c.ZYNUM_NATIVE_OK;
+}
+
 const F64SumReport = c.zynum_native_f64_sum_summary_report_v1;
 
 export fn zynum_native_f64_sum_summary_v1(values_arg: ?*align(1) const f64, backing_elements: u64, count: u64, scale: f64, limit: f64, out_arg: ?*align(1) F64SumReport) i32 {

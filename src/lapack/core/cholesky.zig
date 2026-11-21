@@ -15,6 +15,10 @@ const update = @import("../column_update.zig");
 pub const Triangle = enum { upper, lower };
 pub const FactorContract = @import("cholesky_contract.zig").FactorContract;
 pub const SolveContract = @import("cholesky_contract.zig").SolveContract;
+pub const Factorization = struct {
+    status: enum { complete, not_positive_definite, nonfinite_arithmetic } = .complete,
+    failing_pivot: usize = 0,
+};
 const SolveResult = @import("cholesky_contract.zig").SolveResult;
 const substitute = @import("triangular_substitute.zig");
 
@@ -34,8 +38,18 @@ pub fn factorize(comptime T: type, a: dense.Matrix(T), comptime triangle: Triang
 /// determines partial results; no recursive/blocked reference tail is promised.
 /// Geometry and borrowed storage preconditions are identical to factorize.
 pub fn factorizeWithContract(comptime T: type, a: dense.Matrix(T), comptime triangle: Triangle, comptime contract: FactorContract) usize {
+    return factorizeDetailedWithContract(T, a, triangle, contract).failing_pivot;
+}
+
+/// Keep the checked arithmetic failure distinct from a finite nonpositive
+/// pivot while preserving the same traversal and partial-factor semantics.
+pub fn factorizeDetailed(comptime T: type, a: dense.Matrix(T), comptime triangle: Triangle) Factorization {
+    return factorizeDetailedWithContract(T, a, triangle, .checked_v1);
+}
+
+fn factorizeDetailedWithContract(comptime T: type, a: dense.Matrix(T), comptime triangle: Triangle, comptime contract: FactorContract) Factorization {
     const n: usize = a.row_count;
-    if (n == 0) return 0;
+    if (n == 0) return .{};
     const ld: usize = a.leading_dimension;
     for (0..n) |j| {
         var diagonal = a.values[j + j * ld];
@@ -44,9 +58,10 @@ pub fn factorizeWithContract(comptime T: type, a: dense.Matrix(T), comptime tria
             diagonal -= entry * entry;
         }
         if (comptime contract == .checked_v1) {
-            if (!(diagonal > 0) or !std.math.isFinite(diagonal)) return j + 1;
+            if (!std.math.isFinite(diagonal)) return .{ .status = .nonfinite_arithmetic, .failing_pivot = j + 1 };
+            if (diagonal <= 0) return .{ .status = .not_positive_definite, .failing_pivot = j + 1 };
         } else {
-            if (diagonal <= 0 or std.math.isNan(diagonal)) return j + 1;
+            if (diagonal <= 0 or std.math.isNan(diagonal)) return .{ .status = .not_positive_definite, .failing_pivot = j + 1 };
         }
         const root = @sqrt(diagonal);
         a.values[j + j * ld] = root;
@@ -58,7 +73,7 @@ pub fn factorizeWithContract(comptime T: type, a: dense.Matrix(T), comptime tria
             for (destination) |*entry| {
                 const value = entry.* / root;
                 if (comptime contract == .checked_v1) {
-                    if (!std.math.isFinite(value)) return j + 1;
+                    if (!std.math.isFinite(value)) return .{ .status = .nonfinite_arithmetic, .failing_pivot = j + 1 };
                 }
                 entry.* = value;
             }
@@ -73,12 +88,12 @@ pub fn factorizeWithContract(comptime T: type, a: dense.Matrix(T), comptime tria
             }
             entry /= root;
             if (comptime contract == .checked_v1) {
-                if (!std.math.isFinite(entry)) return j + 1;
+                if (!std.math.isFinite(entry)) return .{ .status = .nonfinite_arithmetic, .failing_pivot = j + 1 };
             }
             a.values[position] = entry;
         }
     }
-    return 0;
+    return .{};
 }
 
 /// Existing numerical diagonal and substitution policy, without frontend scans.

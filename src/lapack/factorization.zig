@@ -5,6 +5,7 @@ const views = @import("../blas/api/views.zig");
 const types = @import("../blas/types.zig");
 const validation = @import("validation.zig");
 const execution = @import("zynum-execution");
+const real_cholesky = @import("cholesky.zig");
 
 fn isComplex(comptime T: type) bool {
     return T == types.ComplexF32 or T == types.ComplexF64;
@@ -22,7 +23,14 @@ pub fn choleskyFactorize(comptime T: type, a: views.Matrix(T), triangle: validat
 pub fn choleskyFactorizeAdmitted(operation: *const execution.context.Operation, comptime T: type, a: views.Matrix(T), triangle: validation.Triangle) validation.Error!usize {
     _ = operation.borrowedContext();
     if (comptime isComplex(T)) return @import("complex_cholesky.zig").factorize(T, a, triangle);
-    return @import("cholesky.zig").factorize(T, a, triangle);
+    return real_cholesky.factorize(T, a, triangle);
+}
+
+/// Preserve the checked pivot breakdown classification for the real
+/// generalized eigensolver, under the same caller-owned admission.
+pub fn realCholeskyFactorizeDetailedAdmitted(operation: *const execution.context.Operation, comptime T: type, a: views.Matrix(T), triangle: validation.Triangle) validation.Error!real_cholesky.Factorization {
+    _ = operation.borrowedContext();
+    return real_cholesky.factorizeDetailed(T, a, triangle);
 }
 
 /// Solve from a successful selected Cholesky triangle; factors are read-only.
