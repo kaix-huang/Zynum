@@ -849,7 +849,7 @@ MAX_JSON_DEPTH = 128
 MAX_JSON_NODES = 262_144
 NATIVE_PROJECTION_SCHEMA_ID = "zynum-reviewed-native-test-projection-v1"
 NATIVE_PROJECTION_SCHEMA_VERSION = 1
-CURRENT_TEST_INVENTORY_SHA256 = '1f4ecbc0000aa7c4e4cf7527fa3dc3a17d85dc8c7a021c780f311cb0fafefd6f'
+CURRENT_TEST_INVENTORY_SHA256 = '33a0e7e0b65decfca56f205ef8ef60ce8572b4cec6e13c30b2287ceec9498a75'
 NEXT_TEST_INVENTORY_SHA256 = None
 CURRENT_NATIVE_PROJECTION_SHA256 = 'bb2627cfe862388f54aab267c8c515e65f4187f541a45a501fee3aebf4b5f858'
 NEXT_NATIVE_PROJECTION_SHA256: str | None = None
@@ -3633,6 +3633,8 @@ def _prepare_inventory_refresh(
                     and row["expectation_state"] == FROZEN_STATE}
         if len(required) != 147 or set(reopen_native_rows) != required:
             raise InventoryError("private resource-port source cut requires exact retirement of all 147 affected historical Zig rows; source-only retention is forbidden")
+    if _reviewed_generalized_eigen_source_refresh(existing, refreshed) and not source_only:
+        raise InventoryError("generalized eigensolver source cut requires source-derived refresh with unchanged native projection")
     if _reviewed_header_install_source_refresh(existing, refreshed) and (not source_only or bindings or reopen_native_rows):
         raise InventoryError("header installation source cut permits only source-derived refresh with unchanged native projection")
     refreshed["python_skip_contracts"] = existing["python_skip_contracts"]
@@ -5118,6 +5120,21 @@ def _reviewed_cholesky_c_source_refresh(previous: dict[str, Any], current: dict[
     return True
 
 
+
+# The native generalized eigensolver adds one Core source and five correctness-only
+# tests. Its source-only migration preserves the exact native enumeration ledger.
+GENERALIZED_EIGEN_PREVIOUS_INVENTORY_SHA256 = "1f4ecbc0000aa7c4e4cf7527fa3dc3a17d85dc8c7a021c780f311cb0fafefd6f"
+GENERALIZED_EIGEN_PREVIOUS_SOURCE_SHA256 = "089479a08428d10668492d0a1acc14e19ec41004a6a342a73315564f25e8707c"
+GENERALIZED_EIGEN_CURRENT_SOURCE_SHA256 = "079ab713c0eb9b3f4c4825e5a840ab6c2f032e01f525c728e8d798c6d73dd734"
+
+
+def _reviewed_generalized_eigen_source_refresh(previous: dict[str, Any], current: dict[str, Any]) -> bool:
+    return (
+        _fact_digest(_host_assembly_source_facts(previous)) == GENERALIZED_EIGEN_PREVIOUS_SOURCE_SHA256
+        and _fact_digest(_host_assembly_source_facts(current)) == GENERALIZED_EIGEN_CURRENT_SOURCE_SHA256
+    )
+
+
 def _refresh_base_compatible_discovery(
     inventory: dict[str, Any], discovered: dict[str, Any]
 ) -> dict[str, Any]:
@@ -5138,6 +5155,7 @@ def _refresh_base_compatible_discovery(
     header_install_migration = _reviewed_header_install_source_refresh(inventory, discovered)
     interval_recurrence_migration = _reviewed_interval_recurrence_source_refresh(inventory, discovered)
     cholesky_c_migration = _reviewed_cholesky_c_source_refresh(inventory, discovered)
+    generalized_eigen_migration = _reviewed_generalized_eigen_source_refresh(inventory, discovered)
     recorded_roots = inventory.get("test_roots")
     current_roots = discovered["test_roots"]
     if (
@@ -5151,7 +5169,7 @@ def _refresh_base_compatible_discovery(
     for recorded, current in zip(recorded_roots, current_roots, strict=True):
         if recorded == current:
             continue
-        if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration or cholesky_c_migration:
+        if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration or cholesky_c_migration or generalized_eigen_migration:
             continue  # The complete exact old/new source facts were checked above.
         if production_profile_migration and current.get("id", "").startswith("zig-root:"):
             continue  # Only the exact reviewed named-dependency graph hashes changed.
@@ -5353,10 +5371,11 @@ def _refresh_base_compatible_discovery(
 
     compatible = dict(discovered)
     compatible["test_roots"] = recorded_roots
-    if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration or cholesky_c_migration:
+    if host_assembly_migration or resource_port_migration or header_install_migration or interval_recurrence_migration or cholesky_c_migration or generalized_eigen_migration:
         compatible["correctness_only_roots"] = inventory["correctness_only_roots"]
         compatible["zig_test_files"] = inventory["zig_test_files"]
-        expected_base = (CHOLESKY_C_PREVIOUS_INVENTORY_SHA256 if cholesky_c_migration else
+        expected_base = (GENERALIZED_EIGEN_PREVIOUS_INVENTORY_SHA256 if generalized_eigen_migration else
+                         CHOLESKY_C_PREVIOUS_INVENTORY_SHA256 if cholesky_c_migration else
                          INTERVAL_RECURRENCE_PREVIOUS_INVENTORY_SHA256 if interval_recurrence_migration else
                          HEADER_INSTALL_PREVIOUS_INVENTORY_SHA256 if header_install_migration else
                          RESOURCE_PORT_PREVIOUS_INVENTORY_SHA256 if resource_port_migration else

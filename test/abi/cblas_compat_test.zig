@@ -1130,7 +1130,7 @@ const admission_execution = @import("zynum-execution");
 fn referenceExecutor(ctx: *admission_execution.context.Context) *admission_execution.owner.Executor {
     return switch (ctx.binding) {
         .legacy => |services| @ptrCast(@alignCast(services.userdata)),
-        .integrated => @panic("reference executor fixture requires legacy Context"),
+        .external => @panic("reference executor fixture requires legacy Context"),
     };
 }
 

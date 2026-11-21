@@ -11981,11 +11981,39 @@ def _native_spectral_source_fact_pair() -> tuple[dict[str, Any], dict[str, Any]]
     return copy.deepcopy(_NATIVE_SPECTRAL_FACT_PAIR)
 
 
+
+def _without_generalized_eigen_source_delta(inventory: dict[str, Any]) -> dict[str, Any]:
+    """Reverse the source-only GEP cut so older migration fixtures keep their baseline."""
+    previous = copy.deepcopy(inventory)
+    solver = "src/lapack/generalized_symmetric_eigen.zig"
+    old_receipts = {
+        "src/zynum.zig": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+        "interfaces/production/public/zig/native.zig": "a5f44482deae7db37a11c02f26839021451f6b821d059d7e47195a3f711ef5ce",
+    }
+    for section in ("test_roots", "correctness_only_roots"):
+        for row in previous[section]:
+            if solver not in row.get("source_reachability", []):
+                continue
+            row["source_reachability"].remove(solver)
+            for receipt in row["named_dependency_sources"]:
+                source = receipt.get("path")
+                if source in old_receipts:
+                    receipt["source_sha256"] = old_receipts[source]
+                input_sha = receipt.get("input_sha256", {})
+                if "include/zynum_native.h" in input_sha:
+                    input_sha["include/zynum_native.h"] = "06c4670d14a7ad8c16804b25636b20037d05ba82c63faa1e37e35a76340bc476"
+    for row in previous["zig_test_files"]:
+        if row["path"] == "test/resource_port_core.zig":
+            row["declarations"] = row["declarations"][:2]
+    return previous
+
+
 class CholeskyCSourceRefreshTests(unittest.TestCase):
     """Reverse only this source cut; never supply history, logs or digest mocks."""
     @classmethod
     def setUpClass(cls) -> None:
-        cls.current = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        cls.with_generalized_eigen = json.loads((REPOSITORY_ROOT / "tools/test_inventory.json").read_text())
+        cls.current = _without_generalized_eigen_source_delta(cls.with_generalized_eigen)
         cls.previous = copy.deepcopy(cls.current)
         old_paths = {"src/checked/cholesky_adapter_test.zig", "src/checked/cholesky_exports.zig", "src/checked/cholesky_status.zig"}
         new_paths = {
@@ -12037,6 +12065,12 @@ class CholeskyCSourceRefreshTests(unittest.TestCase):
     def test_exact_source_pair_retains_native_ledger_without_new_qualification(self) -> None:
         self.assertTrue(CHECKER._reviewed_cholesky_c_source_refresh(self.previous, self.current))
         CHECKER._assert_source_only_native_unchanged(self.previous, self.current)
+        self.assertTrue(CHECKER._reviewed_generalized_eigen_source_refresh(self.current, self.with_generalized_eigen))
+        CHECKER._assert_source_only_native_unchanged(self.current, self.with_generalized_eigen)
+        drifted = copy.deepcopy(self.with_generalized_eigen)
+        row = next(row for row in drifted["zig_test_files"] if row["path"] == "test/resource_port_core.zig")
+        row["declarations"].pop()
+        self.assertFalse(CHECKER._reviewed_generalized_eigen_source_refresh(self.current, drifted))
 
     def test_any_other_source_delta_is_rejected(self) -> None:
         for section in CHECKER.HOST_ASSEMBLY_SOURCE_FIELDS:

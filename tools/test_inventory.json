@@ -620,6 +620,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -723,7 +724,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "blas_module_tests",
@@ -911,6 +912,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -1005,7 +1007,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "blas_public_surface_contract_tests",
@@ -1196,6 +1198,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -1270,7 +1273,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "cblas_tests",
@@ -1546,6 +1549,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -1621,7 +1625,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "fortran_tests",
@@ -1681,7 +1685,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "fortran_tests",
@@ -2184,6 +2188,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -2329,7 +2334,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2367,7 +2372,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2417,7 +2422,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2447,7 +2452,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -2477,7 +2482,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapack_tests",
@@ -3044,6 +3049,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -3167,7 +3173,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3197,7 +3203,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3207,7 +3213,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3217,7 +3223,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "modern_tests",
@@ -3755,6 +3761,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -3844,7 +3851,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3874,7 +3881,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3904,7 +3911,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -3964,7 +3971,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "sparse_tests",
@@ -5492,6 +5499,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -5606,7 +5614,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "zynum_public_surface_contract_tests",
@@ -5783,6 +5791,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -5855,7 +5864,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "dynamic_tests",
@@ -5875,7 +5884,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "dynamic_tests",
@@ -6064,6 +6073,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -6156,7 +6166,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
@@ -6186,7 +6196,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
@@ -6216,7 +6226,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
@@ -6226,7 +6236,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "checked_cholesky_tests",
@@ -6454,6 +6464,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -6539,7 +6550,7 @@
         {
           "alias": "zynum-core",
           "path": "src/zynum.zig",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "module": "zynum_core_test_mod",
           "target": "target",
           "compile_symbol": "lapacke_posv_tests",
@@ -6731,6 +6742,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -6869,7 +6881,7 @@
           "module": "core",
           "attachment_owner": "upstream",
           "target": "requested-target",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         }
       ]
@@ -7017,6 +7029,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -7151,7 +7164,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a",
           "input_sha256": {
-            "include/zynum_native.h": "06c4670d14a7ad8c16804b25636b20037d05ba82c63faa1e37e35a76340bc476",
+            "include/zynum_native.h": "25787cc46e5dddfa8ccc80a82366cbcb415f6e12655ec239f2c832a810b888e3",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7174,7 +7187,7 @@
           "module": "core",
           "attachment_owner": "math_module",
           "target": "requested-target",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -7204,7 +7217,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a",
           "input_sha256": {
-            "include/zynum_native.h": "06c4670d14a7ad8c16804b25636b20037d05ba82c63faa1e37e35a76340bc476",
+            "include/zynum_native.h": "25787cc46e5dddfa8ccc80a82366cbcb415f6e12655ec239f2c832a810b888e3",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7381,6 +7394,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -7531,7 +7545,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a",
           "input_sha256": {
-            "include/zynum_native.h": "06c4670d14a7ad8c16804b25636b20037d05ba82c63faa1e37e35a76340bc476",
+            "include/zynum_native.h": "25787cc46e5dddfa8ccc80a82366cbcb415f6e12655ec239f2c832a810b888e3",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7563,7 +7577,7 @@
           "module": "native",
           "attachment_owner": "main",
           "target": "requested-target",
-          "source_sha256": "a5f44482deae7db37a11c02f26839021451f6b821d059d7e47195a3f711ef5ce",
+          "source_sha256": "d7495525642f380bb0add3f051c01028e20b4722a9349704cd9e83ae0167abe7",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -7581,7 +7595,7 @@
           "module": "core",
           "attachment_owner": "native",
           "target": "requested-target",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         },
         {
@@ -7611,7 +7625,7 @@
           "external_input": "explicit Heteris Data SDK authoritative headers",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a",
           "input_sha256": {
-            "include/zynum_native.h": "06c4670d14a7ad8c16804b25636b20037d05ba82c63faa1e37e35a76340bc476",
+            "include/zynum_native.h": "25787cc46e5dddfa8ccc80a82366cbcb415f6e12655ec239f2c832a810b888e3",
             "include/zynum_native_spectral.h": "029e9a094a35487afe3a6973b7903181a1c28894d419843f248100ab872598ec"
           },
           "external_include_dependencies": [
@@ -7634,7 +7648,7 @@
           "module": "core",
           "attachment_owner": "upstream",
           "target": "requested-target",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "build_contract_sha256": "8c2631e7ca5dd15b7949e9377c4983955b30a7bc7fa8a740be12a86efb4e879a"
         }
       ]
@@ -7780,6 +7794,7 @@
         "src/lapack/core/tridiagonal_eigen.zig",
         "src/lapack/factorization.zig",
         "src/lapack/full_rank_least_squares.zig",
+        "src/lapack/generalized_symmetric_eigen.zig",
         "src/lapack/hermitian_managed.zig",
         "src/lapack/least_squares.zig",
         "src/lapack/lq.zig",
@@ -7883,7 +7898,7 @@
           "module": "core",
           "attachment_owner": "core_port_tests",
           "target": "requested-target",
-          "source_sha256": "72d1b946d73c13d3798237ef1f9f1a91a43c971d0acd2be0483386b939ef5e8f",
+          "source_sha256": "15c9407f7d54d0ecb93b6dbc34d23bb6520371f2a06109e91b483806b8e65760",
           "build_contract_sha256": "c4a6b67643a731020e6ca31f2da88e19dc387280945dfd2898ddd175ab193c06"
         },
         {
@@ -19352,6 +19367,36 @@
           "id": "zig-decl:test/resource_port_core.zig:1",
           "name": "neutral scratch keeps exact ownership and pin until released after operation",
           "ordinal": 1,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/resource_port_core.zig:2",
+          "name": "real generalized eigenpairs use one neutral lease and preserve strided padding",
+          "ordinal": 2,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/resource_port_core.zig:3",
+          "name": "real generalized eigensolve preserves outputs on pivot, arithmetic and convergence failures",
+          "ordinal": 3,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/resource_port_core.zig:4",
+          "name": "real generalized eigensolve rejects bad views before scratch and preserves outputs on budget rejection",
+          "ordinal": 4,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/resource_port_core.zig:5",
+          "name": "real generalized eigensolve accepts shared read-only inputs and an empty typed problem",
+          "ordinal": 5,
+          "kind": "named"
+        },
+        {
+          "id": "zig-decl:test/resource_port_core.zig:6",
+          "name": "real generalized eigensolve refuses scratch across a backing tail or control span",
+          "ordinal": 6,
           "kind": "named"
         }
       ],
@@ -46475,15 +46520,15 @@
     },
     "test_roots": {
       "count": 49,
-      "digest": "40a97f6a409c9c35166b56446f05601185bccaa4ec35f839d1c195671d9448a8"
+      "digest": "d4489f938df13aeca7484debf5fd7d83bf7014a6d891d4670b3a574fba525d56"
     },
     "correctness_only_roots": {
       "count": 7,
-      "digest": "613dd83412067fea281a24597058a6b076781c8bffe518163eb9b11712802695"
+      "digest": "e6b7d353f29933498dc370edcf2d752da261baad75494db68d79d33fae443080"
     },
     "zig_test_files": {
       "count": 177,
-      "digest": "d77202a5b9ae66782c58715b17252d255f4061336bf48fbacd291df180b4cafc"
+      "digest": "e3650214801eecf29284271197a3860f192a3218fba424be68c2f5437e9ada87"
     },
     "python_test_modules": {
       "count": 42,

@@ -40459,6 +40459,12 @@
       "class": "non-generated-source"
     },
     {
+      "path": "src/lapack/generalized_symmetric_eigen.zig",
+      "kind": "zig-source",
+      "class": "non-generated-source",
+      "owner": "library-source"
+    },
+    {
       "path": "src/lapack/hermitian_managed.zig",
       "kind": "zig-source",
       "owner": "library-source",
@@ -42349,7 +42355,7 @@
       "owner": "developer-tooling"
     }
   ],
-  "repository_file_classifications_digest": "736b9b3234b66abb170b3554dfb826ea2f5b1eeebd685ecaf0419c7e5f4041d0",
+  "repository_file_classifications_digest": "30be9d3eaba07a30a2f37f1c18dc0cd2dc515bc46586ff0368d9ab18e9dbfd6e",
   "derived_candidates": [
     {
       "id": "derived:docs/assets/benchmarks/current/gemm-recheck.csv",
